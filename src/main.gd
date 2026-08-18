@@ -36,6 +36,8 @@ const FLOW_STEPS := [
 var flow := RunFlow.new()
 var elapsed_since_tick := 0.0
 var battle_speed_index := 0
+var time_stop_count := 0
+var factory_change_count := 0
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 
 
@@ -105,12 +107,14 @@ func _on_main_action() -> void:
 		flow.advance()
 		_apply_phase()
 	elif flow.phase == RunFlow.Phase.BATTLE and flow.pause_for_reconfiguration():
+		time_stop_count += 1
 		factory_board.begin_edit()
 		_apply_phase()
 	elif flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		if not _factory_is_valid("変更を確定できません"):
 			return
 		factory_board.commit_edit()
+		factory_change_count += 1
 		flow.resume_battle()
 		_apply_phase()
 
@@ -210,11 +214,8 @@ func _on_battle_finished(winner: int) -> void:
 	if winner == BattleSimulation.Side.PLAYER:
 		_enter_victory()
 	else:
-		status_label.text = (
-			"TIME UP // 敵リーダーを撃破できず"
-			if battle_board.simulation.player_leader_health > 0.0
-			else "DEFEAT // 自軍リーダーが崩壊"
-		)
+		status_label.text = "DEFEAT // %s" % _defeat_reason()
+		plan_label.text = "敗因分析 // %s" % _defeat_reason()
 		debug_victory_button.text = "再挑戦"
 		debug_victory_button.visible = true
 
@@ -231,6 +232,8 @@ func _reset_stage() -> void:
 	produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	elapsed_since_tick = 0.0
 	battle_speed_index = 0
+	time_stop_count = 0
+	factory_change_count = 0
 
 
 func _apply_phase() -> void:
@@ -277,7 +280,7 @@ func _apply_phase() -> void:
 			status_label.text = "術式を選び、変更を確定するとリアルタイム戦闘へ戻ります"
 		RunFlow.Phase.VICTORY:
 			pause_button.disabled = true
-			_show_overlay("STAGE CLEAR", "敵リーダーを撃破", "戦闘に勝利しました。\n次に、このルートで得た報酬を確認します。", "OK：報酬を確認")
+			_show_overlay("STAGE CLEAR", "敵リーダーを撃破", _battle_result_summary(), "OK：報酬を確認")
 		RunFlow.Phase.REWARD:
 			pause_button.disabled = true
 			_show_overlay("REWARD", "シジル・リリック・能力などを獲得", "ランを強化する報酬を選ぶ画面です。\n現在は内容を作らず、獲得したものとして先へ進みます。", "OK：獲得して次のルートへ")
@@ -289,6 +292,31 @@ func _show_overlay(kicker: String, title: String, body: String, button_text: Str
 	phase_body.text = body
 	phase_button.text = button_text
 	phase_overlay.visible = true
+
+
+func _battle_result_summary() -> String:
+	var battle := battle_board.simulation
+	var elapsed_seconds := float(battle.tick_index) * TICK_SECONDS
+	return "戦闘時間 %02d:%02d  //  撃破 %d体\n生産: 斥候 %d  衛兵 %d  巨像 %d  //  時間停止 %d回  再構成 %d回  不一致 %d" % [
+		int(elapsed_seconds) / 60,
+		int(elapsed_seconds) % 60,
+		battle.player_kills,
+		produced_units[&"scout"],
+		produced_units[&"sentinel"],
+		produced_units[&"golem"],
+		time_stop_count,
+		factory_change_count,
+		factory_board.simulation.discarded_glyphs,
+	]
+
+
+func _defeat_reason() -> String:
+	var battle := battle_board.simulation
+	if battle.player_leader_health <= 0.0:
+		return "前線を維持できず、自軍リーダーが崩壊しました"
+	if battle.is_enemy_shield_active():
+		return "時間内に敵防壁を突破できませんでした"
+	return "防壁突破後、敵リーダーへの火力が不足しました"
 
 
 func _update_progress() -> void:

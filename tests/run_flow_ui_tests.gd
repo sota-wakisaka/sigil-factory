@@ -74,6 +74,8 @@ func _initialize() -> void:
 
 	main.debug_victory_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.VICTORY, "placeholder completion should defeat the leader")
+	_expect("生産: 斥候" in main.phase_body.text, "victory screen should summarize factory production")
+	_expect("時間停止 1回" in main.phase_body.text, "victory screen should summarize time stops")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.REWARD, "victory OK should open rewards")
 	main.phase_button.pressed.emit()
