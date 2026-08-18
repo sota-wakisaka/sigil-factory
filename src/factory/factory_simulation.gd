@@ -67,6 +67,36 @@ func remove_node(node_id: StringName) -> bool:
 	return true
 
 
+func validate_graph() -> Dictionary:
+	var errors: Array[String] = []
+	var has_source := false
+	var has_summoner := false
+	for node in nodes.values():
+		has_source = has_source or node.kind == FactoryNodeModel.NodeKind.SOURCE
+		has_summoner = has_summoner or node.kind == FactoryNodeModel.NodeKind.SUMMONER
+		for port in node.required_input_count():
+			var has_input := false
+			for line in lines.values():
+				if line.to_node_id == node.id and line.to_port == port:
+					has_input = true
+					break
+			if not has_input:
+				errors.append("missing_input:%s:%d" % [node.id, port])
+		if node.kind != FactoryNodeModel.NodeKind.SUMMONER:
+			var has_output := false
+			for line in lines.values():
+				if line.from_node_id == node.id:
+					has_output = true
+					break
+			if not has_output:
+				errors.append("missing_output:%s" % node.id)
+	if not has_source:
+		errors.append("missing_source")
+	if not has_summoner:
+		errors.append("missing_summoner")
+	return {"ok": errors.is_empty(), "errors": errors}
+
+
 func duplicate_state() -> FactorySimulation:
 	var result := FactorySimulation.new()
 	for recipe in recipes:

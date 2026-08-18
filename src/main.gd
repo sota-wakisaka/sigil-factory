@@ -94,15 +94,27 @@ func _advance_overlay() -> void:
 
 func _on_main_action() -> void:
 	if flow.phase == RunFlow.Phase.FACTORY_BUILD:
+		if not _factory_is_valid("戦闘を開始できません"):
+			return
 		flow.advance()
 		_apply_phase()
 	elif flow.phase == RunFlow.Phase.BATTLE and flow.pause_for_reconfiguration():
 		factory_board.begin_edit()
 		_apply_phase()
 	elif flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
+		if not _factory_is_valid("変更を確定できません"):
+			return
 		factory_board.commit_edit()
 		flow.resume_battle()
 		_apply_phase()
+
+
+func _factory_is_valid(prefix: String) -> bool:
+	var result := factory_board.validation_result()
+	if result["ok"]:
+		return true
+	status_label.text = "%s // %s" % [prefix, result["message"]]
+	return false
 
 
 func _select_plan(plan_id: StringName) -> void:

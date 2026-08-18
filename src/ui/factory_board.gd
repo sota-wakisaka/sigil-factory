@@ -147,6 +147,12 @@ func remove_selected_node() -> bool:
 	return remove_factory_node(selected_node_id)
 
 
+func validation_result() -> Dictionary:
+	var result := _display_simulation().validate_graph()
+	result["message"] = _validation_message(result["errors"])
+	return result
+
+
 func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName, to_port: int) -> Dictionary:
 	if not interaction_enabled:
 		return {"ok": false, "error": "locked"}
@@ -461,6 +467,21 @@ func _connection_result_text(result: Dictionary) -> String:
 			return "接続できません: 同じ設備には接続できません"
 		_:
 			return "接続できません: %s" % result["error"]
+
+
+func _validation_message(errors: Array) -> String:
+	if errors.is_empty():
+		return "工場は稼働可能です"
+	var error := String(errors[0])
+	if error == "missing_source":
+		return "素材源がありません"
+	if error == "missing_summoner":
+		return "召喚器がありません"
+	if error.begins_with("missing_input:"):
+		return "入力が未接続の設備があります"
+	if error.begins_with("missing_output:"):
+		return "出力が未接続の設備があります"
+	return "工場の配線を確認してください"
 
 
 func _panel_style() -> StyleBoxFlat:

@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_factory_rejects_cycles()
 	_test_factory_disconnects_lines()
 	_test_factory_removes_node_and_connected_lines()
+	_test_factory_graph_validation_reports_dangling_nodes()
 	_test_mvp_plans_produce_expected_units()
 	_test_battle_units_fight_and_die()
 	_test_enemy_shield_takes_damage_and_opens()
@@ -193,6 +194,16 @@ func _test_factory_removes_node_and_connected_lines() -> void:
 	_expect(not simulation.nodes.has(&"rotator"), "removed factory node should leave the graph")
 	for line in simulation.lines.values():
 		_expect(line.from_node_id != &"rotator" and line.to_node_id != &"rotator", "removing a node should remove its lines")
+
+
+func _test_factory_graph_validation_reports_dangling_nodes() -> void:
+	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
+	_expect(simulation.validate_graph()["ok"], "complete preset factory should validate")
+	simulation.add_node(FactoryNodeModel.new(&"dangling", FactoryNodeModel.NodeKind.ROTATOR))
+	var result := simulation.validate_graph()
+	_expect(not result["ok"], "dangling factory equipment should fail validation")
+	_expect(result["errors"].has("missing_input:dangling:0"), "validation should identify missing input")
+	_expect(result["errors"].has("missing_output:dangling"), "validation should identify missing output")
 
 
 func _test_mvp_plans_produce_expected_units() -> void:

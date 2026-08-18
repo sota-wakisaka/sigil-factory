@@ -25,6 +25,9 @@ func _initialize() -> void:
 	var node_count_before_palette: int = main.factory_board.simulation.nodes.size()
 	main.get_node("FactoryPalette/RingButton").pressed.emit()
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette + 1, "palette should add factory equipment")
+	main.pause_button.pressed.emit()
+	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "invalid factory should not start battle")
+	_expect("戦闘を開始できません" in main.status_label.text, "invalid factory should explain why battle cannot start")
 	main.get_node("FactoryPalette/DeleteButton").pressed.emit()
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette, "delete button should remove selected equipment")
 
