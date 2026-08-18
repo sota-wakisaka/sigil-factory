@@ -7,6 +7,7 @@ var side: int
 var position: float
 var health: float
 var attack_cooldown := 0
+var age_ticks := 0
 
 
 func _init(
@@ -24,4 +25,3 @@ func _init(
 
 func is_alive() -> bool:
 	return health > 0.0
-

@@ -26,23 +26,23 @@ static func build_battle() -> BattleSimulation:
 
 static func unit_specs() -> Array[UnitSpecModel]:
 	return [
-		UnitSpecModel.new(&"scout", 34.0, 7.0, 4, 7.5, 28.0),
-		UnitSpecModel.new(&"sentinel", 105.0, 9.0, 5, 4.5, 32.0),
-		UnitSpecModel.new(&"golem", 250.0, 34.0, 7, 3.0, 42.0),
-		UnitSpecModel.new(&"raider", 40.0, 7.0, 5, 6.0, 27.0),
-		UnitSpecModel.new(&"swarm", 22.0, 4.0, 3, 8.0, 22.0),
-		UnitSpecModel.new(&"brute", 165.0, 22.0, 7, 3.2, 38.0),
+		UnitSpecModel.new(&"scout", 36.0, 8.0, 4, 7.5, 30.0, 0.0, 1, &"", 1.0, 480),
+		UnitSpecModel.new(&"sentinel", 90.0, 9.0, 5, 4.5, 65.0, 2.0, 3, &"swarm", 1.8, 720),
+		UnitSpecModel.new(&"golem", 260.0, 38.0, 7, 3.0, 44.0, 6.0, 1, &"brute", 1.8, 960),
+		UnitSpecModel.new(&"raider", 55.0, 8.0, 5, 6.0, 28.0, 1.0, 1, &"", 1.0, 600),
+		UnitSpecModel.new(&"swarm", 24.0, 7.0, 3, 8.0, 24.0, 0.0, 1, &"golem", 5.0, 520),
+		UnitSpecModel.new(&"brute", 190.0, 24.0, 7, 3.2, 40.0, 5.0, 1, &"", 1.0, 900),
 	]
 
 
 static func threat_schedule() -> Array[ThreatEventModel]:
 	var events: Array[ThreatEventModel] = []
 	# One battle tick represents 0.2 seconds. The schedule spans ten minutes.
-	for tick in range(30, 900, 45):
+	for tick in range(30, 900, 42):
 		events.append(ThreatEventModel.new(tick, &"raider", 1, "RAIDER PATROL"))
-	for tick in range(900, 1800, 36):
-		events.append(ThreatEventModel.new(tick, &"swarm", 2, "SWARM SURGE"))
-	for tick in range(1800, 2700, 54):
+	for tick in range(900, 1800, 30):
+		events.append(ThreatEventModel.new(tick, &"swarm", 3, "SWARM SURGE"))
+	for tick in range(1800, 2700, 45):
 		events.append(ThreatEventModel.new(tick, &"brute", 1, "ARMORED ADVANCE"))
 	for tick in range(2700, 3001, 30):
 		events.append(ThreatEventModel.new(tick, &"brute", 1, "FINAL ASSAULT"))
@@ -126,6 +126,16 @@ static func plan_name(plan_id: StringName) -> String:
 			return "OPEN-RING SCOUT"
 
 
+static func plan_description(plan_id: StringName) -> String:
+	match plan_id:
+		PLAN_SENTINEL:
+			return "対群体 // 3体同時攻撃・中速"
+		PLAN_GOLEM:
+			return "対装甲 // 高耐久・低速・長工程"
+		_:
+			return "初動 // 高速生産・短寿命"
+
+
 static func node_name(kind: FactoryNodeModel.NodeKind) -> String:
 	match kind:
 		FactoryNodeModel.NodeKind.SOURCE:
@@ -144,13 +154,13 @@ static func node_name(kind: FactoryNodeModel.NodeKind) -> String:
 
 
 static func _build_scout_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_source(&"ring_source", &"ring", 3))
+	simulation.add_node(_source(&"ring_source", &"ring", 18))
 	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_1", &"ring_source", &"summoner", 0, 3))
 
 
 static func _build_sentinel_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_source(&"ring_source", &"ring", 3))
+	simulation.add_node(_source(&"ring_source", &"ring", 22))
 	simulation.add_node(FactoryNodeModel.new(
 		&"rotator",
 		FactoryNodeModel.NodeKind.ROTATOR,
@@ -168,8 +178,8 @@ static func _build_sentinel_factory(simulation: FactorySimulation) -> void:
 
 
 static func _build_golem_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_source(&"ring_source", &"ring", 4))
-	simulation.add_node(_source(&"spike_source", &"spike", 6))
+	simulation.add_node(_source(&"ring_source", &"ring", 36))
+	simulation.add_node(_source(&"spike_source", &"spike", 54))
 	simulation.add_node(FactoryNodeModel.new(
 		&"combiner",
 		FactoryNodeModel.NodeKind.COMBINER,

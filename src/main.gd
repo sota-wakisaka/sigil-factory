@@ -16,6 +16,7 @@ const FORECAST_TICKS := 300
 @onready var status_label: Label = $StatusLabel
 @onready var pause_button: Button = $Toolbar/PauseButton
 @onready var cancel_button: Button = $Toolbar/CancelButton
+@onready var restart_button: Button = $RestartButton
 
 var elapsed_since_tick := 0.0
 var paused := false
@@ -38,6 +39,7 @@ func _ready() -> void:
 	)
 	pause_button.pressed.connect(_toggle_pause)
 	cancel_button.pressed.connect(_cancel_edit)
+	restart_button.pressed.connect(_restart_battle)
 	factory_board.summon_produced.connect(_on_summon_produced)
 	battle_board.battle_finished.connect(_on_battle_finished)
 	_select_plan(MvpContent.PLAN_SCOUT)
@@ -73,10 +75,16 @@ func _draw() -> void:
 func _select_plan(plan_id: StringName) -> void:
 	if paused:
 		factory_board.preview_plan(plan_id)
-		plan_label.text = "仮術式: %s // 未確定" % MvpContent.plan_name(plan_id)
+		plan_label.text = "仮術式: %s // %s // 未確定" % [
+			MvpContent.plan_name(plan_id),
+			MvpContent.plan_description(plan_id),
+		]
 	else:
 		factory_board.configure(plan_id)
-		plan_label.text = "稼働術式: %s" % MvpContent.plan_name(plan_id)
+		plan_label.text = "稼働術式: %s // %s" % [
+			MvpContent.plan_name(plan_id),
+			MvpContent.plan_description(plan_id),
+		]
 
 
 func _toggle_pause() -> void:
@@ -105,7 +113,10 @@ func _resume_after_edit() -> void:
 	_set_plan_buttons_enabled(false)
 	cancel_button.disabled = true
 	pause_button.text = "時間停止"
-	plan_label.text = "稼働術式: %s" % MvpContent.plan_name(factory_board.plan_id)
+	plan_label.text = "稼働術式: %s // %s" % [
+		MvpContent.plan_name(factory_board.plan_id),
+		MvpContent.plan_description(factory_board.plan_id),
+	]
 
 
 func _set_plan_buttons_enabled(enabled: bool) -> void:
@@ -128,6 +139,27 @@ func _on_battle_finished(winner: int) -> void:
 		status_label.text = "VICTORY // 敵リーダーを撃破"
 	else:
 		status_label.text = "DEFEAT // 自軍リーダーが崩壊"
+
+
+func _restart_battle() -> void:
+	battle_board.reset_battle()
+	factory_board.configure(MvpContent.PLAN_SCOUT)
+	produced_units = {
+		&"scout": 0,
+		&"sentinel": 0,
+		&"golem": 0,
+	}
+	elapsed_since_tick = 0.0
+	paused = false
+	pause_button.disabled = false
+	pause_button.text = "時間停止"
+	cancel_button.disabled = true
+	_set_plan_buttons_enabled(false)
+	plan_label.text = "稼働術式: %s // %s" % [
+		MvpContent.plan_name(factory_board.plan_id),
+		MvpContent.plan_description(factory_board.plan_id),
+	]
+	_refresh_status()
 
 
 func _refresh_status() -> void:

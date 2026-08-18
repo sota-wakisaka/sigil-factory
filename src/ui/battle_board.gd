@@ -61,6 +61,21 @@ func _draw() -> void:
 		return
 	var lane_y := size.y * 0.55
 	draw_line(Vector2(35, lane_y), Vector2(size.x - 35, lane_y), LANE_COLOR, 5.0, true)
+	if simulation.tick_index < simulation.enemy_leader_vulnerable_tick:
+		var shield_x := remap(
+			BattleSimulation.ENEMY_SHIELD_POSITION,
+			0.0,
+			1000.0,
+			35.0,
+			size.x - 35.0
+		)
+		draw_line(
+			Vector2(shield_x, lane_y - 72),
+			Vector2(shield_x, lane_y + 72),
+			Color(0.82, 0.36, 0.92, 0.8),
+			3.0,
+			true
+		)
 	_draw_leader(Vector2(35, lane_y), true)
 	_draw_leader(Vector2(size.x - 35, lane_y), false)
 	for unit in simulation.units:
@@ -74,7 +89,11 @@ func _draw_leader(center: Vector2, is_player: bool) -> void:
 		if is_player
 		else simulation.enemy_leader_health
 	)
-	var maximum := 600.0 if is_player else 800.0
+	var maximum := (
+		BattleSimulation.PLAYER_LEADER_MAX_HEALTH
+		if is_player
+		else BattleSimulation.ENEMY_LEADER_MAX_HEALTH
+	)
 	draw_circle(center, 18.0, color.darkened(0.35))
 	draw_arc(center, 20.0, 0.0, TAU * clampf(health / maximum, 0.0, 1.0), 48, color, 4.0)
 

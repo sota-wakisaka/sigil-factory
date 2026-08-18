@@ -176,7 +176,7 @@ func _test_mvp_plans_produce_expected_units() -> void:
 	}
 	for plan_id in expectations:
 		var simulation := MvpContent.build_factory(plan_id)
-		for _tick in 48:
+		for _tick in 160:
 			simulation.tick()
 		var expected_unit: StringName = expectations[plan_id]
 		var produced_expected_unit := false

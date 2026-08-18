@@ -25,6 +25,14 @@ theme_override_font_sizes/font_size = 26
 text = "SIGIL FACTORY // INTEGRATION SLICE"
 horizontal_alignment = 1
 
+[node name="RestartButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1120.0
+offset_top = 18.0
+offset_right = 1238.0
+offset_bottom = 52.0
+text = "再挑戦"
+
 [node name="PlanLabel" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = 10
