@@ -95,6 +95,18 @@ func _initialize() -> void:
 	var upgraded_source: FactoryNodeModel = main.factory_board.simulation.nodes[&"ring_source"]
 	_expect(upgraded_source.config["interval_ticks"] < 18, "selected reward should modify the next route factory")
 
+	main.phase_button.pressed.emit()
+	main.phase_button.pressed.emit()
+	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "next route should reach factory build again")
+	main.get_node("Toolbar/ScoutButton").pressed.emit()
+	main.pause_button.pressed.emit()
+	main.battle_board.simulation.tick_index = main.battle_board.simulation.battle_duration_ticks - 1
+	main.battle_board.advance_tick()
+	_expect("DEFEAT" in main.status_label.text, "time limit should display defeat analysis")
+	_expect(main.debug_victory_button.text == "再挑戦", "defeat should turn the temporary action into retry")
+	main.debug_victory_button.pressed.emit()
+	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "retry should return to factory build")
+
 	main.queue_free()
 	if failures == 0:
 		print("Run flow UI test passed.")
