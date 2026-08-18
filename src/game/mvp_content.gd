@@ -39,14 +39,14 @@ static func threat_schedule() -> Array[ThreatEventModel]:
 	var events: Array[ThreatEventModel] = []
 	# One battle tick represents 0.2 seconds. A standard encounter lasts three minutes.
 	for tick in range(100, 300, 30):
-		events.append(ThreatEventModel.new(tick, &"raider", 1, "RAIDER PATROL"))
+		events.append(ThreatEventModel.new(tick, &"raider", 1, "襲撃兵"))
 	for tick in range(300, 570, 30):
-		events.append(ThreatEventModel.new(tick, &"swarm", 4, "SWARM SURGE"))
+		events.append(ThreatEventModel.new(tick, &"swarm", 4, "群体兵"))
 	for tick in range(570, 780, 42):
-		events.append(ThreatEventModel.new(tick, &"brute", 1, "ARMORED ADVANCE"))
+		events.append(ThreatEventModel.new(tick, &"brute", 1, "装甲兵"))
 	for tick in range(780, 901, 30):
-		events.append(ThreatEventModel.new(tick, &"brute", 1, "FINAL ASSAULT"))
-		events.append(ThreatEventModel.new(tick + 8, &"swarm", 5, "FINAL ASSAULT"))
+		events.append(ThreatEventModel.new(tick, &"brute", 1, "最終装甲兵"))
+		events.append(ThreatEventModel.new(tick + 8, &"swarm", 5, "最終群体兵"))
 	return events
 
 

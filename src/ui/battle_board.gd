@@ -48,11 +48,29 @@ func forecast_text(horizon_ticks: int, tick_seconds: float) -> String:
 	if threats.is_empty():
 		return "予告: 敵影なし"
 	var entries := PackedStringArray()
+	var recommendations := PackedStringArray()
 	for index in mini(threats.size(), 3):
 		var threat: ThreatEventModel = threats[index]
 		var seconds := maxf(float(threat.tick - simulation.tick_index) * tick_seconds, 0.0)
 		entries.append("%s ×%d  %.0fs" % [threat.label, threat.count, seconds])
-	return "予告: " + "  |  ".join(entries)
+		var recommendation := _counter_for(threat.unit_id)
+		if recommendation != "" and not recommendations.has(recommendation):
+			recommendations.append(recommendation)
+	var advice := ""
+	if not recommendations.is_empty():
+		advice = "  //  推奨: " + "・".join(recommendations)
+	return "敵予告: " + "  |  ".join(entries) + advice
+
+
+func _counter_for(enemy_id: StringName) -> String:
+	match enemy_id:
+		&"raider":
+			return "斥候"
+		&"swarm":
+			return "衛兵"
+		&"brute":
+			return "ゴーレム"
+	return ""
 
 
 func _draw() -> void:
