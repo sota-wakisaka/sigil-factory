@@ -11,7 +11,7 @@ The current design document is available at [`docs/GAME_DESIGN.md`](docs/GAME_DE
 - Three production plans: fast scouts, anti-swarm sentinels, and anti-armor golems
 - Transactional factory changes made during time stop
 - One-dimensional automatic battle with unit roles, lifetimes, and leader objectives
-- 60-second enemy threat forecast across a ten-minute encounter
+- 24-second enemy threat forecast across a three-minute standard encounter
 - Victory, reward, next-route, defeat, and instant retry flow
 
 The route selection, stage information, and reward screens are intentionally
@@ -52,7 +52,7 @@ Run the domain tests with the Godot console executable:
   --script "res://tests/run_tests.gd"
 ```
 
-Run the ten-minute balance simulation with:
+Run the three-minute balance simulation with:
 
 ```powershell
 & "C:\Program Files\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe" `

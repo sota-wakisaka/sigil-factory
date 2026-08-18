@@ -8,7 +8,7 @@ const BACKGROUND_COLOR := Color("070a10")
 const GRID_COLOR := Color(0.18, 0.26, 0.36, 0.2)
 const GRID_SPACING := 32
 const TICK_SECONDS := 0.2
-const FORECAST_TICKS := 300
+const FORECAST_TICKS := 120
 const BATTLE_SPEEDS := [1.0, 2.0, 4.0]
 const FLOW_STEPS := [
 	"ルート選択", "ステージ情報", "工場構築", "リアルタイム戦闘",
@@ -187,7 +187,7 @@ func _apply_phase() -> void:
 		RunFlow.Phase.ROUTE_SELECTION:
 			_show_overlay("RUN %02d" % flow.route_number, "ルートを選択", "進みたいルートを選択します。\n現在は内容を作らず、進行だけを確認する仮画面です。", "OK：このルートを選択")
 		RunFlow.Phase.STAGE_INFO:
-			_show_overlay("STAGE PREVIEW", "ステージ情報を確認", "敵の種類、地形、報酬候補などを確認する画面です。\n現在は情報を置かず、確認操作だけを用意しています。", "OK：工場構築へ")
+			_show_overlay("STAGE PREVIEW", "ステージ情報を確認", "通常戦闘 // 制限時間 3:00\n敵の種類、地形、報酬候補は今後この画面に表示します。", "OK：工場構築へ")
 		RunFlow.Phase.FACTORY_BUILD:
 			_set_plan_buttons_enabled(true)
 			pause_button.disabled = false
@@ -250,13 +250,16 @@ func _set_plan_buttons_enabled(enabled: bool) -> void:
 
 func _refresh_status() -> void:
 	var battle := battle_board.simulation
-	var elapsed_seconds := float(battle.tick_index) * TICK_SECONDS
+	var remaining_seconds := maxf(
+		float(battle.battle_duration_ticks - battle.tick_index) * TICK_SECONDS,
+		0.0
+	)
 	threat_label.text = battle_board.forecast_text(FORECAST_TICKS, TICK_SECONDS)
 	if battle.is_finished():
 		return
 	var enemy_objective := "敵防壁HP %.0f" % battle.enemy_shield_health if battle.is_enemy_shield_active() else "敵リーダーHP %.0f" % battle.enemy_leader_health
-	status_label.text = "%02d:%02d  ×%d  |  自軍リーダーHP %.0f  %s  |  S %d  G %d  C %d" % [
-		int(elapsed_seconds) / 60, int(elapsed_seconds) % 60,
+	status_label.text = "残り %02d:%02d  ×%d  |  自軍リーダーHP %.0f  %s  |  S %d  G %d  C %d" % [
+		int(remaining_seconds) / 60, int(remaining_seconds) % 60,
 		int(current_battle_speed()),
 		battle.player_leader_health, enemy_objective,
 		produced_units[&"scout"], produced_units[&"sentinel"], produced_units[&"golem"],

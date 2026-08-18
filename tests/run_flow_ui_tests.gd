@@ -16,6 +16,7 @@ func _initialize() -> void:
 
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.STAGE_INFO, "route OK should show stage information")
+	_expect("制限時間 3:00" in main.phase_body.text, "stage information should disclose the battle duration")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "stage OK should open factory build")
 	_expect(not main.phase_overlay.visible, "factory build should expose the workspace")
@@ -23,6 +24,7 @@ func _initialize() -> void:
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "build confirmation should start battle")
 	_expect("敵防壁HP" in main.status_label.text, "battle status should identify the active enemy shield")
+	_expect("残り 03:00" in main.status_label.text, "battle status should show the remaining time")
 	_expect(not main.speed_button.disabled, "battle should enable speed controls")
 	main.speed_button.pressed.emit()
 	_expect(main.current_battle_speed() == 2.0, "speed button should switch battle to double speed")
