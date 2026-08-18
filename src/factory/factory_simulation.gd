@@ -53,6 +53,20 @@ func disconnect_line(line_id: StringName) -> bool:
 	return true
 
 
+func remove_node(node_id: StringName) -> bool:
+	if not nodes.has(node_id):
+		return false
+	var connected_line_ids: Array[StringName] = []
+	for line_id in lines:
+		var line: FactoryLineModel = lines[line_id]
+		if line.from_node_id == node_id or line.to_node_id == node_id:
+			connected_line_ids.append(line_id)
+	for line_id in connected_line_ids:
+		lines.erase(line_id)
+	nodes.erase(node_id)
+	return true
+
+
 func duplicate_state() -> FactorySimulation:
 	var result := FactorySimulation.new()
 	for recipe in recipes:

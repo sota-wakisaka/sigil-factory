@@ -32,6 +32,7 @@ var drag_offset := Vector2.ZERO
 var connecting_from_node_id: StringName = &""
 var connection_cursor := Vector2.ZERO
 var connection_serial := 1
+var node_serial := 1
 var connection_message := ""
 
 
@@ -78,6 +79,72 @@ func move_node(node_id: StringName, local_position: Vector2) -> bool:
 
 func node_local_position(node_id: StringName) -> Vector2:
 	return _scaled_position(_display_positions().get(node_id, Vector2.ZERO))
+
+
+func add_node_from_palette(template_id: StringName) -> StringName:
+	if not interaction_enabled:
+		return &""
+	var kind := FactoryNodeModel.NodeKind.SOURCE
+	var config := {}
+	var prefix := "node"
+	match template_id:
+		&"ring_source":
+			prefix = "ring_source"
+			config = {"primitive_id": "ring", "interval_ticks": 18}
+		&"spike_source":
+			prefix = "spike_source"
+			config = {"primitive_id": "spike", "interval_ticks": 54}
+		&"rotator":
+			prefix = "rotator"
+			kind = FactoryNodeModel.NodeKind.ROTATOR
+			config = {"steps": 1, "processing_ticks": 2}
+		&"colorizer":
+			prefix = "colorizer"
+			kind = FactoryNodeModel.NodeKind.COLORIZER
+			config = {"color_id": "blue", "processing_ticks": 2}
+		&"combiner":
+			prefix = "combiner"
+			kind = FactoryNodeModel.NodeKind.COMBINER
+			config = {"processing_ticks": 3}
+		&"summoner":
+			prefix = "summoner"
+			kind = FactoryNodeModel.NodeKind.SUMMONER
+		_:
+			return &""
+	var display_simulation := _display_simulation()
+	var node_id := StringName("%s_user_%d" % [prefix, node_serial])
+	while display_simulation.nodes.has(node_id):
+		node_serial += 1
+		node_id = StringName("%s_user_%d" % [prefix, node_serial])
+	node_serial += 1
+	display_simulation.add_node(FactoryNodeModel.new(node_id, kind, config))
+	var column := posmod(node_serial - 2, 3)
+	var row := posmod((node_serial - 2) / 3, 2)
+	_display_positions()[node_id] = Vector2(250 + column * 150, 135 + row * 125)
+	selected_node_id = node_id
+	connection_message = "%sを追加しました" % MvpContent.node_name(kind)
+	queue_redraw()
+	return node_id
+
+
+func remove_factory_node(node_id: StringName) -> bool:
+	if not interaction_enabled or node_id == &"":
+		return false
+	var display_simulation := _display_simulation()
+	if not display_simulation.remove_node(node_id):
+		return false
+	_display_positions().erase(node_id)
+	if selected_node_id == node_id:
+		selected_node_id = &""
+	if connecting_from_node_id == node_id:
+		connecting_from_node_id = &""
+	connection_message = "設備を削除しました"
+	queue_redraw()
+	return true
+
+
+func remove_selected_node() -> bool:
+	return remove_factory_node(selected_node_id)
 
 
 func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName, to_port: int) -> Dictionary:

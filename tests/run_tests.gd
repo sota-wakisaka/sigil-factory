@@ -25,6 +25,7 @@ func _initialize() -> void:
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
 	_test_factory_disconnects_lines()
+	_test_factory_removes_node_and_connected_lines()
 	_test_mvp_plans_produce_expected_units()
 	_test_battle_units_fight_and_die()
 	_test_enemy_shield_takes_damage_and_opens()
@@ -184,6 +185,14 @@ func _test_factory_disconnects_lines() -> void:
 	_expect(simulation.disconnect_line(&"line"), "existing factory line should disconnect")
 	_expect(simulation.lines.is_empty(), "disconnected factory line should be removed")
 	_expect(not simulation.disconnect_line(&"missing"), "missing factory line should not disconnect")
+
+
+func _test_factory_removes_node_and_connected_lines() -> void:
+	var simulation := MvpContent.build_factory(MvpContent.PLAN_SENTINEL)
+	_expect(simulation.remove_node(&"rotator"), "existing factory node should be removable")
+	_expect(not simulation.nodes.has(&"rotator"), "removed factory node should leave the graph")
+	for line in simulation.lines.values():
+		_expect(line.from_node_id != &"rotator" and line.to_node_id != &"rotator", "removing a node should remove its lines")
 
 
 func _test_mvp_plans_produce_expected_units() -> void:

@@ -41,6 +41,13 @@ func _ready() -> void:
 	$Toolbar/ScoutButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SCOUT))
 	$Toolbar/SentinelButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SENTINEL))
 	$Toolbar/GolemButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_GOLEM))
+	$FactoryPalette/RingButton.pressed.connect(func() -> void: _add_factory_node(&"ring_source"))
+	$FactoryPalette/SpikeButton.pressed.connect(func() -> void: _add_factory_node(&"spike_source"))
+	$FactoryPalette/RotateButton.pressed.connect(func() -> void: _add_factory_node(&"rotator"))
+	$FactoryPalette/ColorButton.pressed.connect(func() -> void: _add_factory_node(&"colorizer"))
+	$FactoryPalette/CombineButton.pressed.connect(func() -> void: _add_factory_node(&"combiner"))
+	$FactoryPalette/SummonButton.pressed.connect(func() -> void: _add_factory_node(&"summoner"))
+	$FactoryPalette/DeleteButton.pressed.connect(_delete_factory_node)
 	pause_button.pressed.connect(_on_main_action)
 	speed_button.pressed.connect(_cycle_battle_speed)
 	cancel_button.pressed.connect(_cancel_edit)
@@ -106,6 +113,16 @@ func _select_plan(plan_id: StringName) -> void:
 		factory_board.configure(plan_id)
 		var state := "構築中" if flow.phase == RunFlow.Phase.FACTORY_BUILD else "稼働術式"
 		plan_label.text = "%s: %s // %s" % [state, MvpContent.plan_name(plan_id), MvpContent.plan_description(plan_id)]
+
+
+func _add_factory_node(template_id: StringName) -> void:
+	if factory_board.add_node_from_palette(template_id) != &"":
+		plan_label.text = "カスタム工場 // 設備を配置し、ポート同士を接続してください"
+
+
+func _delete_factory_node() -> void:
+	if factory_board.remove_selected_node():
+		plan_label.text = "カスタム工場 // 選択した設備を削除しました"
 
 
 func _cancel_edit() -> void:
@@ -183,6 +200,7 @@ func _apply_phase() -> void:
 	_update_speed_button()
 	cancel_button.disabled = true
 	_set_plan_buttons_enabled(false)
+	_set_factory_palette_enabled(false)
 	factory_board.set_interaction_enabled(false)
 	match flow.phase:
 		RunFlow.Phase.ROUTE_SELECTION:
@@ -191,6 +209,7 @@ func _apply_phase() -> void:
 			_show_overlay("STAGE PREVIEW", "ステージ情報を確認", "通常戦闘 // 制限時間 3:00\n敵の種類、地形、報酬候補は今後この画面に表示します。", "OK：工場構築へ")
 		RunFlow.Phase.FACTORY_BUILD:
 			_set_plan_buttons_enabled(true)
+			_set_factory_palette_enabled(true)
 			factory_board.set_interaction_enabled(true)
 			pause_button.disabled = false
 			pause_button.text = "構築完了・戦闘開始"
@@ -207,6 +226,7 @@ func _apply_phase() -> void:
 			_refresh_status()
 		RunFlow.Phase.FACTORY_RECONFIGURE:
 			_set_plan_buttons_enabled(true)
+			_set_factory_palette_enabled(true)
 			factory_board.set_interaction_enabled(true)
 			pause_button.disabled = false
 			pause_button.text = "変更を確定・戦闘再開"
@@ -249,6 +269,11 @@ func _set_plan_buttons_enabled(enabled: bool) -> void:
 	$Toolbar/ScoutButton.disabled = not enabled
 	$Toolbar/SentinelButton.disabled = not enabled
 	$Toolbar/GolemButton.disabled = not enabled
+
+
+func _set_factory_palette_enabled(enabled: bool) -> void:
+	for button in $FactoryPalette.get_children():
+		button.disabled = not enabled
 
 
 func _refresh_status() -> void:

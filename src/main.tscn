@@ -118,6 +118,50 @@ text = "00:00"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="FactoryPalette" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 566.0
+offset_right = 610.0
+offset_bottom = 604.0
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="RingButton" type="Button" parent="FactoryPalette"]
+custom_minimum_size = Vector2(74, 38)
+layout_mode = 2
+text = "環素材"
+
+[node name="SpikeButton" type="Button" parent="FactoryPalette"]
+custom_minimum_size = Vector2(74, 38)
+layout_mode = 2
+text = "棘素材"
+
+[node name="RotateButton" type="Button" parent="FactoryPalette"]
+custom_minimum_size = Vector2(74, 38)
+layout_mode = 2
+text = "回転"
+
+[node name="ColorButton" type="Button" parent="FactoryPalette"]
+custom_minimum_size = Vector2(74, 38)
+layout_mode = 2
+text = "着色"
+
+[node name="CombineButton" type="Button" parent="FactoryPalette"]
+custom_minimum_size = Vector2(74, 38)
+layout_mode = 2
+text = "合成"
+
+[node name="SummonButton" type="Button" parent="FactoryPalette"]
+custom_minimum_size = Vector2(74, 38)
+layout_mode = 2
+text = "召喚"
+
+[node name="DeleteButton" type="Button" parent="FactoryPalette"]
+custom_minimum_size = Vector2(74, 38)
+layout_mode = 2
+text = "削除"
+
 [node name="Toolbar" type="HBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 12
