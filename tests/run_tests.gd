@@ -12,6 +12,7 @@ const UnitSpecModel := preload("res://src/battle/unit_spec.gd")
 const ThreatEventModel := preload("res://src/battle/threat_event.gd")
 const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const FactoryBoard := preload("res://src/ui/factory_board.gd")
+const RunFlow := preload("res://src/game/run_flow.gd")
 
 var failures := 0
 
@@ -27,6 +28,7 @@ func _initialize() -> void:
 	_test_battle_units_fight_and_die()
 	_test_threat_forecast_respects_horizon()
 	_test_factory_edit_is_transactional()
+	_test_run_flow_covers_one_route()
 
 	if failures == 0:
 		print("All domain and factory tests passed.")
@@ -229,6 +231,26 @@ func _test_factory_edit_is_transactional() -> void:
 	_expect(board.plan_id == MvpContent.PLAN_GOLEM, "commit should apply pending plan")
 	_expect(board.simulation != original_simulation, "commit should replace factory atomically")
 	board.free()
+
+
+func _test_run_flow_covers_one_route() -> void:
+	var flow := RunFlow.new()
+	_expect(flow.phase == RunFlow.Phase.ROUTE_SELECTION, "run should start at route selection")
+	_expect(flow.advance(), "route selection should advance")
+	_expect(flow.phase == RunFlow.Phase.STAGE_INFO, "route should lead to stage information")
+	flow.advance()
+	_expect(flow.phase == RunFlow.Phase.FACTORY_BUILD, "stage information should lead to factory build")
+	flow.advance()
+	_expect(flow.phase == RunFlow.Phase.BATTLE, "factory build should start battle")
+	_expect(flow.pause_for_reconfiguration(), "battle should allow reconfiguration")
+	_expect(flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "pause should enter reconfiguration")
+	_expect(flow.resume_battle(), "reconfiguration should resume battle")
+	_expect(flow.mark_victory(), "battle should accept victory")
+	flow.advance()
+	_expect(flow.phase == RunFlow.Phase.REWARD, "victory should lead to reward")
+	flow.advance()
+	_expect(flow.phase == RunFlow.Phase.ROUTE_SELECTION, "reward should lead to the next route")
+	_expect(flow.route_number == 2, "finishing a route should increment its number")
 
 
 func _expect(condition: bool, message: String) -> void:
