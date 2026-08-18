@@ -16,6 +16,7 @@ const SELECTED_COLOR := Color(1.0, 0.78, 0.3, 1.0)
 const NODE_HALF_SIZE := Vector2(48, 30)
 const REFERENCE_SIZE := Vector2(820, 395)
 const PORT_RADIUS := 7.0
+const PRODUCTION_PREVIEW_TICKS := 160
 
 var plan_id: StringName = MvpContent.PLAN_SCOUT
 var simulation: FactorySimulation
@@ -35,6 +36,7 @@ var connection_serial := 1
 var node_serial := 1
 var connection_message := ""
 var undo_history: Array[Dictionary] = []
+var cached_production_preview := ""
 
 
 func _ready() -> void:
@@ -53,6 +55,7 @@ func configure(next_plan_id: StringName) -> void:
 	connecting_from_node_id = &""
 	connection_message = ""
 	undo_history.clear()
+	_refresh_production_preview()
 	queue_redraw()
 
 
@@ -126,6 +129,7 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 	_display_positions()[node_id] = Vector2(250 + column * 150, 135 + row * 125)
 	selected_node_id = node_id
 	connection_message = "%sを追加しました" % MvpContent.node_name(kind)
+	_refresh_production_preview()
 	queue_redraw()
 	return node_id
 
@@ -144,6 +148,7 @@ func remove_factory_node(node_id: StringName) -> bool:
 	if connecting_from_node_id == node_id:
 		connecting_from_node_id = &""
 	connection_message = "設備を削除しました"
+	_refresh_production_preview()
 	queue_redraw()
 	return true
 
@@ -165,6 +170,7 @@ func undo() -> bool:
 	selected_node_id = &""
 	connecting_from_node_id = &""
 	connection_message = "元に戻しました"
+	_refresh_production_preview()
 	queue_redraw()
 	return true
 
@@ -173,6 +179,29 @@ func validation_result() -> Dictionary:
 	var result := _display_simulation().validate_graph()
 	result["message"] = _validation_message(result["errors"])
 	return result
+
+
+func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
+	var counts := {&"scout": 0, &"sentinel": 0, &"golem": 0}
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return {"ok": false, "counts": counts, "discarded": 0}
+	var validation := display_simulation.validate_graph()
+	if not validation["ok"]:
+		return {"ok": false, "counts": counts, "discarded": 0}
+	var preview := display_simulation.duplicate_state()
+	var event_start := preview.summon_events.size()
+	var discarded_start := preview.discarded_glyphs
+	for _tick in maxi(ticks, 0):
+		preview.tick()
+	for event_index in range(event_start, preview.summon_events.size()):
+		var unit_id: StringName = preview.summon_events[event_index]["unit_id"]
+		counts[unit_id] = int(counts.get(unit_id, 0)) + 1
+	return {
+		"ok": true,
+		"counts": counts,
+		"discarded": preview.discarded_glyphs - discarded_start,
+	}
 
 
 func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName, to_port: int) -> Dictionary:
@@ -198,6 +227,7 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 	if not result["ok"]:
 		undo_history.pop_back()
 	connection_message = _connection_result_text(result)
+	_refresh_production_preview()
 	queue_redraw()
 	return result
 
@@ -211,6 +241,7 @@ func disconnect_input(to_node_id: StringName, to_port: int) -> bool:
 			_push_undo_snapshot()
 			display_simulation.disconnect_line(line.id)
 			connection_message = "接続を解除しました"
+			_refresh_production_preview()
 			queue_redraw()
 			return true
 	return false
@@ -266,6 +297,7 @@ func begin_edit() -> void:
 	selected_node_id = &""
 	connecting_from_node_id = &""
 	undo_history.clear()
+	_refresh_production_preview()
 	queue_redraw()
 
 
@@ -276,6 +308,7 @@ func preview_plan(next_plan_id: StringName) -> void:
 	preview_simulation = MvpContent.build_factory(pending_plan_id)
 	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
 	undo_history.clear()
+	_refresh_production_preview()
 	queue_redraw()
 
 
@@ -289,6 +322,7 @@ func commit_edit() -> void:
 	editing = false
 	preview_simulation = null
 	undo_history.clear()
+	_refresh_production_preview()
 	queue_redraw()
 
 
@@ -299,6 +333,7 @@ func cancel_edit() -> void:
 	preview_simulation = null
 	preview_node_positions.clear()
 	undo_history.clear()
+	_refresh_production_preview()
 	queue_redraw()
 
 
@@ -368,6 +403,15 @@ func _draw() -> void:
 				12,
 				SELECTED_COLOR
 			)
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(18, 43),
+			cached_production_preview,
+			HORIZONTAL_ALIGNMENT_RIGHT,
+			size.x - 36.0,
+			12,
+			Color(0.54, 0.86, 0.7)
+		)
 
 
 func _draw_lines(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
@@ -523,6 +567,20 @@ func _push_undo_snapshot() -> void:
 		"simulation": display_simulation.duplicate_state(),
 		"positions": _display_positions().duplicate(true),
 	})
+
+
+func _refresh_production_preview() -> void:
+	var result := production_preview()
+	if not result["ok"]:
+		cached_production_preview = "32秒予測 // 配線未完成"
+		return
+	var counts: Dictionary = result["counts"]
+	cached_production_preview = "32秒予測 // 斥候 %d  衛兵 %d  巨像 %d  不一致 %d" % [
+		counts[&"scout"],
+		counts[&"sentinel"],
+		counts[&"golem"],
+		result["discarded"],
+	]
 
 
 func _panel_style() -> StyleBoxFlat:

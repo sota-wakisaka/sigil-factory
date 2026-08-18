@@ -37,6 +37,7 @@ func _initialize() -> void:
 	_test_factory_nodes_can_be_repositioned()
 	_test_factory_editor_undo_restores_graph()
 	_test_factory_board_connections_change_output()
+	_test_factory_production_preview_is_non_destructive()
 	_test_run_flow_covers_one_route()
 
 	if failures == 0:
@@ -363,6 +364,21 @@ func _test_factory_board_connections_change_output() -> void:
 			produced_scout = true
 			break
 	_expect(produced_scout, "edited factory graph should change its summoned unit")
+	board.free()
+
+
+func _test_factory_production_preview_is_non_destructive() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_SCOUT)
+	var tick_before := board.simulation.tick_index
+	var preview := board.production_preview(160)
+	_expect(preview["ok"], "complete factory should produce a preview")
+	_expect(preview["counts"][&"scout"] > 0, "scout factory preview should report scouts")
+	_expect(board.simulation.tick_index == tick_before, "production preview should not advance the real factory")
+	board.set_interaction_enabled(true)
+	board.add_node_from_palette(&"rotator")
+	_expect(not board.production_preview()["ok"], "incomplete custom graph should not produce a preview")
 	board.free()
 
 

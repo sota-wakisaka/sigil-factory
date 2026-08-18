@@ -41,6 +41,8 @@ and then an outlined input port to connect them, and right-click an input port t
 disconnect it. Select equipment before pressing **Delete**. Incomplete factories
 cannot start and display the first missing connection. **Undo** restores placement,
 wiring, additions, and deletions made during the current edit session.
+While editing, a non-destructive 32-second simulation preview reports expected
+scout, sentinel, and golem output plus unmatched glyphs.
 
 Press **Build Complete / Start Battle** when the graph is ready.
 During battle, press **Time Stop**, select a production plan, then confirm the
