@@ -108,6 +108,15 @@ func _draw() -> void:
 	_draw_leader(Vector2(size.x - 35, lane_y), false)
 	for unit in simulation.units:
 		_draw_unit(unit, lane_y)
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(18, size.y - 16.0),
+		"青: ○斥候  □衛兵  ◇巨像    赤: ○襲撃  △群体  ■装甲",
+		HORIZONTAL_ALIGNMENT_CENTER,
+		size.x - 36.0,
+		12,
+		Color(0.62, 0.68, 0.78)
+	)
 
 
 func _draw_leader(center: Vector2, is_player: bool) -> void:
@@ -177,7 +186,7 @@ func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 	var vertical_offset := float(posmod(unit.instance_id, 5) - 2) * 5.0
 	var center := Vector2(x, lane_y + vertical_offset)
 	var display_color := Color.WHITE if unit.hit_flash_ticks > 0 else color
-	draw_circle(center, radius, display_color)
+	_draw_unit_shape(unit.spec.id, center, radius, display_color)
 	var health_ratio := clampf(unit.health / unit.spec.max_health, 0.0, 1.0)
 	var health_bar := Rect2(center + Vector2(-radius, -radius - 5.0), Vector2(radius * 2.0, 2.0))
 	draw_rect(health_bar, Color(0.08, 0.06, 0.09, 1.0), true)
@@ -196,6 +205,29 @@ func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 			10,
 			Color(1.0, 0.78, 0.25)
 		)
+
+
+func _draw_unit_shape(unit_id: StringName, center: Vector2, radius: float, color: Color) -> void:
+	match unit_id:
+		&"sentinel":
+			draw_rect(Rect2(center - Vector2(radius, radius), Vector2(radius * 2.0, radius * 2.0)), color, true)
+		&"golem":
+			draw_colored_polygon(PackedVector2Array([
+				center + Vector2(0, -radius),
+				center + Vector2(radius, 0),
+				center + Vector2(0, radius),
+				center + Vector2(-radius, 0),
+			]), color)
+		&"swarm":
+			draw_colored_polygon(PackedVector2Array([
+				center + Vector2(0, -radius),
+				center + Vector2(radius, radius),
+				center + Vector2(-radius, radius),
+			]), color)
+		&"brute":
+			draw_rect(Rect2(center - Vector2(radius, radius), Vector2(radius * 2.0, radius * 2.0)), color, true)
+		_:
+			draw_circle(center, radius, color)
 
 
 func _panel_style() -> StyleBoxFlat:
