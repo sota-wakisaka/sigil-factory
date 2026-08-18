@@ -152,7 +152,11 @@ func _on_battle_finished(winner: int) -> void:
 	if winner == BattleSimulation.Side.PLAYER:
 		_enter_victory()
 	else:
-		status_label.text = "DEFEAT // 自軍リーダーが崩壊"
+		status_label.text = (
+			"TIME UP // 敵リーダーを撃破できず"
+			if battle_board.simulation.player_leader_health > 0.0
+			else "DEFEAT // 自軍リーダーが崩壊"
+		)
 		debug_victory_button.text = "再挑戦"
 		debug_victory_button.visible = true
 

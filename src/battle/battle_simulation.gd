@@ -25,6 +25,7 @@ var enemy_shield_health := ENEMY_SHIELD_MAX_HEALTH
 var next_instance_id := 1
 var next_schedule_index := 0
 var enemy_leader_vulnerable_tick := 650
+var battle_duration_ticks := 900
 var player_kills := 0
 var enemy_kills := 0
 var battle_events: Array[Dictionary] = []
@@ -70,13 +71,19 @@ func upcoming_threats(horizon_ticks: int) -> Array[ThreatEventModel]:
 
 
 func is_finished() -> bool:
-	return player_leader_health <= 0.0 or enemy_leader_health <= 0.0
+	return (
+		player_leader_health <= 0.0
+		or enemy_leader_health <= 0.0
+		or tick_index >= battle_duration_ticks
+	)
 
 
 func winner() -> int:
 	if enemy_leader_health <= 0.0:
 		return Side.PLAYER
 	if player_leader_health <= 0.0:
+		return Side.ENEMY
+	if tick_index >= battle_duration_ticks:
 		return Side.ENEMY
 	return -1
 

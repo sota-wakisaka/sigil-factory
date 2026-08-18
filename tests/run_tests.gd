@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_test_mvp_plans_produce_expected_units()
 	_test_battle_units_fight_and_die()
 	_test_enemy_shield_takes_damage_and_opens()
+	_test_battle_ends_at_time_limit()
 	_test_threat_forecast_respects_horizon()
 	_test_factory_edit_is_transactional()
 	_test_run_flow_covers_one_route()
@@ -223,6 +224,16 @@ func _test_enemy_shield_takes_damage_and_opens() -> void:
 	var position_before := battle.units[0].position
 	battle.tick()
 	_expect(battle.units[0].position > position_before, "units should advance after breaking the shield")
+
+
+func _test_battle_ends_at_time_limit() -> void:
+	var battle := BattleSimulation.new()
+	battle.battle_duration_ticks = 2
+	battle.tick()
+	_expect(not battle.is_finished(), "battle should run before its time limit")
+	battle.tick()
+	_expect(battle.is_finished(), "battle should end when its time limit expires")
+	_expect(battle.winner() == BattleSimulation.Side.ENEMY, "failing to defeat the leader in time should lose the stage")
 
 
 func _test_threat_forecast_respects_horizon() -> void:
