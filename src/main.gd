@@ -31,6 +31,7 @@ const FLOW_STEPS := [
 @onready var phase_body: Label = $PhaseOverlay/Center/Panel/Content/Body
 @onready var phase_button: Button = $PhaseOverlay/Center/Panel/Content/AdvanceButton
 @onready var reward_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RewardOption
+@onready var route_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RouteOption
 @onready var inspector_label: Label = $FactoryInspector/SelectionLabel
 @onready var inspector_option: OptionButton = $FactoryInspector/SettingOption
 
@@ -40,6 +41,7 @@ var battle_speed_index := 0
 var time_stop_count := 0
 var factory_change_count := 0
 var acquired_rewards: Array[StringName] = []
+var selected_route_name := "中央ルート"
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 
 
@@ -95,6 +97,8 @@ func _draw() -> void:
 
 
 func _advance_overlay() -> void:
+	if flow.phase == RunFlow.Phase.ROUTE_SELECTION:
+		selected_route_name = route_option.get_item_text(route_option.selected)
 	if flow.phase == RunFlow.Phase.REWARD:
 		_acquire_selected_reward()
 	if not flow.advance():
@@ -245,6 +249,7 @@ func _apply_phase() -> void:
 	_update_progress()
 	phase_overlay.visible = false
 	reward_option.visible = false
+	route_option.visible = false
 	debug_victory_button.visible = false
 	speed_button.disabled = true
 	_update_speed_button()
@@ -255,12 +260,13 @@ func _apply_phase() -> void:
 	_refresh_factory_inspector()
 	match flow.phase:
 		RunFlow.Phase.ROUTE_SELECTION:
+			_prepare_route_options()
 			_show_overlay("RUN %02d" % flow.route_number, "ルートを選択", "進みたいルートを選択します。\n現在は内容を作らず、進行だけを確認する仮画面です。", "OK：このルートを選択")
 		RunFlow.Phase.STAGE_INFO:
 			_show_overlay(
 				"STAGE PREVIEW",
 				"ステージ情報を確認",
-				"通常戦闘 // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n0:20 襲撃兵 → 斥候  |  1:00 群体兵 → 衛兵  |  1:54 装甲兵 → ゴーレム",
+				"%s // 通常戦闘 // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n0:20 襲撃兵 → 斥候  |  1:00 群体兵 → 衛兵  |  1:54 装甲兵 → ゴーレム" % selected_route_name,
 				"OK：工場構築へ"
 			)
 		RunFlow.Phase.FACTORY_BUILD:
@@ -315,6 +321,15 @@ func _prepare_reward_options() -> void:
 	reward_option.add_item("高速ライン // 輸送時間 -1 tick")
 	reward_option.set_item_metadata(2, &"line_speed")
 	reward_option.visible = true
+
+
+func _prepare_route_options() -> void:
+	route_option.clear()
+	route_option.add_item("左ルート // シジル報酬傾向（仮）")
+	route_option.add_item("中央ルート // リリック報酬傾向（仮）")
+	route_option.add_item("右ルート // 能力報酬傾向（仮）")
+	route_option.select(1)
+	route_option.visible = true
 
 
 func _acquire_selected_reward() -> void:
