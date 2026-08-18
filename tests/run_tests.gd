@@ -11,6 +11,7 @@ const MvpContent := preload("res://src/game/mvp_content.gd")
 const UnitSpecModel := preload("res://src/battle/unit_spec.gd")
 const ThreatEventModel := preload("res://src/battle/threat_event.gd")
 const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
+const FactoryBoard := preload("res://src/ui/factory_board.gd")
 
 var failures := 0
 
@@ -25,6 +26,7 @@ func _initialize() -> void:
 	_test_mvp_plans_produce_expected_units()
 	_test_battle_units_fight_and_die()
 	_test_threat_forecast_respects_horizon()
+	_test_factory_edit_is_transactional()
 
 	if failures == 0:
 		print("All domain and factory tests passed.")
@@ -213,6 +215,20 @@ func _test_threat_forecast_respects_horizon() -> void:
 	_expect(forecast.size() == 1, "forecast should only include events inside horizon")
 	if forecast.size() == 1:
 		_expect(forecast[0].label == "NEAR", "forecast should return the near threat")
+
+
+func _test_factory_edit_is_transactional() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SCOUT)
+	var original_simulation := board.simulation
+	board.begin_edit()
+	board.preview_plan(MvpContent.PLAN_GOLEM)
+	_expect(board.plan_id == MvpContent.PLAN_SCOUT, "preview should not change committed plan")
+	_expect(board.simulation == original_simulation, "preview should not replace running factory")
+	board.commit_edit()
+	_expect(board.plan_id == MvpContent.PLAN_GOLEM, "commit should apply pending plan")
+	_expect(board.simulation != original_simulation, "commit should replace factory atomically")
+	board.free()
 
 
 func _expect(condition: bool, message: String) -> void:

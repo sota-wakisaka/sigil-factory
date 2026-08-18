@@ -105,9 +105,9 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -390.0
+offset_left = -450.0
 offset_top = -112.0
-offset_right = 390.0
+offset_right = 450.0
 offset_bottom = -62.0
 grow_horizontal = 2
 grow_vertical = 0
@@ -115,24 +115,30 @@ theme_override_constants/separation = 12
 alignment = 1
 
 [node name="ScoutButton" type="Button" parent="Toolbar"]
-custom_minimum_size = Vector2(165, 50)
+custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 text = "斥候術式"
 
 [node name="SentinelButton" type="Button" parent="Toolbar"]
-custom_minimum_size = Vector2(165, 50)
+custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 text = "衛兵術式"
 
 [node name="GolemButton" type="Button" parent="Toolbar"]
-custom_minimum_size = Vector2(165, 50)
+custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 text = "巨像術式"
 
 [node name="PauseButton" type="Button" parent="Toolbar"]
-custom_minimum_size = Vector2(165, 50)
+custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 text = "時間停止"
+
+[node name="CancelButton" type="Button" parent="Toolbar"]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+disabled = true
+text = "変更を破棄"
 
 [node name="Hint" type="Label" parent="."]
 layout_mode = 1

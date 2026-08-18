@@ -16,6 +16,10 @@ var plan_id: StringName = MvpContent.PLAN_SCOUT
 var simulation: FactorySimulation
 var node_positions: Dictionary = {}
 var observed_event_count := 0
+var editing := false
+var pending_plan_id: StringName
+var preview_simulation: FactorySimulation
+var preview_node_positions: Dictionary = {}
 
 
 func _ready() -> void:
@@ -27,7 +31,61 @@ func configure(next_plan_id: StringName) -> void:
 	simulation = MvpContent.build_factory(plan_id)
 	node_positions = MvpContent.layout_for_plan(plan_id)
 	observed_event_count = 0
+	editing = false
+	preview_simulation = null
 	queue_redraw()
+
+
+func begin_edit() -> void:
+	editing = true
+	pending_plan_id = plan_id
+	preview_simulation = MvpContent.build_factory(pending_plan_id)
+	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
+	queue_redraw()
+
+
+func preview_plan(next_plan_id: StringName) -> void:
+	if not editing:
+		return
+	pending_plan_id = next_plan_id
+	preview_simulation = MvpContent.build_factory(pending_plan_id)
+	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
+	queue_redraw()
+
+
+func commit_edit() -> void:
+	if not editing:
+		return
+	plan_id = pending_plan_id
+	simulation = preview_simulation
+	node_positions = preview_node_positions
+	observed_event_count = 0
+	editing = false
+	preview_simulation = null
+	queue_redraw()
+
+
+func cancel_edit() -> void:
+	if not editing:
+		return
+	editing = false
+	preview_simulation = null
+	preview_node_positions.clear()
+	queue_redraw()
+
+
+func work_in_progress_count() -> int:
+	if simulation == null:
+		return 0
+	var count := 0
+	for node in simulation.nodes.values():
+		for glyph in node.input_buffers:
+			count += int(glyph != null)
+		count += int(node.output_buffer != null)
+		count += int(node.processing_glyph != null)
+	for line in simulation.lines.values():
+		count += int(line.payload != null)
+	return count
 
 
 func advance_tick() -> void:
@@ -43,28 +101,41 @@ func advance_tick() -> void:
 
 func _draw() -> void:
 	draw_style_box(_panel_style(), Rect2(Vector2.ZERO, size))
-	if simulation == null:
+	var display_simulation := preview_simulation if editing else simulation
+	var display_positions := preview_node_positions if editing else node_positions
+	if display_simulation == null:
 		return
-	_draw_lines()
-	_draw_nodes()
+	_draw_lines(display_simulation, display_positions)
+	_draw_nodes(display_simulation, display_positions)
+	if editing:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.18, 0.62, 0.9, 0.055), true)
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(18, 28),
+			"PREVIEW // 未確定",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			14,
+			Color(0.46, 0.82, 1.0)
+		)
 
 
-func _draw_lines() -> void:
-	for line_id in simulation.lines:
-		var line: FactoryLineModel = simulation.lines[line_id]
-		var start := _scaled_position(node_positions.get(line.from_node_id, Vector2.ZERO))
-		var finish := _scaled_position(node_positions.get(line.to_node_id, Vector2.ZERO))
+func _draw_lines(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
+	for line_id in display_simulation.lines:
+		var line: FactoryLineModel = display_simulation.lines[line_id]
+		var start := _scaled_position(display_positions.get(line.from_node_id, Vector2.ZERO))
+		var finish := _scaled_position(display_positions.get(line.to_node_id, Vector2.ZERO))
 		draw_line(start, finish, LINE_COLOR, 4.0, true)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
 			draw_circle(start.lerp(finish, progress), 7.0, GLYPH_COLOR)
 
 
-func _draw_nodes() -> void:
+func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
 	var font := ThemeDB.fallback_font
-	for node_id in simulation.nodes:
-		var node: FactoryNodeModel = simulation.nodes[node_id]
-		var center := _scaled_position(node_positions.get(node_id, Vector2.ZERO))
+	for node_id in display_simulation.nodes:
+		var node: FactoryNodeModel = display_simulation.nodes[node_id]
+		var center := _scaled_position(display_positions.get(node_id, Vector2.ZERO))
 		var rect := Rect2(center - Vector2(48, 30), Vector2(96, 60))
 		draw_rect(rect, NODE_COLOR, true)
 		draw_rect(rect, NODE_BORDER, false, 2.0)

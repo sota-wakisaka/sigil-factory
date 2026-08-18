@@ -15,6 +15,7 @@ const FORECAST_TICKS := 300
 @onready var threat_label: Label = $ThreatLabel
 @onready var status_label: Label = $StatusLabel
 @onready var pause_button: Button = $Toolbar/PauseButton
+@onready var cancel_button: Button = $Toolbar/CancelButton
 
 var elapsed_since_tick := 0.0
 var paused := false
@@ -36,9 +37,11 @@ func _ready() -> void:
 		func() -> void: _select_plan(MvpContent.PLAN_GOLEM)
 	)
 	pause_button.pressed.connect(_toggle_pause)
+	cancel_button.pressed.connect(_cancel_edit)
 	factory_board.summon_produced.connect(_on_summon_produced)
 	battle_board.battle_finished.connect(_on_battle_finished)
 	_select_plan(MvpContent.PLAN_SCOUT)
+	_set_plan_buttons_enabled(false)
 	_refresh_status()
 	queue_redraw()
 
@@ -68,18 +71,47 @@ func _draw() -> void:
 
 
 func _select_plan(plan_id: StringName) -> void:
-	factory_board.configure(plan_id)
-	plan_label.text = "稼働術式: %s" % MvpContent.plan_name(plan_id)
+	if paused:
+		factory_board.preview_plan(plan_id)
+		plan_label.text = "仮術式: %s // 未確定" % MvpContent.plan_name(plan_id)
+	else:
+		factory_board.configure(plan_id)
+		plan_label.text = "稼働術式: %s" % MvpContent.plan_name(plan_id)
 
 
 func _toggle_pause() -> void:
-	paused = not paused
-	pause_button.text = "再開" if paused else "時間停止"
-	plan_label.text = (
-		"時間停止中 — 次の脅威に合わせて術式を選択"
-		if paused
-		else "稼働術式: %s" % MvpContent.plan_name(factory_board.plan_id)
-	)
+	if not paused:
+		paused = true
+		factory_board.begin_edit()
+		_set_plan_buttons_enabled(true)
+		cancel_button.disabled = false
+		pause_button.text = "変更を確定"
+		plan_label.text = "時間停止中 // 仕掛品 %d個" % factory_board.work_in_progress_count()
+		return
+
+	factory_board.commit_edit()
+	_resume_after_edit()
+
+
+func _cancel_edit() -> void:
+	if not paused:
+		return
+	factory_board.cancel_edit()
+	_resume_after_edit()
+
+
+func _resume_after_edit() -> void:
+	paused = false
+	_set_plan_buttons_enabled(false)
+	cancel_button.disabled = true
+	pause_button.text = "時間停止"
+	plan_label.text = "稼働術式: %s" % MvpContent.plan_name(factory_board.plan_id)
+
+
+func _set_plan_buttons_enabled(enabled: bool) -> void:
+	$Toolbar/ScoutButton.disabled = not enabled
+	$Toolbar/SentinelButton.disabled = not enabled
+	$Toolbar/GolemButton.disabled = not enabled
 
 
 func _on_summon_produced(unit_id: StringName) -> void:
@@ -90,6 +122,8 @@ func _on_summon_produced(unit_id: StringName) -> void:
 func _on_battle_finished(winner: int) -> void:
 	paused = true
 	pause_button.disabled = true
+	cancel_button.disabled = true
+	_set_plan_buttons_enabled(false)
 	if winner == BattleSimulation.Side.PLAYER:
 		status_label.text = "VICTORY // 敵リーダーを撃破"
 	else:
@@ -111,4 +145,3 @@ func _refresh_status() -> void:
 		produced_units[&"sentinel"],
 		produced_units[&"golem"],
 	]
-
