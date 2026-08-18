@@ -46,6 +46,13 @@ func connect_nodes(line: FactoryLineModel) -> Dictionary:
 	return {"ok": true, "error": ""}
 
 
+func disconnect_line(line_id: StringName) -> bool:
+	if not lines.has(line_id):
+		return false
+	lines.erase(line_id)
+	return true
+
+
 func tick() -> void:
 	tick_index += 1
 	_advance_lines()

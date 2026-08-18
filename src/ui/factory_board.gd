@@ -5,6 +5,7 @@ signal summon_produced(unit_id: StringName)
 
 const MvpContent := preload("res://src/game/mvp_content.gd")
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
+const FactoryLineModel := preload("res://src/factory/factory_line.gd")
 
 const PANEL_COLOR := Color(0.035, 0.055, 0.085, 0.96)
 const NODE_COLOR := Color(0.08, 0.12, 0.18, 1.0)
@@ -14,6 +15,7 @@ const GLYPH_COLOR := Color(0.35, 0.86, 1.0, 1.0)
 const SELECTED_COLOR := Color(1.0, 0.78, 0.3, 1.0)
 const NODE_HALF_SIZE := Vector2(48, 30)
 const REFERENCE_SIZE := Vector2(820, 395)
+const PORT_RADIUS := 7.0
 
 var plan_id: StringName = MvpContent.PLAN_SCOUT
 var simulation: FactorySimulation
@@ -27,6 +29,10 @@ var interaction_enabled := false
 var selected_node_id: StringName = &""
 var dragging_node := false
 var drag_offset := Vector2.ZERO
+var connecting_from_node_id: StringName = &""
+var connection_cursor := Vector2.ZERO
+var connection_serial := 1
+var connection_message := ""
 
 
 func _ready() -> void:
@@ -42,6 +48,8 @@ func configure(next_plan_id: StringName) -> void:
 	preview_simulation = null
 	selected_node_id = &""
 	dragging_node = false
+	connecting_from_node_id = &""
+	connection_message = ""
 	queue_redraw()
 
 
@@ -50,6 +58,7 @@ func set_interaction_enabled(enabled: bool) -> void:
 	if not enabled:
 		dragging_node = false
 		selected_node_id = &""
+		connecting_from_node_id = &""
 	queue_redraw()
 
 
@@ -71,11 +80,62 @@ func node_local_position(node_id: StringName) -> Vector2:
 	return _scaled_position(_display_positions().get(node_id, Vector2.ZERO))
 
 
+func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName, to_port: int) -> Dictionary:
+	if not interaction_enabled:
+		return {"ok": false, "error": "locked"}
+	var display_simulation := _display_simulation()
+	if display_simulation == null or from_node_id == to_node_id:
+		return {"ok": false, "error": "self_connection"}
+	var removed_line: FactoryLineModel
+	for line in display_simulation.lines.values():
+		if line.to_node_id == to_node_id and line.to_port == to_port:
+			removed_line = line
+			display_simulation.disconnect_line(line.id)
+			break
+	var line_id := StringName("user_line_%d" % connection_serial)
+	connection_serial += 1
+	var result := display_simulation.connect_nodes(
+		FactoryLineModel.new(line_id, from_node_id, to_node_id, to_port, 2)
+	)
+	if not result["ok"] and removed_line != null:
+		display_simulation.connect_nodes(removed_line)
+	connection_message = _connection_result_text(result)
+	queue_redraw()
+	return result
+
+
+func disconnect_input(to_node_id: StringName, to_port: int) -> bool:
+	if not interaction_enabled:
+		return false
+	var display_simulation := _display_simulation()
+	for line in display_simulation.lines.values():
+		if line.to_node_id == to_node_id and line.to_port == to_port:
+			display_simulation.disconnect_line(line.id)
+			connection_message = "接続を解除しました"
+			queue_redraw()
+			return true
+	return false
+
+
 func _gui_input(event: InputEvent) -> void:
 	if not interaction_enabled:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			var input_port := _input_port_at(event.position)
+			if not input_port.is_empty() and connecting_from_node_id != &"":
+				connect_nodes_interactive(connecting_from_node_id, input_port["node_id"], input_port["port"])
+				connecting_from_node_id = &""
+				accept_event()
+				return
+			var output_node_id := _output_port_at(event.position)
+			if output_node_id != &"":
+				connecting_from_node_id = output_node_id
+				connection_cursor = event.position
+				connection_message = "入力ポートを選択してください"
+				accept_event()
+				queue_redraw()
+				return
 			selected_node_id = _node_at(event.position)
 			dragging_node = selected_node_id != &""
 			if dragging_node:
@@ -87,6 +147,15 @@ func _gui_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and dragging_node:
 		move_node(selected_node_id, event.position + drag_offset)
 		accept_event()
+	elif event is InputEventMouseMotion and connecting_from_node_id != &"":
+		connection_cursor = event.position
+		queue_redraw()
+		accept_event()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		var input_port := _input_port_at(event.position)
+		if not input_port.is_empty():
+			disconnect_input(input_port["node_id"], input_port["port"])
+			accept_event()
 
 
 func begin_edit() -> void:
@@ -159,6 +228,8 @@ func _draw() -> void:
 	if display_simulation == null:
 		return
 	_draw_lines(display_simulation, display_positions)
+	if connecting_from_node_id != &"":
+		draw_line(_output_port_position(connecting_from_node_id), connection_cursor, SELECTED_COLOR, 3.0, true)
 	_draw_nodes(display_simulation, display_positions)
 	if editing:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.18, 0.62, 0.9, 0.055), true)
@@ -175,19 +246,29 @@ func _draw() -> void:
 		draw_string(
 			ThemeDB.fallback_font,
 			Vector2(18, size.y - 14),
-			"ノードをドラッグして配置",
+			"ドラッグ: 配置  /  ●出力→○入力: 接続  /  右クリック: 解除",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
 			12,
 			Color(0.52, 0.65, 0.76)
 		)
+		if connection_message != "":
+			draw_string(
+				ThemeDB.fallback_font,
+				Vector2(18, 22),
+				connection_message,
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1,
+				12,
+				SELECTED_COLOR
+			)
 
 
 func _draw_lines(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
 	for line_id in display_simulation.lines:
 		var line: FactoryLineModel = display_simulation.lines[line_id]
-		var start := _scaled_position(display_positions.get(line.from_node_id, Vector2.ZERO))
-		var finish := _scaled_position(display_positions.get(line.to_node_id, Vector2.ZERO))
+		var start := _scaled_position(display_positions.get(line.from_node_id, Vector2.ZERO)) + Vector2(NODE_HALF_SIZE.x, 0)
+		var finish := _input_port_position(line.to_node_id, line.to_port)
 		draw_line(start, finish, LINE_COLOR, 4.0, true)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
@@ -215,6 +296,16 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		)
 		if node.output_buffer != null or node.processing_glyph != null:
 			draw_circle(center + Vector2(0, 22), 4.0, GLYPH_COLOR)
+		_draw_ports(node, center)
+
+
+func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
+	if node.kind != FactoryNodeModel.NodeKind.SUMMONER:
+		draw_circle(center + Vector2(NODE_HALF_SIZE.x, 0), PORT_RADIUS, LINE_COLOR)
+	for port in node.required_input_count():
+		var position := _input_port_position(node.id, port)
+		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
+		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, LINE_COLOR, 2.0)
 
 
 func _scaled_position(reference_position: Vector2) -> Vector2:
@@ -250,6 +341,57 @@ func _node_at(local_position: Vector2) -> StringName:
 		if Rect2(center - NODE_HALF_SIZE, NODE_HALF_SIZE * 2.0).has_point(local_position):
 			return node_id
 	return &""
+
+
+func _output_port_position(node_id: StringName) -> Vector2:
+	return node_local_position(node_id) + Vector2(NODE_HALF_SIZE.x, 0)
+
+
+func _input_port_position(node_id: StringName, port: int) -> Vector2:
+	var node: FactoryNodeModel = _display_simulation().nodes[node_id]
+	var y_offset := 0.0
+	if node.required_input_count() == 2:
+		y_offset = -13.0 if port == 0 else 13.0
+	return node_local_position(node_id) + Vector2(-NODE_HALF_SIZE.x, y_offset)
+
+
+func _output_port_at(local_position: Vector2) -> StringName:
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return &""
+	for node_id in display_simulation.nodes:
+		var node: FactoryNodeModel = display_simulation.nodes[node_id]
+		if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
+			continue
+		if local_position.distance_to(_output_port_position(node_id)) <= PORT_RADIUS + 4.0:
+			return node_id
+	return &""
+
+
+func _input_port_at(local_position: Vector2) -> Dictionary:
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return {}
+	for node_id in display_simulation.nodes:
+		var node: FactoryNodeModel = display_simulation.nodes[node_id]
+		for port in node.required_input_count():
+			if local_position.distance_to(_input_port_position(node_id, port)) <= PORT_RADIUS + 4.0:
+				return {"node_id": node_id, "port": port}
+	return {}
+
+
+func _connection_result_text(result: Dictionary) -> String:
+	if result["ok"]:
+		return "接続しました"
+	match result["error"]:
+		"cycle":
+			return "接続できません: 回路が循環します"
+		"invalid_port":
+			return "接続できません: 入力ポートがありません"
+		"self_connection":
+			return "接続できません: 同じ設備には接続できません"
+		_:
+			return "接続できません: %s" % result["error"]
 
 
 func _panel_style() -> StyleBoxFlat:

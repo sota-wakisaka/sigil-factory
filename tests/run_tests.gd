@@ -24,6 +24,7 @@ func _initialize() -> void:
 	_test_factory_pipeline_summons_matching_unit()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
+	_test_factory_disconnects_lines()
 	_test_mvp_plans_produce_expected_units()
 	_test_battle_units_fight_and_die()
 	_test_enemy_shield_takes_damage_and_opens()
@@ -31,6 +32,7 @@ func _initialize() -> void:
 	_test_threat_forecast_respects_horizon()
 	_test_factory_edit_is_transactional()
 	_test_factory_nodes_can_be_repositioned()
+	_test_factory_board_connections_change_output()
 	_test_run_flow_covers_one_route()
 
 	if failures == 0:
@@ -173,6 +175,16 @@ func _test_factory_rejects_cycles() -> void:
 	_expect(not second["ok"] and second["error"] == "cycle", "cycle should be rejected")
 
 
+func _test_factory_disconnects_lines() -> void:
+	var simulation := FactorySimulation.new()
+	simulation.add_node(FactoryNodeModel.new(&"source", FactoryNodeModel.NodeKind.SOURCE))
+	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
+	simulation.connect_nodes(FactoryLineModel.new(&"line", &"source", &"summoner"))
+	_expect(simulation.disconnect_line(&"line"), "existing factory line should disconnect")
+	_expect(simulation.lines.is_empty(), "disconnected factory line should be removed")
+	_expect(not simulation.disconnect_line(&"missing"), "missing factory line should not disconnect")
+
+
 func _test_mvp_plans_produce_expected_units() -> void:
 	var expectations := {
 		MvpContent.PLAN_SCOUT: &"scout",
@@ -273,6 +285,26 @@ func _test_factory_nodes_can_be_repositioned() -> void:
 	board.set_interaction_enabled(true)
 	_expect(board.move_node(&"ring_source", Vector2(300, 160)), "editable factory should allow node movement")
 	_expect(board.node_positions[&"ring_source"] != original, "node movement should update its layout")
+	board.free()
+
+
+func _test_factory_board_connections_change_output() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_SENTINEL)
+	board.set_interaction_enabled(true)
+	_expect(board.disconnect_input(&"rotator", 0), "editor should disconnect a processor input")
+	_expect(board.disconnect_input(&"summoner", 0), "editor should disconnect a summoner input")
+	var result := board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
+	_expect(result["ok"], "editor should connect compatible output and input ports")
+	for _tick in 160:
+		board.advance_tick()
+	var produced_scout := false
+	for event in board.simulation.summon_events:
+		if event["unit_id"] == &"scout":
+			produced_scout = true
+			break
+	_expect(produced_scout, "edited factory graph should change its summoned unit")
 	board.free()
 
 
