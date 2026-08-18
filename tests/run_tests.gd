@@ -387,6 +387,8 @@ func _test_factory_node_configuration_is_undoable() -> void:
 	_expect(board.simulation.nodes[rotator_id].config["steps"] == 2, "inspector should update node configuration")
 	_expect(board.undo(), "node configuration should be undoable")
 	_expect(board.simulation.nodes[rotator_id].config["steps"] == 1, "undo should restore the previous node setting")
+	board.configure(MvpContent.PLAN_SCOUT)
+	_expect(board.selected_node_id == &"", "switching factory templates should clear stale inspector selection")
 	board.free()
 
 

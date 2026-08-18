@@ -59,6 +59,7 @@ func configure(next_plan_id: StringName) -> void:
 	connection_message = ""
 	undo_history.clear()
 	_refresh_production_preview()
+	selection_changed.emit()
 	queue_redraw()
 
 
@@ -385,6 +386,7 @@ func begin_edit() -> void:
 	connecting_from_node_id = &""
 	undo_history.clear()
 	_refresh_production_preview()
+	selection_changed.emit()
 	queue_redraw()
 
 
@@ -395,8 +397,10 @@ func preview_plan(next_plan_id: StringName) -> void:
 	preview_simulation = MvpContent.build_factory(pending_plan_id)
 	_apply_run_upgrades(preview_simulation)
 	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
+	selected_node_id = &""
 	undo_history.clear()
 	_refresh_production_preview()
+	selection_changed.emit()
 	queue_redraw()
 
 
@@ -411,6 +415,7 @@ func commit_edit() -> void:
 	preview_simulation = null
 	undo_history.clear()
 	_refresh_production_preview()
+	selection_changed.emit()
 	queue_redraw()
 
 
@@ -422,6 +427,7 @@ func cancel_edit() -> void:
 	preview_node_positions.clear()
 	undo_history.clear()
 	_refresh_production_preview()
+	selection_changed.emit()
 	queue_redraw()
 
 
