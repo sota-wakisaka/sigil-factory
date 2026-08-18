@@ -251,7 +251,12 @@ func _apply_phase() -> void:
 		RunFlow.Phase.ROUTE_SELECTION:
 			_show_overlay("RUN %02d" % flow.route_number, "ルートを選択", "進みたいルートを選択します。\n現在は内容を作らず、進行だけを確認する仮画面です。", "OK：このルートを選択")
 		RunFlow.Phase.STAGE_INFO:
-			_show_overlay("STAGE PREVIEW", "ステージ情報を確認", "通常戦闘 // 制限時間 3:00\n敵の種類、地形、報酬候補は今後この画面に表示します。", "OK：工場構築へ")
+			_show_overlay(
+				"STAGE PREVIEW",
+				"ステージ情報を確認",
+				"通常戦闘 // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n0:20 襲撃兵 → 斥候  |  1:00 群体兵 → 衛兵  |  1:54 装甲兵 → ゴーレム",
+				"OK：工場構築へ"
+			)
 		RunFlow.Phase.FACTORY_BUILD:
 			_set_plan_buttons_enabled(true)
 			_set_factory_palette_enabled(true)
