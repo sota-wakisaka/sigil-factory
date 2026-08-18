@@ -7,6 +7,8 @@ The current design document is available at [`docs/GAME_DESIGN.md`](docs/GAME_DE
 ## MVP features
 
 - Click-through run flow from route selection to the next route
+- Draggable factory equipment with interactive input/output port wiring
+- Equipment palette for adding and deleting sources, processors, combiners, and summoners
 - Deterministic fixed-tick glyph factory simulation
 - Three production plans: fast scouts, anti-swarm sentinels, and anti-armor golems
 - Transactional factory changes made during time stop
@@ -33,7 +35,13 @@ that adaptive production wins while scout-only and golem-only production do not.
 3. Press **F6** or **F5** to run the main scene.
 
 Follow the highlighted progression bar from **Route Selection**. At the factory
-step, choose a production plan and press **Build Complete / Start Battle**.
+step, choose a production plan as a starting template or customize it with the
+equipment palette. Drag equipment to reposition it, click a filled output port
+and then an outlined input port to connect them, and right-click an input port to
+disconnect it. Select equipment before pressing **Delete**. Incomplete factories
+cannot start and display the first missing connection.
+
+Press **Build Complete / Start Battle** when the graph is ready.
 During battle, press **Time Stop**, select a production plan, then confirm the
 change. Preview changes do not affect the running factory until committed. The
 **Fast Forward** button cycles between 1x, 2x, and 4x battle speed and is disabled
