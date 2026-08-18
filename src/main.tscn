@@ -234,7 +234,7 @@ text = "衛兵術式"
 [node name="GolemButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
-tooltip_text = "環と棘を合成・青着色し、装甲兵に強いゴーレムを生産するテンプレート"
+tooltip_text = "環と棘を合成・青着色し、装甲兵に強い巨像を生産するテンプレート"
 text = "巨像術式"
 
 [node name="SpeedButton" type="Button" parent="Toolbar"]

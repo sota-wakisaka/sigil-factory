@@ -83,7 +83,7 @@ func _counter_for(enemy_id: StringName) -> String:
 		&"swarm":
 			return "衛兵"
 		&"brute":
-			return "ゴーレム"
+			return "巨像"
 	return ""
 
 

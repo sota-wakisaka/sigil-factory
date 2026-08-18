@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_expect("中央ルート" in main.phase_body.text, "stage information should retain the selected route")
 	_expect("制限時間 3:00" in main.phase_body.text, "stage information should disclose the battle duration")
 	_expect("群体兵 → 衛兵" in main.phase_body.text, "stage information should disclose wave counters")
+	_expect("装甲兵 → 巨像" in main.phase_body.text, "stage information should use the same unit name as the factory")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "stage OK should open factory build")
 	_expect(not main.phase_overlay.visible, "factory build should expose the workspace")

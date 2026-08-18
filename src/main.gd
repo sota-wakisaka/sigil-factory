@@ -290,7 +290,7 @@ func _apply_phase() -> void:
 			_show_overlay(
 				"STAGE PREVIEW",
 				"ステージ情報を確認",
-				"%s // 通常戦闘 // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n0:20 襲撃兵 → 斥候  |  1:00 群体兵 → 衛兵  |  1:54 装甲兵 → ゴーレム" % selected_route_name,
+				"%s // 通常戦闘 // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n0:20 襲撃兵 → 斥候  |  1:00 群体兵 → 衛兵  |  1:54 装甲兵 → 巨像" % selected_route_name,
 				"OK：工場構築へ"
 			)
 		RunFlow.Phase.FACTORY_BUILD:
