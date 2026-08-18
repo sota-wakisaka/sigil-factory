@@ -448,7 +448,7 @@ func _refresh_status() -> void:
 			player_unit_count += 1
 		else:
 			enemy_unit_count += 1
-	status_label.text = "残り %02d:%02d ×%d | リーダーHP %.0f %s | 戦場 %d対%d | 生産 S%d G%d C%d" % [
+	status_label.text = "残り %02d:%02d ×%d | リーダーHP %.0f %s | 戦場 %d対%d | 生産 斥候%d 衛兵%d 巨像%d" % [
 		int(remaining_seconds) / 60, int(remaining_seconds) % 60,
 		int(current_battle_speed()),
 		battle.player_leader_health, enemy_objective,
