@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://src/ui/factory_board.gd" id="2_board"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -15,103 +16,97 @@ script = ExtResource("1_main")
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 38.0
-offset_bottom = 83.0
+offset_top = 24.0
+offset_bottom = 67.0
 grow_horizontal = 2
 theme_override_colors/font_color = Color(0.9, 0.94, 1, 1)
-theme_override_colors/font_shadow_color = Color(0.2, 0.65, 1, 0.35)
-theme_override_constants/shadow_offset_x = 2
-theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 32
-text = "SIGIL DIAGNOSTIC"
+theme_override_font_sizes/font_size = 30
+text = "SIGIL FACTORY // FOUNDRY TEST"
 horizontal_alignment = 1
 
-[node name="TargetLabel" type="Label" parent="."]
-layout_mode = 1
-anchor_left = 0.32
-anchor_top = 0.2
-anchor_right = 0.32
-anchor_bottom = 0.2
-offset_left = -100.0
-offset_right = 100.0
-offset_bottom = 32.0
-theme_override_colors/font_color = Color(0.48, 0.58, 0.7, 1)
-theme_override_font_sizes/font_size = 17
-text = "TARGET SIGIL"
-horizontal_alignment = 1
-
-[node name="CurrentLabel" type="Label" parent="."]
-layout_mode = 1
-anchor_left = 0.68
-anchor_top = 0.2
-anchor_right = 0.68
-anchor_bottom = 0.2
-offset_left = -100.0
-offset_right = 100.0
-offset_bottom = 32.0
-theme_override_colors/font_color = Color(0.48, 0.58, 0.7, 1)
-theme_override_font_sizes/font_size = 17
-text = "CURRENT GLYPH"
-horizontal_alignment = 1
-
-[node name="Status" type="Label" parent="."]
+[node name="PlanLabel" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 510.0
-offset_bottom = 550.0
+offset_top = 74.0
+offset_bottom = 108.0
 grow_horizontal = 2
+theme_override_colors/font_color = Color(0.42, 0.72, 0.96, 1)
+theme_override_font_sizes/font_size = 17
+text = "稼働術式"
+horizontal_alignment = 1
+
+[node name="FactoryBoard" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -410.0
+offset_top = 125.0
+offset_right = 410.0
+offset_bottom = 520.0
+grow_horizontal = 2
+script = ExtResource("2_board")
+
+[node name="OutputLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 535.0
+offset_bottom = 575.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.55, 0.94, 0.76, 1)
 theme_override_font_sizes/font_size = 18
-text = "診断中"
+text = "SCOUT 0   SENTINEL 0   GOLEM 0"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Controls" type="HBoxContainer" parent="."]
+[node name="Toolbar" type="HBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 12
 anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -320.0
-offset_top = -122.0
-offset_right = 320.0
-offset_bottom = -74.0
+offset_left = -390.0
+offset_top = -112.0
+offset_right = 390.0
+offset_bottom = -62.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_constants/separation = 14
+theme_override_constants/separation = 12
 alignment = 1
 
-[node name="RotateButton" type="Button" parent="Controls"]
-custom_minimum_size = Vector2(140, 48)
+[node name="ScoutButton" type="Button" parent="Toolbar"]
+custom_minimum_size = Vector2(165, 50)
 layout_mode = 2
-text = "回転 +90°"
+text = "斥候術式"
 
-[node name="MoveButton" type="Button" parent="Controls"]
-custom_minimum_size = Vector2(140, 48)
+[node name="SentinelButton" type="Button" parent="Toolbar"]
+custom_minimum_size = Vector2(165, 50)
 layout_mode = 2
-text = "右へ移動"
+text = "衛兵術式"
 
-[node name="ColorButton" type="Button" parent="Controls"]
-custom_minimum_size = Vector2(140, 48)
+[node name="GolemButton" type="Button" parent="Toolbar"]
+custom_minimum_size = Vector2(165, 50)
 layout_mode = 2
-text = "色を変更"
+text = "巨像術式"
 
-[node name="ResetButton" type="Button" parent="Controls"]
-custom_minimum_size = Vector2(140, 48)
+[node name="PauseButton" type="Button" parent="Toolbar"]
+custom_minimum_size = Vector2(165, 50)
 layout_mode = 2
-text = "リセット"
+text = "時間停止"
 
 [node name="Hint" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = 12
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -56.0
-offset_bottom = -22.0
+offset_top = -48.0
+offset_bottom = -18.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(0.38, 0.46, 0.56, 1)
 theme_override_font_sizes/font_size = 14
-text = "位置・回転・色をターゲットへ合わせてください"
+text = "術式を切り替え、ライン上を流れるグリフと召喚出力を確認してください"
 horizontal_alignment = 1

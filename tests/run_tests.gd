@@ -7,6 +7,7 @@ const SigilRecipeModel := preload("res://src/domain/sigil_recipe.gd")
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
 const FactoryLineModel := preload("res://src/factory/factory_line.gd")
 const FactorySimulation := preload("res://src/factory/factory_simulation.gd")
+const MvpContent := preload("res://src/game/mvp_content.gd")
 
 var failures := 0
 
@@ -18,6 +19,7 @@ func _initialize() -> void:
 	_test_factory_pipeline_summons_matching_unit()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
+	_test_mvp_plans_produce_expected_units()
 
 	if failures == 0:
 		print("All domain and factory tests passed.")
@@ -157,6 +159,28 @@ func _test_factory_rejects_cycles() -> void:
 	var second := simulation.connect_nodes(FactoryLineModel.new(&"back", &"color", &"rotate"))
 	_expect(first["ok"], "first DAG connection should be accepted")
 	_expect(not second["ok"] and second["error"] == "cycle", "cycle should be rejected")
+
+
+func _test_mvp_plans_produce_expected_units() -> void:
+	var expectations := {
+		MvpContent.PLAN_SCOUT: &"scout",
+		MvpContent.PLAN_SENTINEL: &"sentinel",
+		MvpContent.PLAN_GOLEM: &"golem",
+	}
+	for plan_id in expectations:
+		var simulation := MvpContent.build_factory(plan_id)
+		for _tick in 48:
+			simulation.tick()
+		var expected_unit: StringName = expectations[plan_id]
+		var produced_expected_unit := false
+		for event in simulation.summon_events:
+			if event["unit_id"] == expected_unit:
+				produced_expected_unit = true
+				break
+		_expect(
+			produced_expected_unit,
+			"MVP plan %s should produce %s" % [plan_id, expected_unit]
+		)
 
 
 func _expect(condition: bool, message: String) -> void:
