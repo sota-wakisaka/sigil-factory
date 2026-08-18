@@ -9,6 +9,7 @@ const GRID_COLOR := Color(0.18, 0.26, 0.36, 0.2)
 const GRID_SPACING := 32
 const TICK_SECONDS := 0.2
 const FORECAST_TICKS := 300
+const BATTLE_SPEEDS := [1.0, 2.0, 4.0]
 const FLOW_STEPS := [
 	"ルート選択", "ステージ情報", "工場構築", "リアルタイム戦闘",
 	"時間停止・再構成", "敵リーダー撃破", "報酬獲得", "次のルート",
@@ -21,6 +22,7 @@ const FLOW_STEPS := [
 @onready var threat_label: Label = $ThreatLabel
 @onready var status_label: Label = $StatusLabel
 @onready var pause_button: Button = $Toolbar/PauseButton
+@onready var speed_button: Button = $Toolbar/SpeedButton
 @onready var cancel_button: Button = $Toolbar/CancelButton
 @onready var debug_victory_button: Button = $DebugVictoryButton
 @onready var phase_overlay: ColorRect = $PhaseOverlay
@@ -31,6 +33,7 @@ const FLOW_STEPS := [
 
 var flow := RunFlow.new()
 var elapsed_since_tick := 0.0
+var battle_speed_index := 0
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 
 
@@ -39,6 +42,7 @@ func _ready() -> void:
 	$Toolbar/SentinelButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SENTINEL))
 	$Toolbar/GolemButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_GOLEM))
 	pause_button.pressed.connect(_on_main_action)
+	speed_button.pressed.connect(_cycle_battle_speed)
 	cancel_button.pressed.connect(_cancel_edit)
 	debug_victory_button.pressed.connect(_complete_battle_placeholder)
 	phase_button.pressed.connect(_advance_overlay)
@@ -52,7 +56,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if flow.phase != RunFlow.Phase.BATTLE or battle_board.simulation.is_finished():
 		return
-	elapsed_since_tick += delta
+	elapsed_since_tick += delta * current_battle_speed()
 	while elapsed_since_tick >= TICK_SECONDS:
 		elapsed_since_tick -= TICK_SECONDS
 		factory_board.advance_tick()
@@ -112,6 +116,22 @@ func _cancel_edit() -> void:
 	_apply_phase()
 
 
+func current_battle_speed() -> float:
+	return BATTLE_SPEEDS[battle_speed_index]
+
+
+func _cycle_battle_speed() -> void:
+	if flow.phase != RunFlow.Phase.BATTLE:
+		return
+	battle_speed_index = (battle_speed_index + 1) % BATTLE_SPEEDS.size()
+	_update_speed_button()
+	_refresh_status()
+
+
+func _update_speed_button() -> void:
+	speed_button.text = "早送り ×%d" % int(current_battle_speed())
+
+
 func _complete_battle_placeholder() -> void:
 	if flow.phase != RunFlow.Phase.BATTLE:
 		return
@@ -148,12 +168,15 @@ func _reset_stage() -> void:
 	factory_board.configure(MvpContent.PLAN_SCOUT)
 	produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	elapsed_since_tick = 0.0
+	battle_speed_index = 0
 
 
 func _apply_phase() -> void:
 	_update_progress()
 	phase_overlay.visible = false
 	debug_victory_button.visible = false
+	speed_button.disabled = true
+	_update_speed_button()
 	cancel_button.disabled = true
 	_set_plan_buttons_enabled(false)
 	match flow.phase:
@@ -170,6 +193,7 @@ func _apply_phase() -> void:
 			_select_plan(factory_board.plan_id)
 		RunFlow.Phase.BATTLE:
 			pause_button.disabled = false
+			speed_button.disabled = false
 			pause_button.text = "時間停止"
 			debug_victory_button.text = "戦闘を完了（仮）"
 			debug_victory_button.visible = true
@@ -227,8 +251,9 @@ func _refresh_status() -> void:
 	if battle.is_finished():
 		return
 	var enemy_objective := "敵防壁HP %.0f" % battle.enemy_shield_health if battle.is_enemy_shield_active() else "敵リーダーHP %.0f" % battle.enemy_leader_health
-	status_label.text = "%02d:%02d  |  自軍リーダーHP %.0f  %s  |  S %d  G %d  C %d" % [
+	status_label.text = "%02d:%02d  ×%d  |  自軍リーダーHP %.0f  %s  |  S %d  G %d  C %d" % [
 		int(elapsed_seconds) / 60, int(elapsed_seconds) % 60,
+		int(current_battle_speed()),
 		battle.player_leader_health, enemy_objective,
 		produced_units[&"scout"], produced_units[&"sentinel"], produced_units[&"golem"],
 	]

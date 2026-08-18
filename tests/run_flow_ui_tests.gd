@@ -23,8 +23,20 @@ func _initialize() -> void:
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "build confirmation should start battle")
 	_expect("敵防壁HP" in main.status_label.text, "battle status should identify the active enemy shield")
+	_expect(not main.speed_button.disabled, "battle should enable speed controls")
+	main.speed_button.pressed.emit()
+	_expect(main.current_battle_speed() == 2.0, "speed button should switch battle to double speed")
+	main.elapsed_since_tick = 0.0
+	var tick_before_speed_test: int = main.battle_board.simulation.tick_index
+	main._process(0.2)
+	_expect(main.battle_board.simulation.tick_index == tick_before_speed_test + 2, "double speed should advance two simulation ticks per normal interval")
+	main.speed_button.pressed.emit()
+	_expect(main.current_battle_speed() == 4.0, "speed button should switch battle to quadruple speed")
+	main.speed_button.pressed.emit()
+	_expect(main.current_battle_speed() == 1.0, "speed button should cycle back to normal speed")
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "time stop should open reconfiguration")
+	_expect(main.speed_button.disabled, "time stop should disable speed controls")
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "edit confirmation should resume battle")
 

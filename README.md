@@ -35,9 +35,11 @@ that adaptive production wins while scout-only and golem-only production do not.
 Follow the highlighted progression bar from **Route Selection**. At the factory
 step, choose a production plan and press **Build Complete / Start Battle**.
 During battle, press **Time Stop**, select a production plan, then confirm the
-change. Preview changes do not affect the running factory until committed. Use
-the temporary **Complete Battle** button to inspect the victory, reward, and
-next-route screens without waiting for the simulation to finish.
+change. Preview changes do not affect the running factory until committed. The
+**Fast Forward** button cycles between 1x, 2x, and 4x battle speed and is disabled
+during time stop. Use the temporary **Complete Battle** button to inspect the
+victory, reward, and next-route screens without waiting for the simulation to
+finish.
 
 ## Tests
 
