@@ -23,6 +23,7 @@ func _initialize() -> void:
 	_expect(not main.phase_overlay.visible, "factory build should expose the workspace")
 	_expect(main.factory_board.plan_id == MvpContent.PLAN_EMPTY, "first factory build should start from the guided empty workshop")
 	_expect("構築ガイド" in main.plan_label.text, "empty workshop should explain its first connection")
+	_expect(main.factory_board.is_guided_connection_pending(), "empty workshop should highlight its first connection")
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	_expect(main.factory_board.interaction_enabled, "factory build should enable node placement")
 	_expect(not main.get_node("FactoryPalette/RingButton").disabled, "factory build should enable the equipment palette")

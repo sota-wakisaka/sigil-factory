@@ -186,6 +186,17 @@ func validation_result() -> Dictionary:
 	return result
 
 
+func is_guided_connection_pending() -> bool:
+	var display_simulation := _display_simulation()
+	return (
+		plan_id == MvpContent.PLAN_EMPTY
+		and display_simulation != null
+		and display_simulation.lines.is_empty()
+		and display_simulation.nodes.has(&"ring_source")
+		and display_simulation.nodes.has(&"summoner")
+	)
+
+
 func selected_node_details() -> Dictionary:
 	var display_simulation := _display_simulation()
 	if selected_node_id == &"" or display_simulation == null or not display_simulation.nodes.has(selected_node_id):
@@ -434,6 +445,14 @@ func _draw() -> void:
 	if display_simulation == null:
 		return
 	_draw_lines(display_simulation, display_positions)
+	if is_guided_connection_pending():
+		draw_dashed_line(
+			_output_port_position(&"ring_source"),
+			_input_port_position(&"summoner", 0),
+			Color(1.0, 0.74, 0.24, 0.65),
+			3.0,
+			8.0
+		)
 	if connecting_from_node_id != &"":
 		draw_line(_output_port_position(connecting_from_node_id), connection_cursor, SELECTED_COLOR, 3.0, true)
 	_draw_nodes(display_simulation, display_positions)
@@ -525,11 +544,17 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 
 func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 	if node.kind != FactoryNodeModel.NodeKind.SUMMONER:
-		draw_circle(center + Vector2(NODE_HALF_SIZE.x, 0), PORT_RADIUS, LINE_COLOR)
+		var output_color := LINE_COLOR
+		if is_guided_connection_pending() and node.id == &"ring_source":
+			output_color = SELECTED_COLOR
+		draw_circle(center + Vector2(NODE_HALF_SIZE.x, 0), PORT_RADIUS, output_color)
 	for port in node.required_input_count():
 		var position := _input_port_position(node.id, port)
+		var input_color := LINE_COLOR
+		if is_guided_connection_pending() and node.id == &"summoner":
+			input_color = SELECTED_COLOR
 		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
-		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, LINE_COLOR, 2.0)
+		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, input_color, 2.0)
 
 
 func _node_label(node: FactoryNodeModel) -> String:
