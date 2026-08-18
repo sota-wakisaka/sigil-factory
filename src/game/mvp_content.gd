@@ -37,16 +37,16 @@ static func unit_specs() -> Array[UnitSpecModel]:
 
 static func threat_schedule() -> Array[ThreatEventModel]:
 	var events: Array[ThreatEventModel] = []
-	# One battle tick represents 0.2 seconds. The schedule spans ten minutes.
-	for tick in range(30, 900, 42):
+	# One battle tick represents 0.2 seconds. A standard encounter lasts three minutes.
+	for tick in range(100, 300, 30):
 		events.append(ThreatEventModel.new(tick, &"raider", 1, "RAIDER PATROL"))
-	for tick in range(900, 1800, 30):
-		events.append(ThreatEventModel.new(tick, &"swarm", 3, "SWARM SURGE"))
-	for tick in range(1800, 2700, 45):
+	for tick in range(300, 570, 30):
+		events.append(ThreatEventModel.new(tick, &"swarm", 4, "SWARM SURGE"))
+	for tick in range(570, 780, 42):
 		events.append(ThreatEventModel.new(tick, &"brute", 1, "ARMORED ADVANCE"))
-	for tick in range(2700, 3001, 30):
+	for tick in range(780, 901, 30):
 		events.append(ThreatEventModel.new(tick, &"brute", 1, "FINAL ASSAULT"))
-		events.append(ThreatEventModel.new(tick + 8, &"swarm", 2, "FINAL ASSAULT"))
+		events.append(ThreatEventModel.new(tick + 8, &"swarm", 5, "FINAL ASSAULT"))
 	return events
 
 

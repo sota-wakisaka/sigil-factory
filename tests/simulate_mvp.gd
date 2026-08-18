@@ -6,8 +6,8 @@ const MvpContent := preload("res://src/game/mvp_content.gd")
 func _initialize() -> void:
 	var adaptive := _run_strategy("adaptive", [
 		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
-		{"tick": 900, "plan": MvpContent.PLAN_SENTINEL},
-		{"tick": 1800, "plan": MvpContent.PLAN_GOLEM},
+		{"tick": 250, "plan": MvpContent.PLAN_SENTINEL},
+		{"tick": 530, "plan": MvpContent.PLAN_GOLEM},
 	])
 	var scout_only := _run_strategy("scout_only", [
 		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
@@ -32,7 +32,7 @@ func _run_strategy(label: String, changes: Array[Dictionary]) -> Dictionary:
 	var factory: FactorySimulation
 	var event_index := 0
 	var change_index := 0
-	for tick in 3000:
+	for tick in 900:
 		if change_index < changes.size() and tick == changes[change_index]["tick"]:
 			factory = MvpContent.build_factory(changes[change_index]["plan"])
 			event_index = 0
