@@ -187,6 +187,17 @@ func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 	var center := Vector2(x, lane_y + vertical_offset)
 	var display_color := Color.WHITE if unit.hit_flash_ticks > 0 else color
 	_draw_unit_shape(unit.spec.id, center, radius, display_color)
+	if unit.side == BattleSimulation.Side.PLAYER and unit.summon_flash_ticks > 0:
+		draw_arc(center, radius + 6.0, 0.0, TAU, 24, Color(0.58, 0.92, 1.0, 0.85), 2.0)
+		draw_string(
+			ThemeDB.fallback_font,
+			center + Vector2(-12.0, radius + 17.0),
+			"召喚",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			10,
+			Color(0.58, 0.92, 1.0)
+		)
 	var health_ratio := clampf(unit.health / unit.spec.max_health, 0.0, 1.0)
 	var health_bar := Rect2(center + Vector2(-radius, -radius - 5.0), Vector2(radius * 2.0, 2.0))
 	draw_rect(health_bar, Color(0.08, 0.06, 0.09, 1.0), true)

@@ -10,6 +10,7 @@ var attack_cooldown := 0
 var age_ticks := 0
 var hit_flash_ticks := 0
 var weakness_flash_ticks := 0
+var summon_flash_ticks := 6
 
 
 func _init(

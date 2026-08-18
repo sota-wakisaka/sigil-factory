@@ -139,6 +139,7 @@ func _update_units() -> void:
 		unit.age_ticks += 1
 		unit.hit_flash_ticks = maxi(unit.hit_flash_ticks - 1, 0)
 		unit.weakness_flash_ticks = maxi(unit.weakness_flash_ticks - 1, 0)
+		unit.summon_flash_ticks = maxi(unit.summon_flash_ticks - 1, 0)
 		if unit.age_ticks >= unit.spec.max_lifetime_ticks:
 			unit.health = 0.0
 			continue

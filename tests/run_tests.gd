@@ -252,6 +252,7 @@ func _test_battle_units_fight_and_die() -> void:
 	battle.add_spec(UnitSpecModel.new(&"ally", 30.0, 10.0, 1, 10.0, 30.0))
 	battle.add_spec(UnitSpecModel.new(&"enemy", 20.0, 1.0, 2, 5.0, 20.0))
 	battle.spawn_player(&"ally")
+	_expect(battle.units[0].summon_flash_ticks > 0, "new player unit should receive summon feedback")
 	battle.spawn_enemy(&"enemy")
 	for _tick in 100:
 		battle.tick()
