@@ -9,6 +9,7 @@ The current design document is available at [`docs/GAME_DESIGN.md`](docs/GAME_DE
 - Click-through run flow from route selection to the next route
 - Draggable factory equipment with interactive input/output port wiring
 - Equipment palette for adding and deleting sources, processors, combiners, and summoners
+- Selection inspector for source material, rotation, and color configuration
 - Deterministic fixed-tick glyph factory simulation
 - Three production plans: fast scouts, anti-swarm sentinels, and anti-armor golems
 - Transactional factory changes made during time stop
@@ -16,10 +17,11 @@ The current design document is available at [`docs/GAME_DESIGN.md`](docs/GAME_DE
 - 24-second enemy threat forecast across a three-minute standard encounter
 - Victory, reward, next-route, defeat, and instant retry flow
 - Persistent run rewards for source, processor, or transport speed
+- Wave labels, matchup guidance, hit feedback, and post-battle analysis
 
-The route selection, stage information, and reward screens are intentionally
-content-free placeholders. They make the complete game progression testable
-before content production begins.
+Route selection currently offers three placeholder branches that share the same
+battle. The stage briefing, reward choice, reward persistence, and next-route
+loop are functional; route-specific encounters remain future content.
 
 The intended strategy is to start with scouts, switch to sentinels for the swarm
 phase, and finish with golems against armored enemies. Balance validation ensures
@@ -42,6 +44,7 @@ and then an outlined input port to connect them, and right-click an input port t
 disconnect it. Select equipment before pressing **Delete**. Incomplete factories
 cannot start and display the first missing connection. **Undo** restores placement,
 wiring, additions, and deletions made during the current edit session.
+Select a source, rotator, or colorizer to change its setting in the inspector.
 While editing, a non-destructive 32-second simulation preview reports expected
 scout, sentinel, and golem output plus unmatched glyphs.
 
@@ -56,6 +59,10 @@ change. Preview changes do not affect the running factory until committed. The
 during time stop. Use the temporary **Complete Battle** button to inspect the
 victory, reward, and next-route screens without waiting for the simulation to
 finish.
+
+Keyboard shortcuts: **Space** starts, stops, or resumes battle; **F** changes
+battle speed; **Ctrl+Z** undoes an edit; **Delete** removes selected equipment;
+and **0–3** select factory templates.
 
 ## Tests
 
