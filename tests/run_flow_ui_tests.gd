@@ -60,7 +60,10 @@ func _initialize() -> void:
 	_expect("推奨: 斥候" in main.threat_label.text, "enemy forecast should recommend an initial counter")
 	_expect(main.battle_board.wave_status_text() == "前線形成", "battlefield should identify the current wave phase")
 	_expect(not main.speed_button.disabled, "battle should enable speed controls")
-	main.speed_button.pressed.emit()
+	var speed_key := InputEventKey.new()
+	speed_key.keycode = KEY_F
+	speed_key.pressed = true
+	main._unhandled_key_input(speed_key)
 	_expect(main.current_battle_speed() == 2.0, "speed button should switch battle to double speed")
 	main.elapsed_since_tick = 0.0
 	var tick_before_speed_test: int = main.battle_board.simulation.tick_index

@@ -267,7 +267,7 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(0.38, 0.46, 0.56, 1)
 theme_override_font_sizes/font_size = 13
-text = "上の術式は開始テンプレートです。設備の配置・追加・削除・ポート接続で生産回路を編集できます"
+text = "ショートカット: Space 時間停止/再開  F 早送り  Ctrl+Z Undo  Delete 削除  0〜3 工場テンプレート"
 horizontal_alignment = 1
 
 [node name="PhaseOverlay" type="ColorRect" parent="."]

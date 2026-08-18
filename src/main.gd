@@ -88,6 +88,25 @@ func _notification(what: int) -> void:
 		queue_redraw()
 
 
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not event is InputEventKey or not event.pressed or event.echo:
+		return
+	if event.ctrl_pressed and event.keycode == KEY_Z:
+		_undo_factory_edit()
+	elif event.keycode == KEY_DELETE:
+		_delete_factory_node()
+	elif event.keycode == KEY_SPACE and flow.phase in [RunFlow.Phase.FACTORY_BUILD, RunFlow.Phase.BATTLE, RunFlow.Phase.FACTORY_RECONFIGURE]:
+		_on_main_action()
+	elif event.keycode == KEY_F:
+		_cycle_battle_speed()
+	elif factory_board.interaction_enabled:
+		match event.keycode:
+			KEY_0: _select_plan(MvpContent.PLAN_EMPTY)
+			KEY_1: _select_plan(MvpContent.PLAN_SCOUT)
+			KEY_2: _select_plan(MvpContent.PLAN_SENTINEL)
+			KEY_3: _select_plan(MvpContent.PLAN_GOLEM)
+
+
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), BACKGROUND_COLOR)
 	for x in range(0, int(size.x) + GRID_SPACING, GRID_SPACING):
