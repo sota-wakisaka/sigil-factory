@@ -8,6 +8,9 @@ const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
 const FactoryLineModel := preload("res://src/factory/factory_line.gd")
 const FactorySimulation := preload("res://src/factory/factory_simulation.gd")
 const MvpContent := preload("res://src/game/mvp_content.gd")
+const UnitSpecModel := preload("res://src/battle/unit_spec.gd")
+const ThreatEventModel := preload("res://src/battle/threat_event.gd")
+const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 
 var failures := 0
 
@@ -20,6 +23,8 @@ func _initialize() -> void:
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
 	_test_mvp_plans_produce_expected_units()
+	_test_battle_units_fight_and_die()
+	_test_threat_forecast_respects_horizon()
 
 	if failures == 0:
 		print("All domain and factory tests passed.")
@@ -181,6 +186,33 @@ func _test_mvp_plans_produce_expected_units() -> void:
 			produced_expected_unit,
 			"MVP plan %s should produce %s" % [plan_id, expected_unit]
 		)
+
+
+func _test_battle_units_fight_and_die() -> void:
+	var battle := BattleSimulation.new()
+	battle.add_spec(UnitSpecModel.new(&"ally", 30.0, 10.0, 1, 10.0, 30.0))
+	battle.add_spec(UnitSpecModel.new(&"enemy", 20.0, 1.0, 2, 5.0, 20.0))
+	battle.spawn_player(&"ally")
+	battle.spawn_enemy(&"enemy")
+	for _tick in 100:
+		battle.tick()
+		if battle.player_kills > 0:
+			break
+	_expect(battle.player_kills == 1, "player unit should kill weaker enemy")
+	_expect(battle.units.size() == 1, "dead unit should be removed from battle")
+
+
+func _test_threat_forecast_respects_horizon() -> void:
+	var battle := BattleSimulation.new()
+	battle.add_spec(UnitSpecModel.new(&"enemy", 10.0, 1.0, 2, 1.0, 10.0))
+	battle.set_schedule([
+		ThreatEventModel.new(10, &"enemy", 1, "NEAR"),
+		ThreatEventModel.new(30, &"enemy", 1, "FAR"),
+	])
+	var forecast := battle.upcoming_threats(15)
+	_expect(forecast.size() == 1, "forecast should only include events inside horizon")
+	if forecast.size() == 1:
+		_expect(forecast[0].label == "NEAR", "forecast should return the near threat")
 
 
 func _expect(condition: bool, message: String) -> void:

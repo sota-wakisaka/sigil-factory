@@ -52,8 +52,8 @@ func _draw() -> void:
 func _draw_lines() -> void:
 	for line_id in simulation.lines:
 		var line: FactoryLineModel = simulation.lines[line_id]
-		var start: Vector2 = node_positions.get(line.from_node_id, Vector2.ZERO)
-		var finish: Vector2 = node_positions.get(line.to_node_id, Vector2.ZERO)
+		var start := _scaled_position(node_positions.get(line.from_node_id, Vector2.ZERO))
+		var finish := _scaled_position(node_positions.get(line.to_node_id, Vector2.ZERO))
 		draw_line(start, finish, LINE_COLOR, 4.0, true)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
@@ -64,8 +64,8 @@ func _draw_nodes() -> void:
 	var font := ThemeDB.fallback_font
 	for node_id in simulation.nodes:
 		var node: FactoryNodeModel = simulation.nodes[node_id]
-		var center: Vector2 = node_positions.get(node_id, Vector2.ZERO)
-		var rect := Rect2(center - Vector2(58, 34), Vector2(116, 68))
+		var center := _scaled_position(node_positions.get(node_id, Vector2.ZERO))
+		var rect := Rect2(center - Vector2(48, 30), Vector2(96, 60))
 		draw_rect(rect, NODE_COLOR, true)
 		draw_rect(rect, NODE_BORDER, false, 2.0)
 		var label := MvpContent.node_name(node.kind)
@@ -80,6 +80,13 @@ func _draw_nodes() -> void:
 		)
 		if node.output_buffer != null or node.processing_glyph != null:
 			draw_circle(center + Vector2(0, 22), 4.0, GLYPH_COLOR)
+
+
+func _scaled_position(reference_position: Vector2) -> Vector2:
+	return Vector2(
+		reference_position.x / 820.0 * size.x,
+		reference_position.y / 395.0 * size.y
+	)
 
 
 func _panel_style() -> StyleBoxFlat:

@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1_main"]
-[ext_resource type="Script" path="res://src/ui/factory_board.gd" id="2_board"]
+[ext_resource type="Script" path="res://src/ui/factory_board.gd" id="2_factory"]
+[ext_resource type="Script" path="res://src/ui/battle_board.gd" id="3_battle"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -16,48 +17,84 @@ script = ExtResource("1_main")
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 24.0
-offset_bottom = 67.0
+offset_top = 16.0
+offset_bottom = 52.0
 grow_horizontal = 2
 theme_override_colors/font_color = Color(0.9, 0.94, 1, 1)
-theme_override_font_sizes/font_size = 30
-text = "SIGIL FACTORY // FOUNDRY TEST"
+theme_override_font_sizes/font_size = 26
+text = "SIGIL FACTORY // INTEGRATION SLICE"
 horizontal_alignment = 1
 
 [node name="PlanLabel" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 74.0
-offset_bottom = 108.0
+offset_top = 55.0
+offset_bottom = 84.0
 grow_horizontal = 2
 theme_override_colors/font_color = Color(0.42, 0.72, 0.96, 1)
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 16
 text = "稼働術式"
 horizontal_alignment = 1
 
-[node name="FactoryBoard" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 10
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -410.0
-offset_top = 125.0
-offset_right = 410.0
-offset_bottom = 520.0
-grow_horizontal = 2
-script = ExtResource("2_board")
-
-[node name="OutputLabel" type="Label" parent="."]
+[node name="ThreatLabel" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 535.0
-offset_bottom = 575.0
+offset_top = 88.0
+offset_bottom = 119.0
 grow_horizontal = 2
-theme_override_colors/font_color = Color(0.55, 0.94, 0.76, 1)
-theme_override_font_sizes/font_size = 18
-text = "SCOUT 0   SENTINEL 0   GOLEM 0"
+theme_override_colors/font_color = Color(1, 0.58, 0.62, 1)
+theme_override_font_sizes/font_size = 15
+text = "予告"
+horizontal_alignment = 1
+
+[node name="FactoryHeader" type="Label" parent="."]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 127.0
+offset_right = 610.0
+offset_bottom = 155.0
+theme_override_colors/font_color = Color(0.48, 0.68, 0.84, 1)
+text = "FACTORY // 生産回路"
+horizontal_alignment = 1
+
+[node name="BattleHeader" type="Label" parent="."]
+layout_mode = 0
+offset_left = 670.0
+offset_top = 127.0
+offset_right = 1238.0
+offset_bottom = 155.0
+theme_override_colors/font_color = Color(0.82, 0.48, 0.58, 1)
+text = "BATTLEFIELD // 戦術盤"
+horizontal_alignment = 1
+
+[node name="FactoryBoard" type="Control" parent="."]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 158.0
+offset_right = 610.0
+offset_bottom = 510.0
+script = ExtResource("2_factory")
+
+[node name="BattleBoard" type="Control" parent="."]
+layout_mode = 0
+offset_left = 670.0
+offset_top = 158.0
+offset_right = 1238.0
+offset_bottom = 510.0
+script = ExtResource("3_battle")
+
+[node name="StatusLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 522.0
+offset_bottom = 562.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.66, 0.9, 0.78, 1)
+theme_override_font_sizes/font_size = 17
+text = "00:00"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -102,11 +139,11 @@ layout_mode = 1
 anchors_preset = 12
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -48.0
-offset_bottom = -18.0
+offset_top = -46.0
+offset_bottom = -17.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(0.38, 0.46, 0.56, 1)
-theme_override_font_sizes/font_size = 14
-text = "術式を切り替え、ライン上を流れるグリフと召喚出力を確認してください"
+theme_override_font_sizes/font_size = 13
+text = "敵予告を読み、時間停止中に生産術式を切り替えて前線を維持してください"
 horizontal_alignment = 1

@@ -7,10 +7,47 @@ const FactorySimulation := preload("res://src/factory/factory_simulation.gd")
 const SigilRecipeModel := preload("res://src/domain/sigil_recipe.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
+const UnitSpecModel := preload("res://src/battle/unit_spec.gd")
+const ThreatEventModel := preload("res://src/battle/threat_event.gd")
+const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 
 const PLAN_SCOUT := &"scout"
 const PLAN_SENTINEL := &"sentinel"
 const PLAN_GOLEM := &"golem"
+
+
+static func build_battle() -> BattleSimulation:
+	var battle := BattleSimulation.new()
+	for spec in unit_specs():
+		battle.add_spec(spec)
+	battle.set_schedule(threat_schedule())
+	return battle
+
+
+static func unit_specs() -> Array[UnitSpecModel]:
+	return [
+		UnitSpecModel.new(&"scout", 34.0, 7.0, 4, 7.5, 28.0),
+		UnitSpecModel.new(&"sentinel", 105.0, 9.0, 5, 4.5, 32.0),
+		UnitSpecModel.new(&"golem", 250.0, 34.0, 7, 3.0, 42.0),
+		UnitSpecModel.new(&"raider", 40.0, 7.0, 5, 6.0, 27.0),
+		UnitSpecModel.new(&"swarm", 22.0, 4.0, 3, 8.0, 22.0),
+		UnitSpecModel.new(&"brute", 165.0, 22.0, 7, 3.2, 38.0),
+	]
+
+
+static func threat_schedule() -> Array[ThreatEventModel]:
+	var events: Array[ThreatEventModel] = []
+	# One battle tick represents 0.2 seconds. The schedule spans ten minutes.
+	for tick in range(30, 900, 45):
+		events.append(ThreatEventModel.new(tick, &"raider", 1, "RAIDER PATROL"))
+	for tick in range(900, 1800, 36):
+		events.append(ThreatEventModel.new(tick, &"swarm", 2, "SWARM SURGE"))
+	for tick in range(1800, 2700, 54):
+		events.append(ThreatEventModel.new(tick, &"brute", 1, "ARMORED ADVANCE"))
+	for tick in range(2700, 3001, 30):
+		events.append(ThreatEventModel.new(tick, &"brute", 1, "FINAL ASSAULT"))
+		events.append(ThreatEventModel.new(tick + 8, &"swarm", 2, "FINAL ASSAULT"))
+	return events
 
 
 static func build_factory(plan_id: StringName) -> FactorySimulation:
@@ -156,4 +193,3 @@ static func _source(id: StringName, primitive_id: StringName, interval: int) -> 
 		FactoryNodeModel.NodeKind.SOURCE,
 		{"primitive_id": primitive_id, "interval_ticks": interval}
 	)
-
