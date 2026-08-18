@@ -73,12 +73,15 @@ func _initialize() -> void:
 	_expect(main.current_battle_speed() == 4.0, "speed button should switch battle to quadruple speed")
 	main.speed_button.pressed.emit()
 	_expect(main.current_battle_speed() == 1.0, "speed button should cycle back to normal speed")
-	main.pause_button.pressed.emit()
-	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "time stop should open reconfiguration")
+	var action_key := InputEventKey.new()
+	action_key.keycode = KEY_SPACE
+	action_key.pressed = true
+	main._unhandled_key_input(action_key)
+	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "Space should open time-stop reconfiguration")
 	_expect(main.factory_board.interaction_enabled, "time stop should enable node placement")
 	_expect(main.speed_button.disabled, "time stop should disable speed controls")
-	main.pause_button.pressed.emit()
-	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "edit confirmation should resume battle")
+	main._unhandled_key_input(action_key)
+	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "Space should confirm edits and resume battle")
 
 	main.debug_victory_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.VICTORY, "placeholder completion should defeat the leader")
