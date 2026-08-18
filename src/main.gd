@@ -226,8 +226,9 @@ func _refresh_status() -> void:
 	threat_label.text = battle_board.forecast_text(FORECAST_TICKS, TICK_SECONDS)
 	if battle.is_finished():
 		return
-	status_label.text = "%02d:%02d  |  自軍HP %.0f  敵HP %.0f  |  S %d  G %d  C %d" % [
+	var enemy_objective := "敵防壁HP %.0f" % battle.enemy_shield_health if battle.is_enemy_shield_active() else "敵リーダーHP %.0f" % battle.enemy_leader_health
+	status_label.text = "%02d:%02d  |  自軍リーダーHP %.0f  %s  |  S %d  G %d  C %d" % [
 		int(elapsed_seconds) / 60, int(elapsed_seconds) % 60,
-		battle.player_leader_health, battle.enemy_leader_health,
+		battle.player_leader_health, enemy_objective,
 		produced_units[&"scout"], produced_units[&"sentinel"], produced_units[&"golem"],
 	]

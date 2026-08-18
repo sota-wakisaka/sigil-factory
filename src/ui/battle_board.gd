@@ -61,21 +61,8 @@ func _draw() -> void:
 		return
 	var lane_y := size.y * 0.55
 	draw_line(Vector2(35, lane_y), Vector2(size.x - 35, lane_y), LANE_COLOR, 5.0, true)
-	if simulation.tick_index < simulation.enemy_leader_vulnerable_tick:
-		var shield_x := remap(
-			BattleSimulation.ENEMY_SHIELD_POSITION,
-			0.0,
-			1000.0,
-			35.0,
-			size.x - 35.0
-		)
-		draw_line(
-			Vector2(shield_x, lane_y - 72),
-			Vector2(shield_x, lane_y + 72),
-			Color(0.82, 0.36, 0.92, 0.8),
-			3.0,
-			true
-		)
+	if simulation.is_enemy_shield_active():
+		_draw_enemy_shield(lane_y)
 	_draw_leader(Vector2(35, lane_y), true)
 	_draw_leader(Vector2(size.x - 35, lane_y), false)
 	for unit in simulation.units:
@@ -98,6 +85,35 @@ func _draw_leader(center: Vector2, is_player: bool) -> void:
 	draw_arc(center, 20.0, 0.0, TAU * clampf(health / maximum, 0.0, 1.0), 48, color, 4.0)
 
 
+func _draw_enemy_shield(lane_y: float) -> void:
+	var shield_x := remap(
+		BattleSimulation.ENEMY_SHIELD_POSITION,
+		0.0,
+		1000.0,
+		35.0,
+		size.x - 35.0
+	)
+	var color := Color(0.82, 0.36, 0.92, 0.9)
+	draw_line(Vector2(shield_x, lane_y - 72), Vector2(shield_x, lane_y + 72), color, 4.0, true)
+	var bar := Rect2(Vector2(shield_x - 48.0, lane_y - 100.0), Vector2(96.0, 8.0))
+	var ratio := clampf(
+		simulation.enemy_shield_health / BattleSimulation.ENEMY_SHIELD_MAX_HEALTH,
+		0.0,
+		1.0
+	)
+	draw_rect(bar, Color(0.12, 0.08, 0.16, 1.0), true)
+	draw_rect(Rect2(bar.position, Vector2(bar.size.x * ratio, bar.size.y)), color, true)
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(shield_x - 24.0, lane_y - 108.0),
+		"敵防壁",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		12,
+		Color(0.9, 0.72, 1.0)
+	)
+
+
 func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 	var x := remap(unit.position, 0.0, 1000.0, 35.0, size.x - 35.0)
 	var color := PLAYER_COLOR if unit.side == BattleSimulation.Side.PLAYER else ENEMY_COLOR
@@ -108,7 +124,16 @@ func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 		&"golem":
 			radius = 14.0
 	var vertical_offset := float(posmod(unit.instance_id, 5) - 2) * 5.0
-	draw_circle(Vector2(x, lane_y + vertical_offset), radius, color)
+	var center := Vector2(x, lane_y + vertical_offset)
+	draw_circle(center, radius, color)
+	var health_ratio := clampf(unit.health / unit.spec.max_health, 0.0, 1.0)
+	var health_bar := Rect2(center + Vector2(-radius, -radius - 5.0), Vector2(radius * 2.0, 2.0))
+	draw_rect(health_bar, Color(0.08, 0.06, 0.09, 1.0), true)
+	draw_rect(
+		Rect2(health_bar.position, Vector2(health_bar.size.x * health_ratio, health_bar.size.y)),
+		color.lightened(0.18),
+		true
+	)
 
 
 func _panel_style() -> StyleBoxFlat:

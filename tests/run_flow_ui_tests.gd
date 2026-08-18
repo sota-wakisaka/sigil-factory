@@ -22,6 +22,7 @@ func _initialize() -> void:
 
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "build confirmation should start battle")
+	_expect("敵防壁HP" in main.status_label.text, "battle status should identify the active enemy shield")
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "time stop should open reconfiguration")
 	main.pause_button.pressed.emit()
