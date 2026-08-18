@@ -59,6 +59,7 @@ func _initialize() -> void:
 	_expect("敵防壁HP" in main.status_label.text, "battle status should identify the active enemy shield")
 	_expect("残り 03:00" in main.status_label.text, "battle status should show the remaining time")
 	_expect("生産 斥候" in main.status_label.text and "衛兵" in main.status_label.text and "巨像" in main.status_label.text, "battle status should name each production count")
+	_expect(main.status_label.get_minimum_size().x <= main.size.x, "battle status should fit the default viewport width")
 	_expect("推奨: 斥候" in main.threat_label.text, "enemy forecast should recommend an initial counter")
 	_expect(main.battle_board.wave_status_text() == "前線形成", "battlefield should identify the current wave phase")
 	_expect(not main.speed_button.disabled, "battle should enable speed controls")
