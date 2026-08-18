@@ -62,6 +62,20 @@ func forecast_text(horizon_ticks: int, tick_seconds: float) -> String:
 	return "敵予告: " + "  |  ".join(entries) + advice
 
 
+func wave_status_text() -> String:
+	if simulation == null:
+		return "待機中"
+	if simulation.tick_index < 100:
+		return "前線形成"
+	if simulation.tick_index < 300:
+		return "第1波 // 襲撃兵"
+	if simulation.tick_index < 570:
+		return "第2波 // 群体兵"
+	if simulation.tick_index < 780:
+		return "第3波 // 装甲兵"
+	return "最終攻勢 // 防壁・敵リーダー"
+
+
 func _counter_for(enemy_id: StringName) -> String:
 	match enemy_id:
 		&"raider":
@@ -77,6 +91,15 @@ func _draw() -> void:
 	draw_style_box(_panel_style(), Rect2(Vector2.ZERO, size))
 	if simulation == null:
 		return
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(18, 28),
+		wave_status_text(),
+		HORIZONTAL_ALIGNMENT_CENTER,
+		size.x - 36.0,
+		14,
+		Color(0.9, 0.62, 0.7)
+	)
 	var lane_y := size.y * 0.55
 	draw_line(Vector2(35, lane_y), Vector2(size.x - 35, lane_y), LANE_COLOR, 5.0, true)
 	if simulation.is_enemy_shield_active():
