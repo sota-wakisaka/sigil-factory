@@ -65,6 +65,7 @@ func _ready() -> void:
 	phase_button.pressed.connect(_advance_overlay)
 	factory_board.summon_produced.connect(_on_summon_produced)
 	factory_board.selection_changed.connect(_refresh_factory_inspector)
+	factory_board.factory_changed.connect(_refresh_empty_factory_guidance)
 	inspector_option.item_selected.connect(_on_inspector_option_selected)
 	battle_board.battle_finished.connect(_on_battle_finished)
 	_select_plan(MvpContent.PLAN_SCOUT)
@@ -164,6 +165,15 @@ func _select_plan(plan_id: StringName) -> void:
 		plan_label.text = "%s: %s // %s" % [state, MvpContent.plan_name(plan_id), MvpContent.plan_description(plan_id)]
 	if plan_id == MvpContent.PLAN_EMPTY:
 		plan_label.text = "構築ガイド // 環素材の右●をクリック → 召喚器の左○をクリック"
+
+
+func _refresh_empty_factory_guidance() -> void:
+	if flow.phase != RunFlow.Phase.FACTORY_BUILD or factory_board.plan_id != MvpContent.PLAN_EMPTY:
+		return
+	if factory_board.is_guided_connection_pending():
+		plan_label.text = "構築ガイド // 環素材の右●をクリック → 召喚器の左○をクリック"
+	elif factory_board.validation_result()["ok"]:
+		plan_label.text = "構築完了 // 斥候を生産できます。戦闘開始へ進めます"
 
 
 func _add_factory_node(template_id: StringName) -> void:

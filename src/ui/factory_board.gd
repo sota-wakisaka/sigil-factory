@@ -3,6 +3,7 @@ extends Control
 
 signal summon_produced(unit_id: StringName)
 signal selection_changed
+signal factory_changed
 
 const MvpContent := preload("res://src/game/mvp_content.gd")
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
@@ -708,6 +709,7 @@ func _refresh_production_preview() -> void:
 	var result := production_preview()
 	if not result["ok"]:
 		cached_production_preview = "32秒予測 // 配線未完成"
+		factory_changed.emit()
 		return
 	var counts: Dictionary = result["counts"]
 	cached_production_preview = "32秒予測 // 斥候 %d  衛兵 %d  巨像 %d  不一致 %d" % [
@@ -716,6 +718,7 @@ func _refresh_production_preview() -> void:
 		counts[&"golem"],
 		result["discarded"],
 	]
+	factory_changed.emit()
 
 
 func _apply_run_upgrades(target_simulation: FactorySimulation) -> void:
