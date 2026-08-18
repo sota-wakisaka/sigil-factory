@@ -29,6 +29,8 @@ var battle_duration_ticks := 900
 var player_kills := 0
 var enemy_kills := 0
 var battle_events: Array[Dictionary] = []
+var last_enemy_shield_damage := 0.0
+var enemy_shield_flash_ticks := 0
 
 
 func add_spec(spec: UnitSpecModel) -> void:
@@ -119,6 +121,8 @@ func _spawn_scheduled_enemies() -> void:
 
 
 func _update_units() -> void:
+	if enemy_shield_flash_ticks > 0:
+		enemy_shield_flash_ticks -= 1
 	var damage_by_instance: Dictionary = {}
 	var player_leader_damage := 0.0
 	var enemy_leader_damage := 0.0
@@ -133,6 +137,8 @@ func _update_units() -> void:
 		if not unit.is_alive():
 			continue
 		unit.age_ticks += 1
+		unit.hit_flash_ticks = maxi(unit.hit_flash_ticks - 1, 0)
+		unit.weakness_flash_ticks = maxi(unit.weakness_flash_ticks - 1, 0)
 		if unit.age_ticks >= unit.spec.max_lifetime_ticks:
 			unit.health = 0.0
 			continue
@@ -142,6 +148,9 @@ func _update_units() -> void:
 			if unit.attack_cooldown == 0:
 				for target_index in mini(targets_in_range.size(), unit.spec.target_count):
 					var target: BattleUnitModel = targets_in_range[target_index]
+					target.hit_flash_ticks = 2
+					if unit.spec.preferred_target_id == target.spec.id:
+						target.weakness_flash_ticks = 4
 					damage_by_instance[target.instance_id] = (
 						float(damage_by_instance.get(target.instance_id, 0.0))
 						+ unit.spec.damage_against(target.spec)
@@ -173,6 +182,9 @@ func _update_units() -> void:
 	_apply_damage(damage_by_instance)
 	var shield_was_active := is_enemy_shield_active()
 	enemy_shield_health = maxf(enemy_shield_health - enemy_shield_damage, 0.0)
+	if enemy_shield_damage > 0.0:
+		last_enemy_shield_damage = enemy_shield_damage
+		enemy_shield_flash_ticks = 4
 	if shield_was_active and not is_enemy_shield_active():
 		battle_events.append({"type": "shield_destroyed", "tick": tick_index})
 	player_leader_health = maxf(player_leader_health - player_leader_damage, 0.0)

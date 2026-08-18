@@ -329,9 +329,17 @@ func _refresh_status() -> void:
 	if battle.is_finished():
 		return
 	var enemy_objective := "敵防壁HP %.0f" % battle.enemy_shield_health if battle.is_enemy_shield_active() else "敵リーダーHP %.0f" % battle.enemy_leader_health
-	status_label.text = "残り %02d:%02d  ×%d  |  自軍リーダーHP %.0f  %s  |  S %d  G %d  C %d" % [
+	var player_unit_count := 0
+	var enemy_unit_count := 0
+	for unit in battle.units:
+		if unit.side == BattleSimulation.Side.PLAYER:
+			player_unit_count += 1
+		else:
+			enemy_unit_count += 1
+	status_label.text = "残り %02d:%02d ×%d | リーダーHP %.0f %s | 戦場 %d対%d | 生産 S%d G%d C%d" % [
 		int(remaining_seconds) / 60, int(remaining_seconds) % 60,
 		int(current_battle_speed()),
 		battle.player_leader_health, enemy_objective,
+		player_unit_count, enemy_unit_count,
 		produced_units[&"scout"], produced_units[&"sentinel"], produced_units[&"golem"],
 	]

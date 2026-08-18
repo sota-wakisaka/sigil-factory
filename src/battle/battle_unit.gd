@@ -8,6 +8,8 @@ var position: float
 var health: float
 var attack_cooldown := 0
 var age_ticks := 0
+var hit_flash_ticks := 0
+var weakness_flash_ticks := 0
 
 
 func _init(

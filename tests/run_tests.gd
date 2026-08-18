@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_test_mvp_plans_produce_expected_units()
 	_test_empty_factory_requires_player_wiring()
 	_test_battle_units_fight_and_die()
+	_test_preferred_attack_marks_weakness_feedback()
 	_test_enemy_shield_takes_damage_and_opens()
 	_test_battle_ends_at_time_limit()
 	_test_threat_forecast_respects_horizon()
@@ -256,6 +257,18 @@ func _test_battle_units_fight_and_die() -> void:
 			break
 	_expect(battle.player_kills == 1, "player unit should kill weaker enemy")
 	_expect(battle.units.size() == 1, "dead unit should be removed from battle")
+
+
+func _test_preferred_attack_marks_weakness_feedback() -> void:
+	var battle := BattleSimulation.new()
+	battle.add_spec(UnitSpecModel.new(&"counter", 100.0, 2.0, 1, 1.0, 1000.0, 0.0, 1, &"target", 2.0))
+	battle.add_spec(UnitSpecModel.new(&"target", 100.0, 1.0, 10, 1.0, 10.0))
+	battle.spawn_player(&"counter")
+	battle.spawn_enemy(&"target")
+	battle.tick()
+	var target: BattleUnitModel = battle.units[1]
+	_expect(target.hit_flash_ticks > 0, "damaged unit should receive hit feedback")
+	_expect(target.weakness_flash_ticks > 0, "preferred target hit should receive weakness feedback")
 
 
 func _test_enemy_shield_takes_damage_and_opens() -> void:

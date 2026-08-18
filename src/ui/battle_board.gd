@@ -111,7 +111,7 @@ func _draw_enemy_shield(lane_y: float) -> void:
 		35.0,
 		size.x - 35.0
 	)
-	var color := Color(0.82, 0.36, 0.92, 0.9)
+	var color := Color.WHITE if simulation.enemy_shield_flash_ticks > 0 else Color(0.82, 0.36, 0.92, 0.9)
 	draw_line(Vector2(shield_x, lane_y - 72), Vector2(shield_x, lane_y + 72), color, 4.0, true)
 	var bar := Rect2(Vector2(shield_x - 48.0, lane_y - 100.0), Vector2(96.0, 8.0))
 	var ratio := clampf(
@@ -130,6 +130,16 @@ func _draw_enemy_shield(lane_y: float) -> void:
 		12,
 		Color(0.9, 0.72, 1.0)
 	)
+	if simulation.enemy_shield_flash_ticks > 0:
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(shield_x - 34.0, lane_y + 94.0),
+			"防壁 -%.0f" % simulation.last_enemy_shield_damage,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			12,
+			Color(1.0, 0.82, 0.36)
+		)
 
 
 func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
@@ -143,7 +153,8 @@ func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 			radius = 14.0
 	var vertical_offset := float(posmod(unit.instance_id, 5) - 2) * 5.0
 	var center := Vector2(x, lane_y + vertical_offset)
-	draw_circle(center, radius, color)
+	var display_color := Color.WHITE if unit.hit_flash_ticks > 0 else color
+	draw_circle(center, radius, display_color)
 	var health_ratio := clampf(unit.health / unit.spec.max_health, 0.0, 1.0)
 	var health_bar := Rect2(center + Vector2(-radius, -radius - 5.0), Vector2(radius * 2.0, 2.0))
 	draw_rect(health_bar, Color(0.08, 0.06, 0.09, 1.0), true)
@@ -152,6 +163,16 @@ func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 		color.lightened(0.18),
 		true
 	)
+	if unit.weakness_flash_ticks > 0:
+		draw_string(
+			ThemeDB.fallback_font,
+			center + Vector2(-18.0, -radius - 9.0),
+			"弱点!",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			10,
+			Color(1.0, 0.78, 0.25)
+		)
 
 
 func _panel_style() -> StyleBoxFlat:
