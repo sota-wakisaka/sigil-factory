@@ -452,6 +452,11 @@ func _test_run_upgrade_accelerates_ring_source() -> void:
 	board.configure(MvpContent.PLAN_SCOUT)
 	var source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
 	_expect(source.config["interval_ticks"] < 18, "ring speed reward should accelerate future factories")
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	board.configure_selected_node(1)
+	board.configure_selected_node(0)
+	_expect(source.config["interval_ticks"] < 18, "ring speed reward should survive source reconfiguration")
 	board.free()
 
 

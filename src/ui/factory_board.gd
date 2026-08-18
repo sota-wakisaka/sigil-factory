@@ -244,6 +244,7 @@ func configure_selected_node(option_index: int) -> bool:
 				return false
 			node.config["primitive_id"] = "spike" if option_index == 1 else "ring"
 			node.config["interval_ticks"] = 54 if option_index == 1 else 18
+			_apply_node_upgrades(node)
 		FactoryNodeModel.NodeKind.ROTATOR:
 			if option_index < 0 or option_index > 2:
 				undo_history.pop_back()
