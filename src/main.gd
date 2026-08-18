@@ -183,6 +183,7 @@ func _apply_phase() -> void:
 	_update_speed_button()
 	cancel_button.disabled = true
 	_set_plan_buttons_enabled(false)
+	factory_board.set_interaction_enabled(false)
 	match flow.phase:
 		RunFlow.Phase.ROUTE_SELECTION:
 			_show_overlay("RUN %02d" % flow.route_number, "ルートを選択", "進みたいルートを選択します。\n現在は内容を作らず、進行だけを確認する仮画面です。", "OK：このルートを選択")
@@ -190,6 +191,7 @@ func _apply_phase() -> void:
 			_show_overlay("STAGE PREVIEW", "ステージ情報を確認", "通常戦闘 // 制限時間 3:00\n敵の種類、地形、報酬候補は今後この画面に表示します。", "OK：工場構築へ")
 		RunFlow.Phase.FACTORY_BUILD:
 			_set_plan_buttons_enabled(true)
+			factory_board.set_interaction_enabled(true)
 			pause_button.disabled = false
 			pause_button.text = "構築完了・戦闘開始"
 			threat_label.text = "ステージ情報をもとに、戦闘前の工場を構築します"
@@ -205,6 +207,7 @@ func _apply_phase() -> void:
 			_refresh_status()
 		RunFlow.Phase.FACTORY_RECONFIGURE:
 			_set_plan_buttons_enabled(true)
+			factory_board.set_interaction_enabled(true)
 			pause_button.disabled = false
 			pause_button.text = "変更を確定・戦闘再開"
 			cancel_button.disabled = false

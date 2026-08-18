@@ -11,6 +11,9 @@ const NODE_COLOR := Color(0.08, 0.12, 0.18, 1.0)
 const NODE_BORDER := Color(0.38, 0.62, 0.82, 0.9)
 const LINE_COLOR := Color(0.24, 0.48, 0.68, 0.75)
 const GLYPH_COLOR := Color(0.35, 0.86, 1.0, 1.0)
+const SELECTED_COLOR := Color(1.0, 0.78, 0.3, 1.0)
+const NODE_HALF_SIZE := Vector2(48, 30)
+const REFERENCE_SIZE := Vector2(820, 395)
 
 var plan_id: StringName = MvpContent.PLAN_SCOUT
 var simulation: FactorySimulation
@@ -20,6 +23,10 @@ var editing := false
 var pending_plan_id: StringName
 var preview_simulation: FactorySimulation
 var preview_node_positions: Dictionary = {}
+var interaction_enabled := false
+var selected_node_id: StringName = &""
+var dragging_node := false
+var drag_offset := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -33,7 +40,53 @@ func configure(next_plan_id: StringName) -> void:
 	observed_event_count = 0
 	editing = false
 	preview_simulation = null
+	selected_node_id = &""
+	dragging_node = false
 	queue_redraw()
+
+
+func set_interaction_enabled(enabled: bool) -> void:
+	interaction_enabled = enabled
+	if not enabled:
+		dragging_node = false
+		selected_node_id = &""
+	queue_redraw()
+
+
+func move_node(node_id: StringName, local_position: Vector2) -> bool:
+	var positions := _display_positions()
+	if not interaction_enabled or not positions.has(node_id):
+		return false
+	var margin := NODE_HALF_SIZE + Vector2(8, 8)
+	var clamped_local := Vector2(
+		clampf(local_position.x, margin.x, size.x - margin.x),
+		clampf(local_position.y, margin.y, size.y - margin.y)
+	)
+	positions[node_id] = _reference_position(clamped_local)
+	queue_redraw()
+	return true
+
+
+func node_local_position(node_id: StringName) -> Vector2:
+	return _scaled_position(_display_positions().get(node_id, Vector2.ZERO))
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not interaction_enabled:
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			selected_node_id = _node_at(event.position)
+			dragging_node = selected_node_id != &""
+			if dragging_node:
+				drag_offset = node_local_position(selected_node_id) - event.position
+				accept_event()
+		else:
+			dragging_node = false
+		queue_redraw()
+	elif event is InputEventMouseMotion and dragging_node:
+		move_node(selected_node_id, event.position + drag_offset)
+		accept_event()
 
 
 func begin_edit() -> void:
@@ -118,6 +171,16 @@ func _draw() -> void:
 			14,
 			Color(0.46, 0.82, 1.0)
 		)
+	if interaction_enabled:
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(18, size.y - 14),
+			"ノードをドラッグして配置",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			12,
+			Color(0.52, 0.65, 0.76)
+		)
 
 
 func _draw_lines(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
@@ -136,9 +199,10 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 	for node_id in display_simulation.nodes:
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
 		var center := _scaled_position(display_positions.get(node_id, Vector2.ZERO))
-		var rect := Rect2(center - Vector2(48, 30), Vector2(96, 60))
+		var rect := Rect2(center - NODE_HALF_SIZE, NODE_HALF_SIZE * 2.0)
 		draw_rect(rect, NODE_COLOR, true)
-		draw_rect(rect, NODE_BORDER, false, 2.0)
+		var border_color := SELECTED_COLOR if node_id == selected_node_id else NODE_BORDER
+		draw_rect(rect, border_color, false, 3.0 if node_id == selected_node_id else 2.0)
 		var label := MvpContent.node_name(node.kind)
 		draw_string(
 			font,
@@ -155,9 +219,37 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 
 func _scaled_position(reference_position: Vector2) -> Vector2:
 	return Vector2(
-		reference_position.x / 820.0 * size.x,
-		reference_position.y / 395.0 * size.y
+		reference_position.x / REFERENCE_SIZE.x * size.x,
+		reference_position.y / REFERENCE_SIZE.y * size.y
 	)
+
+
+func _reference_position(local_position: Vector2) -> Vector2:
+	return Vector2(
+		local_position.x / size.x * REFERENCE_SIZE.x,
+		local_position.y / size.y * REFERENCE_SIZE.y
+	)
+
+
+func _display_positions() -> Dictionary:
+	return preview_node_positions if editing else node_positions
+
+
+func _display_simulation() -> FactorySimulation:
+	return preview_simulation if editing else simulation
+
+
+func _node_at(local_position: Vector2) -> StringName:
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return &""
+	var ids := display_simulation.nodes.keys()
+	ids.reverse()
+	for node_id in ids:
+		var center := node_local_position(node_id)
+		if Rect2(center - NODE_HALF_SIZE, NODE_HALF_SIZE * 2.0).has_point(local_position):
+			return node_id
+	return &""
 
 
 func _panel_style() -> StyleBoxFlat:

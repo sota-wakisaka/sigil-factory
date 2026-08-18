@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_test_battle_ends_at_time_limit()
 	_test_threat_forecast_respects_horizon()
 	_test_factory_edit_is_transactional()
+	_test_factory_nodes_can_be_repositioned()
 	_test_run_flow_covers_one_route()
 
 	if failures == 0:
@@ -260,6 +261,18 @@ func _test_factory_edit_is_transactional() -> void:
 	board.commit_edit()
 	_expect(board.plan_id == MvpContent.PLAN_GOLEM, "commit should apply pending plan")
 	_expect(board.simulation != original_simulation, "commit should replace factory atomically")
+	board.free()
+
+
+func _test_factory_nodes_can_be_repositioned() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_SCOUT)
+	var original := board.node_positions[&"ring_source"] as Vector2
+	_expect(not board.move_node(&"ring_source", Vector2(300, 160)), "running factory should reject node movement")
+	board.set_interaction_enabled(true)
+	_expect(board.move_node(&"ring_source", Vector2(300, 160)), "editable factory should allow node movement")
+	_expect(board.node_positions[&"ring_source"] != original, "node movement should update its layout")
 	board.free()
 
 
