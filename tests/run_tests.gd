@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_factory_editor_undo_restores_graph()
 	_test_factory_node_configuration_is_undoable()
 	_test_factory_board_connections_change_output()
+	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
 	_test_run_flow_covers_one_route()
 
@@ -404,6 +405,28 @@ func _test_factory_board_connections_change_output() -> void:
 			produced_scout = true
 			break
 	_expect(produced_scout, "edited factory graph should change its summoned unit")
+	board.free()
+
+
+func _test_factory_ports_connect_through_mouse_input() -> void:
+	var board := FactoryBoard.new()
+	root.add_child(board)
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_EMPTY)
+	board.set_interaction_enabled(true)
+	var output_click := InputEventMouseButton.new()
+	output_click.button_index = MOUSE_BUTTON_LEFT
+	output_click.pressed = true
+	output_click.position = board.node_local_position(&"ring_source") + Vector2(48, 0)
+	board._gui_input(output_click)
+	_expect(board.connecting_from_node_id == &"ring_source", "clicking an output port should begin wiring")
+	var input_click := InputEventMouseButton.new()
+	input_click.button_index = MOUSE_BUTTON_LEFT
+	input_click.pressed = true
+	input_click.position = board.node_local_position(&"summoner") - Vector2(48, 0)
+	board._gui_input(input_click)
+	_expect(board.simulation.lines.size() == 1, "clicking the target input port should complete wiring")
+	_expect(not board.is_guided_connection_pending(), "first connection guide should clear after wiring")
 	board.free()
 
 
