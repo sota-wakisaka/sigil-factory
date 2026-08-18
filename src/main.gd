@@ -30,6 +30,8 @@ const FLOW_STEPS := [
 @onready var phase_title: Label = $PhaseOverlay/Center/Panel/Content/Title
 @onready var phase_body: Label = $PhaseOverlay/Center/Panel/Content/Body
 @onready var phase_button: Button = $PhaseOverlay/Center/Panel/Content/AdvanceButton
+@onready var inspector_label: Label = $FactoryInspector/SelectionLabel
+@onready var inspector_option: OptionButton = $FactoryInspector/SettingOption
 
 var flow := RunFlow.new()
 var elapsed_since_tick := 0.0
@@ -55,6 +57,8 @@ func _ready() -> void:
 	debug_victory_button.pressed.connect(_complete_battle_placeholder)
 	phase_button.pressed.connect(_advance_overlay)
 	factory_board.summon_produced.connect(_on_summon_produced)
+	factory_board.selection_changed.connect(_refresh_factory_inspector)
+	inspector_option.item_selected.connect(_on_inspector_option_selected)
 	battle_board.battle_finished.connect(_on_battle_finished)
 	_select_plan(MvpContent.PLAN_SCOUT)
 	_apply_phase()
@@ -143,6 +147,22 @@ func _undo_factory_edit() -> void:
 		plan_label.text = "カスタム工場 // 直前の編集を元に戻しました"
 
 
+func _refresh_factory_inspector() -> void:
+	var details := factory_board.selected_node_details()
+	inspector_label.text = details["title"]
+	inspector_option.clear()
+	for option in details["options"]:
+		inspector_option.add_item(option)
+	inspector_option.disabled = details["options"].is_empty() or not factory_board.interaction_enabled
+	if details["selected_index"] >= 0:
+		inspector_option.select(details["selected_index"])
+
+
+func _on_inspector_option_selected(index: int) -> void:
+	if factory_board.configure_selected_node(index):
+		plan_label.text = "カスタム工場 // 設備設定を変更しました"
+
+
 func _cancel_edit() -> void:
 	if flow.phase != RunFlow.Phase.FACTORY_RECONFIGURE:
 		return
@@ -220,6 +240,7 @@ func _apply_phase() -> void:
 	_set_plan_buttons_enabled(false)
 	_set_factory_palette_enabled(false)
 	factory_board.set_interaction_enabled(false)
+	_refresh_factory_inspector()
 	match flow.phase:
 		RunFlow.Phase.ROUTE_SELECTION:
 			_show_overlay("RUN %02d" % flow.route_number, "ルートを選択", "進みたいルートを選択します。\n現在は内容を作らず、進行だけを確認する仮画面です。", "OK：このルートを選択")

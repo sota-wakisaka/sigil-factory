@@ -2,6 +2,7 @@ class_name FactoryBoard
 extends Control
 
 signal summon_produced(unit_id: StringName)
+signal selection_changed
 
 const MvpContent := preload("res://src/game/mvp_content.gd")
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
@@ -65,6 +66,7 @@ func set_interaction_enabled(enabled: bool) -> void:
 		dragging_node = false
 		selected_node_id = &""
 		connecting_from_node_id = &""
+	selection_changed.emit()
 	queue_redraw()
 
 
@@ -130,6 +132,7 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 	selected_node_id = node_id
 	connection_message = "%sを追加しました" % MvpContent.node_name(kind)
 	_refresh_production_preview()
+	selection_changed.emit()
 	queue_redraw()
 	return node_id
 
@@ -149,6 +152,7 @@ func remove_factory_node(node_id: StringName) -> bool:
 		connecting_from_node_id = &""
 	connection_message = "設備を削除しました"
 	_refresh_production_preview()
+	selection_changed.emit()
 	queue_redraw()
 	return true
 
@@ -171,6 +175,7 @@ func undo() -> bool:
 	connecting_from_node_id = &""
 	connection_message = "元に戻しました"
 	_refresh_production_preview()
+	selection_changed.emit()
 	queue_redraw()
 	return true
 
@@ -179,6 +184,65 @@ func validation_result() -> Dictionary:
 	var result := _display_simulation().validate_graph()
 	result["message"] = _validation_message(result["errors"])
 	return result
+
+
+func selected_node_details() -> Dictionary:
+	var display_simulation := _display_simulation()
+	if selected_node_id == &"" or display_simulation == null or not display_simulation.nodes.has(selected_node_id):
+		return {"selected": false, "title": "設備を選択", "options": PackedStringArray(), "selected_index": -1}
+	var node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
+	var options := PackedStringArray()
+	var selected_index := -1
+	match node.kind:
+		FactoryNodeModel.NodeKind.SOURCE:
+			options = PackedStringArray(["環素材", "棘素材"])
+			selected_index = 1 if String(node.config.get("primitive_id", "ring")) == "spike" else 0
+		FactoryNodeModel.NodeKind.ROTATOR:
+			options = PackedStringArray(["90°", "180°", "270°"])
+			selected_index = clampi(int(node.config.get("steps", 1)) - 1, 0, 2)
+		FactoryNodeModel.NodeKind.COLORIZER:
+			options = PackedStringArray(["青", "赤", "白"])
+			var color_id := String(node.config.get("color_id", "blue"))
+			selected_index = ["blue", "red", "white"].find(color_id)
+	return {
+		"selected": true,
+		"title": _node_label(node),
+		"options": options,
+		"selected_index": selected_index,
+	}
+
+
+func configure_selected_node(option_index: int) -> bool:
+	var display_simulation := _display_simulation()
+	if not interaction_enabled or selected_node_id == &"" or not display_simulation.nodes.has(selected_node_id):
+		return false
+	var node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
+	_push_undo_snapshot()
+	match node.kind:
+		FactoryNodeModel.NodeKind.SOURCE:
+			if option_index < 0 or option_index > 1:
+				undo_history.pop_back()
+				return false
+			node.config["primitive_id"] = "spike" if option_index == 1 else "ring"
+			node.config["interval_ticks"] = 54 if option_index == 1 else 18
+		FactoryNodeModel.NodeKind.ROTATOR:
+			if option_index < 0 or option_index > 2:
+				undo_history.pop_back()
+				return false
+			node.config["steps"] = option_index + 1
+		FactoryNodeModel.NodeKind.COLORIZER:
+			if option_index < 0 or option_index > 2:
+				undo_history.pop_back()
+				return false
+			node.config["color_id"] = ["blue", "red", "white"][option_index]
+		_:
+			undo_history.pop_back()
+			return false
+	connection_message = "設備設定を変更しました"
+	_refresh_production_preview()
+	selection_changed.emit()
+	queue_redraw()
+	return true
 
 
 func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
@@ -267,6 +331,7 @@ func _gui_input(event: InputEvent) -> void:
 				queue_redraw()
 				return
 			selected_node_id = _node_at(event.position)
+			selection_changed.emit()
 			dragging_node = selected_node_id != &""
 			if dragging_node:
 				_push_undo_snapshot()

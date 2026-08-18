@@ -36,6 +36,7 @@ func _initialize() -> void:
 	_test_factory_edit_preserves_custom_graph()
 	_test_factory_nodes_can_be_repositioned()
 	_test_factory_editor_undo_restores_graph()
+	_test_factory_node_configuration_is_undoable()
 	_test_factory_board_connections_change_output()
 	_test_factory_production_preview_is_non_destructive()
 	_test_run_flow_covers_one_route()
@@ -344,6 +345,19 @@ func _test_factory_editor_undo_restores_graph() -> void:
 	_expect(board.undo(), "factory editor should undo its latest edit")
 	_expect(board.simulation.nodes.size() == original_node_count, "undo should restore the previous graph")
 	_expect(not board.simulation.nodes.has(added_id), "undo should remove the newly added node")
+	board.free()
+
+
+func _test_factory_node_configuration_is_undoable() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_SCOUT)
+	board.set_interaction_enabled(true)
+	var rotator_id := board.add_node_from_palette(&"rotator")
+	_expect(board.configure_selected_node(1), "selected rotator should accept a 180-degree setting")
+	_expect(board.simulation.nodes[rotator_id].config["steps"] == 2, "inspector should update node configuration")
+	_expect(board.undo(), "node configuration should be undoable")
+	_expect(board.simulation.nodes[rotator_id].config["steps"] == 1, "undo should restore the previous node setting")
 	board.free()
 
 

@@ -27,6 +27,10 @@ func _initialize() -> void:
 	main.get_node("FactoryPalette/RingButton").pressed.emit()
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette + 1, "palette should add factory equipment")
 	_expect("配線未完成" in main.factory_board.cached_production_preview, "dangling equipment should invalidate production preview")
+	_expect(not main.inspector_option.disabled, "selected configurable equipment should enable its inspector")
+	main.inspector_option.item_selected.emit(1)
+	var selected_source: FactoryNodeModel = main.factory_board.simulation.nodes[main.factory_board.selected_node_id]
+	_expect(selected_source.config["primitive_id"] == "spike", "inspector should change a selected source to spike material")
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "invalid factory should not start battle")
 	_expect("戦闘を開始できません" in main.status_label.text, "invalid factory should explain why battle cannot start")
@@ -34,6 +38,8 @@ func _initialize() -> void:
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette, "delete button should remove selected equipment")
 	main.get_node("FactoryPalette/UndoButton").pressed.emit()
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette + 1, "undo button should restore deleted equipment")
+	main.get_node("FactoryPalette/UndoButton").pressed.emit()
+	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette + 1, "undo button should restore the previous equipment setting")
 	main.get_node("FactoryPalette/UndoButton").pressed.emit()
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette, "undo button should restore the graph before equipment was added")
 
