@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_test_factory_board_connections_change_output()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
+	_test_run_upgrade_accelerates_ring_source()
 	_test_run_flow_covers_one_route()
 
 	if failures == 0:
@@ -442,6 +443,15 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	board.set_interaction_enabled(true)
 	board.add_node_from_palette(&"rotator")
 	_expect(not board.production_preview()["ok"], "incomplete custom graph should not produce a preview")
+	board.free()
+
+
+func _test_run_upgrade_accelerates_ring_source() -> void:
+	var board := FactoryBoard.new()
+	board.set_run_upgrades([&"ring_speed"])
+	board.configure(MvpContent.PLAN_SCOUT)
+	var source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
+	_expect(source.config["interval_ticks"] < 18, "ring speed reward should accelerate future factories")
 	board.free()
 
 

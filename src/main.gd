@@ -30,6 +30,7 @@ const FLOW_STEPS := [
 @onready var phase_title: Label = $PhaseOverlay/Center/Panel/Content/Title
 @onready var phase_body: Label = $PhaseOverlay/Center/Panel/Content/Body
 @onready var phase_button: Button = $PhaseOverlay/Center/Panel/Content/AdvanceButton
+@onready var reward_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RewardOption
 @onready var inspector_label: Label = $FactoryInspector/SelectionLabel
 @onready var inspector_option: OptionButton = $FactoryInspector/SettingOption
 
@@ -38,6 +39,7 @@ var elapsed_since_tick := 0.0
 var battle_speed_index := 0
 var time_stop_count := 0
 var factory_change_count := 0
+var acquired_rewards: Array[StringName] = []
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 
 
@@ -93,6 +95,8 @@ func _draw() -> void:
 
 
 func _advance_overlay() -> void:
+	if flow.phase == RunFlow.Phase.REWARD:
+		_acquire_selected_reward()
 	if not flow.advance():
 		return
 	if flow.phase == RunFlow.Phase.FACTORY_BUILD or flow.phase == RunFlow.Phase.ROUTE_SELECTION:
@@ -228,6 +232,7 @@ func _enter_victory() -> void:
 
 func _reset_stage() -> void:
 	battle_board.reset_battle()
+	factory_board.set_run_upgrades(acquired_rewards)
 	factory_board.configure(MvpContent.PLAN_EMPTY)
 	produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	elapsed_since_tick = 0.0
@@ -239,6 +244,7 @@ func _reset_stage() -> void:
 func _apply_phase() -> void:
 	_update_progress()
 	phase_overlay.visible = false
+	reward_option.visible = false
 	debug_victory_button.visible = false
 	speed_button.disabled = true
 	_update_speed_button()
@@ -288,7 +294,8 @@ func _apply_phase() -> void:
 			_show_overlay("STAGE CLEAR", "敵リーダーを撃破", _battle_result_summary(), "OK：報酬を確認")
 		RunFlow.Phase.REWARD:
 			pause_button.disabled = true
-			_show_overlay("REWARD", "シジル・リリック・能力などを獲得", "ランを強化する報酬を選ぶ画面です。\n現在は内容を作らず、獲得したものとして先へ進みます。", "OK：獲得して次のルートへ")
+			_prepare_reward_options()
+			_show_overlay("REWARD", "ラン強化を1つ獲得", "選んだ強化は次のルート以降の工場へ適用されます。", "獲得して次のルートへ")
 
 
 func _show_overlay(kicker: String, title: String, body: String, button_text: String) -> void:
@@ -297,6 +304,24 @@ func _show_overlay(kicker: String, title: String, body: String, button_text: Str
 	phase_body.text = body
 	phase_button.text = button_text
 	phase_overlay.visible = true
+
+
+func _prepare_reward_options() -> void:
+	reward_option.clear()
+	reward_option.add_item("迅速な環 // 環素材の生成間隔 -20%")
+	reward_option.set_item_metadata(0, &"ring_speed")
+	reward_option.add_item("高速加工 // 加工器の処理時間 -1 tick")
+	reward_option.set_item_metadata(1, &"processing_speed")
+	reward_option.add_item("高速ライン // 輸送時間 -1 tick")
+	reward_option.set_item_metadata(2, &"line_speed")
+	reward_option.visible = true
+
+
+func _acquire_selected_reward() -> void:
+	if reward_option.item_count == 0:
+		return
+	var reward_id: StringName = reward_option.get_item_metadata(reward_option.selected)
+	acquired_rewards.append(reward_id)
 
 
 func _battle_result_summary() -> String:

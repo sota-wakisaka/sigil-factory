@@ -321,6 +321,12 @@ text = "進みたいルートを選択します。"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="RewardOption" type="OptionButton" parent="PhaseOverlay/Center/Panel/Content"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+visible = false
+theme_override_font_sizes/font_size = 16
+
 [node name="AdvanceButton" type="Button" parent="PhaseOverlay/Center/Panel/Content"]
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2

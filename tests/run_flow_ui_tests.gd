@@ -80,9 +80,13 @@ func _initialize() -> void:
 	_expect("時間停止 1回" in main.phase_body.text, "victory screen should summarize time stops")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.REWARD, "victory OK should open rewards")
+	_expect(main.reward_option.visible and main.reward_option.item_count == 3, "reward phase should offer three run upgrades")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.ROUTE_SELECTION, "reward OK should return to route selection")
 	_expect(main.flow.route_number == 2, "UI should display the next route")
+	_expect(main.acquired_rewards.size() == 1, "selected reward should persist into the next route")
+	var upgraded_source: FactoryNodeModel = main.factory_board.simulation.nodes[&"ring_source"]
+	_expect(upgraded_source.config["interval_ticks"] < 18, "selected reward should modify the next route factory")
 
 	main.queue_free()
 	if failures == 0:

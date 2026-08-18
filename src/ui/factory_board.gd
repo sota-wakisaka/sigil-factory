@@ -38,6 +38,7 @@ var node_serial := 1
 var connection_message := ""
 var undo_history: Array[Dictionary] = []
 var cached_production_preview := ""
+var run_upgrades: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -47,6 +48,7 @@ func _ready() -> void:
 func configure(next_plan_id: StringName) -> void:
 	plan_id = next_plan_id
 	simulation = MvpContent.build_factory(plan_id)
+	_apply_run_upgrades(simulation)
 	node_positions = MvpContent.layout_for_plan(plan_id)
 	observed_event_count = 0
 	editing = false
@@ -125,7 +127,9 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 		node_serial += 1
 		node_id = StringName("%s_user_%d" % [prefix, node_serial])
 	node_serial += 1
-	display_simulation.add_node(FactoryNodeModel.new(node_id, kind, config))
+	var new_node := FactoryNodeModel.new(node_id, kind, config)
+	_apply_node_upgrades(new_node)
+	display_simulation.add_node(new_node)
 	var column := posmod(node_serial - 2, 3)
 	var row := posmod((node_serial - 2) / 3, 2)
 	_display_positions()[node_id] = Vector2(250 + column * 150, 135 + row * 125)
@@ -184,6 +188,10 @@ func validation_result() -> Dictionary:
 	var result := _display_simulation().validate_graph()
 	result["message"] = _validation_message(result["errors"])
 	return result
+
+
+func set_run_upgrades(upgrades: Array[StringName]) -> void:
+	run_upgrades = upgrades.duplicate()
 
 
 func is_guided_connection_pending() -> bool:
@@ -297,6 +305,8 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 	var result := display_simulation.connect_nodes(
 		FactoryLineModel.new(line_id, from_node_id, to_node_id, to_port, 2)
 	)
+	if result["ok"]:
+		_apply_line_upgrades(display_simulation.lines[line_id])
 	if not result["ok"] and removed_line != null:
 		display_simulation.connect_nodes(removed_line)
 	if not result["ok"]:
@@ -382,6 +392,7 @@ func preview_plan(next_plan_id: StringName) -> void:
 		return
 	pending_plan_id = next_plan_id
 	preview_simulation = MvpContent.build_factory(pending_plan_id)
+	_apply_run_upgrades(preview_simulation)
 	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
 	undo_history.clear()
 	_refresh_production_preview()
@@ -698,6 +709,27 @@ func _refresh_production_preview() -> void:
 		counts[&"golem"],
 		result["discarded"],
 	]
+
+
+func _apply_run_upgrades(target_simulation: FactorySimulation) -> void:
+	for node in target_simulation.nodes.values():
+		_apply_node_upgrades(node)
+	for line in target_simulation.lines.values():
+		_apply_line_upgrades(line)
+
+
+func _apply_node_upgrades(node: FactoryNodeModel) -> void:
+	for upgrade_id in run_upgrades:
+		if upgrade_id == &"ring_speed" and node.kind == FactoryNodeModel.NodeKind.SOURCE and String(node.config.get("primitive_id", "")) == "ring":
+			node.config["interval_ticks"] = maxi(int(round(float(node.config.get("interval_ticks", 18)) * 0.8)), 1)
+		elif upgrade_id == &"processing_speed" and node.kind not in [FactoryNodeModel.NodeKind.SOURCE, FactoryNodeModel.NodeKind.SUMMONER]:
+			node.config["processing_ticks"] = maxi(int(node.config.get("processing_ticks", 1)) - 1, 1)
+
+
+func _apply_line_upgrades(line: FactoryLineModel) -> void:
+	for upgrade_id in run_upgrades:
+		if upgrade_id == &"line_speed":
+			line.travel_ticks = maxi(line.travel_ticks - 1, 1)
 
 
 func _panel_style() -> StyleBoxFlat:

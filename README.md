@@ -15,6 +15,7 @@ The current design document is available at [`docs/GAME_DESIGN.md`](docs/GAME_DE
 - One-dimensional automatic battle with unit roles, lifetimes, and leader objectives
 - 24-second enemy threat forecast across a three-minute standard encounter
 - Victory, reward, next-route, defeat, and instant retry flow
+- Persistent run rewards for source, processor, or transport speed
 
 The route selection, stage information, and reward screens are intentionally
 content-free placeholders. They make the complete game progression testable
