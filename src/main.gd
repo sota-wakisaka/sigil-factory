@@ -261,7 +261,12 @@ func _apply_phase() -> void:
 	match flow.phase:
 		RunFlow.Phase.ROUTE_SELECTION:
 			_prepare_route_options()
-			_show_overlay("RUN %02d" % flow.route_number, "ルートを選択", "進みたいルートを選択します。\n現在は内容を作らず、進行だけを確認する仮画面です。", "OK：このルートを選択")
+			_show_overlay(
+				"RUN %02d" % flow.route_number,
+				"ルートを選択",
+				"進みたいルートを選択します。戦闘内容は現在共通です。\n所持強化: %s" % _reward_summary(),
+				"OK：このルートを選択"
+			)
 		RunFlow.Phase.STAGE_INFO:
 			_show_overlay(
 				"STAGE PREVIEW",
@@ -337,6 +342,18 @@ func _acquire_selected_reward() -> void:
 		return
 	var reward_id: StringName = reward_option.get_item_metadata(reward_option.selected)
 	acquired_rewards.append(reward_id)
+
+
+func _reward_summary() -> String:
+	if acquired_rewards.is_empty():
+		return "なし"
+	var names := PackedStringArray()
+	for reward_id in acquired_rewards:
+		match reward_id:
+			&"ring_speed": names.append("迅速な環")
+			&"processing_speed": names.append("高速加工")
+			&"line_speed": names.append("高速ライン")
+	return " / ".join(names)
 
 
 func _battle_result_summary() -> String:

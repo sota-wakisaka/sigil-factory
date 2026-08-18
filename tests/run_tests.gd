@@ -458,6 +458,14 @@ func _test_run_upgrade_accelerates_ring_source() -> void:
 	board.configure_selected_node(0)
 	_expect(source.config["interval_ticks"] < 18, "ring speed reward should survive source reconfiguration")
 	board.free()
+	var processing_board := FactoryBoard.new()
+	processing_board.set_run_upgrades([&"processing_speed", &"line_speed"])
+	processing_board.configure(MvpContent.PLAN_SENTINEL)
+	var rotator: FactoryNodeModel = processing_board.simulation.nodes[&"rotator"]
+	var first_line: FactoryLineModel = processing_board.simulation.lines[&"line_1"]
+	_expect(rotator.config["processing_ticks"] == 1, "processing reward should accelerate processors")
+	_expect(first_line.travel_ticks == 1, "line reward should accelerate transport")
+	processing_board.free()
 
 
 func _test_run_flow_covers_one_route() -> void:

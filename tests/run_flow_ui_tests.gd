@@ -87,6 +87,7 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.ROUTE_SELECTION, "reward OK should return to route selection")
 	_expect(main.flow.route_number == 2, "UI should display the next route")
 	_expect(main.acquired_rewards.size() == 1, "selected reward should persist into the next route")
+	_expect("迅速な環" in main.phase_body.text, "next route should display acquired run rewards")
 	var upgraded_source: FactoryNodeModel = main.factory_board.simulation.nodes[&"ring_source"]
 	_expect(upgraded_source.config["interval_ticks"] < 18, "selected reward should modify the next route factory")
 
