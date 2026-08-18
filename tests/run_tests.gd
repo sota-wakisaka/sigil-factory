@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_factory_rejects_cycles()
 	_test_mvp_plans_produce_expected_units()
 	_test_battle_units_fight_and_die()
+	_test_enemy_shield_takes_damage_and_opens()
 	_test_threat_forecast_respects_horizon()
 	_test_factory_edit_is_transactional()
 	_test_run_flow_covers_one_route()
@@ -204,6 +205,24 @@ func _test_battle_units_fight_and_die() -> void:
 			break
 	_expect(battle.player_kills == 1, "player unit should kill weaker enemy")
 	_expect(battle.units.size() == 1, "dead unit should be removed from battle")
+
+
+func _test_enemy_shield_takes_damage_and_opens() -> void:
+	var battle := BattleSimulation.new()
+	battle.add_spec(UnitSpecModel.new(
+		&"breaker", 100.0, BattleSimulation.ENEMY_SHIELD_MAX_HEALTH,
+		1, 100.0, 20.0, 0.0, 1, &"", 1.0, 100
+	))
+	battle.spawn_player(&"breaker")
+	for _tick in 10:
+		battle.tick()
+		if not battle.is_enemy_shield_active():
+			break
+	_expect(battle.enemy_shield_health < BattleSimulation.ENEMY_SHIELD_MAX_HEALTH, "units at the wall should damage the enemy shield")
+	_expect(not battle.is_enemy_shield_active(), "depleted enemy shield should open the route")
+	var position_before := battle.units[0].position
+	battle.tick()
+	_expect(battle.units[0].position > position_before, "units should advance after breaking the shield")
 
 
 func _test_threat_forecast_respects_horizon() -> void:

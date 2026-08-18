@@ -11,6 +11,7 @@ const ENEMY_SPAWN := 900.0
 const PLAYER_LEADER_POSITION := 30.0
 const ENEMY_LEADER_POSITION := 970.0
 const ENEMY_SHIELD_POSITION := 760.0
+const ENEMY_SHIELD_MAX_HEALTH := 40000.0
 const PLAYER_LEADER_MAX_HEALTH := 1200.0
 const ENEMY_LEADER_MAX_HEALTH := 5000.0
 
@@ -20,6 +21,7 @@ var schedule: Array[ThreatEventModel] = []
 var tick_index := 0
 var player_leader_health := PLAYER_LEADER_MAX_HEALTH
 var enemy_leader_health := ENEMY_LEADER_MAX_HEALTH
+var enemy_shield_health := ENEMY_SHIELD_MAX_HEALTH
 var next_instance_id := 1
 var next_schedule_index := 0
 var enemy_leader_vulnerable_tick := 2700
@@ -79,6 +81,10 @@ func winner() -> int:
 	return -1
 
 
+func is_enemy_shield_active() -> bool:
+	return enemy_shield_health > 0.0 and tick_index < enemy_leader_vulnerable_tick
+
+
 func _spawn_unit(unit_id: StringName, side: int, position: float) -> bool:
 	if not specs.has(unit_id):
 		return false
@@ -109,6 +115,7 @@ func _update_units() -> void:
 	var damage_by_instance: Dictionary = {}
 	var player_leader_damage := 0.0
 	var enemy_leader_damage := 0.0
+	var enemy_shield_damage := 0.0
 	var ordered_units := units.duplicate()
 	ordered_units.sort_custom(
 		func(a: BattleUnitModel, b: BattleUnitModel) -> bool:
@@ -135,6 +142,13 @@ func _update_units() -> void:
 				unit.attack_cooldown = unit.spec.attack_interval_ticks
 		elif _closest_enemy(unit) != null:
 			_move_toward_enemy(unit)
+		elif unit.side == Side.PLAYER and is_enemy_shield_active():
+			if absf(ENEMY_SHIELD_POSITION - unit.position) <= unit.spec.attack_range:
+				if unit.attack_cooldown == 0:
+					enemy_shield_damage += unit.spec.attack_damage
+					unit.attack_cooldown = unit.spec.attack_interval_ticks
+			else:
+				_move_toward_enemy(unit)
 		else:
 			var leader_position := (
 				ENEMY_LEADER_POSITION if unit.side == Side.PLAYER else PLAYER_LEADER_POSITION
@@ -142,8 +156,7 @@ func _update_units() -> void:
 			if absf(leader_position - unit.position) <= unit.spec.attack_range:
 				if unit.attack_cooldown == 0:
 					if unit.side == Side.PLAYER:
-						if tick_index >= enemy_leader_vulnerable_tick:
-							enemy_leader_damage += unit.spec.attack_damage
+						enemy_leader_damage += unit.spec.attack_damage
 					else:
 						player_leader_damage += unit.spec.attack_damage
 					unit.attack_cooldown = unit.spec.attack_interval_ticks
@@ -151,6 +164,10 @@ func _update_units() -> void:
 				_move_toward_enemy(unit)
 
 	_apply_damage(damage_by_instance)
+	var shield_was_active := is_enemy_shield_active()
+	enemy_shield_health = maxf(enemy_shield_health - enemy_shield_damage, 0.0)
+	if shield_was_active and not is_enemy_shield_active():
+		battle_events.append({"type": "shield_destroyed", "tick": tick_index})
 	player_leader_health = maxf(player_leader_health - player_leader_damage, 0.0)
 	enemy_leader_health = maxf(enemy_leader_health - enemy_leader_damage, 0.0)
 
@@ -191,7 +208,7 @@ func _enemies_in_range(unit: BattleUnitModel) -> Array[BattleUnitModel]:
 func _move_toward_enemy(unit: BattleUnitModel) -> void:
 	var direction := 1.0 if unit.side == Side.PLAYER else -1.0
 	var maximum_position := ENEMY_LEADER_POSITION
-	if unit.side == Side.PLAYER and tick_index < enemy_leader_vulnerable_tick:
+	if unit.side == Side.PLAYER and is_enemy_shield_active():
 		maximum_position = ENEMY_SHIELD_POSITION
 	unit.position = clampf(
 		unit.position + direction * unit.spec.move_speed,
