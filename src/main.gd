@@ -41,6 +41,7 @@ var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 
 func _ready() -> void:
 	$Toolbar/ScoutButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SCOUT))
+	$Toolbar/EmptyButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_EMPTY))
 	$Toolbar/SentinelButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SENTINEL))
 	$Toolbar/GolemButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_GOLEM))
 	$FactoryPalette/RingButton.pressed.connect(func() -> void: _add_factory_node(&"ring_source"))
@@ -130,6 +131,8 @@ func _select_plan(plan_id: StringName) -> void:
 		factory_board.configure(plan_id)
 		var state := "構築中" if flow.phase == RunFlow.Phase.FACTORY_BUILD else "稼働術式"
 		plan_label.text = "%s: %s // %s" % [state, MvpContent.plan_name(plan_id), MvpContent.plan_description(plan_id)]
+	if plan_id == MvpContent.PLAN_EMPTY:
+		plan_label.text = "構築ガイド // 環素材の右●をクリック → 召喚器の左○をクリック"
 
 
 func _add_factory_node(template_id: StringName) -> void:
@@ -224,7 +227,7 @@ func _enter_victory() -> void:
 
 func _reset_stage() -> void:
 	battle_board.reset_battle()
-	factory_board.configure(MvpContent.PLAN_SCOUT)
+	factory_board.configure(MvpContent.PLAN_EMPTY)
 	produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	elapsed_since_tick = 0.0
 	battle_speed_index = 0
@@ -305,6 +308,7 @@ func _update_progress() -> void:
 
 
 func _set_plan_buttons_enabled(enabled: bool) -> void:
+	$Toolbar/EmptyButton.disabled = not enabled
 	$Toolbar/ScoutButton.disabled = not enabled
 	$Toolbar/SentinelButton.disabled = not enabled
 	$Toolbar/GolemButton.disabled = not enabled

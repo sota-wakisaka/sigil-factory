@@ -44,6 +44,10 @@ wiring, additions, and deletions made during the current edit session.
 While editing, a non-destructive 32-second simulation preview reports expected
 scout, sentinel, and golem output plus unmatched glyphs.
 
+The first factory step opens an unwired workshop containing a ring source and a
+summoner. Connecting its two highlighted ports produces the first scout. The
+three completed production plans remain available as reference templates.
+
 Press **Build Complete / Start Battle** when the graph is ready.
 During battle, press **Time Stop**, select a production plan, then confirm the
 change. Preview changes do not affect the running factory until committed. The

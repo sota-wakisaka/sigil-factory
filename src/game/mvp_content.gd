@@ -14,6 +14,7 @@ const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const PLAN_SCOUT := &"scout"
 const PLAN_SENTINEL := &"sentinel"
 const PLAN_GOLEM := &"golem"
+const PLAN_EMPTY := &"empty"
 
 
 static func build_battle() -> BattleSimulation:
@@ -56,6 +57,8 @@ static func build_factory(plan_id: StringName) -> FactorySimulation:
 		simulation.add_recipe(recipe)
 
 	match plan_id:
+		PLAN_EMPTY:
+			_build_empty_factory(simulation)
 		PLAN_SENTINEL:
 			_build_sentinel_factory(simulation)
 		PLAN_GOLEM:
@@ -94,6 +97,11 @@ static func recipes() -> Array[SigilRecipeModel]:
 
 static func layout_for_plan(plan_id: StringName) -> Dictionary:
 	match plan_id:
+		PLAN_EMPTY:
+			return {
+				&"ring_source": Vector2(180, 190),
+				&"summoner": Vector2(640, 190),
+			}
 		PLAN_SENTINEL:
 			return {
 				&"ring_source": Vector2(90, 190),
@@ -118,6 +126,8 @@ static func layout_for_plan(plan_id: StringName) -> Dictionary:
 
 static func plan_name(plan_id: StringName) -> String:
 	match plan_id:
+		PLAN_EMPTY:
+			return "EMPTY WORKSHOP"
 		PLAN_SENTINEL:
 			return "AZURE SENTINEL"
 		PLAN_GOLEM:
@@ -128,6 +138,8 @@ static func plan_name(plan_id: StringName) -> String:
 
 static func plan_description(plan_id: StringName) -> String:
 	match plan_id:
+		PLAN_EMPTY:
+			return "構築練習 // 環素材の出力を召喚器へ接続"
 		PLAN_SENTINEL:
 			return "対群体 // 3体同時攻撃・中速"
 		PLAN_GOLEM:
@@ -157,6 +169,11 @@ static func _build_scout_factory(simulation: FactorySimulation) -> void:
 	simulation.add_node(_source(&"ring_source", &"ring", 18))
 	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_1", &"ring_source", &"summoner", 0, 3))
+
+
+static func _build_empty_factory(simulation: FactorySimulation) -> void:
+	simulation.add_node(_source(&"ring_source", &"ring", 18))
+	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
 
 
 static func _build_sentinel_factory(simulation: FactorySimulation) -> void:

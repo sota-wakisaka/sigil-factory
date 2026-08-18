@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_test_factory_removes_node_and_connected_lines()
 	_test_factory_graph_validation_reports_dangling_nodes()
 	_test_mvp_plans_produce_expected_units()
+	_test_empty_factory_requires_player_wiring()
 	_test_battle_units_fight_and_die()
 	_test_enemy_shield_takes_damage_and_opens()
 	_test_battle_ends_at_time_limit()
@@ -229,6 +230,18 @@ func _test_mvp_plans_produce_expected_units() -> void:
 			produced_expected_unit,
 			"MVP plan %s should produce %s" % [plan_id, expected_unit]
 		)
+
+
+func _test_empty_factory_requires_player_wiring() -> void:
+	var simulation := MvpContent.build_factory(MvpContent.PLAN_EMPTY)
+	_expect(simulation.nodes.size() == 2, "empty workshop should start with source and summoner")
+	_expect(simulation.lines.is_empty(), "empty workshop should require the player to create its first line")
+	_expect(not simulation.validate_graph()["ok"], "unwired empty workshop should not start battle")
+	var connection := simulation.connect_nodes(FactoryLineModel.new(&"first_line", &"ring_source", &"summoner", 0, 3))
+	_expect(connection["ok"], "player should be able to complete the empty workshop")
+	for _tick in 80:
+		simulation.tick()
+	_expect(not simulation.summon_events.is_empty(), "completed empty workshop should produce its first scout")
 
 
 func _test_battle_units_fight_and_die() -> void:

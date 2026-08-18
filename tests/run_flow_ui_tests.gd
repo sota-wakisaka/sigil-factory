@@ -1,6 +1,7 @@
 extends SceneTree
 
 const RunFlow := preload("res://src/game/run_flow.gd")
+const MvpContent := preload("res://src/game/mvp_content.gd")
 
 var failures := 0
 
@@ -20,6 +21,9 @@ func _initialize() -> void:
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "stage OK should open factory build")
 	_expect(not main.phase_overlay.visible, "factory build should expose the workspace")
+	_expect(main.factory_board.plan_id == MvpContent.PLAN_EMPTY, "first factory build should start from the guided empty workshop")
+	_expect("構築ガイド" in main.plan_label.text, "empty workshop should explain its first connection")
+	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	_expect(main.factory_board.interaction_enabled, "factory build should enable node placement")
 	_expect(not main.get_node("FactoryPalette/RingButton").disabled, "factory build should enable the equipment palette")
 	_expect("斥候" in main.factory_board.cached_production_preview, "factory build should preview expected production")
