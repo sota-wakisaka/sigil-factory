@@ -25,6 +25,7 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "stage OK should open factory build")
 	_expect(not main.phase_overlay.visible, "factory build should expose the workspace")
 	_expect(main.factory_board.plan_id == MvpContent.PLAN_EMPTY, "first factory build should start from the guided empty workshop")
+	_expect("戦闘を開始" in main.pause_button.tooltip_text, "main action tooltip should explain build confirmation")
 	_expect("構築ガイド" in main.plan_label.text, "empty workshop should explain its first connection")
 	_expect(main.factory_board.is_guided_connection_pending(), "empty workshop should highlight its first connection")
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
@@ -60,6 +61,7 @@ func _initialize() -> void:
 	_expect("推奨: 斥候" in main.threat_label.text, "enemy forecast should recommend an initial counter")
 	_expect(main.battle_board.wave_status_text() == "前線形成", "battlefield should identify the current wave phase")
 	_expect(not main.speed_button.disabled, "battle should enable speed controls")
+	_expect("時間を停止" in main.pause_button.tooltip_text, "main action tooltip should explain time stop during battle")
 	var speed_key := InputEventKey.new()
 	speed_key.keycode = KEY_F
 	speed_key.pressed = true
@@ -79,6 +81,7 @@ func _initialize() -> void:
 	main._unhandled_key_input(action_key)
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "Space should open time-stop reconfiguration")
 	_expect(main.factory_board.interaction_enabled, "time stop should enable node placement")
+	_expect("戦闘を再開" in main.pause_button.tooltip_text, "main action tooltip should explain edit confirmation")
 	_expect(main.speed_button.disabled, "time stop should disable speed controls")
 	main._unhandled_key_input(action_key)
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "Space should confirm edits and resume battle")

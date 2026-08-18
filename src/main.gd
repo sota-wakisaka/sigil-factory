@@ -299,6 +299,7 @@ func _apply_phase() -> void:
 			factory_board.set_interaction_enabled(true)
 			pause_button.disabled = false
 			pause_button.text = "構築完了・戦闘開始"
+			pause_button.tooltip_text = "配線が完成した工場を確定し、リアルタイム戦闘を開始します"
 			threat_label.text = "ステージ情報をもとに、戦闘前の工場を構築します"
 			status_label.text = "工場を選び、準備ができたら戦闘を開始してください"
 			_select_plan(factory_board.plan_id)
@@ -306,6 +307,7 @@ func _apply_phase() -> void:
 			pause_button.disabled = false
 			speed_button.disabled = false
 			pause_button.text = "時間停止"
+			pause_button.tooltip_text = "工場を再構成するため、工場と戦場の時間を停止します"
 			debug_victory_button.text = "検証用: 戦闘をスキップ"
 			debug_victory_button.visible = true
 			plan_label.text = "稼働術式: %s // %s" % [MvpContent.plan_name(factory_board.plan_id), MvpContent.plan_description(factory_board.plan_id)]
@@ -316,6 +318,7 @@ func _apply_phase() -> void:
 			factory_board.set_interaction_enabled(true)
 			pause_button.disabled = false
 			pause_button.text = "変更を確定・戦闘再開"
+			pause_button.tooltip_text = "有効な工場変更を一括確定し、リアルタイム戦闘を再開します"
 			cancel_button.disabled = false
 			plan_label.text = "時間停止中 // 工場・召喚門を再構成 // 仕掛品 %d個" % factory_board.work_in_progress_count()
 			status_label.text = "術式を選び、変更を確定するとリアルタイム戦闘へ戻ります"

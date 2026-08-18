@@ -31,6 +31,7 @@ offset_left = 1080.0
 offset_top = 18.0
 offset_right = 1238.0
 offset_bottom = 52.0
+tooltip_text = "進行画面の検証専用。通常プレイでは敵リーダーを撃破してください"
 text = "検証用: 戦闘をスキップ"
 
 [node name="ProgressLabel" type="Label" parent="."]
@@ -246,7 +247,7 @@ text = "早送り ×1"
 [node name="PauseButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
-tooltip_text = "戦場を止めて工場を安全に再構成します"
+tooltip_text = "現在のフェーズで次の進行操作を実行します"
 text = "時間停止"
 
 [node name="CancelButton" type="Button" parent="Toolbar"]
