@@ -56,9 +56,9 @@ Press **Build Complete / Start Battle** when the graph is ready.
 During battle, press **Time Stop**, select a production plan, then confirm the
 change. Preview changes do not affect the running factory until committed. The
 **Fast Forward** button cycles between 1x, 2x, and 4x battle speed and is disabled
-during time stop. Use the temporary **Complete Battle** button to inspect the
-victory, reward, and next-route screens without waiting for the simulation to
-finish.
+during time stop. Use **検証用: 戦闘をスキップ** only when you need to inspect
+the victory, reward, and next-route screens without waiting for the simulation
+to finish; it is not part of the intended battle controls.
 
 Keyboard shortcuts: **Space** starts, stops, or resumes battle; **F** changes
 battle speed; **Ctrl+Z** undoes an edit; **Delete** removes selected equipment;

@@ -306,7 +306,7 @@ func _apply_phase() -> void:
 			pause_button.disabled = false
 			speed_button.disabled = false
 			pause_button.text = "時間停止"
-			debug_victory_button.text = "戦闘を完了（仮）"
+			debug_victory_button.text = "検証用: 戦闘をスキップ"
 			debug_victory_button.visible = true
 			plan_label.text = "稼働術式: %s // %s" % [MvpContent.plan_name(factory_board.plan_id), MvpContent.plan_description(factory_board.plan_id)]
 			_refresh_status()

@@ -31,7 +31,7 @@ offset_left = 1080.0
 offset_top = 18.0
 offset_right = 1238.0
 offset_bottom = 52.0
-text = "戦闘を完了（仮）"
+text = "検証用: 戦闘をスキップ"
 
 [node name="ProgressLabel" type="Label" parent="."]
 layout_mode = 1
