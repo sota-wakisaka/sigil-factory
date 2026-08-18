@@ -1,0 +1,12 @@
+# Godot-generated files
+.godot/
+
+# Mono / C# generated files (kept here if the project adopts C# later)
+.mono/
+
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
