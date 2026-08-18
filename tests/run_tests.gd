@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_test_battle_ends_at_time_limit()
 	_test_threat_forecast_respects_horizon()
 	_test_factory_edit_is_transactional()
+	_test_factory_edit_preserves_custom_graph()
 	_test_factory_nodes_can_be_repositioned()
 	_test_factory_board_connections_change_output()
 	_test_run_flow_covers_one_route()
@@ -273,6 +274,28 @@ func _test_factory_edit_is_transactional() -> void:
 	board.commit_edit()
 	_expect(board.plan_id == MvpContent.PLAN_GOLEM, "commit should apply pending plan")
 	_expect(board.simulation != original_simulation, "commit should replace factory atomically")
+	board.free()
+
+
+func _test_factory_edit_preserves_custom_graph() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_SENTINEL)
+	board.set_interaction_enabled(true)
+	board.disconnect_input(&"rotator", 0)
+	board.disconnect_input(&"summoner", 0)
+	board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
+	board.move_node(&"summoner", Vector2(480, 280))
+	for _tick in 80:
+		board.advance_tick()
+	var committed_position: Vector2 = board.node_positions[&"summoner"]
+	var committed_tick := board.simulation.tick_index
+	board.begin_edit()
+	_expect(board.preview_node_positions[&"summoner"] == committed_position, "time stop should preserve custom node placement")
+	_expect(board.preview_simulation.tick_index == committed_tick, "time stop should preserve factory progress")
+	_expect(board.preview_simulation.lines.size() == board.simulation.lines.size(), "time stop should preserve custom wiring")
+	board.commit_edit()
+	_expect(board.observed_event_count == board.simulation.summon_events.size(), "commit should not replay historical summons")
 	board.free()
 
 

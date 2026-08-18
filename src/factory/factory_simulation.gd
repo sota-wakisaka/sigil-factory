@@ -53,6 +53,38 @@ func disconnect_line(line_id: StringName) -> bool:
 	return true
 
 
+func duplicate_state() -> FactorySimulation:
+	var result := FactorySimulation.new()
+	for recipe in recipes:
+		result.add_recipe(recipe)
+	for node_id in nodes:
+		var node: FactoryNodeModel = nodes[node_id]
+		var copied_node := FactoryNodeModel.new(node.id, node.kind, node.config)
+		for port in node.input_buffers.size():
+			if node.input_buffers[port] != null:
+				copied_node.input_buffers[port] = node.input_buffers[port].copy()
+		if node.output_buffer != null:
+			copied_node.output_buffer = node.output_buffer.copy()
+		if node.processing_glyph != null:
+			copied_node.processing_glyph = node.processing_glyph.copy()
+		copied_node.remaining_processing_ticks = node.remaining_processing_ticks
+		copied_node.source_timer = node.source_timer
+		result.add_node(copied_node)
+	for line_id in lines:
+		var line: FactoryLineModel = lines[line_id]
+		var copied_line := FactoryLineModel.new(
+			line.id, line.from_node_id, line.to_node_id, line.to_port, line.travel_ticks
+		)
+		if line.payload != null:
+			copied_line.payload = line.payload.copy()
+		copied_line.remaining_ticks = line.remaining_ticks
+		result.lines[copied_line.id] = copied_line
+	result.summon_events = summon_events.duplicate(true)
+	result.discarded_glyphs = discarded_glyphs
+	result.tick_index = tick_index
+	return result
+
+
 func tick() -> void:
 	tick_index += 1
 	_advance_lines()

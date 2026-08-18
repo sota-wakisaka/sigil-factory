@@ -161,8 +161,10 @@ func _gui_input(event: InputEvent) -> void:
 func begin_edit() -> void:
 	editing = true
 	pending_plan_id = plan_id
-	preview_simulation = MvpContent.build_factory(pending_plan_id)
-	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
+	preview_simulation = simulation.duplicate_state()
+	preview_node_positions = node_positions.duplicate(true)
+	selected_node_id = &""
+	connecting_from_node_id = &""
 	queue_redraw()
 
 
@@ -181,7 +183,7 @@ func commit_edit() -> void:
 	plan_id = pending_plan_id
 	simulation = preview_simulation
 	node_positions = preview_node_positions
-	observed_event_count = 0
+	observed_event_count = simulation.summon_events.size()
 	editing = false
 	preview_simulation = null
 	queue_redraw()
