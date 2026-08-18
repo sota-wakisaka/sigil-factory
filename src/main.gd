@@ -48,6 +48,7 @@ func _ready() -> void:
 	$FactoryPalette/CombineButton.pressed.connect(func() -> void: _add_factory_node(&"combiner"))
 	$FactoryPalette/SummonButton.pressed.connect(func() -> void: _add_factory_node(&"summoner"))
 	$FactoryPalette/DeleteButton.pressed.connect(_delete_factory_node)
+	$FactoryPalette/UndoButton.pressed.connect(_undo_factory_edit)
 	pause_button.pressed.connect(_on_main_action)
 	speed_button.pressed.connect(_cycle_battle_speed)
 	cancel_button.pressed.connect(_cancel_edit)
@@ -135,6 +136,11 @@ func _add_factory_node(template_id: StringName) -> void:
 func _delete_factory_node() -> void:
 	if factory_board.remove_selected_node():
 		plan_label.text = "カスタム工場 // 選択した設備を削除しました"
+
+
+func _undo_factory_edit() -> void:
+	if factory_board.undo():
+		plan_label.text = "カスタム工場 // 直前の編集を元に戻しました"
 
 
 func _cancel_edit() -> void:

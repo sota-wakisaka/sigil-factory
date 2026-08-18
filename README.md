@@ -39,7 +39,8 @@ step, choose a production plan as a starting template or customize it with the
 equipment palette. Drag equipment to reposition it, click a filled output port
 and then an outlined input port to connect them, and right-click an input port to
 disconnect it. Select equipment before pressing **Delete**. Incomplete factories
-cannot start and display the first missing connection.
+cannot start and display the first missing connection. **Undo** restores placement,
+wiring, additions, and deletions made during the current edit session.
 
 Press **Build Complete / Start Battle** when the graph is ready.
 During battle, press **Time Stop**, select a production plan, then confirm the

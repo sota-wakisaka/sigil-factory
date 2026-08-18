@@ -128,39 +128,44 @@ theme_override_constants/separation = 4
 alignment = 1
 
 [node name="RingButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(74, 38)
+custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
 text = "環素材"
 
 [node name="SpikeButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(74, 38)
+custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
 text = "棘素材"
 
 [node name="RotateButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(74, 38)
+custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
 text = "回転"
 
 [node name="ColorButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(74, 38)
+custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
 text = "着色"
 
 [node name="CombineButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(74, 38)
+custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
 text = "合成"
 
 [node name="SummonButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(74, 38)
+custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
 text = "召喚"
 
 [node name="DeleteButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(74, 38)
+custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
 text = "削除"
+
+[node name="UndoButton" type="Button" parent="FactoryPalette"]
+custom_minimum_size = Vector2(64, 38)
+layout_mode = 2
+text = "元に戻す"
 
 [node name="Toolbar" type="HBoxContainer" parent="."]
 layout_mode = 1

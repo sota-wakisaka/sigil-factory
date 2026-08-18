@@ -34,6 +34,7 @@ var connection_cursor := Vector2.ZERO
 var connection_serial := 1
 var node_serial := 1
 var connection_message := ""
+var undo_history: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -51,6 +52,7 @@ func configure(next_plan_id: StringName) -> void:
 	dragging_node = false
 	connecting_from_node_id = &""
 	connection_message = ""
+	undo_history.clear()
 	queue_redraw()
 
 
@@ -112,6 +114,7 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 		_:
 			return &""
 	var display_simulation := _display_simulation()
+	_push_undo_snapshot()
 	var node_id := StringName("%s_user_%d" % [prefix, node_serial])
 	while display_simulation.nodes.has(node_id):
 		node_serial += 1
@@ -131,7 +134,9 @@ func remove_factory_node(node_id: StringName) -> bool:
 	if not interaction_enabled or node_id == &"":
 		return false
 	var display_simulation := _display_simulation()
+	_push_undo_snapshot()
 	if not display_simulation.remove_node(node_id):
+		undo_history.pop_back()
 		return false
 	_display_positions().erase(node_id)
 	if selected_node_id == node_id:
@@ -147,6 +152,23 @@ func remove_selected_node() -> bool:
 	return remove_factory_node(selected_node_id)
 
 
+func undo() -> bool:
+	if not interaction_enabled or undo_history.is_empty():
+		return false
+	var snapshot: Dictionary = undo_history.pop_back()
+	if editing:
+		preview_simulation = snapshot["simulation"]
+		preview_node_positions = snapshot["positions"]
+	else:
+		simulation = snapshot["simulation"]
+		node_positions = snapshot["positions"]
+	selected_node_id = &""
+	connecting_from_node_id = &""
+	connection_message = "元に戻しました"
+	queue_redraw()
+	return true
+
+
 func validation_result() -> Dictionary:
 	var result := _display_simulation().validate_graph()
 	result["message"] = _validation_message(result["errors"])
@@ -159,6 +181,7 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 	var display_simulation := _display_simulation()
 	if display_simulation == null or from_node_id == to_node_id:
 		return {"ok": false, "error": "self_connection"}
+	_push_undo_snapshot()
 	var removed_line: FactoryLineModel
 	for line in display_simulation.lines.values():
 		if line.to_node_id == to_node_id and line.to_port == to_port:
@@ -172,6 +195,8 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 	)
 	if not result["ok"] and removed_line != null:
 		display_simulation.connect_nodes(removed_line)
+	if not result["ok"]:
+		undo_history.pop_back()
 	connection_message = _connection_result_text(result)
 	queue_redraw()
 	return result
@@ -183,6 +208,7 @@ func disconnect_input(to_node_id: StringName, to_port: int) -> bool:
 	var display_simulation := _display_simulation()
 	for line in display_simulation.lines.values():
 		if line.to_node_id == to_node_id and line.to_port == to_port:
+			_push_undo_snapshot()
 			display_simulation.disconnect_line(line.id)
 			connection_message = "接続を解除しました"
 			queue_redraw()
@@ -212,6 +238,7 @@ func _gui_input(event: InputEvent) -> void:
 			selected_node_id = _node_at(event.position)
 			dragging_node = selected_node_id != &""
 			if dragging_node:
+				_push_undo_snapshot()
 				drag_offset = node_local_position(selected_node_id) - event.position
 				accept_event()
 		else:
@@ -238,6 +265,7 @@ func begin_edit() -> void:
 	preview_node_positions = node_positions.duplicate(true)
 	selected_node_id = &""
 	connecting_from_node_id = &""
+	undo_history.clear()
 	queue_redraw()
 
 
@@ -247,6 +275,7 @@ func preview_plan(next_plan_id: StringName) -> void:
 	pending_plan_id = next_plan_id
 	preview_simulation = MvpContent.build_factory(pending_plan_id)
 	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
+	undo_history.clear()
 	queue_redraw()
 
 
@@ -259,6 +288,7 @@ func commit_edit() -> void:
 	observed_event_count = simulation.summon_events.size()
 	editing = false
 	preview_simulation = null
+	undo_history.clear()
 	queue_redraw()
 
 
@@ -268,6 +298,7 @@ func cancel_edit() -> void:
 	editing = false
 	preview_simulation = null
 	preview_node_positions.clear()
+	undo_history.clear()
 	queue_redraw()
 
 
@@ -482,6 +513,16 @@ func _validation_message(errors: Array) -> String:
 	if error.begins_with("missing_output:"):
 		return "出力が未接続の設備があります"
 	return "工場の配線を確認してください"
+
+
+func _push_undo_snapshot() -> void:
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return
+	undo_history.append({
+		"simulation": display_simulation.duplicate_state(),
+		"positions": _display_positions().duplicate(true),
+	})
 
 
 func _panel_style() -> StyleBoxFlat:

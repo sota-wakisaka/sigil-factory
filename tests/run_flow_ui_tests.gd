@@ -30,6 +30,10 @@ func _initialize() -> void:
 	_expect("戦闘を開始できません" in main.status_label.text, "invalid factory should explain why battle cannot start")
 	main.get_node("FactoryPalette/DeleteButton").pressed.emit()
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette, "delete button should remove selected equipment")
+	main.get_node("FactoryPalette/UndoButton").pressed.emit()
+	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette + 1, "undo button should restore deleted equipment")
+	main.get_node("FactoryPalette/UndoButton").pressed.emit()
+	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette, "undo button should restore the graph before equipment was added")
 
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "build confirmation should start battle")
