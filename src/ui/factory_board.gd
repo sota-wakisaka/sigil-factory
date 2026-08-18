@@ -386,12 +386,21 @@ func _draw() -> void:
 	if interaction_enabled:
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(18, size.y - 14),
+			Vector2(18, size.y - 12),
 			"ドラッグ: 配置  /  ●出力→○入力: 接続  /  右クリック: 解除",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
 			12,
 			Color(0.52, 0.65, 0.76)
+		)
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(18, size.y - 31),
+			"シジル工程 // 斥候: 環  |  衛兵: 環→回転→青  |  巨像: 環+棘→合成→青",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			11,
+			Color(0.66, 0.72, 0.84)
 		)
 		if connection_message != "":
 			draw_string(
@@ -434,7 +443,7 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		draw_rect(rect, NODE_COLOR, true)
 		var border_color := SELECTED_COLOR if node_id == selected_node_id else NODE_BORDER
 		draw_rect(rect, border_color, false, 3.0 if node_id == selected_node_id else 2.0)
-		var label := MvpContent.node_name(node.kind)
+		var label := _node_label(node)
 		draw_string(
 			font,
 			center + Vector2(-font.get_string_size(label).x * 0.5, 5),
@@ -456,6 +465,24 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 		var position := _input_port_position(node.id, port)
 		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
 		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, LINE_COLOR, 2.0)
+
+
+func _node_label(node: FactoryNodeModel) -> String:
+	match node.kind:
+		FactoryNodeModel.NodeKind.SOURCE:
+			var primitive := String(node.config.get("primitive_id", "ring"))
+			return "棘素材" if primitive == "spike" else "環素材"
+		FactoryNodeModel.NodeKind.ROTATOR:
+			return "回転 +90°"
+		FactoryNodeModel.NodeKind.TRANSLATOR:
+			return "位置移動"
+		FactoryNodeModel.NodeKind.COLORIZER:
+			return "青着色"
+		FactoryNodeModel.NodeKind.COMBINER:
+			return "グリフ合成"
+		FactoryNodeModel.NodeKind.SUMMONER:
+			return "召喚器"
+	return MvpContent.node_name(node.kind)
 
 
 func _scaled_position(reference_position: Vector2) -> Vector2:
