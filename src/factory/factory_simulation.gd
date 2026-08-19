@@ -100,6 +100,59 @@ func validate_graph() -> Dictionary:
 	return {"ok": errors.is_empty(), "errors": errors}
 
 
+func flow_diagnostics() -> Array[Dictionary]:
+	var diagnostics: Array[Dictionary] = []
+	for line_id in _sorted_keys(lines):
+		if line_flow_state(line_id) == &"buffer_full":
+			var line: FactoryLineModel = lines[line_id]
+			diagnostics.append({
+				"code": &"buffer_full",
+				"line_id": line_id,
+				"node_id": line.to_node_id,
+			})
+	for node_id in _sorted_keys(nodes):
+		var state := node_flow_state(node_id)
+		if state != &"running":
+			diagnostics.append({"code": state, "node_id": node_id})
+	return diagnostics
+
+
+func line_flow_state(line_id: StringName) -> StringName:
+	if not lines.has(line_id):
+		return &"missing"
+	var line: FactoryLineModel = lines[line_id]
+	if line.payload == null:
+		return &"empty"
+	if line.remaining_ticks > 0:
+		return &"transporting"
+	var target: FactoryNodeModel = nodes.get(line.to_node_id)
+	if target != null and not target.can_accept(line.to_port):
+		return &"buffer_full"
+	return &"arrived"
+
+
+func node_flow_state(node_id: StringName) -> StringName:
+	if not nodes.has(node_id):
+		return &"missing"
+	var node: FactoryNodeModel = nodes[node_id]
+	if node.output_buffer != null:
+		var outgoing := _outgoing_line_ids(node_id)
+		var can_dispatch := false
+		for line_id in outgoing:
+			if lines[line_id].payload == null:
+				can_dispatch = true
+				break
+		if not can_dispatch:
+			return &"output_blocked"
+	if node.kind == FactoryNodeModel.NodeKind.COMBINER:
+		var filled_inputs := 0
+		for glyph in node.input_buffers:
+			filled_inputs += int(glyph != null)
+		if filled_inputs > 0 and filled_inputs < node.required_input_count():
+			return &"material_shortage"
+	return &"running"
+
+
 func duplicate_state() -> FactorySimulation:
 	var result := FactorySimulation.new()
 	for recipe in recipes:

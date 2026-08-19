@@ -36,6 +36,7 @@ func _initialize() -> void:
 	_test_factory_disconnects_lines()
 	_test_factory_removes_node_and_connected_lines()
 	_test_factory_graph_validation_reports_dangling_nodes()
+	_test_factory_flow_diagnostics_distinguish_blockages()
 	_test_mvp_plans_produce_expected_units()
 	_test_empty_factory_requires_player_wiring()
 	_test_battle_units_fight_and_die()
@@ -52,6 +53,7 @@ func _initialize() -> void:
 	_test_factory_rewiring_discards_work_transactionally()
 	_test_factory_board_connections_change_output()
 	_test_factory_board_shows_summon_failure_reason()
+	_test_factory_board_shows_distinct_flow_warning()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
 	_test_run_upgrade_accelerates_ring_source()
@@ -375,6 +377,30 @@ func _test_factory_graph_validation_reports_dangling_nodes() -> void:
 	_expect(result["errors"].has("missing_output:dangling"), "validation should identify missing output")
 
 
+func _test_factory_flow_diagnostics_distinguish_blockages() -> void:
+	var simulation := FactorySimulation.new()
+	var source := FactoryNodeModel.new(&"source", FactoryNodeModel.NodeKind.SOURCE)
+	var blocked := FactoryNodeModel.new(&"blocked", FactoryNodeModel.NodeKind.ROTATOR)
+	var combiner := FactoryNodeModel.new(&"combiner", FactoryNodeModel.NodeKind.COMBINER)
+	for node in [source, blocked, combiner]:
+		simulation.add_node(node)
+	simulation.connect_nodes(FactoryLineModel.new(&"blocked_line", &"source", &"blocked"))
+	var glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	source.output_buffer = glyph.copy()
+	blocked.input_buffers[0] = glyph.copy()
+	blocked.output_buffer = glyph.copy()
+	combiner.input_buffers[0] = glyph.copy()
+	var line: FactoryLineModel = simulation.lines[&"blocked_line"]
+	line.payload = glyph.copy()
+	line.remaining_ticks = 0
+	var codes := PackedStringArray()
+	for diagnostic in simulation.flow_diagnostics():
+		codes.append(String(diagnostic["code"]))
+	_expect(codes.has("buffer_full"), "arrived cargo should diagnose a full target buffer")
+	_expect(codes.has("output_blocked"), "held output should diagnose downstream blockage")
+	_expect(codes.has("material_shortage"), "partially filled combiner should diagnose missing material")
+
+
 func _test_mvp_plans_produce_expected_units() -> void:
 	var expectations := {
 		MvpContent.PLAN_SCOUT: &"scout",
@@ -652,6 +678,19 @@ func _test_factory_board_shows_summon_failure_reason() -> void:
 		"部品不足" in board.connection_message or "余分な部品" in board.connection_message,
 		"factory board should explain the recipe mismatch"
 	)
+	board.free()
+
+
+func _test_factory_board_shows_distinct_flow_warning() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_EMPTY)
+	var blocked := FactoryNodeModel.new(&"blocked", FactoryNodeModel.NodeKind.ROTATOR)
+	var glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	blocked.input_buffers[0] = glyph.copy()
+	blocked.output_buffer = glyph.copy()
+	board.simulation.add_node(blocked)
+	board.advance_tick()
+	_expect("出力閉塞" in board.flow_warning_message, "factory board should name output blockage separately")
 	board.free()
 
 

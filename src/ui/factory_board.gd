@@ -15,6 +15,8 @@ const NODE_BORDER := Color(0.38, 0.62, 0.82, 0.9)
 const LINE_COLOR := Color(0.24, 0.48, 0.68, 0.75)
 const GLYPH_COLOR := Color(0.35, 0.86, 1.0, 1.0)
 const SELECTED_COLOR := Color(1.0, 0.78, 0.3, 1.0)
+const WARNING_COLOR := Color(1.0, 0.38, 0.28, 1.0)
+const WAITING_COLOR := Color(1.0, 0.72, 0.24, 1.0)
 const NODE_HALF_SIZE := Vector2(48, 30)
 const REFERENCE_SIZE := Vector2(820, 395)
 const PORT_RADIUS := 7.0
@@ -38,6 +40,7 @@ var connection_cursor := Vector2.ZERO
 var connection_serial := 1
 var node_serial := 1
 var connection_message := ""
+var flow_warning_message := ""
 var undo_history: Array[Dictionary] = []
 var cached_production_preview := ""
 var run_upgrades: Array[StringName] = []
@@ -60,6 +63,7 @@ func configure(next_plan_id: StringName) -> void:
 	dragging_node = false
 	connecting_from_node_id = &""
 	connection_message = ""
+	flow_warning_message = ""
 	undo_history.clear()
 	_refresh_production_preview()
 	selection_changed.emit()
@@ -563,6 +567,7 @@ func advance_tick() -> void:
 		var event := simulation.summon_failure_events[observed_failure_count]
 		observed_failure_count += 1
 		connection_message = _summon_failure_message(event)
+	_refresh_flow_warning()
 	queue_redraw()
 
 
@@ -570,6 +575,23 @@ func _summon_failure_message(event: Dictionary) -> String:
 	var diagnostics: PackedStringArray = event.get("diagnostics", PackedStringArray())
 	var reason := "原因不明" if diagnostics.is_empty() else " / ".join(diagnostics)
 	return "召喚失敗 // %s" % reason
+
+
+func _refresh_flow_warning() -> void:
+	var warnings := PackedStringArray()
+	for diagnostic in simulation.flow_diagnostics():
+		var node_id: StringName = diagnostic.get("node_id", &"")
+		var node_label := String(node_id)
+		if simulation.nodes.has(node_id):
+			node_label = _node_label(simulation.nodes[node_id])
+		match diagnostic["code"]:
+			&"buffer_full":
+				warnings.append("入力満杯: %s" % node_label)
+			&"output_blocked":
+				warnings.append("出力閉塞: %s" % node_label)
+			&"material_shortage":
+				warnings.append("素材不足: %s" % node_label)
+	flow_warning_message = "" if warnings.is_empty() else "工場警告 // " + " / ".join(warnings)
 
 
 func _draw() -> void:
@@ -639,6 +661,16 @@ func _draw() -> void:
 			12,
 			SELECTED_COLOR
 		)
+	if not interaction_enabled and flow_warning_message != "":
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(18, size.y - 12),
+			flow_warning_message,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			size.x - 36.0,
+			12,
+			WARNING_COLOR
+		)
 
 
 func _draw_lines(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
@@ -646,7 +678,8 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		var line: FactoryLineModel = display_simulation.lines[line_id]
 		var start := _scaled_position(display_positions.get(line.from_node_id, Vector2.ZERO)) + Vector2(NODE_HALF_SIZE.x, 0)
 		var finish := _input_port_position(line.to_node_id, line.to_port)
-		draw_line(start, finish, LINE_COLOR, 4.0, true)
+		var line_color := WARNING_COLOR if display_simulation.line_flow_state(line_id) == &"buffer_full" else LINE_COLOR
+		draw_line(start, finish, line_color, 4.0, true)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
 			draw_circle(start.lerp(finish, progress), 7.0, GLYPH_COLOR)
@@ -659,7 +692,14 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		var center := _scaled_position(display_positions.get(node_id, Vector2.ZERO))
 		var rect := Rect2(center - NODE_HALF_SIZE, NODE_HALF_SIZE * 2.0)
 		draw_rect(rect, NODE_COLOR, true)
-		var border_color := SELECTED_COLOR if node_id == selected_node_id else NODE_BORDER
+		var node_state := display_simulation.node_flow_state(node_id)
+		var border_color := NODE_BORDER
+		if node_state == &"output_blocked":
+			border_color = WARNING_COLOR
+		elif node_state == &"material_shortage":
+			border_color = WAITING_COLOR
+		if node_id == selected_node_id:
+			border_color = SELECTED_COLOR
 		draw_rect(rect, border_color, false, 3.0 if node_id == selected_node_id else 2.0)
 		var label := _node_label(node)
 		draw_string(
