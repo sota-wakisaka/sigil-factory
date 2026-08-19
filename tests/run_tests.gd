@@ -2236,6 +2236,8 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	output_click.position = board.node_local_position(&"ring_source") + Vector2(48, 0)
 	board._gui_input(output_click)
 	_expect(board.connecting_from_node_id == &"ring_source", "clicking an output port should begin wiring")
+	_expect(board.input_port_connectable(&"summoner", 0), "wiring mode should identify the valid target input before click")
+	_expect(not board.input_port_connectable(&"ring_source", 0), "wiring mode should not highlight a node without a valid input")
 	var input_click := InputEventMouseButton.new()
 	input_click.button_index = MOUSE_BUTTON_LEFT
 	input_click.pressed = true

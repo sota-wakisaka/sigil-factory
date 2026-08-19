@@ -1449,8 +1449,48 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 		var input_color := LINE_COLOR
 		if is_guided_connection_pending() and node.id == &"summoner":
 			input_color = SELECTED_COLOR
+		if connecting_from_node_id != &"":
+			if input_port_connectable(node.id, port):
+				input_color = MATCH_COLOR
+				draw_arc(position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(MATCH_COLOR, 0.32), 2.0, true)
+			else:
+				input_color = Color(LINE_COLOR, 0.2)
 		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
 		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, input_color, 2.0)
+
+
+func input_port_connectable(to_node_id: StringName, to_port: int) -> bool:
+	var display_simulation := _display_simulation()
+	if (
+		connecting_from_node_id == &""
+		or display_simulation == null
+		or not display_simulation.nodes.has(connecting_from_node_id)
+		or not display_simulation.nodes.has(to_node_id)
+		or connecting_from_node_id == to_node_id
+	):
+		return false
+	var target: FactoryNodeModel = display_simulation.nodes[to_node_id]
+	if to_port < 0 or to_port >= target.required_input_count():
+		return false
+	for line in display_simulation.lines.values():
+		if line.from_node_id != connecting_from_node_id:
+			continue
+		if line.to_node_id != to_node_id or line.to_port != to_port:
+			return false
+	return not _path_reaches_node(to_node_id, connecting_from_node_id, {})
+
+
+func _path_reaches_node(current_id: StringName, sought_id: StringName, visited: Dictionary) -> bool:
+	if current_id == sought_id:
+		return true
+	if visited.has(current_id):
+		return false
+	visited[current_id] = true
+	var display_simulation := _display_simulation()
+	for line in display_simulation.lines.values():
+		if line.from_node_id == current_id and _path_reaches_node(line.to_node_id, sought_id, visited):
+			return true
+	return false
 
 
 func _node_label(node: FactoryNodeModel) -> String:
