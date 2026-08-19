@@ -863,8 +863,16 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		var start := _scaled_position(display_positions.get(line.from_node_id, Vector2.ZERO)) + Vector2(NODE_HALF_SIZE.x, 0)
 		var finish := _input_port_position(line.to_node_id, line.to_port)
 		var line_color := WARNING_COLOR if display_simulation.line_flow_state(line_id) == &"buffer_full" else LINE_COLOR
+		var goal_state := line_goal_match_state(line_id)
+		if display_simulation.line_flow_state(line_id) != &"buffer_full":
+			if goal_state == &"match":
+				line_color = Color(MATCH_COLOR, 0.76)
+			elif goal_state == &"mismatch":
+				line_color = Color(WARNING_COLOR, 0.76)
 		draw_line(start, finish, line_color, FACTORY_LINE_WIDTH, true)
 		_draw_flow_arrow(start, finish, line_color)
+		if goal_state in [&"match", &"mismatch"]:
+			_draw_recipe_match_marker(start.lerp(finish, 0.76), goal_state, 7.0)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
 			var glyph_center := start.lerp(finish, progress)
@@ -1285,6 +1293,32 @@ func line_recipe_match_state(line_id: StringName) -> StringName:
 	if line.payload == null:
 		return &"empty"
 	return _recipe_match_state_for_glyph(display_simulation, line.payload)
+
+
+func line_goal_match_state(line_id: StringName) -> StringName:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.lines.has(line_id):
+		return &"missing"
+	var line: FactoryLineModel = display_simulation.lines[line_id]
+	if not display_simulation.nodes.has(line.to_node_id):
+		return &"invalid"
+	if display_simulation.nodes[line.to_node_id].kind != FactoryNodeModel.NodeKind.SUMMONER:
+		return &"not_applicable"
+	var glyph: GlyphModel = line.payload
+	if not GlyphPainterModel.can_draw(glyph):
+		glyph = cached_node_output_glyphs.get(line.from_node_id)
+	if not GlyphPainterModel.can_draw(glyph):
+		return &"empty"
+	var target_recipe_id := MvpContent.recipe_id_for_plan(plan_id)
+	for recipe in MvpContent.recipes():
+		if recipe.id != target_recipe_id:
+			continue
+		return (
+			&"match"
+			if recipe.glyph.canonical_serialization() == glyph.canonical_serialization()
+			else &"mismatch"
+		)
+	return &"invalid"
 
 
 func input_recipe_match_state(node_id: StringName, port: int) -> StringName:

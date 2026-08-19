@@ -2267,6 +2267,10 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(board.production_summary_unit_at(summary_center) == &"scout", "production Glyph should expose a stable hover target")
 	_expect(board._get_tooltip(summary_center) == "glyph_preview", "production Glyph should open the same large visual tooltip as factory Glyphs")
 	_expect(board.tooltip_glyph != null and "生産見込み" in board.tooltip_context, "production tooltip should pair its CanonicalGlyph with the forecast count")
+	_expect(board.line_goal_match_state(&"line_1") == &"match", "summoner path should compare its predicted Glyph with the selected goal before battle")
+	board.selected_node_id = &"ring_source"
+	board.configure_selected_node(1)
+	_expect(board.line_goal_match_state(&"line_1") == &"mismatch", "changing the source should immediately mark the summoner path as a goal mismatch")
 	_expect(preview["ok"], "complete factory should produce a preview")
 	_expect(preview["counts"][&"scout"] > 0, "scout factory preview should report scouts")
 	_expect(
