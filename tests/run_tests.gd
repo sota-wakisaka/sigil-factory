@@ -1995,6 +1995,10 @@ func _test_factory_board_shows_summon_failure_reason() -> void:
 		if not board.simulation.summon_failure_events.is_empty():
 			break
 	_expect("召喚失敗" in board.connection_message, "factory board should expose summon failure during battle")
+	_expect(board.connection_feedback_kind() == &"error", "summon failure should collapse its permanent sentence into an error badge")
+	board.size = Vector2(1196, 401)
+	_expect(board.connection_feedback_badge_at(Vector2(28, 27)), "connection feedback badge should expose a stable hover target")
+	_expect("召喚失敗" in board._get_tooltip(Vector2(28, 27)), "connection feedback badge should retain the detailed message on hover")
 	_expect("巨像シジルとの差分" in board.connection_message, "factory board should name the closest known recipe")
 	_expect(
 		"部品不足" in board.connection_message or "余分な部品" in board.connection_message,

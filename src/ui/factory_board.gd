@@ -820,15 +820,7 @@ func _draw() -> void:
 			_draw_production_error_badge()
 		_draw_mana_meter()
 	if connection_message != "":
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(18, 76 if editing else 22),
-			connection_message,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			12,
-			SELECTED_COLOR
-		)
+		_draw_connection_feedback_badge()
 	if not interaction_enabled and flow_warning_message != "":
 		_draw_flow_warning_badge()
 
@@ -966,6 +958,42 @@ func _draw_flow_warning_badge() -> void:
 	draw_circle(center + Vector2(0, 6), 1.5, Color.WHITE)
 	var warning_count := maxi(simulation.flow_diagnostics().size(), 1)
 	draw_string(ThemeDB.fallback_font, center + Vector2(13, 5), str(warning_count), HORIZONTAL_ALIGNMENT_LEFT, 22.0, 11, WARNING_COLOR)
+
+
+func connection_feedback_kind() -> StringName:
+	if connection_message == "":
+		return &"none"
+	if "失敗" in connection_message or "できません" in connection_message or "破損" in connection_message:
+		return &"error"
+	if "選択してください" in connection_message:
+		return &"pending"
+	return &"success"
+
+
+func _connection_feedback_center() -> Vector2:
+	return Vector2(28, 76 if editing else 27)
+
+
+func connection_feedback_badge_at(at_position: Vector2) -> bool:
+	return connection_message != "" and at_position.distance_to(_connection_feedback_center()) <= 16.0
+
+
+func _draw_connection_feedback_badge() -> void:
+	var center := _connection_feedback_center()
+	var kind := connection_feedback_kind()
+	var color := WARNING_COLOR if kind == &"error" else (WAITING_COLOR if kind == &"pending" else MATCH_COLOR)
+	draw_circle(center, 10.0, Color(0.025, 0.045, 0.068, 0.96))
+	draw_arc(center, 10.0, 0.0, TAU, 24, color, 1.8, true)
+	if kind == &"error":
+		draw_line(center + Vector2(-4, -4), center + Vector2(4, 4), color, 1.8, true)
+		draw_line(center + Vector2(-4, 4), center + Vector2(4, -4), color, 1.8, true)
+	elif kind == &"pending":
+		draw_circle(center + Vector2(-4, 0), 3.0, color)
+		draw_arc(center + Vector2(5, 0), 4.0, 0.0, TAU, 16, color, 1.4, true)
+		draw_line(center, center + Vector2(2, 0), color, 1.4, true)
+	else:
+		draw_line(center + Vector2(-5, 0), center + Vector2(-1, 4), color, 2.0, true)
+		draw_line(center + Vector2(-1, 4), center + Vector2(6, -5), color, 2.0, true)
 
 
 func _draw_production_summary() -> void:
@@ -1291,6 +1319,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_glyph = null
 	tooltip_title = ""
 	tooltip_context = ""
+	if connection_feedback_badge_at(at_position):
+		return connection_message
 	if flow_warning_badge_at(at_position):
 		return flow_warning_message
 	var work_index := work_in_progress_summary_index_at(at_position)
