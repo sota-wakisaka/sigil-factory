@@ -680,9 +680,22 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		var finish := _input_port_position(line.to_node_id, line.to_port)
 		var line_color := WARNING_COLOR if display_simulation.line_flow_state(line_id) == &"buffer_full" else LINE_COLOR
 		draw_line(start, finish, line_color, 4.0, true)
+		_draw_flow_arrow(start, finish, line_color)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
 			draw_circle(start.lerp(finish, progress), 7.0, GLYPH_COLOR)
+
+
+func _draw_flow_arrow(start: Vector2, finish: Vector2, color: Color) -> void:
+	var direction := start.direction_to(finish)
+	if direction == Vector2.ZERO:
+		return
+	var center := start.lerp(finish, 0.5)
+	var tip := center + direction * 8.0
+	var wing_origin := center - direction * 5.0
+	var normal := Vector2(-direction.y, direction.x) * 6.0
+	draw_line(tip, wing_origin + normal, color, 2.5, true)
+	draw_line(tip, wing_origin - normal, color, 2.5, true)
 
 
 func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
