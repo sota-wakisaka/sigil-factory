@@ -15,6 +15,7 @@ Design documents:
 - Draggable factory equipment with interactive input/output port wiring
 - Equipment palette for adding and deleting sources, processors, combiners, and summoners
 - Fixed 100-mana equipment capacity with immediate refunds when nodes are removed
+- A single generic summoner enforced by both palette actions and graph validation
 - Selection inspector for source material, rotation, and color configuration
 - Deterministic fixed-tick glyph factory simulation
 - Canonical binary Combine structure with hierarchy-aware sigil matching

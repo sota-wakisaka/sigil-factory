@@ -75,11 +75,11 @@ func remove_node(node_id: StringName) -> bool:
 func validate_graph() -> Dictionary:
 	var errors: Array[String] = []
 	var has_source := false
-	var has_summoner := false
+	var summoner_count := 0
 	for node_id in _sorted_keys(nodes):
 		var node: FactoryNodeModel = nodes[node_id]
 		has_source = has_source or node.kind == FactoryNodeModel.NodeKind.SOURCE
-		has_summoner = has_summoner or node.kind == FactoryNodeModel.NodeKind.SUMMONER
+		summoner_count += int(node.kind == FactoryNodeModel.NodeKind.SUMMONER)
 		for port in node.required_input_count():
 			var has_input := false
 			for line_id in _sorted_keys(lines):
@@ -100,8 +100,10 @@ func validate_graph() -> Dictionary:
 				errors.append("missing_output:%s" % node.id)
 	if not has_source:
 		errors.append("missing_source")
-	if not has_summoner:
+	if summoner_count == 0:
 		errors.append("missing_summoner")
+	elif summoner_count > 1:
+		errors.append("multiple_summoners")
 	return {"ok": errors.is_empty(), "errors": errors}
 
 

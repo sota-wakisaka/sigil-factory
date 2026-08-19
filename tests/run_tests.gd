@@ -60,6 +60,7 @@ func _initialize() -> void:
 	_test_factory_nodes_can_be_repositioned()
 	_test_factory_editor_undo_restores_graph()
 	_test_factory_mana_budget_limits_and_refunds_nodes()
+	_test_factory_enforces_single_summoner()
 	_test_factory_node_configuration_is_undoable()
 	_test_factory_configuration_discards_work_transactionally()
 	_test_factory_rewiring_discards_work_transactionally()
@@ -938,6 +939,24 @@ func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
 	golem_board.configure(MvpContent.PLAN_GOLEM)
 	_expect(golem_board.mana_used() == 95, "complete golem template should fit with five mana remaining")
 	golem_board.free()
+
+
+func _test_factory_enforces_single_summoner() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_EMPTY)
+	board.set_interaction_enabled(true)
+	var initial_node_count := board.simulation.nodes.size()
+	_expect(board.add_node_from_palette(&"summoner") == &"", "palette should reject a second summoner in the MVP")
+	_expect(board.simulation.nodes.size() == initial_node_count, "rejected second summoner should not mutate the graph")
+	_expect("1基まで" in board.connection_message, "summoner rejection should explain the MVP limit")
+	_expect(board.remove_factory_node(&"summoner"), "existing summoner should remain removable")
+	var replacement_id := board.add_node_from_palette(&"summoner")
+	_expect(replacement_id != &"", "removing the original summoner should allow one replacement")
+	board.simulation.add_node(FactoryNodeModel.new(&"forced_summoner", FactoryNodeModel.NodeKind.SUMMONER))
+	var validation := board.validation_result()
+	_expect(not validation["ok"], "forced multiple-summoner graph should fail validation")
+	_expect(validation["errors"].has("multiple_summoners"), "validation should identify the multiple-summoner violation")
+	board.free()
 
 
 func _test_factory_node_configuration_is_undoable() -> void:

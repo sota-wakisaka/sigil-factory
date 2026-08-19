@@ -162,7 +162,7 @@ text = "合成"
 [node name="SummonButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
-tooltip_text = "完成グリフをシジルと照合して召喚する設備を追加（魔力20）"
+tooltip_text = "召喚器がない場合、完成グリフを照合する汎用召喚器を1基追加（魔力20）"
 text = "召喚"
 
 [node name="DeleteButton" type="Button" parent="FactoryPalette"]

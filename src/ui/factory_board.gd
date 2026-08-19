@@ -132,6 +132,10 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 		_:
 			return &""
 	var display_simulation := _display_simulation()
+	if kind == FactoryNodeModel.NodeKind.SUMMONER and _summoner_count(display_simulation) >= 1:
+		connection_message = "召喚器を追加できません: 現MVPは1基までです"
+		queue_redraw()
+		return &""
 	var node_cost := MvpContent.node_mana_cost(kind)
 	if mana_used(display_simulation) + node_cost > MvpContent.FACTORY_MANA_MAX:
 		connection_message = "設備を追加できません: 魔力不足（必要%d / 空き%d）" % [
@@ -241,6 +245,13 @@ func mana_status_text() -> String:
 		MvpContent.FACTORY_MANA_MAX,
 		mana_available(),
 	]
+
+
+func _summoner_count(source_simulation: FactorySimulation) -> int:
+	var count := 0
+	for node in source_simulation.nodes.values():
+		count += int(node.kind == FactoryNodeModel.NodeKind.SUMMONER)
+	return count
 
 
 func set_run_upgrades(upgrades: Array[StringName]) -> void:
@@ -951,6 +962,8 @@ func _validation_message(errors: Array) -> String:
 		return "出力が未接続の設備があります"
 	if error == "mana_exceeded":
 		return "工場魔力が上限を超えています"
+	if error == "multiple_summoners":
+		return "召喚器は現MVPでは1基だけ配置できます"
 	return "工場の配線を確認してください"
 
 
