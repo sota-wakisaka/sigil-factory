@@ -1828,8 +1828,30 @@ func _test_factory_node_configuration_is_undoable() -> void:
 	var rotator_id := board.add_node_from_palette(&"rotator")
 	_expect(board.configure_selected_node(1), "selected rotator should accept a 180-degree setting")
 	_expect(board.simulation.nodes[rotator_id].config["steps"] == 2, "inspector should update node configuration")
+	_expect(
+		board.selected_node_details()["title"] == "回転 +180°",
+		"rotator label should reflect the configured angle"
+	)
 	_expect(board.undo(), "node configuration should be undoable")
 	_expect(board.simulation.nodes[rotator_id].config["steps"] == 1, "undo should restore the previous node setting")
+	board.selected_node_id = rotator_id
+	_expect(
+		board.selected_node_details()["title"] == "回転 +90°",
+		"rotator label should follow the angle restored by undo"
+	)
+	var colorizer_id := board.add_node_from_palette(&"colorizer")
+	_expect(board.configure_selected_node(1), "selected colorizer should accept a red setting")
+	_expect(board.simulation.nodes[colorizer_id].config["color_id"] == "red", "inspector should store the selected color")
+	_expect(
+		board.selected_node_details()["title"] == "赤着色",
+		"colorizer label should reflect the configured color"
+	)
+	_expect(board.undo(), "colorizer configuration should be undoable")
+	board.selected_node_id = colorizer_id
+	_expect(
+		board.selected_node_details()["title"] == "青着色",
+		"colorizer label should follow the color restored by undo"
+	)
 	board.configure(MvpContent.PLAN_SCOUT)
 	_expect(board.selected_node_id == &"", "switching factory templates should clear stale inspector selection")
 	board.free()

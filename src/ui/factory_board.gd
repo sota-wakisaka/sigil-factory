@@ -1117,18 +1117,17 @@ func _node_label(node: FactoryNodeModel) -> String:
 			var primitive := String(node.config.get("primitive_id", "ring"))
 			return "棘素材" if primitive == "spike" else "環素材"
 		FactoryNodeModel.NodeKind.ROTATOR:
-			return "回転 +90°"
+			var steps := clampi(int(node.config.get("steps", 1)), 1, 3)
+			return "回転 +%d°" % (steps * 90)
 		FactoryNodeModel.NodeKind.TRANSLATOR:
 			return "位置移動"
 		FactoryNodeModel.NodeKind.COLORIZER:
-			return "青着色"
+			return "%s着色" % _color_name(StringName(node.config.get("color_id", "blue")))
 		FactoryNodeModel.NodeKind.COMBINER:
 			return "グリフ合成"
 		FactoryNodeModel.NodeKind.SUMMONER:
 			return "召喚器"
 	return MvpContent.node_name(node.kind)
-
-
 func _scaled_position(reference_position: Vector2) -> Vector2:
 	return Vector2(
 		reference_position.x / REFERENCE_SIZE.x * size.x,
