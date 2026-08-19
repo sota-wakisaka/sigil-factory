@@ -15,6 +15,7 @@ const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const FactoryBoard := preload("res://src/ui/factory_board.gd")
 const SigilGhost := preload("res://src/ui/sigil_ghost.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
+const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 const RunFlow := preload("res://src/game/run_flow.gd")
 
 var failures := 0
@@ -2278,8 +2279,18 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	var ghost := SigilGhost.new()
 	_expect(ghost.show_recipe(&"azure_guard"), "sigil ghost should accept a known recipe")
+	_expect(ghost.custom_minimum_size.x >= 220.0, "sigil goal should reserve enough width for a readable persistent sample")
+	_expect(ghost.glyph_draw_scale() >= 1.0, "sigil goal should keep its persistent CanonicalGlyph readable")
+	var target_tooltip = ghost._make_custom_tooltip(ghost.tooltip_text)
+	_expect(target_tooltip.get_script() == GlyphTooltipModel, "sigil goal hover should create a visual Glyph tooltip")
+	_expect(target_tooltip.custom_minimum_size.x >= 300.0, "visual Glyph tooltip should be substantially larger than the persistent sample")
+	_expect(
+		target_tooltip.glyph.canonical_serialization() == ghost.glyph.canonical_serialization(),
+		"visual Glyph tooltip should draw the same CanonicalGlyph as the target"
+	)
+	target_tooltip.free()
 	_expect(ghost.recipe_id == &"azure_guard", "sigil ghost should retain the displayed recipe ID")
-	_expect(ghost.glyph_draw_scale() == 1.5, "single-Primitive completion ghost should use the larger readable scale")
+	_expect(ghost.glyph_draw_scale() == 2.0, "single-Primitive completion ghost should use the larger readable scale")
 	var expected: SigilRecipeModel
 	for recipe in MvpContent.recipes():
 		if recipe.id == &"azure_guard":
@@ -2294,7 +2305,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	_expect(not ghost.show_recipe(&"missing_recipe"), "sigil ghost should reject an unknown recipe")
 	_expect(ghost.recipe_id == &"azure_guard", "unknown recipe should not erase the current ghost")
 	_expect(ghost.show_recipe(&"bound_colossus"), "sigil ghost should accept the combined recipe")
-	_expect(ghost.glyph_draw_scale() == 1.0, "combined completion ghost should keep its outer ring inside the panel")
+	_expect(ghost.glyph_draw_scale() == 1.15, "combined completion ghost should keep its outer ring inside the panel")
 	ghost.free()
 
 
