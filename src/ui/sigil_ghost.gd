@@ -45,4 +45,10 @@ func _draw() -> void:
 	if glyph == null:
 		return
 	var center := Vector2(size.x - 25.0, size.y * 0.5)
-	GlyphPainterModel.draw_glyph(self, glyph, center)
+	GlyphPainterModel.draw_glyph(self, glyph, center, glyph_draw_scale())
+
+
+func glyph_draw_scale() -> float:
+	if glyph != null and glyph.combine_children.is_empty():
+		return 1.5
+	return 1.0

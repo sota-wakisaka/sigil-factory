@@ -839,7 +839,7 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
 			var glyph_center := start.lerp(finish, progress)
-			_draw_mini_glyph(line.payload, glyph_center, 0.55)
+			_draw_mini_glyph(line.payload, glyph_center, 0.72)
 			var match_state := line_recipe_match_state(line_id)
 			if match_state == &"match":
 				draw_arc(glyph_center, 11.0, 0.0, TAU, 24, MATCH_COLOR, 2.0, true)
@@ -875,7 +875,7 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		if node_id == selected_node_id:
 			border_color = SELECTED_COLOR
 		draw_rect(rect, border_color, false, 3.0 if node_id == selected_node_id else 2.0)
-		_draw_node_activity_progress(node, center)
+		_draw_node_activity_progress(node, center, display_simulation.tick_index > 0)
 		var label := _node_label(node)
 		draw_string(
 			font,
@@ -888,9 +888,15 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		)
 		var visible_glyph := _visible_node_active_glyph(node)
 		if visible_glyph != null:
-			_draw_mini_glyph(visible_glyph, center + Vector2(0, 21), 0.43)
+			_draw_mini_glyph(visible_glyph, center + Vector2(0, 20), node_glyph_draw_scale(visible_glyph))
 		elif cached_node_output_glyphs.has(node_id):
-			_draw_mini_glyph(cached_node_output_glyphs[node_id], center + Vector2(0, 21), 0.43, 0.34)
+			var predicted_glyph: GlyphModel = cached_node_output_glyphs[node_id]
+			_draw_mini_glyph(
+				predicted_glyph,
+				center + Vector2(0, 20),
+				node_glyph_draw_scale(predicted_glyph),
+				0.68
+			)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
 
@@ -920,9 +926,13 @@ func _node_activity_progress(node: FactoryNodeModel) -> float:
 	)
 
 
-func _draw_node_activity_progress(node: FactoryNodeModel, center: Vector2) -> void:
+func _draw_node_activity_progress(
+	node: FactoryNodeModel,
+	center: Vector2,
+	show_empty: bool
+) -> void:
 	var progress := _node_activity_progress(node)
-	if progress < 0.0:
+	if progress < 0.0 or (progress == 0.0 and not show_empty):
 		return
 	var start := center + Vector2(-34.0, -22.0)
 	var finish := center + Vector2(34.0, -22.0)
@@ -940,6 +950,12 @@ func visible_glyph_for_node(node_id: StringName) -> GlyphModel:
 
 func predicted_output_glyph_for_node(node_id: StringName) -> GlyphModel:
 	return cached_node_output_glyphs.get(node_id)
+
+
+func node_glyph_draw_scale(glyph: GlyphModel) -> float:
+	if glyph != null and not glyph.combine_children.is_empty():
+		return 0.55
+	return 0.82
 
 
 func visible_glyph_for_line(line_id: StringName) -> GlyphModel:
@@ -1018,7 +1034,7 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 		var y_offset := 0.0
 		if node.required_input_count() == 2:
 			y_offset = -13.0 if port == 0 else 13.0
-		_draw_mini_glyph(glyph, center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset), 0.35)
+		_draw_mini_glyph(glyph, center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset), 0.5)
 
 
 func _draw_mini_glyph(

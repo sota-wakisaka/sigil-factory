@@ -2057,6 +2057,10 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(rotation_preview != null, "factory board should cache the predicted rotated output")
 	_expect(color_preview != null, "factory board should cache the predicted colored output")
 	if source_preview != null and rotation_preview != null and color_preview != null:
+		_expect(
+			sentinel_board.node_glyph_draw_scale(source_preview) > 0.8,
+			"single-Primitive node ghosts should use a legible factory scale"
+		)
 		_expect(source_preview.components[0].rotation_step == 0, "source prediction should retain the raw orientation")
 		_expect(rotation_preview.components[0].rotation_step == 1, "rotator prediction should expose its quarter turn")
 		_expect(color_preview.components[0].color_id == &"blue", "colorizer prediction should expose its output color")
@@ -2127,6 +2131,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	var ghost := SigilGhost.new()
 	_expect(ghost.show_recipe(&"azure_guard"), "sigil ghost should accept a known recipe")
 	_expect(ghost.recipe_id == &"azure_guard", "sigil ghost should retain the displayed recipe ID")
+	_expect(ghost.glyph_draw_scale() == 1.5, "single-Primitive completion ghost should use the larger readable scale")
 	var expected: SigilRecipeModel
 	for recipe in MvpContent.recipes():
 		if recipe.id == &"azure_guard":
@@ -2140,6 +2145,8 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 		)
 	_expect(not ghost.show_recipe(&"missing_recipe"), "sigil ghost should reject an unknown recipe")
 	_expect(ghost.recipe_id == &"azure_guard", "unknown recipe should not erase the current ghost")
+	_expect(ghost.show_recipe(&"bound_colossus"), "sigil ghost should accept the combined recipe")
+	_expect(ghost.glyph_draw_scale() == 1.0, "combined completion ghost should keep its outer ring inside the panel")
 	ghost.free()
 
 
