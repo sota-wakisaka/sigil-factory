@@ -22,6 +22,8 @@ func _initialize() -> void:
 	_test_exact_match_is_order_independent()
 	_test_attribute_diagnostics()
 	_test_missing_and_extra_components()
+	_test_diagnostics_are_stable_for_duplicate_primitives()
+	_test_diagnostics_follow_player_facing_priority()
 	_test_combine_structure_is_order_independent()
 	_test_combine_children_use_hash_then_serialization_order()
 	_test_combine_hierarchy_affects_matching()
@@ -111,6 +113,54 @@ func _test_missing_and_extra_components() -> void:
 	var diagnostics: PackedStringArray = result["diagnostics"]
 	_expect(diagnostics.has("部品不足: spike"), "missing primitive should be diagnosed")
 	_expect(diagnostics.has("余分な部品: branch"), "extra primitive should be diagnosed")
+
+
+func _test_diagnostics_are_stable_for_duplicate_primitives() -> void:
+	var target := GlyphModel.new([
+		GlyphComponentModel.new(&"ring", Vector2i(0, 0), 0, 1, &"blue"),
+		GlyphComponentModel.new(&"ring", Vector2i(1, 0), 0, 1, &"red"),
+	])
+	var first_actual := GlyphComponentModel.new(&"ring", Vector2i(0, 0), 0, 1, &"red")
+	var second_actual := GlyphComponentModel.new(&"ring", Vector2i(1, 0), 0, 1, &"blue")
+	var forward := SigilMatcher.compare(
+		GlyphModel.new([first_actual, second_actual]),
+		target
+	)
+	var reverse := SigilMatcher.compare(
+		GlyphModel.new([second_actual, first_actual]),
+		target
+	)
+	_expect(
+		forward["diagnostics"] == reverse["diagnostics"],
+		"duplicate primitive diagnostics should not depend on component insertion order"
+	)
+	_expect(
+		forward["diagnostics"] == PackedStringArray(["色が違います"]),
+		"equal-score duplicate primitives should use canonical-key tie breaking"
+	)
+
+
+func _test_diagnostics_follow_player_facing_priority() -> void:
+	var target := GlyphModel.new([
+		GlyphComponentModel.new(&"ring", Vector2i.ZERO, 1, 2, &"blue"),
+		GlyphComponentModel.new(&"spike"),
+	])
+	var actual := GlyphModel.new([
+		GlyphComponentModel.new(&"ring", Vector2i(1, 0), 0, 1, &"white"),
+		GlyphComponentModel.new(&"branch"),
+	])
+	var diagnostics: PackedStringArray = SigilMatcher.compare(actual, target)["diagnostics"]
+	_expect(
+		diagnostics == PackedStringArray([
+			"部品不足: spike",
+			"余分な部品: branch",
+			"色が違います",
+			"回転が違います",
+			"倍率が違います",
+			"位置が違います",
+		]),
+		"diagnostics should follow the player-facing correction priority"
+	)
 
 
 func _test_combine_structure_is_order_independent() -> void:

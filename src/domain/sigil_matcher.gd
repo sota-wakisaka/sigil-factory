@@ -32,8 +32,13 @@ static func compare(actual: GlyphModel, target: GlyphModel) -> Dictionary:
 	if actual.canonical_keys() == target.canonical_keys():
 		_add_unique(diagnostics, "合成階層が違います")
 	var used_actual_indices: Dictionary = {}
+	var target_components: Array[GlyphComponentModel] = target.components.duplicate()
+	target_components.sort_custom(
+		func(first: GlyphComponentModel, second: GlyphComponentModel) -> bool:
+			return first.canonical_key() < second.canonical_key()
+	)
 
-	for target_component in target.components:
+	for target_component in target_components:
 		var actual_index := _find_closest_component(
 			target_component,
 			actual.components,
@@ -50,7 +55,12 @@ static func compare(actual: GlyphModel, target: GlyphModel) -> Dictionary:
 			diagnostics
 		)
 
-	for index in actual.components.size():
+	var actual_indices := range(actual.components.size())
+	actual_indices.sort_custom(
+		func(first: int, second: int) -> bool:
+			return actual.components[first].canonical_key() < actual.components[second].canonical_key()
+	)
+	for index in actual_indices:
 		if not used_actual_indices.has(index):
 			_add_unique(
 				diagnostics,
@@ -59,7 +69,7 @@ static func compare(actual: GlyphModel, target: GlyphModel) -> Dictionary:
 
 	return {
 		"is_match": false,
-		"diagnostics": diagnostics,
+		"diagnostics": _ordered_diagnostics(diagnostics),
 	}
 
 
@@ -70,6 +80,7 @@ static func _find_closest_component(
 ) -> int:
 	var best_index := -1
 	var best_score := 1_000_000
+	var best_key := ""
 	for index in actual_components.size():
 		if used_indices.has(index):
 			continue
@@ -77,9 +88,11 @@ static func _find_closest_component(
 		if candidate.primitive_id != target_component.primitive_id:
 			continue
 		var score := _difference_score(candidate, target_component)
-		if score < best_score:
+		var candidate_key := candidate.canonical_key()
+		if score < best_score or (score == best_score and candidate_key < best_key):
 			best_score = score
 			best_index = index
+			best_key = candidate_key
 	return best_index
 
 
@@ -100,14 +113,47 @@ static func _append_component_differences(
 	target: GlyphComponentModel,
 	diagnostics: PackedStringArray
 ) -> void:
-	if actual.position != target.position:
-		_add_unique(diagnostics, "位置が違います")
+	if actual.color_id != target.color_id:
+		_add_unique(diagnostics, "色が違います")
 	if actual.rotation_step != target.rotation_step:
 		_add_unique(diagnostics, "回転が違います")
 	if actual.scale_step != target.scale_step:
 		_add_unique(diagnostics, "倍率が違います")
-	if actual.color_id != target.color_id:
-		_add_unique(diagnostics, "色が違います")
+	if actual.position != target.position:
+		_add_unique(diagnostics, "位置が違います")
+
+
+static func _ordered_diagnostics(values: PackedStringArray) -> PackedStringArray:
+	var ordered: Array[String] = []
+	for value in values:
+		ordered.append(value)
+	ordered.sort_custom(
+		func(first: String, second: String) -> bool:
+			var first_priority := _diagnostic_priority(first)
+			var second_priority := _diagnostic_priority(second)
+			if first_priority != second_priority:
+				return first_priority < second_priority
+			return first < second
+	)
+	return PackedStringArray(ordered)
+
+
+static func _diagnostic_priority(value: String) -> int:
+	if value.begins_with("部品不足:"):
+		return 0
+	if value.begins_with("余分な部品:"):
+		return 1
+	if value == "色が違います":
+		return 2
+	if value == "回転が違います":
+		return 3
+	if value == "倍率が違います":
+		return 4
+	if value == "位置が違います":
+		return 5
+	if value == "合成階層が違います":
+		return 6
+	return 7
 
 
 static func _add_unique(values: PackedStringArray, value: String) -> void:
