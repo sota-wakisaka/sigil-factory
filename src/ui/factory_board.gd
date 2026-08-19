@@ -781,15 +781,6 @@ func _draw() -> void:
 		)
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(18, size.y - 31),
-			"シジル工程 // 斥候: 環  |  衛兵: 環→回転→青  |  巨像: 環+棘→合成→青",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			11,
-			Color(0.66, 0.72, 0.84)
-		)
-		draw_string(
-			ThemeDB.fallback_font,
 			Vector2(18, 43),
 			cached_production_preview,
 			HORIZONTAL_ALIGNMENT_RIGHT,
