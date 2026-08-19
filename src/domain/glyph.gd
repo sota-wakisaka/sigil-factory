@@ -88,10 +88,23 @@ func has_complete_overlap() -> bool:
 
 
 func rotate(steps: int) -> void:
+	var normalized_steps := posmod(steps, 4)
 	for component in components:
-		component.rotation_step = posmod(component.rotation_step + steps, 4)
+		component.position = _rotate_position(component.position, normalized_steps)
+		component.rotation_step = posmod(component.rotation_step + normalized_steps, 4)
 	for child in combine_children:
-		child.rotate(steps)
+		child.rotate(normalized_steps)
+
+
+func _rotate_position(position: Vector2i, steps: int) -> Vector2i:
+	match posmod(steps, 4):
+		1:
+			return Vector2i(-position.y, position.x)
+		2:
+			return Vector2i(-position.x, -position.y)
+		3:
+			return Vector2i(position.y, -position.x)
+	return position
 
 
 func translate(offset: Vector2i) -> void:

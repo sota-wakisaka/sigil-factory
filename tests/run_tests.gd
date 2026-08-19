@@ -26,6 +26,8 @@ func _initialize() -> void:
 	_test_combine_hierarchy_affects_matching()
 	_test_production_context_does_not_affect_matching()
 	_test_rotation_is_normalized_to_quarter_turns()
+	_test_combined_rotation_transforms_positions_and_orientation()
+	_test_transform_history_folds_into_final_state()
 	_test_complete_overlap_is_rejected()
 	_test_factory_tick_prevents_same_tick_multistage_processing()
 	_test_factory_tick_uses_starting_input_availability()
@@ -155,6 +157,61 @@ func _test_rotation_is_normalized_to_quarter_turns() -> void:
 	var negative := GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, -3)])
 	_expect(SigilMatcher.compare(first, wrapped)["is_match"], "rotation should wrap after four quarter turns")
 	_expect(SigilMatcher.compare(first, negative)["is_match"], "negative rotation should normalize into the same cycle")
+
+
+func _test_combined_rotation_transforms_positions_and_orientation() -> void:
+	var ring := GlyphModel.new([
+		GlyphComponentModel.new(&"ring", Vector2i(1, 0), 0),
+	])
+	var spike := GlyphModel.new([
+		GlyphComponentModel.new(&"spike", Vector2i(0, 1), 1),
+	])
+	var combined := GlyphModel.combine(ring, spike)
+	var original_serialization := combined.canonical_serialization()
+	combined.rotate(1)
+	var expected_ring := GlyphModel.new([
+		GlyphComponentModel.new(&"ring", Vector2i(0, 1), 1),
+	])
+	var expected_spike := GlyphModel.new([
+		GlyphComponentModel.new(&"spike", Vector2i(-1, 0), 2),
+	])
+	var expected := GlyphModel.combine(expected_ring, expected_spike)
+	_expect(
+		SigilMatcher.compare(combined, expected)["is_match"],
+		"rotating a combined glyph should rotate every child position and orientation"
+	)
+	_expect(
+		combined.canonical_keys() == expected.canonical_keys(),
+		"combined glyph flat components should stay synchronized with rotated children"
+	)
+	combined.rotate(3)
+	_expect(
+		combined.canonical_serialization() == original_serialization,
+		"four quarter turns should restore the complete combined canonical structure"
+	)
+
+
+func _test_transform_history_folds_into_final_state() -> void:
+	var original := GlyphModel.new([
+		GlyphComponentModel.new(&"ring", Vector2i(1, -1), 0, 1, &"white"),
+	])
+	var sequential := original.copy()
+	sequential.rotate(1)
+	sequential.rotate(1)
+	sequential.translate(Vector2i(2, -3))
+	sequential.translate(Vector2i(-2, 3))
+	sequential.recolor(&"red")
+	sequential.recolor(&"white")
+	var folded := original.copy()
+	folded.rotate(2)
+	_expect(
+		sequential.canonical_serialization() == folded.canonical_serialization(),
+		"equivalent transform histories should fold into the same final canonical state"
+	)
+	_expect(
+		sequential.canonical_hash() == folded.canonical_hash(),
+		"folded transform histories should share the same canonical hash"
+	)
 
 
 func _test_complete_overlap_is_rejected() -> void:
