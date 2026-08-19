@@ -394,9 +394,14 @@ func begin_edit() -> void:
 func preview_plan(next_plan_id: StringName) -> void:
 	if not editing:
 		return
+	var discarded_before_edit := simulation.discarded_glyphs
+	var discarded_work_in_progress := work_in_progress_count()
+	var committed_tick := simulation.tick_index
 	pending_plan_id = next_plan_id
 	preview_simulation = MvpContent.build_factory(pending_plan_id)
 	_apply_run_upgrades(preview_simulation)
+	preview_simulation.discarded_glyphs = discarded_before_edit + discarded_work_in_progress
+	preview_simulation.tick_index = committed_tick
 	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
 	selected_node_id = &""
 	undo_history.clear()
@@ -444,6 +449,12 @@ func work_in_progress_count() -> int:
 	for line in simulation.lines.values():
 		count += int(line.payload != null)
 	return count
+
+
+func pending_discard_count() -> int:
+	if not editing or preview_simulation == null or simulation == null:
+		return 0
+	return maxi(preview_simulation.discarded_glyphs - simulation.discarded_glyphs, 0)
 
 
 func advance_tick() -> void:

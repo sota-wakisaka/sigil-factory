@@ -446,14 +446,28 @@ func _test_threat_forecast_respects_horizon() -> void:
 func _test_factory_edit_is_transactional() -> void:
 	var board := FactoryBoard.new()
 	board.configure(MvpContent.PLAN_SCOUT)
+	for _tick in 18:
+		board.advance_tick()
+	var committed_tick := board.simulation.tick_index
+	var committed_work_in_progress := board.work_in_progress_count()
+	_expect(committed_work_in_progress > 0, "running factory should have work in progress for the edit test")
 	var original_simulation := board.simulation
 	board.begin_edit()
 	board.preview_plan(MvpContent.PLAN_GOLEM)
 	_expect(board.plan_id == MvpContent.PLAN_SCOUT, "preview should not change committed plan")
 	_expect(board.simulation == original_simulation, "preview should not replace running factory")
+	_expect(board.pending_discard_count() == committed_work_in_progress, "preview should disclose discarded work in progress")
+	_expect(board.preview_simulation.tick_index == committed_tick, "template preview should preserve factory time")
+	board.cancel_edit()
+	_expect(board.simulation == original_simulation, "cancel should preserve the running factory")
+	_expect(board.work_in_progress_count() == committed_work_in_progress, "cancel should restore all work in progress")
+	_expect(board.simulation.discarded_glyphs == 0, "cancel should not count preview discards")
+	board.begin_edit()
+	board.preview_plan(MvpContent.PLAN_GOLEM)
 	board.commit_edit()
 	_expect(board.plan_id == MvpContent.PLAN_GOLEM, "commit should apply pending plan")
 	_expect(board.simulation != original_simulation, "commit should replace factory atomically")
+	_expect(board.simulation.discarded_glyphs == committed_work_in_progress, "commit should count discarded work in progress")
 	board.free()
 
 

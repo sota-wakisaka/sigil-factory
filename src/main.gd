@@ -163,6 +163,9 @@ func _select_plan(plan_id: StringName) -> void:
 	if flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		factory_board.preview_plan(plan_id)
 		plan_label.text = "仮術式: %s // %s // 未確定" % [MvpContent.plan_name(plan_id), MvpContent.plan_description(plan_id)]
+		var pending_discard := factory_board.pending_discard_count()
+		if pending_discard > 0:
+			plan_label.text += " // 仕掛品%d個を廃棄予定" % pending_discard
 	else:
 		factory_board.configure(plan_id)
 		var state := "構築中" if flow.phase == RunFlow.Phase.FACTORY_BUILD else "稼働術式"
@@ -435,7 +438,7 @@ func _reward_summary() -> String:
 func _battle_result_summary() -> String:
 	var battle := battle_board.simulation
 	var elapsed_seconds := float(battle.tick_index) * TICK_SECONDS
-	return "戦闘時間 %02d:%02d  //  撃破 %d体\n生産: 斥候 %d  衛兵 %d  巨像 %d  //  時間停止 %d回  再構成 %d回  不一致 %d" % [
+	return "戦闘時間 %02d:%02d  //  撃破 %d体\n生産: 斥候 %d  衛兵 %d  巨像 %d  //  時間停止 %d回  再構成 %d回  廃棄・不一致 %d" % [
 		int(elapsed_seconds) / 60,
 		int(elapsed_seconds) % 60,
 		battle.player_kills,
