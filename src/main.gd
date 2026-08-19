@@ -199,6 +199,7 @@ func _factory_is_valid(prefix: String) -> bool:
 
 func _select_plan(plan_id: StringName) -> void:
 	sigil_ghost.show_recipe(MvpContent.recipe_id_for_plan(plan_id))
+	_refresh_factory_goal_tools()
 	for button in [$Toolbar/EmptyButton, $Toolbar/ScoutButton, $Toolbar/SentinelButton, $Toolbar/GolemButton]:
 		button.set_plan_selected(button.plan_id == plan_id)
 	if flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
@@ -251,6 +252,34 @@ func _refresh_factory_inspector() -> void:
 
 func _refresh_factory_goal_candidate() -> void:
 	sigil_ghost.show_candidate(factory_board.final_summoner_candidate_glyph())
+
+
+func _refresh_factory_goal_tools() -> void:
+	var relevant := {}
+	_collect_goal_equipment(sigil_ghost.glyph, relevant)
+	relevant[&"summoner"] = true
+	for button in $FactoryPalette.get_children():
+		if button.equipment_kind in [&"delete", &"undo"]:
+			button.set_goal_relevant(false)
+		else:
+			button.set_goal_relevant(relevant.has(button.equipment_kind))
+
+
+func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
+	if glyph == null:
+		return
+	if not glyph.combine_children.is_empty():
+		relevant[&"combiner"] = true
+	for component in glyph.components:
+		match component.primitive_id:
+			&"ring": relevant[&"ring_source"] = true
+			&"spike": relevant[&"spike_source"] = true
+		if component.rotation_step != 0:
+			relevant[&"rotator"] = true
+		if component.color_id != &"white":
+			relevant[&"colorizer"] = true
+	for child in glyph.combine_children:
+		_collect_goal_equipment(child, relevant)
 
 
 func _on_inspector_option_selected(index: int) -> void:

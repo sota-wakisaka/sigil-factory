@@ -72,6 +72,18 @@ func _initialize() -> void:
 	_expect(main.get_node("FactoryPalette/SummonButton").equipment_kind == &"summoner", "summoner palette choice should expose its dedicated vector icon kind")
 	_expect(main.get_node("FactoryPalette/RingButton").mana_cost == 20, "palette should expose source mana cost without requiring a tooltip")
 	_expect(main.get_node("FactoryPalette/RotateButton").mana_cost == 15, "palette should expose processor mana cost with the same visual convention")
+	_expect(main.get_node("FactoryPalette/RingButton").goal_relevant, "scout target should visually link to its ring source tool")
+	_expect(not main.get_node("FactoryPalette/RotateButton").goal_relevant, "scout target should not mark an unused rotation tool")
+	main.sigil_ghost.show_recipe(&"azure_guard")
+	main._refresh_factory_goal_tools()
+	_expect(main.get_node("FactoryPalette/RotateButton").goal_relevant, "rotated target should visually mark the rotation tool")
+	_expect(main.get_node("FactoryPalette/ColorButton").goal_relevant, "colored target should visually mark the color tool")
+	main.sigil_ghost.show_recipe(&"bound_colossus")
+	main._refresh_factory_goal_tools()
+	_expect(main.get_node("FactoryPalette/SpikeButton").goal_relevant, "combined target should visually mark its spike source")
+	_expect(main.get_node("FactoryPalette/CombineButton").goal_relevant, "combined target should visually mark the combine tool")
+	main.sigil_ghost.show_recipe(&"open_ring")
+	main._refresh_factory_goal_tools()
 	_expect(main.get_node("FactoryPalette/RotateButton").custom_minimum_size.y >= 50.0, "palette icon should reserve readable vertical space")
 	_expect(
 		"90°・180°・270°" in main.get_node("FactoryPalette/RotateButton").tooltip_text,

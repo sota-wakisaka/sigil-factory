@@ -9,6 +9,7 @@ const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 @export var mana_cost := 0
 
 var preview_glyph: GlyphModel
+var goal_relevant := false
 
 
 func _ready() -> void:
@@ -39,6 +40,19 @@ func _draw() -> void:
 		_draw_mana_cost()
 	if disabled:
 		_draw_unavailable_overlay()
+	if goal_relevant:
+		_draw_goal_marker()
+
+
+func set_goal_relevant(relevant: bool) -> void:
+	goal_relevant = relevant
+	queue_redraw()
+
+
+func _draw_goal_marker() -> void:
+	var color := Color(0.28, 0.78, 1.0, 0.96)
+	draw_line(Vector2(8, size.y - 2), Vector2(size.x - 8, size.y - 2), color, 2.0, true)
+	draw_circle(Vector2(size.x * 0.5, size.y - 2), 2.6, color)
 
 
 func _draw_mana_cost() -> void:
