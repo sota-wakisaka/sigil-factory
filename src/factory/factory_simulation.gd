@@ -17,21 +17,26 @@ var tick_index := 0
 
 
 func add_node(node: FactoryNodeModel) -> bool:
-	if node == null or nodes.has(node.id) or not _node_work_in_progress_is_valid(node):
+	if not node_registration_result(node)["ok"]:
 		return false
 	var stored_node := node.copy_state()
 	nodes[stored_node.id] = stored_node
 	return true
 
 
-func _node_work_in_progress_is_valid(node: FactoryNodeModel) -> bool:
-	for glyph_value in node.input_buffers:
-		if not _runtime_glyph_is_valid(glyph_value):
-			return false
-	return (
-		_runtime_glyph_is_valid(node.processing_glyph)
-		and _runtime_glyph_is_valid(node.output_buffer)
-	)
+func node_registration_result(node: FactoryNodeModel) -> Dictionary:
+	var errors: Array[String] = []
+	if node == null:
+		return {"ok": false, "errors": ["missing_node"]}
+	if node.id == &"":
+		errors.append("missing_node_id")
+	if nodes.has(node.id):
+		errors.append("duplicate_node_id")
+	for port in node.input_buffers.size():
+		_append_runtime_glyph_errors(errors, node.input_buffers[port], "input[%d]" % port)
+	_append_runtime_glyph_errors(errors, node.processing_glyph, "processing")
+	_append_runtime_glyph_errors(errors, node.output_buffer, "output")
+	return {"ok": errors.is_empty(), "errors": errors}
 
 
 func add_recipe(recipe: SigilRecipeModel) -> bool:

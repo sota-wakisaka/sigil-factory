@@ -153,6 +153,12 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 	node_serial += 1
 	var new_node := FactoryNodeModel.new(node_id, kind, config)
 	_apply_node_upgrades(new_node)
+	var registration := display_simulation.node_registration_result(new_node)
+	if not registration["ok"]:
+		undo_history.pop_back()
+		connection_message = "設備を追加できません: 設備データが不正です（%s）" % ", ".join(registration["errors"])
+		queue_redraw()
+		return &""
 	display_simulation.add_node(new_node)
 	var column := posmod(node_serial - 2, 3)
 	var row := posmod((node_serial - 2) / 3, 2)

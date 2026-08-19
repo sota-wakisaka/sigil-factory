@@ -47,6 +47,7 @@ func _initialize() -> void:
 	_test_factory_rejects_invalid_recipe_structures()
 	_test_factory_owns_registered_recipe_data()
 	_test_factory_owns_registered_node_data()
+	_test_node_registration_reports_stable_errors()
 	_test_factory_duplicate_owns_recipe_data()
 	_test_factory_duplicate_reports_invalid_state()
 	_test_combiner_waits_for_both_inputs()
@@ -876,6 +877,37 @@ func _test_factory_owns_registered_node_data() -> void:
 	invalid_node.input_buffers[0] = "not-a-glyph"
 	_expect(not simulation.add_node(invalid_node), "node registration should reject unsafe work in progress")
 	_expect(not simulation.nodes.has(&"invalid"), "rejected node state should not leave a partial registration")
+
+
+func _test_node_registration_reports_stable_errors() -> void:
+	var simulation := FactorySimulation.new()
+	var existing := FactoryNodeModel.new(&"existing", FactoryNodeModel.NodeKind.ROTATOR)
+	_expect(simulation.add_node(existing), "node diagnostic fixture should register")
+	var duplicate := FactoryNodeModel.new(&"existing", FactoryNodeModel.NodeKind.ROTATOR)
+	duplicate.input_buffers[0] = "not-a-glyph"
+	duplicate.output_buffer = GlyphModel.new([
+		GlyphComponentModel.new(&"ring"),
+		GlyphComponentModel.new(&"spike"),
+	])
+	var result := simulation.node_registration_result(duplicate)
+	_expect(
+		result["errors"] == [
+			"duplicate_node_id",
+			"invalid_glyph:input[0]:not_glyph",
+			"invalid_glyph:output:primitive_arity:root:2",
+		],
+		"node registration should report identity and work-in-progress errors in stable order"
+	)
+	_expect(simulation.nodes.size() == 1, "node registration diagnostics should not mutate the factory")
+	_expect(
+		simulation.node_registration_result(null)["errors"] == ["missing_node"],
+		"node registration should reject a missing object without dereferencing it"
+	)
+	var missing_id := FactoryNodeModel.new(&"", FactoryNodeModel.NodeKind.SUMMONER)
+	_expect(
+		simulation.node_registration_result(missing_id)["errors"] == ["missing_node_id"],
+		"node registration should report an empty node ID"
+	)
 
 
 func _test_factory_duplicate_owns_recipe_data() -> void:
