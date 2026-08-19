@@ -830,15 +830,7 @@ func _draw() -> void:
 			SELECTED_COLOR
 		)
 	if not interaction_enabled and flow_warning_message != "":
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(18, size.y - 12),
-			flow_warning_message,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			size.x - 36.0,
-			12,
-			WARNING_COLOR
-		)
+		_draw_flow_warning_badge()
 
 
 func _draw_lines(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
@@ -855,6 +847,8 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 				line_color = Color(WARNING_COLOR, 0.76)
 		draw_line(start, finish, line_color, FACTORY_LINE_WIDTH, true)
 		_draw_flow_arrow(start, finish, line_color)
+		if display_simulation.line_flow_state(line_id) == &"buffer_full":
+			_draw_line_blocked_marker(start.lerp(finish, 0.58))
 		if goal_state in [&"match", &"mismatch"]:
 			_draw_recipe_match_marker(start.lerp(finish, 0.76), goal_state, 7.0)
 		if line.payload != null:
@@ -903,6 +897,7 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		if node_id == selected_node_id:
 			border_color = SELECTED_COLOR
 		_draw_node_frame(node, center, border_color, node_id == selected_node_id)
+		_draw_node_warning_marker(node_state, center)
 		_draw_node_activity_progress(node, center, display_simulation.tick_index > 0)
 		var visible_glyph := _visible_node_active_glyph(node)
 		if visible_glyph != null:
@@ -925,6 +920,52 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 
 func persistent_node_label_count() -> int:
 	return 0
+
+
+func warning_marker_symbol(flow_state: StringName) -> StringName:
+	match flow_state:
+		&"output_blocked": return &"cross"
+		&"material_shortage": return &"half_empty"
+		&"buffer_full": return &"stop"
+	return &""
+
+
+func _draw_node_warning_marker(flow_state: StringName, center: Vector2) -> void:
+	var symbol := warning_marker_symbol(flow_state)
+	if symbol == &"":
+		return
+	var badge_center := center + Vector2(34, -20)
+	var color := WARNING_COLOR if symbol == &"cross" else WAITING_COLOR
+	draw_circle(badge_center, 8.0, Color(0.025, 0.045, 0.068, 0.96))
+	draw_arc(badge_center, 8.0, 0.0, TAU, 20, color, 1.6, true)
+	if symbol == &"cross":
+		draw_line(badge_center + Vector2(-4, -4), badge_center + Vector2(4, 4), color, 1.6, true)
+		draw_line(badge_center + Vector2(-4, 4), badge_center + Vector2(4, -4), color, 1.6, true)
+	else:
+		draw_arc(badge_center + Vector2(-2.5, 0), 3.0, 0.0, TAU, 14, color, 1.3, true)
+		draw_arc(badge_center + Vector2(3.5, 0), 3.0, 0.0, TAU, 14, Color(color, 0.28), 1.3, true)
+
+
+func _draw_line_blocked_marker(center: Vector2) -> void:
+	draw_circle(center, 8.0, Color(0.025, 0.045, 0.068, 0.96))
+	draw_line(center + Vector2(-3, -5), center + Vector2(-3, 5), WARNING_COLOR, 2.0, true)
+	draw_line(center + Vector2(3, -5), center + Vector2(3, 5), WARNING_COLOR, 2.0, true)
+
+
+func flow_warning_badge_at(at_position: Vector2) -> bool:
+	return not interaction_enabled and flow_warning_message != "" and at_position.distance_to(Vector2(28, size.y - 18)) <= 18.0
+
+
+func _draw_flow_warning_badge() -> void:
+	var center := Vector2(28, size.y - 18)
+	var points := PackedVector2Array([
+		center + Vector2(0, -12), center + Vector2(11, 9), center + Vector2(-11, 9),
+	])
+	draw_colored_polygon(points, Color(WARNING_COLOR, 0.9))
+	draw_line(center + Vector2(0, -5), center + Vector2(0, 3), Color.WHITE, 2.0, true)
+	draw_circle(center + Vector2(0, 6), 1.5, Color.WHITE)
+	var warning_count := maxi(simulation.flow_diagnostics().size(), 1)
+	draw_string(ThemeDB.fallback_font, center + Vector2(13, 5), str(warning_count), HORIZONTAL_ALIGNMENT_LEFT, 22.0, 11, WARNING_COLOR)
 
 
 func _draw_production_summary() -> void:
@@ -1250,6 +1291,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_glyph = null
 	tooltip_title = ""
 	tooltip_context = ""
+	if flow_warning_badge_at(at_position):
+		return flow_warning_message
 	var work_index := work_in_progress_summary_index_at(at_position)
 	if work_index >= 0:
 		var work_entry: Dictionary = work_in_progress_visual_summary()[work_index]

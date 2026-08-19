@@ -2044,6 +2044,12 @@ func _test_factory_board_shows_distinct_flow_warning() -> void:
 	board.simulation.add_node(blocked)
 	board.advance_tick()
 	_expect("出力閉塞" in board.flow_warning_message, "factory board should name output blockage separately")
+	_expect(board.warning_marker_symbol(&"output_blocked") == &"cross", "output blockage should use a shape marker in addition to color")
+	_expect(board.warning_marker_symbol(&"material_shortage") == &"half_empty", "combiner shortage should show which paired input is missing")
+	_expect(board.warning_marker_symbol(&"buffer_full") == &"stop", "blocked transport should use a stop marker")
+	board.size = Vector2(1196, 401)
+	_expect(board.flow_warning_badge_at(Vector2(28, board.size.y - 18)), "long runtime warning should collapse into a hoverable badge")
+	_expect("出力閉塞" in board._get_tooltip(Vector2(28, board.size.y - 18)), "runtime warning badge should retain the actionable reason on hover")
 	board.free()
 
 
