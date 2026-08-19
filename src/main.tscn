@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/factory_board.gd" id="2_factory"]
 [ext_resource type="Script" path="res://src/ui/battle_board.gd" id="3_battle"]
 [ext_resource type="Script" path="res://src/ui/sigil_ghost.gd" id="4_ghost"]
+[ext_resource type="Script" path="res://src/ui/sigil_plan_button.gd" id="5_plan_button"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -250,28 +251,40 @@ theme_override_constants/separation = 12
 alignment = 1
 
 [node name="EmptyButton" type="Button" parent="Toolbar"]
-custom_minimum_size = Vector2(110, 50)
+custom_minimum_size = Vector2(128, 50)
 layout_mode = 2
 tooltip_text = "環素材源と召喚器だけから、自分で最初の配線を作ります"
-text = "空工場"
+script = ExtResource("5_plan_button")
+plan_id = &"empty"
+recipe_id = &"open_ring"
+caption = "手組み"
 
 [node name="ScoutButton" type="Button" parent="Toolbar"]
-custom_minimum_size = Vector2(150, 50)
+custom_minimum_size = Vector2(128, 50)
 layout_mode = 2
 tooltip_text = "環を直接召喚器へ送り、斥候を高速生産するテンプレート"
-text = "斥候術式"
+script = ExtResource("5_plan_button")
+plan_id = &"scout"
+recipe_id = &"open_ring"
+caption = "斥候"
 
 [node name="SentinelButton" type="Button" parent="Toolbar"]
-custom_minimum_size = Vector2(150, 50)
+custom_minimum_size = Vector2(128, 50)
 layout_mode = 2
 tooltip_text = "環を回転・青着色し、群体兵に強い衛兵を生産するテンプレート"
-text = "衛兵術式"
+script = ExtResource("5_plan_button")
+plan_id = &"sentinel"
+recipe_id = &"azure_guard"
+caption = "衛兵"
 
 [node name="GolemButton" type="Button" parent="Toolbar"]
-custom_minimum_size = Vector2(150, 50)
+custom_minimum_size = Vector2(128, 50)
 layout_mode = 2
 tooltip_text = "環と棘を合成・青着色し、装甲兵に強い巨像を生産するテンプレート"
-text = "巨像術式"
+script = ExtResource("5_plan_button")
+plan_id = &"golem"
+recipe_id = &"bound_colossus"
+caption = "巨像"
 
 [node name="SpeedButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(120, 50)

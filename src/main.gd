@@ -194,6 +194,8 @@ func _factory_is_valid(prefix: String) -> bool:
 
 func _select_plan(plan_id: StringName) -> void:
 	sigil_ghost.show_recipe(MvpContent.recipe_id_for_plan(plan_id))
+	for button in [$Toolbar/EmptyButton, $Toolbar/ScoutButton, $Toolbar/SentinelButton, $Toolbar/GolemButton]:
+		button.set_plan_selected(button.plan_id == plan_id)
 	if flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		factory_board.preview_plan(plan_id)
 		plan_label.text = "◇ %s  • 未確定" % MvpContent.plan_name(plan_id)

@@ -35,6 +35,8 @@ func _initialize() -> void:
 	_expect(main.factory_board.visible and main.get_node("FactoryPalette").visible, "factory tab should restore factory controls")
 	_expect(main.factory_board.plan_id == MvpContent.PLAN_EMPTY, "first factory build should start from the guided empty workshop")
 	_expect(main.sigil_ghost.recipe_id == &"open_ring", "empty workshop should show the first scout sigil goal")
+	_expect(main.get_node("Toolbar/EmptyButton").button_pressed, "current factory plan should remain visually selected")
+	_expect(main.get_node("Toolbar/EmptyButton").glyph != null, "manual plan button should show its target CanonicalGlyph")
 	_expect(main.factory_board.mana_status_text() == "魔力 40/100 // 空き60", "factory build should disclose fixed mana capacity")
 	_expect("戦闘を開始" in main.pause_button.tooltip_text, "main action tooltip should explain build confirmation")
 	_expect(main.plan_label.text == "◇ 配線待ち", "empty workshop should use a compact visual state instead of a written instruction")
@@ -46,6 +48,12 @@ func _initialize() -> void:
 	_expect(main.plan_label.text == "◇ 配線待ち", "removing the first connection should restore the compact pending state")
 	main.factory_board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
+	_expect(main.get_node("Toolbar/ScoutButton").button_pressed, "selected sigil plan should be highlighted")
+	_expect(not main.get_node("Toolbar/EmptyButton").button_pressed, "previous sigil plan should clear its highlight")
+	_expect(
+		main.get_node("Toolbar/ScoutButton").glyph.canonical_serialization() == main.sigil_ghost.glyph.canonical_serialization(),
+		"selected plan button and persistent goal should draw the same CanonicalGlyph"
+	)
 	_expect(main.factory_board.interaction_enabled, "factory build should enable node placement")
 	_expect(not main.get_node("FactoryPalette/RingButton").disabled, "factory build should enable the equipment palette")
 	_expect(
