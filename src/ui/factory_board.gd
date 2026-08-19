@@ -825,15 +825,7 @@ func _draw() -> void:
 		if cached_production_valid:
 			_draw_production_summary()
 		else:
-			draw_string(
-				ThemeDB.fallback_font,
-				Vector2(18, 35),
-				cached_production_preview,
-				HORIZONTAL_ALIGNMENT_RIGHT,
-				size.x - 36.0,
-				12,
-				WARNING_COLOR
-			)
+			_draw_production_error_badge()
 		_draw_mana_meter()
 	if connection_message != "":
 		draw_string(
@@ -977,6 +969,17 @@ func _draw_production_summary() -> void:
 
 func interaction_legend_count() -> int:
 	return 3
+
+
+func _draw_production_error_badge() -> void:
+	var center := Vector2(size.x - 18.0, 27.0)
+	draw_circle(center, 10.0, WARNING_COLOR)
+	draw_line(center + Vector2(-4, -4), center + Vector2(4, 4), Color.WHITE, 1.8, true)
+	draw_line(center + Vector2(-4, 4), center + Vector2(4, -4), Color.WHITE, 1.8, true)
+
+
+func production_error_at(at_position: Vector2) -> bool:
+	return interaction_enabled and not cached_production_valid and at_position.distance_to(Vector2(size.x - 18.0, 27.0)) <= 16.0
 
 
 func _draw_interaction_legend() -> void:
@@ -1196,6 +1199,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_glyph = null
 	tooltip_title = ""
 	tooltip_context = ""
+	if production_error_at(at_position):
+		return cached_production_preview
 	var summary_unit := production_summary_unit_at(at_position)
 	if summary_unit != &"":
 		for recipe in MvpContent.recipes():
@@ -1258,7 +1263,15 @@ func _set_glyph_tooltip(next_glyph: GlyphModel, next_title: String, next_context
 	tooltip_context = next_context
 
 
-func _make_custom_tooltip(_for_text: String):
+func _make_custom_tooltip(for_text: String):
+	if for_text != "glyph_preview":
+		var label := Label.new()
+		label.text = for_text
+		label.custom_minimum_size = Vector2(360, 42)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.add_theme_color_override("font_color", Color(1.0, 0.76, 0.64))
+		return label
 	var preview := GlyphTooltipModel.new()
 	preview.configure(tooltip_glyph, tooltip_title, tooltip_context)
 	return preview
