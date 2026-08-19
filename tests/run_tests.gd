@@ -43,6 +43,7 @@ func _initialize() -> void:
 	_test_factory_closest_recipe_is_order_independent()
 	_test_factory_rejects_ambiguous_recipes()
 	_test_recipe_registration_reports_stable_errors()
+	_test_mvp_recipe_set_validation_reports_content_location()
 	_test_factory_rejects_invalid_recipe_structures()
 	_test_factory_owns_registered_recipe_data()
 	_test_factory_duplicate_owns_recipe_data()
@@ -735,6 +736,30 @@ func _test_recipe_registration_reports_stable_errors() -> void:
 		"recipe registration should report required fields before structural errors"
 	)
 	_expect(simulation.recipes.size() == 1, "registration diagnostics should not mutate the recipe registry")
+
+
+func _test_mvp_recipe_set_validation_reports_content_location() -> void:
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var candidates: Array[SigilRecipeModel] = [
+		SigilRecipeModel.new(&"ring_recipe", ring, &"scout"),
+		SigilRecipeModel.new(&"ring_recipe", ring, &"sentinel"),
+		SigilRecipeModel.new(&"", GlyphModel.new(), &""),
+	]
+	var result := MvpContent.validate_recipe_set(candidates)
+	_expect(not result["ok"], "invalid recipe set should fail content validation")
+	_expect(result["accepted_count"] == 1, "content validation should count only accepted recipes")
+	_expect(
+		result["errors"] == PackedStringArray([
+			"recipe[1]=ring_recipe:duplicate_recipe_id",
+			"recipe[1]=ring_recipe:duplicate_glyph_structure",
+			"recipe[2]=<empty>:missing_recipe_id",
+			"recipe[2]=<empty>:missing_unit_id",
+			"recipe[2]=<empty>:glyph:primitive_arity:root:0",
+		]),
+		"recipe set diagnostics should identify content index, ID, and stable rejection reasons"
+	)
+	var mvp_result := MvpContent.validate_recipe_set(MvpContent.recipes())
+	_expect(mvp_result["ok"] and mvp_result["accepted_count"] == 3, "shipped MVP recipes should pass aggregate validation")
 
 
 func _test_factory_rejects_invalid_recipe_structures() -> void:

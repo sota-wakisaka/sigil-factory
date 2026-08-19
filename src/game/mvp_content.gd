@@ -54,7 +54,13 @@ static func threat_schedule() -> Array[ThreatEventModel]:
 
 static func build_factory(plan_id: StringName) -> FactorySimulation:
 	var simulation := FactorySimulation.new()
-	for recipe in recipes():
+	var recipe_set := recipes()
+	var content_validation := validate_recipe_set(recipe_set)
+	assert(
+		content_validation["ok"],
+		"Invalid MVP recipe content: %s" % ", ".join(content_validation["errors"])
+	)
+	for recipe in recipe_set:
 		simulation.add_recipe(recipe)
 
 	match plan_id:
@@ -67,6 +73,25 @@ static func build_factory(plan_id: StringName) -> FactorySimulation:
 		_:
 			_build_scout_factory(simulation)
 	return simulation
+
+
+static func validate_recipe_set(candidate_recipes: Array[SigilRecipeModel]) -> Dictionary:
+	var registry := FactorySimulation.new()
+	var errors := PackedStringArray()
+	for recipe_index in candidate_recipes.size():
+		var recipe: SigilRecipeModel = candidate_recipes[recipe_index]
+		var result := registry.recipe_registration_result(recipe)
+		if result["ok"]:
+			registry.add_recipe(recipe)
+			continue
+		var recipe_label := String(recipe.id) if recipe.id != &"" else "<empty>"
+		for error in result["errors"]:
+			errors.append("recipe[%d]=%s:%s" % [recipe_index, recipe_label, error])
+	return {
+		"ok": errors.is_empty(),
+		"errors": errors,
+		"accepted_count": registry.recipes.size(),
+	}
 
 
 static func recipes() -> Array[SigilRecipeModel]:

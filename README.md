@@ -27,6 +27,7 @@ Design documents:
 - Cycle-safe Combine validation for malformed restored glyph trees
 - Unique recipe IDs and canonical structures with acquisition-order-independent registration
 - Side-effect-free structured diagnostics for rejected recipe registrations
+- Aggregate MVP recipe-set validation before factory construction
 - Owned recipe snapshots that isolate runtime factories and non-destructive previews
 - Completed-sigil ghost preview for the currently selected production plan
 - Pre-battle production preview with the closest recipe and first mismatch correction
