@@ -29,7 +29,7 @@ func add_recipe(recipe: SigilRecipeModel) -> bool:
 			return false
 		if existing.glyph.canonical_serialization() == candidate_serialization:
 			return false
-	recipes.append(recipe)
+	recipes.append(recipe.copy())
 	recipes.sort_custom(
 		func(first: SigilRecipeModel, second: SigilRecipeModel) -> bool:
 			return String(first.id) < String(second.id)

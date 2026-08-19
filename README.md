@@ -21,6 +21,7 @@ Design documents:
 - Authoritative graph validation for restored or externally constructed factory data
 - Collision-safe canonical binary Combine structure with hierarchy-aware sigil matching
 - Unique recipe IDs and canonical structures with acquisition-order-independent registration
+- Owned recipe snapshots that isolate runtime factories and non-destructive previews
 - Completed-sigil ghost preview for the currently selected production plan
 - Pre-battle production preview with the closest recipe and first mismatch correction
 - Production provenance for processing count, traversed node kinds, and source IDs

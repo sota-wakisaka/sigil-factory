@@ -42,6 +42,8 @@ func _initialize() -> void:
 	_test_factory_records_closest_summon_failure()
 	_test_factory_closest_recipe_is_order_independent()
 	_test_factory_rejects_ambiguous_recipes()
+	_test_factory_owns_registered_recipe_data()
+	_test_factory_duplicate_owns_recipe_data()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
 	_test_factory_rejects_implicit_fan_out()
@@ -697,6 +699,46 @@ func _test_factory_rejects_ambiguous_recipes() -> void:
 		"accepted recipes should use stable ID order instead of acquisition order"
 	)
 	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 3, "all MVP recipes should have unique IDs and structures")
+
+
+func _test_factory_owns_registered_recipe_data() -> void:
+	var simulation := FactorySimulation.new()
+	var recipe := SigilRecipeModel.new(
+		&"owned_ring",
+		GlyphModel.new([GlyphComponentModel.new(&"ring")]),
+		&"scout"
+	)
+	_expect(simulation.add_recipe(recipe), "recipe ownership fixture should register")
+	recipe.id = &"mutated_id"
+	recipe.unit_id = &"golem"
+	recipe.glyph.recolor(&"blue")
+	var registered: SigilRecipeModel = simulation.recipes[0]
+	_expect(registered.id == &"owned_ring", "registered recipe ID should not share caller mutation")
+	_expect(registered.unit_id == &"scout", "registered unit ID should not share caller mutation")
+	_expect(
+		registered.glyph.components[0].color_id == &"white",
+		"registered glyph should not share caller mutation"
+	)
+
+
+func _test_factory_duplicate_owns_recipe_data() -> void:
+	var simulation := FactorySimulation.new()
+	simulation.add_recipe(SigilRecipeModel.new(
+		&"owned_ring",
+		GlyphModel.new([GlyphComponentModel.new(&"ring")]),
+		&"scout"
+	))
+	var duplicate := simulation.duplicate_state()
+	duplicate.recipes[0].id = &"preview_only"
+	duplicate.recipes[0].unit_id = &"golem"
+	duplicate.recipes[0].glyph.recolor(&"blue")
+	var original: SigilRecipeModel = simulation.recipes[0]
+	_expect(original.id == &"owned_ring", "duplicate recipe ID mutation should not affect the original")
+	_expect(original.unit_id == &"scout", "duplicate unit mutation should not affect the original")
+	_expect(
+		original.glyph.components[0].color_id == &"white",
+		"duplicate glyph mutation should not affect the original"
+	)
 
 
 func _test_combiner_waits_for_both_inputs() -> void:

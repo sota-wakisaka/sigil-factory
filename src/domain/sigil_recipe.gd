@@ -15,3 +15,6 @@ func _init(
 	glyph = initial_glyph.copy()
 	unit_id = initial_unit_id
 
+
+func copy() -> SigilRecipeModel:
+	return SigilRecipeModel.new(id, glyph, unit_id)
