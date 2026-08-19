@@ -811,15 +811,7 @@ func _draw() -> void:
 	_draw_nodes(display_simulation, display_positions)
 	if editing:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.18, 0.62, 0.9, 0.055), true)
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(18, 28),
-			"PREVIEW // 未確定",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			14,
-			Color(0.46, 0.82, 1.0)
-		)
+		_draw_edit_summary()
 	if interaction_enabled:
 		_draw_interaction_legend()
 		if cached_production_valid:
@@ -830,7 +822,7 @@ func _draw() -> void:
 	if connection_message != "":
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(18, 22),
+			Vector2(18, 76 if editing else 22),
 			connection_message,
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -978,8 +970,67 @@ func _draw_production_error_badge() -> void:
 	draw_line(center + Vector2(-4, 4), center + Vector2(4, -4), Color.WHITE, 1.8, true)
 
 
+func work_in_progress_visual_summary() -> Array[Dictionary]:
+	var grouped := {}
+	for entry in _work_in_progress_entries(simulation):
+		var glyph: GlyphModel = entry["glyph"]
+		if not GlyphPainterModel.can_draw(glyph):
+			continue
+		var key := glyph.canonical_serialization()
+		if not grouped.has(key):
+			grouped[key] = {"glyph": glyph.copy(), "count": 0}
+		grouped[key]["count"] += 1
+	var keys := grouped.keys()
+	keys.sort()
+	var result: Array[Dictionary] = []
+	for key in keys:
+		result.append(grouped[key])
+	return result
+
+
+func _draw_edit_summary() -> void:
+	var pause_center := Vector2(28, 28)
+	draw_circle(pause_center, 13.0, Color(0.04, 0.09, 0.14, 0.95))
+	draw_arc(pause_center, 13.0, 0.0, TAU, 24, Color(0.42, 0.78, 1.0, 0.9), 1.5, true)
+	draw_line(pause_center + Vector2(-4, -6), pause_center + Vector2(-4, 6), Color(0.62, 0.86, 1.0), 2.5, true)
+	draw_line(pause_center + Vector2(4, -6), pause_center + Vector2(4, 6), Color(0.62, 0.86, 1.0), 2.5, true)
+	var groups := work_in_progress_visual_summary()
+	for index in mini(groups.size(), 6):
+		var entry: Dictionary = groups[index]
+		var glyph: GlyphModel = entry["glyph"]
+		var center := Vector2(72.0 + index * 58.0, 28.0)
+		draw_circle(center, 16.0, Color(0.025, 0.055, 0.085, 0.92))
+		GlyphPainterModel.draw_glyph(self, glyph, center, 0.78 if not glyph.combine_children.is_empty() else 1.3)
+		draw_string(
+			ThemeDB.fallback_font,
+			center + Vector2(12, 12),
+			str(entry["count"]),
+			HORIZONTAL_ALIGNMENT_CENTER,
+			18.0,
+			10,
+			Color(0.76, 0.9, 1.0)
+		)
+	var discard_count := pending_discard_count()
+	if discard_count > 0:
+		var center := Vector2(78.0 + mini(groups.size(), 6) * 58.0, 28.0)
+		draw_circle(center, 10.0, WARNING_COLOR)
+		draw_line(center + Vector2(-4, -4), center + Vector2(4, 4), Color.WHITE, 1.8, true)
+		draw_line(center + Vector2(-4, 4), center + Vector2(4, -4), Color.WHITE, 1.8, true)
+		draw_string(ThemeDB.fallback_font, center + Vector2(13, 4), str(discard_count), HORIZONTAL_ALIGNMENT_LEFT, 24.0, 11, WARNING_COLOR)
+
+
 func production_error_at(at_position: Vector2) -> bool:
 	return interaction_enabled and not cached_production_valid and at_position.distance_to(Vector2(size.x - 18.0, 27.0)) <= 16.0
+
+
+func work_in_progress_summary_index_at(at_position: Vector2) -> int:
+	if not editing:
+		return -1
+	var groups := work_in_progress_visual_summary()
+	for index in mini(groups.size(), 6):
+		if at_position.distance_to(Vector2(72.0 + index * 58.0, 28.0)) <= 22.0:
+			return index
+	return -1
 
 
 func _draw_interaction_legend() -> void:
@@ -1199,6 +1250,15 @@ func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_glyph = null
 	tooltip_title = ""
 	tooltip_context = ""
+	var work_index := work_in_progress_summary_index_at(at_position)
+	if work_index >= 0:
+		var work_entry: Dictionary = work_in_progress_visual_summary()[work_index]
+		_set_glyph_tooltip(
+			work_entry["glyph"],
+			"時間停止 // 仕掛品",
+			"工場内 %d個" % work_entry["count"]
+		)
+		return "glyph_preview"
 	if production_error_at(at_position):
 		return cached_production_preview
 	var summary_unit := production_summary_unit_at(at_position)

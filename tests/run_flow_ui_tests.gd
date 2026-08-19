@@ -159,6 +159,7 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "Space should open time-stop reconfiguration")
 	_expect(main.factory_board.visible and not main.battle_board.visible, "time stop should return to the full-width factory tab")
 	_expect(main.factory_board.interaction_enabled, "time stop should enable node placement")
+	_expect(main.plan_label.text == "Ⅱ", "time stop should move work-in-progress details from permanent text into the factory visual summary")
 	_expect("戦闘を再開" in main.pause_button.tooltip_text, "main action tooltip should explain edit confirmation")
 	_expect(main.speed_button.disabled, "time stop should disable speed controls")
 	main.get_node("Toolbar/SentinelButton").pressed.emit()

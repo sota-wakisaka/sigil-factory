@@ -1690,8 +1690,19 @@ func _test_factory_edit_is_transactional() -> void:
 	var committed_tick := board.simulation.tick_index
 	var committed_work_in_progress := board.work_in_progress_count()
 	_expect(committed_work_in_progress > 0, "running factory should have work in progress for the edit test")
+	var visual_summary := board.work_in_progress_visual_summary()
+	_expect(not visual_summary.is_empty(), "time-stop preview should expose work-in-progress as grouped CanonicalGlyphs")
+	var visual_count := 0
+	for entry in visual_summary:
+		visual_count += entry["count"]
+	_expect(visual_count == committed_work_in_progress, "visual work-in-progress summary should preserve the exact item count")
 	var original_simulation := board.simulation
 	board.begin_edit()
+	board.size = Vector2(1196, 401)
+	var work_center := Vector2(72, 28)
+	_expect(board.work_in_progress_summary_index_at(work_center) == 0, "time-stop Glyph summary should expose a stable hover target")
+	_expect(board._get_tooltip(work_center) == "glyph_preview", "time-stop Glyph should open a large CanonicalGlyph tooltip")
+	_expect("工場内" in board.tooltip_context, "time-stop Glyph tooltip should retain its grouped item count")
 	board.preview_plan(MvpContent.PLAN_GOLEM)
 	_expect(board.plan_id == MvpContent.PLAN_SCOUT, "preview should not change committed plan")
 	_expect(board.simulation == original_simulation, "preview should not replace running factory")

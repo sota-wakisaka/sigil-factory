@@ -512,10 +512,7 @@ func _apply_phase() -> void:
 			pause_button.text = "変更を確定・戦闘再開"
 			pause_button.tooltip_text = "有効な工場変更を一括確定し、リアルタイム戦闘を再開します"
 			cancel_button.disabled = false
-			var work_summary := factory_board.work_in_progress_summary()
-			plan_label.text = "Ⅱ 時間停止  •  仕掛品 %d" % factory_board.work_in_progress_count()
-			if work_summary != "":
-				plan_label.text += "（%s）" % work_summary
+			plan_label.text = "Ⅱ"
 			status_label.text = ""
 		RunFlow.Phase.VICTORY:
 			pause_button.disabled = true
