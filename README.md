@@ -19,6 +19,7 @@ Design documents:
 - Selection inspector for source material, rotation, and color configuration
 - Deterministic fixed-tick glyph factory simulation
 - Canonical binary Combine structure with hierarchy-aware sigil matching
+- Unique recipe IDs and canonical structures with acquisition-order-independent registration
 - Completed-sigil ghost preview for the currently selected production plan
 - Production provenance for processing count, traversed node kinds, and source IDs
 - Quarter-turn normalization of orientation and root-relative position, plus rejection of fully overlapping primitives

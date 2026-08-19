@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_factory_pipeline_summons_matching_unit()
 	_test_factory_records_closest_summon_failure()
 	_test_factory_closest_recipe_is_order_independent()
+	_test_factory_rejects_ambiguous_recipes()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
 	_test_factory_rejects_implicit_fan_out()
@@ -600,6 +601,34 @@ func _test_factory_closest_recipe_is_order_independent() -> void:
 		selected_recipe_ids == PackedStringArray(["a_recipe", "a_recipe"]),
 		"equal-rank closest recipe selection should use recipe ID instead of acquisition order"
 	)
+
+
+func _test_factory_rejects_ambiguous_recipes() -> void:
+	var simulation := FactorySimulation.new()
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	_expect(
+		simulation.add_recipe(SigilRecipeModel.new(&"z_ring", ring, &"scout")),
+		"first unique recipe should register"
+	)
+	_expect(
+		not simulation.add_recipe(SigilRecipeModel.new(&"z_ring", spike, &"golem")),
+		"duplicate recipe ID should be rejected even with a different structure"
+	)
+	_expect(
+		not simulation.add_recipe(SigilRecipeModel.new(&"a_alias", ring, &"sentinel")),
+		"duplicate canonical structure should not map to a second summon result"
+	)
+	_expect(
+		simulation.add_recipe(SigilRecipeModel.new(&"b_spike", spike, &"golem")),
+		"different canonical structure should register"
+	)
+	_expect(simulation.recipes.size() == 2, "only unambiguous recipes should remain registered")
+	_expect(
+		simulation.recipes[0].id == &"b_spike" and simulation.recipes[1].id == &"z_ring",
+		"accepted recipes should use stable ID order instead of acquisition order"
+	)
+	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 3, "all MVP recipes should have unique IDs and structures")
 
 
 func _test_combiner_waits_for_both_inputs() -> void:

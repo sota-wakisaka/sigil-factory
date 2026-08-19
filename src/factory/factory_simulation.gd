@@ -22,8 +22,19 @@ func add_node(node: FactoryNodeModel) -> bool:
 	return true
 
 
-func add_recipe(recipe: SigilRecipeModel) -> void:
+func add_recipe(recipe: SigilRecipeModel) -> bool:
+	var candidate_serialization := recipe.glyph.canonical_serialization()
+	for existing in recipes:
+		if existing.id == recipe.id:
+			return false
+		if existing.glyph.canonical_serialization() == candidate_serialization:
+			return false
 	recipes.append(recipe)
+	recipes.sort_custom(
+		func(first: SigilRecipeModel, second: SigilRecipeModel) -> bool:
+			return String(first.id) < String(second.id)
+	)
+	return true
 
 
 func connect_nodes(line: FactoryLineModel) -> Dictionary:
