@@ -4,6 +4,7 @@ extends Control
 const MvpContent := preload("res://src/game/mvp_content.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
+const GlyphComparisonTooltipModel := preload("res://src/ui/glyph_comparison_tooltip.gd")
 
 const PANEL_COLOR := Color(0.035, 0.055, 0.085, 0.96)
 const BORDER_COLOR := Color(0.32, 0.56, 0.76, 0.9)
@@ -86,6 +87,11 @@ func _draw() -> void:
 	else:
 		draw_arc(candidate_center, 13.0, 0.0, TAU, 24, Color(0.32, 0.44, 0.54, 0.6), 1.0, true)
 	_draw_candidate_marker(candidate_center + Vector2(24, -13))
+	if candidate_state == &"match":
+		draw_arc(candidate_center, 20.0, 0.0, TAU, 24, Color(MATCH_COLOR, 0.72), 1.5, true)
+	elif candidate_state == &"mismatch":
+		draw_arc(target_center, 20.0, 0.0, TAU, 24, Color(1.0, 0.74, 0.28, 0.72), 1.5, true)
+		draw_arc(candidate_center, 20.0, 0.0, TAU, 24, Color(MISMATCH_COLOR, 0.72), 1.5, true)
 
 
 func glyph_draw_scale() -> float:
@@ -126,6 +132,10 @@ func _get_tooltip(at_position: Vector2) -> String:
 
 
 func _make_custom_tooltip(_for_text: String):
+	if candidate_glyph != null:
+		var comparison := GlyphComparisonTooltipModel.new()
+		comparison.configure(glyph, candidate_glyph, display_name)
+		return comparison
 	var preview := GlyphTooltipModel.new()
 	preview.configure(
 		tooltip_glyph,

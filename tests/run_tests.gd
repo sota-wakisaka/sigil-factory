@@ -16,6 +16,7 @@ const FactoryBoard := preload("res://src/ui/factory_board.gd")
 const SigilGhost := preload("res://src/ui/sigil_ghost.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
+const GlyphComparisonTooltipModel := preload("res://src/ui/glyph_comparison_tooltip.gd")
 const RunFlow := preload("res://src/game/run_flow.gd")
 
 var failures := 0
@@ -2366,6 +2367,16 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 		ghost.tooltip_glyph.canonical_serialization() == mismatching_candidate.canonical_serialization(),
 		"candidate tooltip should use the compared CanonicalGlyph"
 	)
+	var comparison_tooltip = ghost._make_custom_tooltip("candidate")
+	_expect(comparison_tooltip.get_script() == GlyphComparisonTooltipModel, "available factory output should open a side-by-side visual comparison")
+	_expect(comparison_tooltip.custom_minimum_size.x >= 500.0, "side-by-side comparison should be substantially larger than the persistent card")
+	_expect(comparison_tooltip.comparison_state == &"mismatch", "comparison tooltip should preserve the mismatch state")
+	_expect(
+		comparison_tooltip.target_glyph.canonical_serialization() == ghost.glyph.canonical_serialization()
+		and comparison_tooltip.candidate_glyph.canonical_serialization() == mismatching_candidate.canonical_serialization(),
+		"comparison tooltip should own exact copies of both compared CanonicalGlyphs"
+	)
+	comparison_tooltip.free()
 	ghost.show_candidate(null)
 	_expect(ghost.candidate_state == &"missing", "missing factory candidate should leave an empty comparison slot")
 	var expected: SigilRecipeModel
