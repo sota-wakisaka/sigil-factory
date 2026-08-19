@@ -94,6 +94,7 @@ func _initialize() -> void:
 	_test_factory_board_shows_distinct_flow_warning()
 	_test_factory_board_holds_transient_flow_warning()
 	_test_factory_board_exposes_visible_work_in_progress_glyphs()
+	_test_factory_board_exposes_node_activity_progress()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
 	_test_factory_production_preview_explains_first_mismatch()
@@ -1976,6 +1977,36 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		"input Glyph lookup should reject an out-of-range port"
 	)
 	combine_board.free()
+
+
+func _test_factory_board_exposes_node_activity_progress() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SENTINEL)
+	var source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
+	source.source_timer = 11
+	_expect(
+		is_equal_approx(board.node_activity_progress(&"ring_source"), 0.5),
+		"source activity should expose fixed-tick generation progress"
+	)
+	source.output_buffer = GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	_expect(
+		board.node_activity_progress(&"ring_source") == 1.0,
+		"ready source output should show completed activity"
+	)
+	var rotator: FactoryNodeModel = board.simulation.nodes[&"rotator"]
+	_expect(board.node_activity_progress(&"rotator") < 0.0, "idle processor should not show active progress")
+	rotator.processing_glyph = GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	rotator.remaining_processing_ticks = 1
+	_expect(
+		is_equal_approx(board.node_activity_progress(&"rotator"), 0.5),
+		"processor activity should expose remaining fixed ticks"
+	)
+	rotator.processing_glyph = null
+	rotator.output_buffer = GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, 1)])
+	_expect(board.node_activity_progress(&"rotator") == 1.0, "ready processor output should show completed activity")
+	_expect(board.node_activity_progress(&"summoner") < 0.0, "summoner should not show a manufacturing progress bar")
+	_expect(board.node_activity_progress(&"missing") < 0.0, "missing equipment should not expose progress")
+	board.free()
 
 
 func _test_factory_ports_connect_through_mouse_input() -> void:

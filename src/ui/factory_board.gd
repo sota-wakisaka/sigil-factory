@@ -855,6 +855,7 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		if node_id == selected_node_id:
 			border_color = SELECTED_COLOR
 		draw_rect(rect, border_color, false, 3.0 if node_id == selected_node_id else 2.0)
+		_draw_node_activity_progress(node, center)
 		var label := _node_label(node)
 		draw_string(
 			font,
@@ -870,6 +871,42 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 			_draw_mini_glyph(visible_glyph, center + Vector2(0, 21), 0.43)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
+
+
+func node_activity_progress(node_id: StringName) -> float:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return -1.0
+	return _node_activity_progress(display_simulation.nodes[node_id])
+
+
+func _node_activity_progress(node: FactoryNodeModel) -> float:
+	if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
+		return -1.0
+	if node.output_buffer != null:
+		return 1.0
+	if node.kind == FactoryNodeModel.NodeKind.SOURCE:
+		var interval := maxi(int(node.config.get("interval_ticks", 1)), 1)
+		return clampf(float(node.source_timer) / float(interval), 0.0, 1.0)
+	if node.processing_glyph == null:
+		return -1.0
+	var processing_ticks := maxi(int(node.config.get("processing_ticks", 1)), 1)
+	return clampf(
+		1.0 - float(node.remaining_processing_ticks) / float(processing_ticks),
+		0.0,
+		1.0
+	)
+
+
+func _draw_node_activity_progress(node: FactoryNodeModel, center: Vector2) -> void:
+	var progress := _node_activity_progress(node)
+	if progress < 0.0:
+		return
+	var start := center + Vector2(-34.0, -22.0)
+	var finish := center + Vector2(34.0, -22.0)
+	draw_line(start, finish, Color(0.02, 0.035, 0.055, 0.95), 3.0, true)
+	if progress > 0.0:
+		draw_line(start, start.lerp(finish, progress), GLYPH_COLOR, 3.0, true)
 
 
 func visible_glyph_for_node(node_id: StringName) -> GlyphModel:
