@@ -25,6 +25,7 @@ Design documents:
 - Work-in-progress discard preview with glyph-type summaries, full undo, and cancel restoration
 - Player-facing summon mismatch reasons based on the closest known recipe
 - Distinct input-full, output-blocked, and missing-material factory warnings
+- One-second minimum hold time for transient factory warning text
 - Direction arrows and blockage coloring on factory transport lines
 - One-dimensional automatic battle with unit roles, lifetimes, and leader objectives
 - 24-second enemy threat forecast across a three-minute standard encounter

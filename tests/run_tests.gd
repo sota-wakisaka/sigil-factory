@@ -64,6 +64,7 @@ func _initialize() -> void:
 	_test_factory_board_connections_change_output()
 	_test_factory_board_shows_summon_failure_reason()
 	_test_factory_board_shows_distinct_flow_warning()
+	_test_factory_board_holds_transient_flow_warning()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
 	_test_run_upgrade_accelerates_ring_source()
@@ -1024,6 +1025,24 @@ func _test_factory_board_shows_distinct_flow_warning() -> void:
 	board.simulation.add_node(blocked)
 	board.advance_tick()
 	_expect("出力閉塞" in board.flow_warning_message, "factory board should name output blockage separately")
+	board.free()
+
+
+func _test_factory_board_holds_transient_flow_warning() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_EMPTY)
+	var blocked := FactoryNodeModel.new(&"blocked", FactoryNodeModel.NodeKind.ROTATOR)
+	var glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	blocked.output_buffer = glyph
+	board.simulation.add_node(blocked)
+	board.advance_tick()
+	_expect(board.flow_warning_message != "", "transient blockage should create a readable warning")
+	blocked.output_buffer = null
+	for _tick in FactoryBoard.FLOW_WARNING_HOLD_TICKS - 1:
+		board.advance_tick()
+		_expect(board.flow_warning_message != "", "resolved warning should remain visible for its minimum hold time")
+	board.advance_tick()
+	_expect(board.flow_warning_message == "", "resolved warning should clear exactly after its hold time")
 	board.free()
 
 

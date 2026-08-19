@@ -21,6 +21,7 @@ const NODE_HALF_SIZE := Vector2(48, 30)
 const REFERENCE_SIZE := Vector2(820, 395)
 const PORT_RADIUS := 7.0
 const PRODUCTION_PREVIEW_TICKS := 160
+const FLOW_WARNING_HOLD_TICKS := 5
 
 var plan_id: StringName = MvpContent.PLAN_SCOUT
 var simulation: FactorySimulation
@@ -41,6 +42,7 @@ var connection_serial := 1
 var node_serial := 1
 var connection_message := ""
 var flow_warning_message := ""
+var flow_warning_hold_ticks := 0
 var undo_history: Array[Dictionary] = []
 var cached_production_preview := ""
 var run_upgrades: Array[StringName] = []
@@ -64,6 +66,7 @@ func configure(next_plan_id: StringName) -> void:
 	connecting_from_node_id = &""
 	connection_message = ""
 	flow_warning_message = ""
+	flow_warning_hold_ticks = 0
 	undo_history.clear()
 	_refresh_production_preview()
 	selection_changed.emit()
@@ -622,7 +625,15 @@ func _refresh_flow_warning() -> void:
 				warnings.append("出力閉塞: %s" % node_label)
 			&"material_shortage":
 				warnings.append("素材不足: %s" % node_label)
-	flow_warning_message = "" if warnings.is_empty() else "工場警告 // " + " / ".join(warnings)
+	if not warnings.is_empty():
+		flow_warning_message = "工場警告 // " + " / ".join(warnings)
+		flow_warning_hold_ticks = FLOW_WARNING_HOLD_TICKS
+	elif flow_warning_hold_ticks > 0:
+		flow_warning_hold_ticks -= 1
+		if flow_warning_hold_ticks == 0:
+			flow_warning_message = ""
+	else:
+		flow_warning_message = ""
 
 
 func _draw() -> void:
