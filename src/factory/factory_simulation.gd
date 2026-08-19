@@ -51,18 +51,25 @@ func add_recipe(recipe: SigilRecipeModel) -> bool:
 
 
 func recipe_registration_result(recipe: SigilRecipeModel) -> Dictionary:
-	var errors := PackedStringArray()
-	if recipe.id == &"":
-		errors.append("missing_recipe_id")
-	if recipe.unit_id == &"":
-		errors.append("missing_unit_id")
-	var structure_errors := recipe.glyph.structure_validation_errors()
-	for structure_error in structure_errors:
-		errors.append("glyph:%s" % structure_error)
-	if not structure_errors.is_empty():
+	var errors := _recipe_intrinsic_validation_errors(recipe)
+	if recipe == null or recipe.glyph == null:
+		return {"ok": false, "errors": errors}
+	if not recipe.glyph.structure_validation_errors().is_empty():
 		return {"ok": false, "errors": errors}
 	var candidate_serialization := recipe.glyph.canonical_serialization()
-	for existing in recipes:
+	for recipe_index in recipes.size():
+		var existing: SigilRecipeModel = recipes[recipe_index]
+		var existing_errors := _recipe_intrinsic_validation_errors(existing)
+		if not existing_errors.is_empty():
+			var existing_label := "<null>"
+			if existing != null:
+				existing_label = String(existing.id) if existing.id != &"" else "<empty>"
+			for existing_error in existing_errors:
+				errors.append(
+					"invalid_registry_recipe:recipe[%d]=%s:%s"
+					% [recipe_index, existing_label, existing_error]
+				)
+			continue
 		if existing.id == recipe.id and not errors.has("duplicate_recipe_id"):
 			errors.append("duplicate_recipe_id")
 		if (
@@ -71,6 +78,23 @@ func recipe_registration_result(recipe: SigilRecipeModel) -> Dictionary:
 		):
 			errors.append("duplicate_glyph_structure")
 	return {"ok": errors.is_empty(), "errors": errors}
+
+
+func _recipe_intrinsic_validation_errors(recipe: SigilRecipeModel) -> PackedStringArray:
+	var errors := PackedStringArray()
+	if recipe == null:
+		errors.append("missing_recipe")
+		return errors
+	if recipe.id == &"":
+		errors.append("missing_recipe_id")
+	if recipe.unit_id == &"":
+		errors.append("missing_unit_id")
+	if recipe.glyph == null:
+		errors.append("missing_glyph")
+		return errors
+	for structure_error in recipe.glyph.structure_validation_errors():
+		errors.append("glyph:%s" % structure_error)
+	return errors
 
 
 func connect_nodes(line: FactoryLineModel) -> Dictionary:

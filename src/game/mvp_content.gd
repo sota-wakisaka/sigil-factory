@@ -84,7 +84,9 @@ static func validate_recipe_set(candidate_recipes: Array[SigilRecipeModel]) -> D
 		if result["ok"]:
 			registry.add_recipe(recipe)
 			continue
-		var recipe_label := String(recipe.id) if recipe.id != &"" else "<empty>"
+		var recipe_label := "<null>"
+		if recipe != null:
+			recipe_label = String(recipe.id) if recipe.id != &"" else "<empty>"
 		for error in result["errors"]:
 			errors.append("recipe[%d]=%s:%s" % [recipe_index, recipe_label, error])
 	return {

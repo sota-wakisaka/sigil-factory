@@ -43,6 +43,7 @@ func _initialize() -> void:
 	_test_factory_closest_recipe_is_order_independent()
 	_test_factory_rejects_ambiguous_recipes()
 	_test_recipe_registration_reports_stable_errors()
+	_test_recipe_registration_rejects_missing_objects()
 	_test_mvp_recipe_set_validation_reports_content_location()
 	_test_factory_rejects_invalid_recipe_structures()
 	_test_factory_owns_registered_recipe_data()
@@ -749,6 +750,49 @@ func _test_recipe_registration_reports_stable_errors() -> void:
 		"recipe registration should report required fields before structural errors"
 	)
 	_expect(simulation.recipes.size() == 1, "registration diagnostics should not mutate the recipe registry")
+
+
+func _test_recipe_registration_rejects_missing_objects() -> void:
+	var simulation := FactorySimulation.new()
+	_expect(
+		simulation.recipe_registration_result(null)["errors"] == PackedStringArray(["missing_recipe"]),
+		"recipe registration should reject a missing recipe without dereferencing it"
+	)
+	var missing_glyph := SigilRecipeModel.new(
+		&"missing_glyph",
+		GlyphModel.new([GlyphComponentModel.new(&"ring")]),
+		&"scout"
+	)
+	missing_glyph.glyph = null
+	_expect(
+		simulation.recipe_registration_result(missing_glyph)["errors"] == PackedStringArray(["missing_glyph"]),
+		"recipe registration should reject a missing Glyph before structural validation"
+	)
+	var stored := SigilRecipeModel.new(
+		&"stored_ring",
+		GlyphModel.new([GlyphComponentModel.new(&"ring")]),
+		&"scout"
+	)
+	_expect(simulation.add_recipe(stored), "corrupt registry fixture should register")
+	simulation.recipes[0].glyph = null
+	var candidate := SigilRecipeModel.new(
+		&"candidate_spike",
+		GlyphModel.new([GlyphComponentModel.new(&"spike")]),
+		&"golem"
+	)
+	_expect(
+		simulation.recipe_registration_result(candidate)["errors"] == PackedStringArray([
+			"invalid_registry_recipe:recipe[0]=stored_ring:missing_glyph",
+		]),
+		"registration should reject a corrupted existing registry without canonicalizing it"
+	)
+	_expect(simulation.recipes.size() == 1, "corrupt registry diagnostics should not add the candidate")
+	var null_candidates: Array[SigilRecipeModel] = [null]
+	var set_result := MvpContent.validate_recipe_set(null_candidates)
+	_expect(
+		set_result["errors"] == PackedStringArray(["recipe[0]=<null>:missing_recipe"]),
+		"recipe set validation should retain a missing candidate's content location"
+	)
 
 
 func _test_mvp_recipe_set_validation_reports_content_location() -> void:
