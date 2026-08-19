@@ -860,9 +860,10 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 			15,
 			Color(0.82, 0.9, 1.0)
 		)
-		var visible_glyph := _visible_node_glyph(node)
+		var visible_glyph := _visible_node_active_glyph(node)
 		if visible_glyph != null:
 			_draw_mini_glyph(visible_glyph, center + Vector2(0, 21), 0.62)
+		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
 
 
@@ -883,10 +884,24 @@ func visible_glyph_for_line(line_id: StringName) -> GlyphModel:
 	return glyph
 
 
+func visible_input_glyph_for_node(node_id: StringName, port: int) -> GlyphModel:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return null
+	var node: FactoryNodeModel = display_simulation.nodes[node_id]
+	if port < 0 or port >= node.input_buffers.size():
+		return null
+	var glyph_value = node.input_buffers[port]
+	if not glyph_value is GlyphModel:
+		return null
+	var glyph: GlyphModel = glyph_value
+	if not glyph.structure_validation_errors().is_empty():
+		return null
+	return glyph
+
+
 func _visible_node_glyph(node: FactoryNodeModel) -> GlyphModel:
-	var glyph: GlyphModel = node.output_buffer
-	if glyph == null:
-		glyph = node.processing_glyph
+	var glyph := _visible_node_active_glyph(node)
 	if glyph == null:
 		for input_glyph in node.input_buffers:
 			if input_glyph is GlyphModel:
@@ -895,6 +910,29 @@ func _visible_node_glyph(node: FactoryNodeModel) -> GlyphModel:
 	if glyph == null or not glyph.structure_validation_errors().is_empty():
 		return null
 	return glyph
+
+
+func _visible_node_active_glyph(node: FactoryNodeModel) -> GlyphModel:
+	var glyph: GlyphModel = node.output_buffer
+	if glyph == null:
+		glyph = node.processing_glyph
+	if glyph == null or not glyph.structure_validation_errors().is_empty():
+		return null
+	return glyph
+
+
+func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
+	for port in node.input_buffers.size():
+		var glyph_value = node.input_buffers[port]
+		if not glyph_value is GlyphModel:
+			continue
+		var glyph: GlyphModel = glyph_value
+		if not glyph.structure_validation_errors().is_empty():
+			continue
+		var y_offset := 0.0
+		if node.required_input_count() == 2:
+			y_offset = -13.0 if port == 0 else 13.0
+		_draw_mini_glyph(glyph, center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset), 0.5)
 
 
 func _draw_mini_glyph(glyph: GlyphModel, center: Vector2, scale: float) -> void:

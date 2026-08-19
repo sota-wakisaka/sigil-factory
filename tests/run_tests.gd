@@ -1901,6 +1901,26 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		"invalid transported Glyph should stay with corruption diagnostics instead of being drawn"
 	)
 	board.free()
+	var combine_board := FactoryBoard.new()
+	combine_board.configure(MvpContent.PLAN_GOLEM)
+	var combiner: FactoryNodeModel = combine_board.simulation.nodes[&"combiner"]
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	combiner.input_buffers[0] = ring
+	combiner.input_buffers[1] = spike
+	_expect(
+		combine_board.visible_input_glyph_for_node(&"combiner", 0) == ring,
+		"combiner display should retain the first input Glyph separately"
+	)
+	_expect(
+		combine_board.visible_input_glyph_for_node(&"combiner", 1) == spike,
+		"combiner display should retain the second input Glyph separately"
+	)
+	_expect(
+		combine_board.visible_input_glyph_for_node(&"combiner", 2) == null,
+		"input Glyph lookup should reject an out-of-range port"
+	)
+	combine_board.free()
 
 
 func _test_factory_ports_connect_through_mouse_input() -> void:
