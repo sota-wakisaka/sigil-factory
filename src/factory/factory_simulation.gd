@@ -74,6 +74,14 @@ func recipe_registration_result(recipe: SigilRecipeModel) -> Dictionary:
 
 
 func connect_nodes(line: FactoryLineModel) -> Dictionary:
+	if line == null:
+		return _connection_error("missing_line")
+	if line.id == &"":
+		return _connection_error("missing_line_id")
+	var payload_errors: Array[String] = []
+	_append_runtime_glyph_errors(payload_errors, line.payload, "payload")
+	if not payload_errors.is_empty():
+		return _connection_error("invalid_payload", payload_errors)
 	if lines.has(line.id):
 		return _connection_error("duplicate_line")
 	if not nodes.has(line.from_node_id) or not nodes.has(line.to_node_id):
@@ -700,5 +708,5 @@ func _sorted_keys(values: Dictionary) -> Array:
 	return keys
 
 
-func _connection_error(code: String) -> Dictionary:
-	return {"ok": false, "error": code}
+func _connection_error(code: String, errors: Array[String] = []) -> Dictionary:
+	return {"ok": false, "error": code, "errors": errors.duplicate()}

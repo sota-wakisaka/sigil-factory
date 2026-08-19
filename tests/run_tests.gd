@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_test_factory_rejects_cycles()
 	_test_factory_rejects_implicit_fan_out()
 	_test_factory_owns_connected_line_state()
+	_test_factory_rejects_invalid_connected_line_state()
 	_test_factory_disconnects_lines()
 	_test_factory_removes_node_and_connected_lines()
 	_test_factory_graph_validation_reports_dangling_nodes()
@@ -1060,6 +1061,35 @@ func _test_factory_owns_connected_line_state() -> void:
 	_expect(stored.to_port == 0 and stored.travel_ticks == 3, "connected routing settings should not share caller mutation")
 	_expect(stored.remaining_ticks == 2, "connected transport progress should not share caller mutation")
 	_expect(stored.payload.components[0].color_id == &"white", "connected payload should not share caller mutation")
+
+
+func _test_factory_rejects_invalid_connected_line_state() -> void:
+	var simulation := FactorySimulation.new()
+	simulation.add_node(FactoryNodeModel.new(&"source", FactoryNodeModel.NodeKind.SOURCE))
+	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
+	var cyclic_payload := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	cyclic_payload.combine_children = [cyclic_payload, cyclic_payload]
+	var line := FactoryLineModel.new(&"unsafe", &"source", &"summoner")
+	line.payload = cyclic_payload
+	var result := simulation.connect_nodes(line)
+	_expect(not result["ok"] and result["error"] == "invalid_payload", "unsafe line payload should be rejected before copying")
+	_expect(
+		result["errors"] == [
+			"invalid_glyph:payload:cyclic_structure:root.0",
+			"invalid_glyph:payload:cyclic_structure:root.1",
+		],
+		"line connection should retain the payload structure location"
+	)
+	_expect(simulation.lines.is_empty(), "rejected line payload should not leave a partial connection")
+	_expect(
+		simulation.connect_nodes(null)["error"] == "missing_line",
+		"line connection should reject a missing object without dereferencing it"
+	)
+	_expect(
+		simulation.connect_nodes(FactoryLineModel.new(&"", &"source", &"summoner"))["error"] == "missing_line_id",
+		"line connection should reject an empty line ID"
+	)
+	cyclic_payload.combine_children = []
 
 
 func _test_factory_disconnects_lines() -> void:

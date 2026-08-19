@@ -981,6 +981,10 @@ func _connection_result_text(result: Dictionary) -> String:
 			return "接続できません: 出力はすでに接続されています。分岐器はMVP対象外です"
 		"self_connection":
 			return "接続できません: 同じ設備には接続できません"
+		"invalid_payload":
+			return "接続できません: ライン上の仕掛品データが破損しています"
+		"missing_line", "missing_line_id":
+			return "接続できません: ラインデータにIDがありません"
 		_:
 			return "接続できません: %s" % result["error"]
 
