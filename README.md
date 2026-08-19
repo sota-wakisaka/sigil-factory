@@ -22,7 +22,10 @@ Design documents:
 - Fixed-tick factory stages that prevent same-tick multi-node cascading
 - Three production plans: fast scouts, anti-swarm sentinels, and anti-armor golems
 - Transactional factory changes made during time stop
-- Work-in-progress discard preview with full undo and cancel restoration
+- Work-in-progress discard preview with glyph-type summaries, full undo, and cancel restoration
+- Player-facing summon mismatch reasons based on the closest known recipe
+- Distinct input-full, output-blocked, and missing-material factory warnings
+- Direction arrows and blockage coloring on factory transport lines
 - One-dimensional automatic battle with unit roles, lifetimes, and leader objectives
 - 24-second enemy threat forecast across a three-minute standard encounter
 - Victory, reward, next-route, defeat, and instant retry flow
@@ -62,6 +65,12 @@ wiring, additions, and deletions made during the current edit session.
 Select a source, rotator, or colorizer to change its setting in the inspector.
 While editing, a non-destructive 32-second simulation preview reports expected
 scout, sentinel, and golem output plus unmatched glyphs.
+
+During production, rejected glyphs report actionable structural differences such
+as missing parts, rotation, or color. Factory equipment and lines also distinguish
+missing combiner material, full target buffers, and blocked outputs. Time-stop
+edits list both the count and processed type of work in progress that will be
+discarded before the change is committed.
 
 The first factory step opens an unwired workshop containing a ring source and a
 summoner. Connecting its two highlighted ports produces the first scout. The
