@@ -144,13 +144,13 @@ text = "棘素材"
 [node name="RotateButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
-tooltip_text = "入力グリフ全体を90度回転する加工器を追加（魔力15）"
+tooltip_text = "回転器を追加（魔力15）。選択後に90°・180°・270°を設定できます"
 text = "回転"
 
 [node name="ColorButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
-tooltip_text = "入力グリフ全体を青色にする加工器を追加（魔力15）"
+tooltip_text = "着色器を追加（魔力15）。選択後に青・赤・白を設定できます"
 text = "着色"
 
 [node name="CombineButton" type="Button" parent="FactoryPalette"]

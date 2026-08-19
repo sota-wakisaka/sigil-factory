@@ -40,6 +40,14 @@ func _initialize() -> void:
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	_expect(main.factory_board.interaction_enabled, "factory build should enable node placement")
 	_expect(not main.get_node("FactoryPalette/RingButton").disabled, "factory build should enable the equipment palette")
+	_expect(
+		"90°・180°・270°" in main.get_node("FactoryPalette/RotateButton").tooltip_text,
+		"rotator palette tooltip should disclose every inspector setting"
+	)
+	_expect(
+		"青・赤・白" in main.get_node("FactoryPalette/ColorButton").tooltip_text,
+		"colorizer palette tooltip should disclose every inspector setting"
+	)
 	_expect("斥候" in main.factory_board.cached_production_preview, "factory build should preview expected production")
 	var node_count_before_palette: int = main.factory_board.simulation.nodes.size()
 	main.get_node("FactoryPalette/RingButton").pressed.emit()
