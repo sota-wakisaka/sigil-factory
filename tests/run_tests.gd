@@ -2413,12 +2413,26 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	_expect(comparison_tooltip.get_script() == GlyphComparisonTooltipModel, "available factory output should open a side-by-side visual comparison")
 	_expect(comparison_tooltip.custom_minimum_size.x >= 500.0, "side-by-side comparison should be substantially larger than the persistent card")
 	_expect(comparison_tooltip.comparison_state == &"mismatch", "comparison tooltip should preserve the mismatch state")
+	_expect(&"primitive" in comparison_tooltip.difference_categories(), "side-by-side comparison should identify a Primitive-shape difference visually")
 	_expect(
 		comparison_tooltip.target_glyph.canonical_serialization() == ghost.glyph.canonical_serialization()
 		and comparison_tooltip.candidate_glyph.canonical_serialization() == mismatching_candidate.canonical_serialization(),
 		"comparison tooltip should own exact copies of both compared CanonicalGlyphs"
 	)
 	comparison_tooltip.free()
+	var sentinel_recipe: SigilRecipeModel
+	for recipe in MvpContent.recipes():
+		if recipe.id == &"azure_guard":
+			sentinel_recipe = recipe
+	var attribute_comparison = GlyphComparisonTooltipModel.new()
+	attribute_comparison.configure(
+		sentinel_recipe.glyph,
+		GlyphModel.new([GlyphComponentModel.new(&"ring")]),
+		"衛兵"
+	)
+	_expect(&"rotation" in attribute_comparison.difference_categories(), "comparison should expose a rotation difference without a written guide")
+	_expect(&"color" in attribute_comparison.difference_categories(), "comparison should expose a color difference without a written guide")
+	attribute_comparison.free()
 	ghost.show_candidate(null)
 	_expect(ghost.candidate_state == &"missing", "missing factory candidate should leave an empty comparison slot")
 	var expected: SigilRecipeModel
