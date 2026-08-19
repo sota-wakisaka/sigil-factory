@@ -37,6 +37,7 @@ var preview_node_positions: Dictionary = {}
 var interaction_enabled := false
 var selected_node_id: StringName = &""
 var dragging_node := false
+var drag_snapshot_pending := false
 var drag_offset := Vector2.ZERO
 var connecting_from_node_id: StringName = &""
 var connection_cursor := Vector2.ZERO
@@ -67,6 +68,7 @@ func configure(next_plan_id: StringName) -> void:
 	preview_simulation = null
 	selected_node_id = &""
 	dragging_node = false
+	drag_snapshot_pending = false
 	connecting_from_node_id = &""
 	connection_message = ""
 	flow_warning_message = ""
@@ -81,6 +83,7 @@ func set_interaction_enabled(enabled: bool) -> void:
 	interaction_enabled = enabled
 	if not enabled:
 		dragging_node = false
+		drag_snapshot_pending = false
 		selected_node_id = &""
 		connecting_from_node_id = &""
 	selection_changed.emit()
@@ -494,13 +497,17 @@ func _gui_input(event: InputEvent) -> void:
 			selection_changed.emit()
 			dragging_node = selected_node_id != &""
 			if dragging_node:
-				_push_undo_snapshot()
+				drag_snapshot_pending = true
 				drag_offset = node_local_position(selected_node_id) - event.position
 				accept_event()
 		else:
 			dragging_node = false
+			drag_snapshot_pending = false
 		queue_redraw()
 	elif event is InputEventMouseMotion and dragging_node:
+		if drag_snapshot_pending:
+			_push_undo_snapshot()
+			drag_snapshot_pending = false
 		move_node(selected_node_id, event.position + drag_offset)
 		accept_event()
 	elif event is InputEventMouseMotion and connecting_from_node_id != &"":

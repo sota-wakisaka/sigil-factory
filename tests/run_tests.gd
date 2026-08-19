@@ -1749,13 +1749,34 @@ func _test_factory_edit_preserves_custom_graph() -> void:
 
 func _test_factory_nodes_can_be_repositioned() -> void:
 	var board := FactoryBoard.new()
+	root.add_child(board)
 	board.size = Vector2(568, 339)
 	board.configure(MvpContent.PLAN_SCOUT)
 	var original := board.node_positions[&"ring_source"] as Vector2
 	_expect(not board.move_node(&"ring_source", Vector2(300, 160)), "running factory should reject node movement")
 	board.set_interaction_enabled(true)
-	_expect(board.move_node(&"ring_source", Vector2(300, 160)), "editable factory should allow node movement")
+	var node_center := board.node_local_position(&"ring_source")
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = node_center
+	board._gui_input(press)
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.position = node_center
+	board._gui_input(release)
+	_expect(board.undo_history.is_empty(), "selecting equipment without moving it should not consume an undo step")
+	board._gui_input(press)
+	var motion := InputEventMouseMotion.new()
+	motion.position = node_center + Vector2(60, 30)
+	board._gui_input(motion)
+	release.position = motion.position
+	board._gui_input(release)
 	_expect(board.node_positions[&"ring_source"] != original, "node movement should update its layout")
+	_expect(board.undo_history.size() == 1, "one drag should create exactly one undo step")
+	_expect(board.undo(), "node movement should be undoable")
+	_expect(board.node_positions[&"ring_source"] == original, "undo should restore the position before the drag")
 	board.free()
 
 
