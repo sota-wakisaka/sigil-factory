@@ -596,7 +596,10 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 
 func recipe_match_result(glyph: GlyphModel) -> Dictionary:
 	var validation_errors: Array[String] = []
-	_append_runtime_glyph_errors(validation_errors, glyph, "candidate")
+	if glyph == null:
+		validation_errors.append("invalid_glyph:candidate:missing_glyph")
+	else:
+		_append_runtime_glyph_errors(validation_errors, glyph, "candidate")
 	validation_errors.append_array(_recipe_state_validation_errors())
 	if not validation_errors.is_empty():
 		return {

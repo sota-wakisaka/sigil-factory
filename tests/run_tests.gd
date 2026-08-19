@@ -642,6 +642,12 @@ func _test_factory_recipe_match_preview_is_non_destructive() -> void:
 	var mismatch := simulation.recipe_match_result(spike)
 	_expect(mismatch["ok"] and not mismatch["is_match"], "match preview should identify a non-matching Glyph")
 	_expect(mismatch["closest_recipe_id"] != &"", "mismatch preview should retain the closest acquired recipe")
+	var missing := simulation.recipe_match_result(null)
+	_expect(not missing["ok"] and not missing["is_match"], "match preview should reject a missing candidate safely")
+	_expect(
+		missing["errors"] == ["invalid_glyph:candidate:missing_glyph"],
+		"missing match candidate should retain its API location"
+	)
 	_expect(simulation.summon_events.size() == event_count, "match preview should not emit summon events")
 	_expect(simulation.discarded_glyphs == discard_count, "match preview should not discard its candidate")
 
