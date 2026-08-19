@@ -18,13 +18,17 @@ Design documents:
 - Deterministic fixed-tick glyph factory simulation
 - Canonical binary Combine structure with hierarchy-aware sigil matching
 - Production provenance for processing count, traversed node kinds, and source IDs
+- Quarter-turn normalization and rejection of fully overlapping primitives
+- Fixed-tick factory stages that prevent same-tick multi-node cascading
 - Three production plans: fast scouts, anti-swarm sentinels, and anti-armor golems
 - Transactional factory changes made during time stop
+- Work-in-progress discard preview with full undo and cancel restoration
 - One-dimensional automatic battle with unit roles, lifetimes, and leader objectives
 - 24-second enemy threat forecast across a three-minute standard encounter
 - Victory, reward, next-route, defeat, and instant retry flow
 - Persistent run rewards for source, processor, or transport speed
 - Wave labels, matchup guidance, hit feedback, and post-battle analysis
+- Before/after production impact shown when battle resumes
 
 The MVP now preserves glyph production provenance through transport, processing,
 copying, and Combine operations. Provenance is exposed on summon events for future
