@@ -28,6 +28,8 @@ func _initialize() -> void:
 	_test_rotation_is_normalized_to_quarter_turns()
 	_test_complete_overlap_is_rejected()
 	_test_factory_tick_prevents_same_tick_multistage_processing()
+	_test_factory_tick_uses_starting_input_availability()
+	_test_factory_tick_does_not_refill_freed_line()
 	_test_factory_pipeline_summons_matching_unit()
 	_test_factory_records_closest_summon_failure()
 	_test_combiner_waits_for_both_inputs()
@@ -200,6 +202,52 @@ func _test_factory_tick_prevents_same_tick_multistage_processing() -> void:
 	_expect(simulation.summon_events.is_empty(), "a newly delivered glyph should not summon in the same tick")
 	simulation.tick()
 	_expect(simulation.summon_events.size() == 1, "the glyph should summon on the following tick")
+
+
+func _test_factory_tick_uses_starting_input_availability() -> void:
+	var simulation := FactorySimulation.new()
+	var source := FactoryNodeModel.new(&"source", FactoryNodeModel.NodeKind.SOURCE)
+	var rotator := FactoryNodeModel.new(
+		&"rotator",
+		FactoryNodeModel.NodeKind.ROTATOR,
+		{"steps": 1, "processing_ticks": 1}
+	)
+	simulation.add_node(source)
+	simulation.add_node(rotator)
+	simulation.connect_nodes(FactoryLineModel.new(&"line", &"source", &"rotator", 0, 1))
+	var first := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var waiting := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	rotator.input_buffers[0] = first
+	var line: FactoryLineModel = simulation.lines[&"line"]
+	line.payload = waiting
+	line.remaining_ticks = 0
+
+	simulation.tick()
+	_expect(rotator.input_buffers[0] == null, "an input consumed this tick should remain unavailable to arriving cargo")
+	_expect(line.payload != null, "cargo should wait when its target input was full at tick start")
+	simulation.tick()
+	_expect(rotator.input_buffers[0] != null, "waiting cargo should arrive on the next tick after input becomes available")
+
+
+func _test_factory_tick_does_not_refill_freed_line() -> void:
+	var simulation := FactorySimulation.new()
+	var source := FactoryNodeModel.new(&"source", FactoryNodeModel.NodeKind.SOURCE)
+	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
+	simulation.add_node(source)
+	simulation.add_node(summoner)
+	simulation.connect_nodes(FactoryLineModel.new(&"line", &"source", &"summoner", 0, 1))
+	var glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	source.output_buffer = glyph.copy()
+	var line: FactoryLineModel = simulation.lines[&"line"]
+	line.payload = glyph.copy()
+	line.remaining_ticks = 0
+
+	simulation.tick()
+	_expect(line.payload == null, "cargo should leave a line when its target was free at tick start")
+	_expect(source.output_buffer != null, "a line freed this tick should not be refilled until the next tick")
+	simulation.tick()
+	_expect(line.payload != null, "the held output should dispatch once the line starts a tick empty")
+	_expect(source.output_buffer == null, "dispatch on the following tick should clear the output buffer")
 
 
 func _test_factory_pipeline_summons_matching_unit() -> void:

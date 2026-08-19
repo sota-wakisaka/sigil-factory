@@ -211,12 +211,34 @@ func discard_all_work_in_progress() -> int:
 
 func tick() -> void:
 	tick_index += 1
+	var input_acceptance := _snapshot_input_acceptance()
+	var line_availability := _snapshot_line_availability()
 	_advance_nodes()
-	_advance_lines()
-	_dispatch_outputs()
+	_advance_lines(input_acceptance)
+	_dispatch_outputs(line_availability)
 
 
-func _advance_lines() -> void:
+func _snapshot_input_acceptance() -> Dictionary:
+	var snapshot := {}
+	for node_id in _sorted_keys(nodes):
+		var node: FactoryNodeModel = nodes[node_id]
+		for port in node.required_input_count():
+			snapshot[_input_key(node_id, port)] = node.can_accept(port)
+	return snapshot
+
+
+func _snapshot_line_availability() -> Dictionary:
+	var snapshot := {}
+	for line_id in _sorted_keys(lines):
+		snapshot[line_id] = lines[line_id].payload == null
+	return snapshot
+
+
+func _input_key(node_id: StringName, port: int) -> String:
+	return "%s:%d" % [node_id, port]
+
+
+func _advance_lines(input_acceptance: Dictionary) -> void:
 	for line_id in _sorted_keys(lines):
 		var line: FactoryLineModel = lines[line_id]
 		if line.payload == null:
@@ -226,7 +248,10 @@ func _advance_lines() -> void:
 		if line.remaining_ticks > 0:
 			continue
 		var target: FactoryNodeModel = nodes[line.to_node_id]
-		if target.accept(line.to_port, line.payload):
+		var accepted_at_tick_start := bool(
+			input_acceptance.get(_input_key(line.to_node_id, line.to_port), false)
+		)
+		if accepted_at_tick_start and target.accept(line.to_port, line.payload):
 			line.payload = null
 
 
@@ -360,12 +385,14 @@ func _node_kind_id(kind: FactoryNodeModel.NodeKind) -> StringName:
 	return &"unknown"
 
 
-func _dispatch_outputs() -> void:
+func _dispatch_outputs(line_availability: Dictionary) -> void:
 	for node_id in _sorted_keys(nodes):
 		var node: FactoryNodeModel = nodes[node_id]
 		if node.output_buffer == null:
 			continue
 		for line_id in _outgoing_line_ids(node.id):
+			if not bool(line_availability.get(line_id, false)):
+				continue
 			var line: FactoryLineModel = lines[line_id]
 			if line.send(node.output_buffer):
 				node.output_buffer = null

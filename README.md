@@ -19,7 +19,7 @@ Design documents:
 - Canonical binary Combine structure with hierarchy-aware sigil matching
 - Production provenance for processing count, traversed node kinds, and source IDs
 - Quarter-turn normalization and rejection of fully overlapping primitives
-- Fixed-tick factory stages that prevent same-tick multi-node cascading
+- Tick-start input and line snapshots that prevent same-tick cascading or slot reuse
 - Three production plans: fast scouts, anti-swarm sentinels, and anti-armor golems
 - Transactional factory changes made during time stop
 - Work-in-progress discard preview with glyph-type summaries, full undo, and cancel restoration
