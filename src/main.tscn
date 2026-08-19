@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/factory_board.gd" id="2_factory"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://src/ui/sigil_ghost.gd" id="4_ghost"]
 [ext_resource type="Script" path="res://src/ui/sigil_plan_button.gd" id="5_plan_button"]
 [ext_resource type="Script" path="res://src/ui/factory_palette_button.gd" id="6_palette_button"]
+[ext_resource type="Script" path="res://src/ui/factory_selection_indicator.gd" id="7_selection_indicator"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -239,12 +240,10 @@ mouse_filter = 1
 mouse_default_cursor_shape = 4
 script = ExtResource("4_ghost")
 
-[node name="SelectionLabel" type="Label" parent="FactoryInspector"]
+[node name="SelectionLabel" type="Control" parent="FactoryInspector"]
 custom_minimum_size = Vector2(140, 50)
 layout_mode = 2
-text = "設備を選択"
-horizontal_alignment = 2
-vertical_alignment = 1
+script = ExtResource("7_selection_indicator")
 
 [node name="SettingOption" type="OptionButton" parent="FactoryInspector"]
 custom_minimum_size = Vector2(140, 50)

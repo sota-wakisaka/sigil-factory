@@ -4,6 +4,7 @@ const MvpContent := preload("res://src/game/mvp_content.gd")
 const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const RunFlow := preload("res://src/game/run_flow.gd")
 const SigilGhostControl := preload("res://src/ui/sigil_ghost.gd")
+const FactorySelectionIndicatorControl := preload("res://src/ui/factory_selection_indicator.gd")
 
 const BACKGROUND_COLOR := Color("070a10")
 const GRID_COLOR := Color(0.18, 0.26, 0.36, 0.2)
@@ -40,7 +41,7 @@ enum WorkspaceView {
 @onready var phase_button: Button = $PhaseOverlay/Center/Panel/Content/AdvanceButton
 @onready var reward_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RewardOption
 @onready var route_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RouteOption
-@onready var inspector_label: Label = $FactoryInspector/SelectionLabel
+@onready var inspector_label: FactorySelectionIndicatorControl = $FactoryInspector/SelectionLabel
 @onready var inspector_option: OptionButton = $FactoryInspector/SettingOption
 @onready var sigil_ghost: SigilGhostControl = $FactoryInspector/SigilGhost
 @onready var factory_tab: Button = $WorkspaceTabs/FactoryTab
@@ -239,7 +240,7 @@ func _undo_factory_edit() -> void:
 
 func _refresh_factory_inspector() -> void:
 	var details := factory_board.selected_node_details()
-	inspector_label.text = details["title"]
+	inspector_label.configure(details["selected"], details["kind"], details["title"])
 	inspector_option.clear()
 	for option in details["options"]:
 		inspector_option.add_item(option)

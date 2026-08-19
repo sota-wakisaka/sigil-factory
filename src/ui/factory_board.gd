@@ -328,7 +328,7 @@ func is_guided_connection_pending() -> bool:
 func selected_node_details() -> Dictionary:
 	var display_simulation := _display_simulation()
 	if selected_node_id == &"" or display_simulation == null or not display_simulation.nodes.has(selected_node_id):
-		return {"selected": false, "title": "設備を選択", "options": PackedStringArray(), "selected_index": -1}
+		return {"selected": false, "kind": -1, "title": "設備を選択", "options": PackedStringArray(), "selected_index": -1}
 	var node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
 	var options := PackedStringArray()
 	var selected_index := -1
@@ -345,6 +345,7 @@ func selected_node_details() -> Dictionary:
 			selected_index = ["blue", "red", "white"].find(color_id)
 	return {
 		"selected": true,
+		"kind": node.kind,
 		"title": _node_label(node),
 		"options": options,
 		"selected_index": selected_index,
