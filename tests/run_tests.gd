@@ -70,6 +70,7 @@ func _initialize() -> void:
 	_test_threat_forecast_respects_horizon()
 	_test_major_change_forecast_uses_long_horizon()
 	_test_factory_edit_is_transactional()
+	_test_factory_edit_recovers_only_invalid_work_in_progress()
 	_test_factory_edit_preserves_custom_graph()
 	_test_factory_nodes_can_be_repositioned()
 	_test_factory_editor_undo_restores_graph()
@@ -1359,6 +1360,42 @@ func _test_factory_edit_is_transactional() -> void:
 	_expect(board.plan_id == MvpContent.PLAN_GOLEM, "commit should apply pending plan")
 	_expect(board.simulation != original_simulation, "commit should replace factory atomically")
 	_expect(board.simulation.discarded_glyphs == committed_work_in_progress, "commit should count discarded work in progress")
+	board.free()
+
+
+func _test_factory_edit_recovers_only_invalid_work_in_progress() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SENTINEL)
+	var valid_glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var invalid_glyph := GlyphModel.new([
+		GlyphComponentModel.new(&"ring"),
+		GlyphComponentModel.new(&"spike"),
+	])
+	board.simulation.nodes[&"rotator"].input_buffers[0] = valid_glyph
+	board.simulation.nodes[&"ring_source"].output_buffer = invalid_glyph
+	var discarded_before := board.simulation.discarded_glyphs
+	board.begin_edit()
+	_expect(board.editing and board.preview_simulation != null, "corrupt work recovery should still enter edit mode")
+	_expect(board.last_corrupt_discard_count == 1, "edit recovery should discard only one invalid work item")
+	_expect(
+		board.simulation.nodes[&"rotator"].input_buffers[0] != null,
+		"edit recovery should preserve valid committed work in progress"
+	)
+	_expect(
+		board.preview_simulation.nodes[&"rotator"].input_buffers[0] != null,
+		"edit preview should retain a safe copy of valid work in progress"
+	)
+	_expect(board.simulation.nodes[&"ring_source"].output_buffer == null, "edit recovery should remove invalid committed work")
+	_expect(
+		board.simulation.discarded_glyphs == discarded_before + 1,
+		"edit recovery should count the invalid work as discarded"
+	)
+	_expect("破損仕掛品 1個を廃棄" in board.connection_message, "edit recovery should explain the automatic discard")
+	board.cancel_edit()
+	_expect(
+		board.simulation.nodes[&"rotator"].input_buffers[0] != null,
+		"cancel should keep valid committed work after corrupt recovery"
+	)
 	board.free()
 
 

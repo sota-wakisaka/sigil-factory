@@ -35,6 +35,7 @@ Design documents:
 - Quarter-turn normalization of orientation and root-relative position, plus rejection of fully overlapping primitives
 - Tick-start input and line snapshots that prevent same-tick cascading or slot reuse
 - Fixed-tick guard against malformed restored glyphs in equipment and transport lines
+- Edit-time recovery that discards only malformed work while preserving valid in-progress glyphs
 - Three production plans: fast scouts, anti-swarm sentinels, and anti-armor golems
 - Transactional factory changes made during time stop
 - Work-in-progress discard preview with glyph-type summaries, full undo, and cancel restoration

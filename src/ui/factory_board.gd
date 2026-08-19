@@ -46,6 +46,7 @@ var flow_warning_hold_ticks := 0
 var undo_history: Array[Dictionary] = []
 var cached_production_preview := ""
 var run_upgrades: Array[StringName] = []
+var last_corrupt_discard_count := 0
 
 
 func _ready() -> void:
@@ -477,6 +478,11 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func begin_edit() -> void:
+	last_corrupt_discard_count = 0
+	var runtime_errors := simulation.work_in_progress_validation_errors()
+	if not runtime_errors.is_empty():
+		last_corrupt_discard_count = simulation.discard_invalid_work_in_progress()
+		connection_message = "破損仕掛品 %d個を廃棄して編集状態へ復旧しました" % last_corrupt_discard_count
 	editing = true
 	pending_plan_id = plan_id
 	preview_simulation = simulation.duplicate_state()

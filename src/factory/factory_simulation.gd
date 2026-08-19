@@ -355,6 +355,42 @@ func discard_all_work_in_progress() -> int:
 	return discarded_now
 
 
+func discard_invalid_work_in_progress() -> int:
+	var discarded_now := 0
+	for node_id in _sorted_keys(nodes):
+		var node: FactoryNodeModel = nodes[node_id]
+		for port in node.input_buffers.size():
+			if not _runtime_glyph_is_valid(node.input_buffers[port]):
+				node.input_buffers[port] = null
+				discarded_now += 1
+		if node.processing_glyph != null and not _runtime_glyph_is_valid(node.processing_glyph):
+			node.processing_glyph = null
+			node.remaining_processing_ticks = 0
+			discarded_now += 1
+		if node.output_buffer != null and not _runtime_glyph_is_valid(node.output_buffer):
+			node.output_buffer = null
+			discarded_now += 1
+	for line_id in _sorted_keys(lines):
+		var line: FactoryLineModel = lines[line_id]
+		if line.payload != null and not _runtime_glyph_is_valid(line.payload):
+			line.payload = null
+			line.remaining_ticks = 0
+			discarded_now += 1
+	discarded_glyphs += discarded_now
+	last_runtime_glyph_errors = work_in_progress_validation_errors()
+	return discarded_now
+
+
+func _runtime_glyph_is_valid(glyph_value) -> bool:
+	return (
+		glyph_value == null
+		or (
+			glyph_value is GlyphModel
+			and (glyph_value as GlyphModel).structure_validation_errors().is_empty()
+		)
+	)
+
+
 func tick() -> void:
 	last_runtime_glyph_errors = work_in_progress_validation_errors()
 	if not last_runtime_glyph_errors.is_empty():
