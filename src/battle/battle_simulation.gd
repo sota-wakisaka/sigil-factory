@@ -72,6 +72,18 @@ func upcoming_threats(horizon_ticks: int) -> Array[ThreatEventModel]:
 	return result
 
 
+func upcoming_major_changes(horizon_ticks: int) -> Array[ThreatEventModel]:
+	var result: Array[ThreatEventModel] = []
+	var last_tick := tick_index + maxi(horizon_ticks, 0)
+	for index in range(next_schedule_index, schedule.size()):
+		var event := schedule[index]
+		if event.tick > last_tick:
+			break
+		if event.is_major_change:
+			result.append(event)
+	return result
+
+
 func is_finished() -> bool:
 	return (
 		player_leader_health <= 0.0

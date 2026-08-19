@@ -43,11 +43,11 @@ static func threat_schedule() -> Array[ThreatEventModel]:
 	for tick in range(100, 300, 30):
 		events.append(ThreatEventModel.new(tick, &"raider", 1, "襲撃兵"))
 	for tick in range(300, 570, 30):
-		events.append(ThreatEventModel.new(tick, &"swarm", 4, "群体兵"))
+		events.append(ThreatEventModel.new(tick, &"swarm", 4, "群体兵", &"center", tick == 300))
 	for tick in range(570, 780, 42):
-		events.append(ThreatEventModel.new(tick, &"brute", 1, "装甲兵"))
+		events.append(ThreatEventModel.new(tick, &"brute", 1, "装甲兵", &"center", tick == 570))
 	for tick in range(780, 901, 30):
-		events.append(ThreatEventModel.new(tick, &"brute", 1, "最終装甲兵"))
+		events.append(ThreatEventModel.new(tick, &"brute", 1, "最終装甲兵", &"center", tick == 780))
 		events.append(ThreatEventModel.new(tick + 8, &"swarm", 5, "最終群体兵"))
 	return events
 

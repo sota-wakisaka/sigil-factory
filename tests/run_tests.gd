@@ -55,6 +55,7 @@ func _initialize() -> void:
 	_test_enemy_shield_takes_damage_and_opens()
 	_test_battle_ends_at_time_limit()
 	_test_threat_forecast_respects_horizon()
+	_test_major_change_forecast_uses_long_horizon()
 	_test_factory_edit_is_transactional()
 	_test_factory_edit_preserves_custom_graph()
 	_test_factory_nodes_can_be_repositioned()
@@ -834,6 +835,32 @@ func _test_threat_forecast_respects_horizon() -> void:
 	_expect(forecast.size() == 1, "forecast should only include events inside horizon")
 	if forecast.size() == 1:
 		_expect(forecast[0].label == "NEAR", "forecast should return the near threat")
+
+
+func _test_major_change_forecast_uses_long_horizon() -> void:
+	var battle := MvpContent.build_battle()
+	_expect(battle.upcoming_major_changes(299).is_empty(), "major wave should remain outside a shorter-than-sixty-second horizon")
+	var changes := battle.upcoming_major_changes(300)
+	_expect(changes.size() == 1, "sixty-second horizon should include the first major wave change")
+	if changes.size() == 1:
+		_expect(changes[0].tick == 300 and changes[0].unit_id == &"swarm", "first major change should mark the swarm phase")
+	var board := BattleBoard.new()
+	board.simulation = battle
+	_expect(
+		board.major_change_text(300, 120, 0.2) == "編成警告 60s: 群体兵→衛兵",
+		"long-horizon warning should name timing, wave, and recommended counter"
+	)
+	battle.tick_index = 180
+	_expect(
+		board.major_change_text(300, 120, 0.2) == "",
+		"major warning should not duplicate a change already inside the near horizon"
+	)
+	battle.tick_index = 270
+	_expect(
+		board.major_change_text(300, 120, 0.2) == "編成警告 60s: 装甲兵→巨像",
+		"warning should look past the near swarm change to the next major armor phase"
+	)
+	board.free()
 
 
 func _test_factory_edit_is_transactional() -> void:

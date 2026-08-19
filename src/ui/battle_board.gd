@@ -62,6 +62,27 @@ func forecast_text(horizon_ticks: int, tick_seconds: float) -> String:
 	return "敵予告: " + "  |  ".join(entries) + advice
 
 
+func major_change_text(
+	horizon_ticks: int,
+	near_horizon_ticks: int,
+	tick_seconds: float
+) -> String:
+	if simulation == null:
+		return ""
+	for threat in simulation.upcoming_major_changes(horizon_ticks):
+		var lead_ticks: int = threat.tick - simulation.tick_index
+		if lead_ticks <= near_horizon_ticks:
+			continue
+		var seconds := maxf(float(lead_ticks) * tick_seconds, 0.0)
+		var recommendation := _counter_for(threat.unit_id)
+		return "編成警告 %.0fs: %s%s" % [
+			seconds,
+			threat.label,
+			"→" + recommendation if recommendation != "" else "",
+		]
+	return ""
+
+
 func wave_status_text() -> String:
 	if simulation == null:
 		return "待機中"

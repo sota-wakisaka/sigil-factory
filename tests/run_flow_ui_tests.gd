@@ -70,6 +70,8 @@ func _initialize() -> void:
 	_expect("生産 斥候" in main.status_label.text and "衛兵" in main.status_label.text and "巨像" in main.status_label.text, "battle status should name each production count")
 	_expect(main.status_label.get_minimum_size().x <= main.size.x, "battle status should fit the default viewport width")
 	_expect("推奨: 斥候" in main.threat_label.text, "enemy forecast should recommend an initial counter")
+	_expect("編成警告 60s: 群体兵→衛兵" in main.threat_label.text, "battle should warn major wave changes sixty seconds ahead")
+	_expect(main.threat_label.get_minimum_size().x <= main.size.x, "combined long and near forecasts should fit the default viewport")
 	_expect(main.battle_board.wave_status_text() == "前線形成", "battlefield should identify the current wave phase")
 	_expect(not main.speed_button.disabled, "battle should enable speed controls")
 	_expect("時間を停止" in main.pause_button.tooltip_text, "main action tooltip should explain time stop during battle")

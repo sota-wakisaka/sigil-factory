@@ -33,6 +33,7 @@ Design documents:
 - Direction arrows and blockage coloring on factory transport lines
 - One-dimensional automatic battle with unit roles, lifetimes, and leader objectives
 - 24-second enemy threat forecast across a three-minute standard encounter
+- 60-second advance warnings for major swarm, armor, and final wave changes
 - Victory, reward, next-route, defeat, and instant retry flow
 - Persistent run rewards for source, processor, or transport speed
 - Wave labels, matchup guidance, hit feedback, and post-battle analysis

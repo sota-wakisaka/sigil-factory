@@ -10,6 +10,7 @@ const GRID_COLOR := Color(0.18, 0.26, 0.36, 0.2)
 const GRID_SPACING := 32
 const TICK_SECONDS := 0.2
 const FORECAST_TICKS := 120
+const MAJOR_FORECAST_TICKS := 300
 const BATTLE_SPEEDS := [1.0, 2.0, 4.0]
 const FLOW_STEPS := [
 	"ルート選択", "ステージ情報", "工場構築", "リアルタイム戦闘",
@@ -503,7 +504,17 @@ func _refresh_status() -> void:
 		float(battle.battle_duration_ticks - battle.tick_index) * TICK_SECONDS,
 		0.0
 	)
-	threat_label.text = battle_board.forecast_text(FORECAST_TICKS, TICK_SECONDS)
+	var near_forecast := battle_board.forecast_text(FORECAST_TICKS, TICK_SECONDS)
+	var major_forecast := battle_board.major_change_text(
+		MAJOR_FORECAST_TICKS,
+		FORECAST_TICKS,
+		TICK_SECONDS
+	)
+	threat_label.text = (
+		near_forecast
+		if major_forecast == ""
+		else "%s  //  %s" % [major_forecast, near_forecast]
+	)
 	if battle.is_finished():
 		return
 	var enemy_objective := "敵防壁HP %.0f" % battle.enemy_shield_health if battle.is_enemy_shield_active() else "敵リーダーHP %.0f" % battle.enemy_leader_health
