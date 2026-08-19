@@ -164,6 +164,16 @@ static func sigil_name(recipe_id: StringName) -> String:
 			return String(recipe_id)
 
 
+static func recipe_id_for_plan(plan_id: StringName) -> StringName:
+	match plan_id:
+		PLAN_SENTINEL:
+			return &"azure_guard"
+		PLAN_GOLEM:
+			return &"bound_colossus"
+		_:
+			return &"open_ring"
+
+
 static func node_name(kind: FactoryNodeModel.NodeKind) -> String:
 	match kind:
 		FactoryNodeModel.NodeKind.SOURCE:

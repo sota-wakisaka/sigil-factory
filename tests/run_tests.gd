@@ -13,6 +13,7 @@ const UnitSpecModel := preload("res://src/battle/unit_spec.gd")
 const ThreatEventModel := preload("res://src/battle/threat_event.gd")
 const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const FactoryBoard := preload("res://src/ui/factory_board.gd")
+const SigilGhost := preload("res://src/ui/sigil_ghost.gd")
 const RunFlow := preload("res://src/game/run_flow.gd")
 
 var failures := 0
@@ -68,6 +69,7 @@ func _initialize() -> void:
 	_test_factory_board_holds_transient_flow_warning()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
+	_test_sigil_ghost_tracks_plan_recipe()
 	_test_run_upgrade_accelerates_ring_source()
 	_test_run_flow_covers_one_route()
 
@@ -1113,6 +1115,26 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	board.add_node_from_palette(&"rotator")
 	_expect(not board.production_preview()["ok"], "incomplete custom graph should not produce a preview")
 	board.free()
+
+
+func _test_sigil_ghost_tracks_plan_recipe() -> void:
+	var ghost := SigilGhost.new()
+	_expect(ghost.show_recipe(&"azure_guard"), "sigil ghost should accept a known recipe")
+	_expect(ghost.recipe_id == &"azure_guard", "sigil ghost should retain the displayed recipe ID")
+	var expected: SigilRecipeModel
+	for recipe in MvpContent.recipes():
+		if recipe.id == &"azure_guard":
+			expected = recipe
+			break
+	_expect(expected != null, "ghost test recipe should exist in MVP content")
+	if expected != null:
+		_expect(
+			ghost.glyph.canonical_serialization() == expected.glyph.canonical_serialization(),
+			"sigil ghost should render a copy of the canonical recipe structure"
+		)
+	_expect(not ghost.show_recipe(&"missing_recipe"), "sigil ghost should reject an unknown recipe")
+	_expect(ghost.recipe_id == &"azure_guard", "unknown recipe should not erase the current ghost")
+	ghost.free()
 
 
 func _test_run_upgrade_accelerates_ring_source() -> void:

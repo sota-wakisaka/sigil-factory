@@ -3,6 +3,7 @@ extends Control
 const MvpContent := preload("res://src/game/mvp_content.gd")
 const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const RunFlow := preload("res://src/game/run_flow.gd")
+const SigilGhostControl := preload("res://src/ui/sigil_ghost.gd")
 
 const BACKGROUND_COLOR := Color("070a10")
 const GRID_COLOR := Color(0.18, 0.26, 0.36, 0.2)
@@ -34,6 +35,7 @@ const FLOW_STEPS := [
 @onready var route_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RouteOption
 @onready var inspector_label: Label = $FactoryInspector/SelectionLabel
 @onready var inspector_option: OptionButton = $FactoryInspector/SettingOption
+@onready var sigil_ghost: SigilGhostControl = $FactoryInspector/SigilGhost
 
 var flow := RunFlow.new()
 var elapsed_since_tick := 0.0
@@ -160,6 +162,7 @@ func _factory_is_valid(prefix: String) -> bool:
 
 
 func _select_plan(plan_id: StringName) -> void:
+	sigil_ghost.show_recipe(MvpContent.recipe_id_for_plan(plan_id))
 	if flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		factory_board.preview_plan(plan_id)
 		plan_label.text = "仮術式: %s // %s // 未確定" % [MvpContent.plan_name(plan_id), MvpContent.plan_description(plan_id)]
