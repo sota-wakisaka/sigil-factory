@@ -593,6 +593,7 @@ func advance_tick() -> void:
 	while observed_event_count < simulation.summon_events.size():
 		var event := simulation.summon_events[observed_event_count]
 		observed_event_count += 1
+		connection_message = "召喚成功 // %s" % MvpContent.sigil_name(event["recipe_id"])
 		summon_produced.emit(event["unit_id"])
 	while observed_failure_count < simulation.summon_failure_events.size():
 		var event := simulation.summon_failure_events[observed_failure_count]

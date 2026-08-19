@@ -63,6 +63,7 @@ func _initialize() -> void:
 	_test_factory_rewiring_discards_work_transactionally()
 	_test_factory_board_connections_change_output()
 	_test_factory_board_shows_summon_failure_reason()
+	_test_factory_board_replaces_failure_with_success()
 	_test_factory_board_shows_distinct_flow_warning()
 	_test_factory_board_holds_transient_flow_warning()
 	_test_factory_ports_connect_through_mouse_input()
@@ -1011,6 +1012,37 @@ func _test_factory_board_shows_summon_failure_reason() -> void:
 	_expect(
 		"部品不足" in board.connection_message or "余分な部品" in board.connection_message,
 		"factory board should explain the recipe mismatch"
+	)
+	board.free()
+
+
+func _test_factory_board_replaces_failure_with_success() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_EMPTY)
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	board.configure_selected_node(1)
+	board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
+	board.set_interaction_enabled(false)
+	for _tick in 80:
+		board.advance_tick()
+		if not board.simulation.summon_failure_events.is_empty():
+			break
+	_expect("召喚失敗" in board.connection_message, "recovery scenario should begin from a visible summon failure")
+
+	board.begin_edit()
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	_expect(board.configure_selected_node(0), "recovery scenario should restore ring production")
+	board.commit_edit()
+	board.set_interaction_enabled(false)
+	for _tick in 80:
+		board.advance_tick()
+		if not board.simulation.summon_events.is_empty():
+			break
+	_expect(
+		board.connection_message == "召喚成功 // 斥候シジル",
+		"successful recovery should replace the stale failure with direct success feedback"
 	)
 	board.free()
 

@@ -24,6 +24,7 @@ Design documents:
 - Transactional factory changes made during time stop
 - Work-in-progress discard preview with glyph-type summaries, full undo, and cancel restoration
 - Player-facing summon mismatch reasons based on the closest known recipe
+- Successful summon feedback that replaces stale mismatch messages after recovery
 - Distinct input-full, output-blocked, and missing-material factory warnings
 - One-second minimum hold time for transient factory warning text
 - Direction arrows and blockage coloring on factory transport lines
