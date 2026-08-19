@@ -18,6 +18,11 @@ const FLOW_STEPS := [
 	"時間停止・再構成", "敵リーダー撃破", "報酬獲得", "次のルート",
 ]
 
+enum WorkspaceView {
+	FACTORY,
+	BATTLE,
+}
+
 @onready var factory_board: FactoryBoard = $FactoryBoard
 @onready var battle_board: BattleBoard = $BattleBoard
 @onready var progress_label: Label = $ProgressLabel
@@ -38,6 +43,8 @@ const FLOW_STEPS := [
 @onready var inspector_label: Label = $FactoryInspector/SelectionLabel
 @onready var inspector_option: OptionButton = $FactoryInspector/SettingOption
 @onready var sigil_ghost: SigilGhostControl = $FactoryInspector/SigilGhost
+@onready var factory_tab: Button = $WorkspaceTabs/FactoryTab
+@onready var battle_tab: Button = $WorkspaceTabs/BattleTab
 
 var flow := RunFlow.new()
 var elapsed_since_tick := 0.0
@@ -51,9 +58,12 @@ var pre_edit_production_counts: Dictionary = {}
 var last_factory_change_summary := ""
 var factory_change_battle_baseline: Dictionary = {}
 var last_factory_change_battle_impact := ""
+var workspace_view := WorkspaceView.FACTORY
 
 
 func _ready() -> void:
+	factory_tab.pressed.connect(func() -> void: _show_workspace(WorkspaceView.FACTORY))
+	battle_tab.pressed.connect(func() -> void: _show_workspace(WorkspaceView.BATTLE))
 	$Toolbar/ScoutButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SCOUT))
 	$Toolbar/EmptyButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_EMPTY))
 	$Toolbar/SentinelButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SENTINEL))
@@ -79,6 +89,22 @@ func _ready() -> void:
 	_select_plan(MvpContent.PLAN_SCOUT)
 	_apply_phase()
 	queue_redraw()
+
+
+func _show_workspace(next_view: WorkspaceView) -> void:
+	workspace_view = next_view
+	var show_factory := workspace_view == WorkspaceView.FACTORY
+	factory_board.visible = show_factory
+	battle_board.visible = not show_factory
+	$FactoryPalette.visible = show_factory
+	$FactoryInspector.visible = show_factory
+	factory_tab.set_pressed_no_signal(show_factory)
+	battle_tab.set_pressed_no_signal(not show_factory)
+	$Toolbar/EmptyButton.visible = show_factory
+	$Toolbar/ScoutButton.visible = show_factory
+	$Toolbar/SentinelButton.visible = show_factory
+	$Toolbar/GolemButton.visible = show_factory
+	speed_button.visible = not show_factory
 
 
 func _process(delta: float) -> void:
@@ -170,40 +196,39 @@ func _select_plan(plan_id: StringName) -> void:
 	sigil_ghost.show_recipe(MvpContent.recipe_id_for_plan(plan_id))
 	if flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		factory_board.preview_plan(plan_id)
-		plan_label.text = "仮術式: %s // %s // 未確定" % [MvpContent.plan_name(plan_id), MvpContent.plan_description(plan_id)]
+		plan_label.text = "◇ %s  • 未確定" % MvpContent.plan_name(plan_id)
 		var discard_notice := factory_board.pending_discard_notice()
 		if discard_notice != "":
 			plan_label.text += " // " + discard_notice
 	else:
 		factory_board.configure(plan_id)
-		var state := "構築中" if flow.phase == RunFlow.Phase.FACTORY_BUILD else "稼働術式"
-		plan_label.text = "%s: %s // %s" % [state, MvpContent.plan_name(plan_id), MvpContent.plan_description(plan_id)]
+		plan_label.text = "◇ %s" % MvpContent.plan_name(plan_id)
 	if plan_id == MvpContent.PLAN_EMPTY:
-		plan_label.text = "構築ガイド // 環素材の右●をクリック → 召喚器の左○をクリック"
+		plan_label.text = "◇ 配線待ち"
 
 
 func _refresh_empty_factory_guidance() -> void:
 	if flow.phase != RunFlow.Phase.FACTORY_BUILD or factory_board.plan_id != MvpContent.PLAN_EMPTY:
 		return
 	if factory_board.is_guided_connection_pending():
-		plan_label.text = "構築ガイド // 環素材の右●をクリック → 召喚器の左○をクリック"
+		plan_label.text = "◇ 配線待ち"
 	elif factory_board.validation_result()["ok"]:
-		plan_label.text = "構築完了 // 斥候を生産できます。戦闘開始へ進めます"
+		plan_label.text = "✓ 構築可能"
 
 
 func _add_factory_node(template_id: StringName) -> void:
 	if factory_board.add_node_from_palette(template_id) != &"":
-		plan_label.text = "カスタム工場 // 設備を配置し、ポート同士を接続してください"
+		plan_label.text = "◇ 未接続"
 
 
 func _delete_factory_node() -> void:
 	if factory_board.remove_selected_node():
-		plan_label.text = "カスタム工場 // 選択した設備を削除しました"
+		plan_label.text = "− 設備削除"
 
 
 func _undo_factory_edit() -> void:
 	if factory_board.undo():
-		plan_label.text = "カスタム工場 // 直前の編集を元に戻しました"
+		plan_label.text = "↶ Undo"
 
 
 func _refresh_factory_inspector() -> void:
@@ -219,7 +244,7 @@ func _refresh_factory_inspector() -> void:
 
 func _on_inspector_option_selected(index: int) -> void:
 	if factory_board.configure_selected_node(index):
-		plan_label.text = "カスタム工場 // 設備設定を変更しました"
+		plan_label.text = "◇ 設定変更"
 		var discard_notice := factory_board.pending_discard_notice()
 		if discard_notice != "":
 			plan_label.text += " // " + discard_notice
@@ -418,16 +443,18 @@ func _apply_phase() -> void:
 				"OK：工場構築へ"
 			)
 		RunFlow.Phase.FACTORY_BUILD:
+			_show_workspace(WorkspaceView.FACTORY)
 			_set_plan_buttons_enabled(true)
 			_set_factory_palette_enabled(true)
 			factory_board.set_interaction_enabled(true)
 			pause_button.disabled = false
 			pause_button.text = "構築完了・戦闘開始"
 			pause_button.tooltip_text = "配線が完成した工場を確定し、リアルタイム戦闘を開始します"
-			threat_label.text = "ステージ情報をもとに、戦闘前の工場を構築します"
-			status_label.text = "工場を選び、準備ができたら戦闘を開始してください"
+			threat_label.text = ""
+			status_label.text = ""
 			_select_plan(factory_board.plan_id)
 		RunFlow.Phase.BATTLE:
+			_show_workspace(WorkspaceView.BATTLE)
 			pause_button.disabled = false
 			speed_button.disabled = false
 			pause_button.text = "時間停止"
@@ -437,6 +464,7 @@ func _apply_phase() -> void:
 			_refresh_battle_plan_label()
 			_refresh_status()
 		RunFlow.Phase.FACTORY_RECONFIGURE:
+			_show_workspace(WorkspaceView.FACTORY)
 			_set_plan_buttons_enabled(true)
 			_set_factory_palette_enabled(true)
 			factory_board.set_interaction_enabled(true)
@@ -445,10 +473,10 @@ func _apply_phase() -> void:
 			pause_button.tooltip_text = "有効な工場変更を一括確定し、リアルタイム戦闘を再開します"
 			cancel_button.disabled = false
 			var work_summary := factory_board.work_in_progress_summary()
-			plan_label.text = "時間停止中 // 工場・召喚門を再構成 // 仕掛品 %d個" % factory_board.work_in_progress_count()
+			plan_label.text = "Ⅱ 時間停止  •  仕掛品 %d" % factory_board.work_in_progress_count()
 			if work_summary != "":
 				plan_label.text += "（%s）" % work_summary
-			status_label.text = "術式を選び、変更を確定するとリアルタイム戦闘へ戻ります"
+			status_label.text = ""
 		RunFlow.Phase.VICTORY:
 			pause_button.disabled = true
 			_show_overlay("STAGE CLEAR", "敵リーダーを撃破", _battle_result_summary(), "OK：報酬を確認")
