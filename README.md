@@ -2,7 +2,12 @@
 
 Factory × RTS × roguelite game prototype built with Godot 4 and GDScript.
 
-The current design document is available at [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md).
+Design documents:
+
+- [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) — overall design and MVP scope
+- [`docs/SIGIL_SPEC.md`](docs/SIGIL_SPEC.md) — glyph structure, normalization, matching, and evolution
+- [`docs/FACTORY_SPEC.md`](docs/FACTORY_SPEC.md) — factory nodes, routing, blocking, and editing
+- [`docs/ROGUELITE_SPEC.md`](docs/ROGUELITE_SPEC.md) — route rewards, progression, and enemy summons
 
 ## MVP features
 
