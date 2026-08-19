@@ -11,6 +11,7 @@ var summon_events: Array[Dictionary] = []
 var summon_failure_events: Array[Dictionary] = []
 var blocked_line_ids: Array[StringName] = []
 var blocked_output_node_ids: Array[StringName] = []
+var last_runtime_glyph_errors: Array[String] = []
 var discarded_glyphs := 0
 var tick_index := 0
 
@@ -108,6 +109,7 @@ func validate_graph() -> Dictionary:
 	for node_key in _sorted_keys(nodes):
 		var configured_node: FactoryNodeModel = nodes[node_key]
 		errors.append_array(_node_configuration_errors(node_key, configured_node))
+	errors.append_array(work_in_progress_validation_errors())
 	var structurally_valid_line_ids: Dictionary = {}
 	var input_line_counts: Dictionary = {}
 	var output_line_counts: Dictionary = {}
@@ -175,6 +177,35 @@ func validate_graph() -> Dictionary:
 	elif summoner_count > 1:
 		errors.append("multiple_summoners")
 	return {"ok": errors.is_empty(), "errors": errors}
+
+
+func work_in_progress_validation_errors() -> Array[String]:
+	var errors: Array[String] = []
+	for node_id in _sorted_keys(nodes):
+		var node: FactoryNodeModel = nodes[node_id]
+		for port in node.input_buffers.size():
+			_append_runtime_glyph_errors(
+				errors,
+				node.input_buffers[port],
+				"node[%s].input[%d]" % [node_id, port]
+			)
+		_append_runtime_glyph_errors(errors, node.processing_glyph, "node[%s].processing" % node_id)
+		_append_runtime_glyph_errors(errors, node.output_buffer, "node[%s].output" % node_id)
+	for line_id in _sorted_keys(lines):
+		var line: FactoryLineModel = lines[line_id]
+		_append_runtime_glyph_errors(errors, line.payload, "line[%s].payload" % line_id)
+	return errors
+
+
+func _append_runtime_glyph_errors(errors: Array[String], glyph_value, location: String) -> void:
+	if glyph_value == null:
+		return
+	if not glyph_value is GlyphModel:
+		errors.append("invalid_glyph:%s:not_glyph" % location)
+		return
+	var glyph: GlyphModel = glyph_value
+	for structure_error in glyph.structure_validation_errors():
+		errors.append("invalid_glyph:%s:%s" % [location, structure_error])
 
 
 func _node_configuration_errors(node_key: StringName, node: FactoryNodeModel) -> Array[String]:
@@ -292,6 +323,7 @@ func duplicate_state() -> FactorySimulation:
 	result.summon_failure_events = summon_failure_events.duplicate(true)
 	result.blocked_line_ids = blocked_line_ids.duplicate()
 	result.blocked_output_node_ids = blocked_output_node_ids.duplicate()
+	result.last_runtime_glyph_errors = last_runtime_glyph_errors.duplicate()
 	result.discarded_glyphs = discarded_glyphs
 	result.tick_index = tick_index
 	return result
@@ -319,10 +351,14 @@ func discard_all_work_in_progress() -> int:
 	discarded_glyphs += discarded_now
 	blocked_line_ids.clear()
 	blocked_output_node_ids.clear()
+	last_runtime_glyph_errors.clear()
 	return discarded_now
 
 
 func tick() -> void:
+	last_runtime_glyph_errors = work_in_progress_validation_errors()
+	if not last_runtime_glyph_errors.is_empty():
+		return
 	tick_index += 1
 	var input_acceptance := _snapshot_input_acceptance()
 	var line_availability := _snapshot_line_availability()

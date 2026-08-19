@@ -57,6 +57,7 @@ func _initialize() -> void:
 	_test_factory_validation_rejects_externally_injected_lines()
 	_test_factory_validation_rejects_externally_injected_cycle()
 	_test_factory_validation_rejects_invalid_restored_configuration()
+	_test_factory_validation_rejects_invalid_work_in_progress()
 	_test_factory_validation_order_is_stable()
 	_test_factory_flow_diagnostics_distinguish_blockages()
 	_test_mvp_plans_produce_expected_units()
@@ -1073,6 +1074,53 @@ func _test_factory_validation_rejects_invalid_restored_configuration() -> void:
 		"line_key_mismatch:wrong_line_key:actual_line_id",
 	]:
 		_expect(result["errors"].has(expected_error), "restored validation should report %s" % expected_error)
+
+
+func _test_factory_validation_rejects_invalid_work_in_progress() -> void:
+	var simulation := MvpContent.build_factory(MvpContent.PLAN_SENTINEL)
+	simulation.nodes[&"ring_source"].output_buffer = GlyphModel.new([
+		GlyphComponentModel.new(&"ring"),
+		GlyphComponentModel.new(&"spike"),
+	])
+	simulation.nodes[&"rotator"].input_buffers[0] = "not-a-glyph"
+	var malformed_payload := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	malformed_payload.combine_children = [null, GlyphModel.new([GlyphComponentModel.new(&"ring")])]
+	simulation.lines[&"line_1"].payload = malformed_payload
+	var expected_errors: Array[String] = [
+		"invalid_glyph:node[ring_source].output:primitive_arity:root:2",
+		"invalid_glyph:node[rotator].input[0]:not_glyph",
+		"invalid_glyph:line[line_1].payload:invalid_child:root.0",
+	]
+	_expect(
+		simulation.work_in_progress_validation_errors() == expected_errors,
+		"work-in-progress validation should report stable equipment and line locations"
+	)
+	var validation := simulation.validate_graph()
+	_expect(not validation["ok"], "invalid restored work in progress should block factory execution")
+	for expected_error in expected_errors:
+		_expect(validation["errors"].has(expected_error), "graph validation should include %s" % expected_error)
+	var tick_before := simulation.tick_index
+	simulation.tick()
+	_expect(simulation.tick_index == tick_before, "invalid work in progress should stop fixed-tick time")
+	_expect(
+		simulation.last_runtime_glyph_errors == expected_errors,
+		"stopped tick should retain actionable runtime glyph errors"
+	)
+	simulation.discard_all_work_in_progress()
+	_expect(simulation.last_runtime_glyph_errors.is_empty(), "discarding invalid work should clear stopped-tick errors")
+	var board := FactoryBoard.new()
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_SENTINEL)
+	board.simulation.nodes[&"ring_source"].output_buffer = GlyphModel.new([
+		GlyphComponentModel.new(&"ring"),
+		GlyphComponentModel.new(&"spike"),
+	])
+	board._refresh_production_preview()
+	_expect(
+		"仕掛品データが破損" in board.cached_production_preview,
+		"production preview should explain invalid restored work in progress"
+	)
+	board.free()
 
 
 func _test_factory_validation_order_is_stable() -> void:
