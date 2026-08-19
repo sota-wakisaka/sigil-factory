@@ -574,20 +574,55 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 	var glyph: GlyphModel = node.input_buffers[0]
 	node.input_buffers[0] = null
 	glyph.production_context.record_node(&"summoner", false)
+	var match_result := recipe_match_result(glyph)
+	if match_result["is_match"]:
+		summon_events.append({
+			"tick": tick_index,
+			"recipe_id": match_result["recipe_id"],
+			"unit_id": match_result["unit_id"],
+			"summoner_id": node.id,
+			"production_context": glyph.production_context.to_dictionary(),
+		})
+		return
+	discarded_glyphs += 1
+	summon_failure_events.append({
+		"tick": tick_index,
+		"summoner_id": node.id,
+		"glyph_hash": glyph.canonical_hash(),
+		"closest_recipe_id": match_result["closest_recipe_id"],
+		"diagnostics": match_result["diagnostics"].duplicate(),
+	})
+
+
+func recipe_match_result(glyph: GlyphModel) -> Dictionary:
+	var validation_errors: Array[String] = []
+	_append_runtime_glyph_errors(validation_errors, glyph, "candidate")
+	validation_errors.append_array(_recipe_state_validation_errors())
+	if not validation_errors.is_empty():
+		return {
+			"ok": false,
+			"is_match": false,
+			"recipe_id": &"",
+			"unit_id": &"",
+			"closest_recipe_id": &"",
+			"diagnostics": PackedStringArray(validation_errors),
+			"errors": validation_errors,
+		}
 	var closest_recipe_id: StringName = &""
 	var closest_diagnostics := PackedStringArray()
 	var closest_rank := 2147483647
 	for recipe in recipes:
 		var result := SigilMatcher.compare(glyph, recipe.glyph)
 		if result["is_match"]:
-			summon_events.append({
-				"tick": tick_index,
+			return {
+				"ok": true,
+				"is_match": true,
 				"recipe_id": recipe.id,
 				"unit_id": recipe.unit_id,
-				"summoner_id": node.id,
-				"production_context": glyph.production_context.to_dictionary(),
-			})
-			return
+				"closest_recipe_id": recipe.id,
+				"diagnostics": PackedStringArray(),
+				"errors": [],
+			}
 		var diagnostics: PackedStringArray = result["diagnostics"]
 		var rank := _summon_failure_rank(diagnostics)
 		if (
@@ -600,16 +635,17 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 			closest_rank = rank
 			closest_recipe_id = recipe.id
 			closest_diagnostics = diagnostics.duplicate()
-	discarded_glyphs += 1
 	if recipes.is_empty():
 		closest_diagnostics = PackedStringArray(["獲得済みシジルがありません"])
-	summon_failure_events.append({
-		"tick": tick_index,
-		"summoner_id": node.id,
-		"glyph_hash": glyph.canonical_hash(),
+	return {
+		"ok": true,
+		"is_match": false,
+		"recipe_id": &"",
+		"unit_id": &"",
 		"closest_recipe_id": closest_recipe_id,
 		"diagnostics": closest_diagnostics,
-	})
+		"errors": [],
+	}
 
 
 func _summon_failure_rank(diagnostics: PackedStringArray) -> int:

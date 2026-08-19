@@ -18,6 +18,7 @@ const GLYPH_COLOR := Color(0.35, 0.86, 1.0, 1.0)
 const SELECTED_COLOR := Color(1.0, 0.78, 0.3, 1.0)
 const WARNING_COLOR := Color(1.0, 0.38, 0.28, 1.0)
 const WAITING_COLOR := Color(1.0, 0.72, 0.24, 1.0)
+const MATCH_COLOR := Color(0.36, 1.0, 0.58, 1.0)
 const NODE_HALF_SIZE := Vector2(48, 30)
 const REFERENCE_SIZE := Vector2(820, 395)
 const PORT_RADIUS := 7.0
@@ -817,7 +818,13 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		_draw_flow_arrow(start, finish, line_color)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
-			_draw_mini_glyph(line.payload, start.lerp(finish, progress), 0.55)
+			var glyph_center := start.lerp(finish, progress)
+			_draw_mini_glyph(line.payload, glyph_center, 0.55)
+			var match_state := line_recipe_match_state(line_id)
+			if match_state == &"match":
+				draw_arc(glyph_center, 11.0, 0.0, TAU, 24, MATCH_COLOR, 2.0, true)
+			elif match_state == &"mismatch":
+				draw_arc(glyph_center, 11.0, 0.0, TAU, 24, WARNING_COLOR, 2.0, true)
 
 
 func _draw_flow_arrow(start: Vector2, finish: Vector2, color: Color) -> void:
@@ -880,6 +887,24 @@ func visible_glyph_for_line(line_id: StringName) -> GlyphModel:
 	if glyph == null or not glyph.structure_validation_errors().is_empty():
 		return null
 	return glyph
+
+
+func line_recipe_match_state(line_id: StringName) -> StringName:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.lines.has(line_id):
+		return &"missing"
+	var line: FactoryLineModel = display_simulation.lines[line_id]
+	if not display_simulation.nodes.has(line.to_node_id):
+		return &"invalid"
+	var target: FactoryNodeModel = display_simulation.nodes[line.to_node_id]
+	if target.kind != FactoryNodeModel.NodeKind.SUMMONER:
+		return &"not_applicable"
+	if line.payload == null:
+		return &"empty"
+	var result := display_simulation.recipe_match_result(line.payload)
+	if not result["ok"]:
+		return &"invalid"
+	return &"match" if result["is_match"] else &"mismatch"
 
 
 func visible_input_glyph_for_node(node_id: StringName, port: int) -> GlyphModel:

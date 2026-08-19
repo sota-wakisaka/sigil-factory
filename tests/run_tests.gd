@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_factory_tick_does_not_refill_freed_line()
 	_test_factory_replay_is_independent_of_insertion_order()
 	_test_factory_pipeline_summons_matching_unit()
+	_test_factory_recipe_match_preview_is_non_destructive()
 	_test_factory_records_closest_summon_failure()
 	_test_factory_closest_recipe_is_order_independent()
 	_test_factory_rejects_ambiguous_recipes()
@@ -627,6 +628,22 @@ func _test_factory_pipeline_summons_matching_unit() -> void:
 		_expect(context["visited_node_kinds"].has(&"source"), "production context should retain source traversal")
 		_expect(context["visited_node_kinds"].has(&"summoner"), "production context should retain summoner traversal")
 		_expect(context["source_ids"].has(&"source"), "production context should retain source identity")
+
+
+func _test_factory_recipe_match_preview_is_non_destructive() -> void:
+	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	var event_count := simulation.summon_events.size()
+	var discard_count := simulation.discarded_glyphs
+	var matching := simulation.recipe_match_result(ring)
+	_expect(matching["ok"] and matching["is_match"], "match preview should identify an acquired exact recipe")
+	_expect(matching["recipe_id"] == &"open_ring", "match preview should expose the exact recipe ID")
+	var mismatch := simulation.recipe_match_result(spike)
+	_expect(mismatch["ok"] and not mismatch["is_match"], "match preview should identify a non-matching Glyph")
+	_expect(mismatch["closest_recipe_id"] != &"", "mismatch preview should retain the closest acquired recipe")
+	_expect(simulation.summon_events.size() == event_count, "match preview should not emit summon events")
+	_expect(simulation.discarded_glyphs == discard_count, "match preview should not discard its candidate")
 
 
 func _test_factory_records_closest_summon_failure() -> void:
@@ -1914,6 +1931,20 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		"invalid transported Glyph should stay with corruption diagnostics instead of being drawn"
 	)
 	board.free()
+	var match_board := FactoryBoard.new()
+	match_board.configure(MvpContent.PLAN_SCOUT)
+	var summon_line: FactoryLineModel = match_board.simulation.lines[&"line_1"]
+	summon_line.payload = GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	_expect(
+		match_board.line_recipe_match_state(&"line_1") == &"match",
+		"summoner-bound matching Glyph should expose a positive arrival state"
+	)
+	summon_line.payload = GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	_expect(
+		match_board.line_recipe_match_state(&"line_1") == &"mismatch",
+		"summoner-bound mismatching Glyph should expose a rejected arrival state"
+	)
+	match_board.free()
 	var combine_board := FactoryBoard.new()
 	combine_board.configure(MvpContent.PLAN_GOLEM)
 	var combiner: FactoryNodeModel = combine_board.simulation.nodes[&"combiner"]
@@ -1921,6 +1952,11 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	combiner.input_buffers[0] = ring
 	combiner.input_buffers[1] = spike
+	combine_board.simulation.lines[&"line_ring"].payload = ring
+	_expect(
+		combine_board.line_recipe_match_state(&"line_ring") == &"not_applicable",
+		"intermediate factory lines should not be judged as final recipes"
+	)
 	_expect(
 		combine_board.visible_input_glyph_for_node(&"combiner", 0) == ring,
 		"combiner display should retain the first input Glyph separately"
