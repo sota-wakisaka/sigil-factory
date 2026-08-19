@@ -2,6 +2,7 @@ extends SceneTree
 
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
+const GlyphProductionContextModel := preload("res://src/domain/glyph_production_context.gd")
 const SigilMatcher := preload("res://src/domain/sigil_matcher.gd")
 const SigilRecipeModel := preload("res://src/domain/sigil_recipe.gd")
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
@@ -21,6 +22,9 @@ func _initialize() -> void:
 	_test_exact_match_is_order_independent()
 	_test_attribute_diagnostics()
 	_test_missing_and_extra_components()
+	_test_combine_structure_is_order_independent()
+	_test_combine_hierarchy_affects_matching()
+	_test_production_context_does_not_affect_matching()
 	_test_factory_pipeline_summons_matching_unit()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
@@ -90,6 +94,45 @@ func _test_missing_and_extra_components() -> void:
 	var diagnostics: PackedStringArray = result["diagnostics"]
 	_expect(diagnostics.has("部品不足: spike"), "missing primitive should be diagnosed")
 	_expect(diagnostics.has("余分な部品: branch"), "extra primitive should be diagnosed")
+
+
+func _test_combine_structure_is_order_independent() -> void:
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	var first := GlyphModel.combine(ring, spike)
+	var second := GlyphModel.combine(spike, ring)
+	_expect(
+		first.canonical_serialization() == second.canonical_serialization(),
+		"combine input order should not affect canonical structure"
+	)
+	_expect(first.canonical_hash() == second.canonical_hash(), "equal structures should share a stable hash")
+
+
+func _test_combine_hierarchy_affects_matching() -> void:
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	var branch := GlyphModel.new([GlyphComponentModel.new(&"branch")])
+	var left_nested := GlyphModel.combine(GlyphModel.combine(ring, spike), branch)
+	var right_nested := GlyphModel.combine(ring, GlyphModel.combine(spike, branch))
+	var result := SigilMatcher.compare(left_nested, right_nested)
+	_expect(not result["is_match"], "different combine hierarchy should not match")
+	_expect(
+		result["diagnostics"].has("合成階層が違います"),
+		"hierarchy mismatch should be diagnosed"
+	)
+
+
+func _test_production_context_does_not_affect_matching() -> void:
+	var first := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var second := first.copy()
+	second.production_context.record_node(&"rotator", true)
+	second.production_context.record_source(&"north_source")
+	_expect(
+		SigilMatcher.compare(first, second)["is_match"],
+		"production provenance should not affect sigil matching"
+	)
+	_expect(second.production_context.processing_count == 1, "production context should count processing")
+	_expect(second.production_context.has_visited(&"rotator"), "production context should retain node kinds")
 
 
 func _test_factory_pipeline_summons_matching_unit() -> void:

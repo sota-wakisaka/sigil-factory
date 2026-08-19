@@ -3,13 +3,15 @@ extends RefCounted
 
 
 static func compare(actual: GlyphModel, target: GlyphModel) -> Dictionary:
-	if actual.canonical_keys() == target.canonical_keys():
+	if actual.canonical_serialization() == target.canonical_serialization():
 		return {
 			"is_match": true,
 			"diagnostics": PackedStringArray(),
 		}
 
 	var diagnostics := PackedStringArray()
+	if actual.canonical_keys() == target.canonical_keys():
+		_add_unique(diagnostics, "合成階層が違います")
 	var used_actual_indices: Dictionary = {}
 
 	for target_component in target.components:
@@ -92,4 +94,3 @@ static func _append_component_differences(
 static func _add_unique(values: PackedStringArray, value: String) -> void:
 	if not values.has(value):
 		values.append(value)
-
