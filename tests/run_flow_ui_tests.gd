@@ -70,6 +70,8 @@ func _initialize() -> void:
 	_expect(main.get_node("FactoryPalette/RingButton").preview_glyph != null, "source palette choice should use its Primitive as the main icon")
 	_expect(main.get_node("FactoryPalette/RingButton").text == "", "palette choice should not rely on the native text label")
 	_expect(main.get_node("FactoryPalette/SummonButton").equipment_kind == &"summoner", "summoner palette choice should expose its dedicated vector icon kind")
+	_expect(main.get_node("FactoryPalette/RingButton").mana_cost == 20, "palette should expose source mana cost without requiring a tooltip")
+	_expect(main.get_node("FactoryPalette/RotateButton").mana_cost == 15, "palette should expose processor mana cost with the same visual convention")
 	_expect(main.get_node("FactoryPalette/RotateButton").custom_minimum_size.y >= 50.0, "palette icon should reserve readable vertical space")
 	_expect(
 		"90°・180°・270°" in main.get_node("FactoryPalette/RotateButton").tooltip_text,

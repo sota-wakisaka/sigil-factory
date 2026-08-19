@@ -167,6 +167,7 @@ tooltip_text = "環グリフを一定周期で生成する素材源を追加（�
 script = ExtResource("6_palette_button")
 equipment_kind = &"ring_source"
 caption = "環"
+mana_cost = 20
 
 [node name="SpikeButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 50)
@@ -175,6 +176,7 @@ tooltip_text = "棘グリフを一定周期で生成する素材源を追加（�
 script = ExtResource("6_palette_button")
 equipment_kind = &"spike_source"
 caption = "棘"
+mana_cost = 20
 
 [node name="RotateButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 50)
@@ -183,6 +185,7 @@ tooltip_text = "回転器を追加（魔力15）。選択後に90°・180°・27
 script = ExtResource("6_palette_button")
 equipment_kind = &"rotator"
 caption = "回転"
+mana_cost = 15
 
 [node name="ColorButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 50)
@@ -191,6 +194,7 @@ tooltip_text = "着色器を追加（魔力15）。選択後に青・赤・白�
 script = ExtResource("6_palette_button")
 equipment_kind = &"colorizer"
 caption = "着色"
+mana_cost = 15
 
 [node name="CombineButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 50)
@@ -199,6 +203,7 @@ tooltip_text = "2つの入力グリフを1つにまとめる合成器を追加�
 script = ExtResource("6_palette_button")
 equipment_kind = &"combiner"
 caption = "合成"
+mana_cost = 20
 
 [node name="SummonButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 50)
@@ -207,6 +212,7 @@ tooltip_text = "召喚器がない場合、完成グリフを照合する汎用�
 script = ExtResource("6_palette_button")
 equipment_kind = &"summoner"
 caption = "召喚"
+mana_cost = 20
 
 [node name="DeleteButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 50)

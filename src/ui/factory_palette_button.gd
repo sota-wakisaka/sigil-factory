@@ -6,6 +6,7 @@ const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 
 @export var equipment_kind: StringName
 @export var caption := "設備"
+@export var mana_cost := 0
 
 var preview_glyph: GlyphModel
 
@@ -34,8 +35,22 @@ func _draw() -> void:
 		10,
 		Color(0.66, 0.76, 0.84, 1.0)
 	)
+	if mana_cost > 0:
+		_draw_mana_cost()
 	if disabled:
 		_draw_unavailable_overlay()
+
+
+func _draw_mana_cost() -> void:
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(4, 10),
+		"◆%d" % mana_cost,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		28.0,
+		8,
+		Color(0.32, 0.68, 0.96, 0.88)
+	)
 
 
 func _draw_unavailable_overlay() -> void:
