@@ -69,8 +69,8 @@ scout, sentinel, and golem output plus unmatched glyphs.
 During production, rejected glyphs report actionable structural differences such
 as missing parts, rotation, or color. Factory equipment and lines also distinguish
 missing combiner material, full target buffers, and blocked outputs. Time-stop
-edits list both the count and processed type of work in progress that will be
-discarded before the change is committed.
+edits list the count, processed type, and affected equipment or transport line
+for work in progress that will be discarded before the change is committed.
 
 The first factory step opens an unwired workshop containing a ring source and a
 summoner. Connecting its two highlighted ports produces the first scout. The

@@ -478,12 +478,13 @@ func cancel_edit() -> void:
 
 
 func work_in_progress_count() -> int:
-	return _work_in_progress_glyphs(simulation).size()
+	return _work_in_progress_entries(simulation).size()
 
 
 func work_in_progress_summary() -> String:
 	var counts := {}
-	for glyph in _work_in_progress_glyphs(simulation):
+	for entry in _work_in_progress_entries(simulation):
+		var glyph: GlyphModel = entry["glyph"]
 		var label := _glyph_type_label(glyph)
 		counts[label] = int(counts.get(label, 0)) + 1
 	var labels := counts.keys()
@@ -492,6 +493,16 @@ func work_in_progress_summary() -> String:
 	for label in labels:
 		parts.append("%s×%d" % [label, counts[label]])
 	return "、".join(parts)
+
+
+func work_in_progress_impact_summary() -> String:
+	var impacts := PackedStringArray()
+	for entry in _work_in_progress_entries(simulation):
+		var location := String(entry["location"])
+		if not impacts.has(location):
+			impacts.append(location)
+	impacts.sort()
+	return "、".join(impacts)
 
 
 func pending_discard_count() -> int:
@@ -505,29 +516,46 @@ func pending_discard_notice() -> String:
 	if count <= 0:
 		return ""
 	var summary := work_in_progress_summary()
-	return (
+	var notice := (
 		"仕掛品%d個を廃棄予定" % count
 		if summary == ""
 		else "仕掛品%d個（%s）を廃棄予定" % [count, summary]
 	)
+	var impact_summary := work_in_progress_impact_summary()
+	if impact_summary != "":
+		notice += " // 影響: " + impact_summary
+	return notice
 
 
-func _work_in_progress_glyphs(source_simulation: FactorySimulation) -> Array:
-	var glyphs: Array = []
+func _work_in_progress_entries(source_simulation: FactorySimulation) -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
 	if source_simulation == null:
-		return glyphs
-	for node in source_simulation.nodes.values():
-		for glyph in node.input_buffers:
+		return entries
+	var node_ids := source_simulation.nodes.keys()
+	node_ids.sort()
+	for node_id in node_ids:
+		var node: FactoryNodeModel = source_simulation.nodes[node_id]
+		var node_label := _node_label(node)
+		for port in node.input_buffers.size():
+			var glyph = node.input_buffers[port]
 			if glyph != null:
-				glyphs.append(glyph)
+				entries.append({"glyph": glyph, "location": "%s・入力%d" % [node_label, port + 1]})
 		if node.output_buffer != null:
-			glyphs.append(node.output_buffer)
+			entries.append({"glyph": node.output_buffer, "location": "%s・出力" % node_label})
 		if node.processing_glyph != null:
-			glyphs.append(node.processing_glyph)
-	for line in source_simulation.lines.values():
+			entries.append({"glyph": node.processing_glyph, "location": "%s・処理中" % node_label})
+	var line_ids := source_simulation.lines.keys()
+	line_ids.sort()
+	for line_id in line_ids:
+		var line: FactoryLineModel = source_simulation.lines[line_id]
 		if line.payload != null:
-			glyphs.append(line.payload)
-	return glyphs
+			var from_node: FactoryNodeModel = source_simulation.nodes[line.from_node_id]
+			var to_node: FactoryNodeModel = source_simulation.nodes[line.to_node_id]
+			entries.append({
+				"glyph": line.payload,
+				"location": "%s→%s" % [_node_label(from_node), _node_label(to_node)],
+			})
+	return entries
 
 
 func _glyph_type_label(glyph: GlyphModel) -> String:
