@@ -974,6 +974,24 @@ func _test_shared_glyph_painter_rejects_invalid_structures() -> void:
 		GlyphPainterModel.component_color(&"blue") == GlyphPainterModel.BLUE_GLYPH,
 		"shared Glyph painter should own the color mapping used by every factory view"
 	)
+	_expect(
+		GlyphPainterModel.primitive_stroke_width(2.0) > GlyphPainterModel.combine_stroke_width(2.0)
+		and GlyphPainterModel.combine_stroke_width(2.0) > GlyphPainterModel.connection_stroke_width(2.0),
+		"shared Glyph painter should enforce Primitive > Combine circle > connection line hierarchy"
+	)
+	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	var branch := GlyphModel.new([GlyphComponentModel.new(&"branch")])
+	var nested := GlyphModel.combine(GlyphModel.combine(valid, spike), branch)
+	var nested_visuals := GlyphPainterModel.combine_visuals(nested, 2.0)
+	_expect(nested_visuals["circles"].size() == 2, "each nested Combine should produce its own structural circle")
+	_expect(
+		float(nested_visuals["circles"][0]["radius"]) > float(nested_visuals["circles"][1]["radius"]),
+		"outer Combine circle should remain larger than its nested child circle"
+	)
+	var left := GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i(-1, 0))])
+	var right := GlyphModel.new([GlyphComponentModel.new(&"spike", Vector2i(1, 0))])
+	var separated_visuals := GlyphPainterModel.combine_visuals(GlyphModel.combine(left, right), 2.0)
+	_expect(separated_visuals["connections"].size() == 2, "positioned Combine children should draw low-priority structural connections")
 
 
 func _test_factory_owns_registered_recipe_data() -> void:

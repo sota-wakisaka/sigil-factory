@@ -5,6 +5,7 @@ const WHITE_GLYPH := Color(0.76, 0.88, 1.0, 0.95)
 const BLUE_GLYPH := Color(0.28, 0.8, 1.0, 0.98)
 const RED_GLYPH := Color(1.0, 0.4, 0.42, 0.98)
 const COMBINE_COLOR := Color(0.55, 0.74, 0.9, 0.72)
+const CONNECTION_COLOR := Color(0.42, 0.6, 0.74, 0.42)
 
 
 static func can_draw(glyph: GlyphModel) -> bool:
@@ -21,15 +22,24 @@ static func draw_glyph(
 	if canvas == null or not can_draw(glyph) or scale <= 0.0 or opacity <= 0.0:
 		return false
 	var normalized_opacity := clampf(opacity, 0.0, 1.0)
-	if not glyph.combine_children.is_empty():
+	var structure := combine_visuals(glyph, scale)
+	for connection in structure["connections"]:
+		canvas.draw_line(
+			center + connection["from"],
+			center + connection["to"],
+			_with_opacity(CONNECTION_COLOR, normalized_opacity),
+			connection_stroke_width(scale),
+			true
+		)
+	for circle in structure["circles"]:
 		canvas.draw_arc(
-			center,
-			16.0 * scale,
+			center + circle["center"],
+			circle["radius"],
 			0.0,
 			TAU,
 			28,
 			_with_opacity(COMBINE_COLOR, normalized_opacity),
-			maxf(1.0, 1.4 * scale),
+			combine_stroke_width(scale),
 			true
 		)
 	for component in glyph.components:
@@ -41,6 +51,74 @@ static func draw_glyph(
 			normalized_opacity
 		)
 	return true
+
+
+static func combine_visuals(glyph: GlyphModel, scale: float = 1.0) -> Dictionary:
+	var circles: Array[Dictionary] = []
+	var connections: Array[Dictionary] = []
+	if not can_draw(glyph) or scale <= 0.0:
+		return {"circles": circles, "connections": connections}
+	_collect_combine_visuals(glyph, scale, circles, connections)
+	return {"circles": circles, "connections": connections}
+
+
+static func _collect_combine_visuals(
+	glyph: GlyphModel,
+	scale: float,
+	circles: Array[Dictionary],
+	connections: Array[Dictionary]
+) -> void:
+	if glyph.combine_children.is_empty():
+		return
+	var glyph_center := _glyph_center_offset(glyph, scale)
+	var radius := _glyph_content_radius(glyph, glyph_center, scale)
+	radius += float(_combine_depth(glyph) - 1) * 6.0 * scale
+	circles.append({"center": glyph_center, "radius": radius})
+	for child_value in glyph.combine_children:
+		var child: GlyphModel = child_value
+		var child_center := _glyph_center_offset(child, scale)
+		if glyph_center.distance_to(child_center) >= 2.0 * scale:
+			connections.append({"from": glyph_center, "to": child_center})
+		_collect_combine_visuals(child, scale, circles, connections)
+
+
+static func _glyph_center_offset(glyph: GlyphModel, scale: float) -> Vector2:
+	if glyph.components.is_empty():
+		return Vector2.ZERO
+	var center := Vector2.ZERO
+	for component in glyph.components:
+		center += Vector2(component.position) * 6.0 * scale
+	return center / float(glyph.components.size())
+
+
+static func _glyph_content_radius(glyph: GlyphModel, center: Vector2, scale: float) -> float:
+	var radius := 0.0
+	for component in glyph.components:
+		var component_center := Vector2(component.position) * 6.0 * scale
+		var component_radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
+		radius = maxf(radius, center.distance_to(component_center) + component_radius)
+	return maxf(12.0 * scale, radius + 11.0 * scale)
+
+
+static func _combine_depth(glyph: GlyphModel) -> int:
+	if glyph.combine_children.is_empty():
+		return 0
+	var child_depth := 0
+	for child in glyph.combine_children:
+		child_depth = maxi(child_depth, _combine_depth(child))
+	return child_depth + 1
+
+
+static func primitive_stroke_width(scale: float) -> float:
+	return maxf(1.0, 2.0 * scale)
+
+
+static func combine_stroke_width(scale: float) -> float:
+	return maxf(0.9, 1.25 * scale)
+
+
+static func connection_stroke_width(scale: float) -> float:
+	return maxf(0.65, 0.8 * scale)
 
 
 static func component_color(color_id: StringName) -> Color:
@@ -62,7 +140,7 @@ static func _draw_component(
 	var color := _with_opacity(component_color(component.color_id), opacity)
 	var angle := float(component.rotation_step) * PI * 0.5
 	var radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
-	var stroke := maxf(1.0, 2.0 * scale)
+	var stroke := primitive_stroke_width(scale)
 	match component.primitive_id:
 		&"ring":
 			canvas.draw_arc(center, radius, angle + 0.38, angle + TAU - 0.38, 20, color, stroke, true)
