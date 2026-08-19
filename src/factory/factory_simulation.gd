@@ -57,9 +57,10 @@ func connect_nodes(line: FactoryLineModel) -> Dictionary:
 		if existing_line.from_node_id == line.from_node_id:
 			return _connection_error("occupied_output")
 
-	lines[line.id] = line
+	var stored_line := line.copy()
+	lines[stored_line.id] = stored_line
 	if _has_cycle():
-		lines.erase(line.id)
+		lines.erase(stored_line.id)
 		return _connection_error("cycle")
 	return {"ok": true, "error": ""}
 
@@ -268,12 +269,7 @@ func duplicate_state() -> FactorySimulation:
 		result.add_node(copied_node)
 	for line_id in lines:
 		var line: FactoryLineModel = lines[line_id]
-		var copied_line := FactoryLineModel.new(
-			line.id, line.from_node_id, line.to_node_id, line.to_port, line.travel_ticks
-		)
-		if line.payload != null:
-			copied_line.payload = line.payload.copy()
-		copied_line.remaining_ticks = line.remaining_ticks
+		var copied_line := line.copy()
 		result.lines[copied_line.id] = copied_line
 	result.summon_events = summon_events.duplicate(true)
 	result.summon_failure_events = summon_failure_events.duplicate(true)

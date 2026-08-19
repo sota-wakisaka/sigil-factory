@@ -20,6 +20,7 @@ Design documents:
 - Deterministic fixed-tick glyph factory simulation
 - Authoritative graph validation for restored or externally constructed factory data
 - Restored node and line identity/configuration validation before fixed-tick execution
+- Owned line snapshots that isolate connected routing and in-transit glyph state
 - Actionable validation reasons shared by pre-battle production preview and start rejection
 - Collision-safe canonical binary Combine structure with hierarchy-aware sigil matching
 - Recipe-boundary validation for primitive leaves, binary Combine arity, and component fields

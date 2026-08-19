@@ -48,6 +48,7 @@ func _initialize() -> void:
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
 	_test_factory_rejects_implicit_fan_out()
+	_test_factory_owns_connected_line_state()
 	_test_factory_disconnects_lines()
 	_test_factory_removes_node_and_connected_lines()
 	_test_factory_graph_validation_reports_dangling_nodes()
@@ -868,6 +869,33 @@ func _test_factory_rejects_implicit_fan_out() -> void:
 		not second["ok"] and second["error"] == "occupied_output",
 		"a normal node output should not create an implicit splitter"
 	)
+
+
+func _test_factory_owns_connected_line_state() -> void:
+	var simulation := FactorySimulation.new()
+	simulation.add_node(FactoryNodeModel.new(
+		&"source",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"primitive_id": "ring", "interval_ticks": 2}
+	))
+	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
+	var caller_line := FactoryLineModel.new(&"owned_line", &"source", &"summoner", 0, 3)
+	caller_line.payload = GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	caller_line.remaining_ticks = 2
+	_expect(simulation.connect_nodes(caller_line)["ok"], "line ownership fixture should connect")
+	caller_line.id = &"mutated_id"
+	caller_line.from_node_id = &"missing"
+	caller_line.to_node_id = &"missing"
+	caller_line.to_port = 7
+	caller_line.travel_ticks = 99
+	caller_line.remaining_ticks = 88
+	caller_line.payload.recolor(&"blue")
+	var stored: FactoryLineModel = simulation.lines[&"owned_line"]
+	_expect(stored.id == &"owned_line", "connected line ID should not share caller mutation")
+	_expect(stored.from_node_id == &"source" and stored.to_node_id == &"summoner", "connected endpoints should not share caller mutation")
+	_expect(stored.to_port == 0 and stored.travel_ticks == 3, "connected routing settings should not share caller mutation")
+	_expect(stored.remaining_ticks == 2, "connected transport progress should not share caller mutation")
+	_expect(stored.payload.components[0].color_id == &"white", "connected payload should not share caller mutation")
 
 
 func _test_factory_disconnects_lines() -> void:

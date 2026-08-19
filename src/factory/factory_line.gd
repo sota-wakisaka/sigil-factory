@@ -36,3 +36,10 @@ func send(glyph: GlyphModel) -> bool:
 	remaining_ticks = travel_ticks
 	return true
 
+
+func copy() -> FactoryLineModel:
+	var result := FactoryLineModel.new(id, from_node_id, to_node_id, to_port, travel_ticks)
+	if payload != null:
+		result.payload = payload.copy()
+	result.remaining_ticks = remaining_ticks
+	return result
