@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_test_factory_tick_prevents_same_tick_multistage_processing()
 	_test_factory_tick_uses_starting_input_availability()
 	_test_factory_tick_does_not_refill_freed_line()
+	_test_factory_replay_is_independent_of_insertion_order()
 	_test_factory_pipeline_summons_matching_unit()
 	_test_factory_records_closest_summon_failure()
 	_test_combiner_waits_for_both_inputs()
@@ -38,6 +39,7 @@ func _initialize() -> void:
 	_test_factory_disconnects_lines()
 	_test_factory_removes_node_and_connected_lines()
 	_test_factory_graph_validation_reports_dangling_nodes()
+	_test_factory_validation_order_is_stable()
 	_test_factory_flow_diagnostics_distinguish_blockages()
 	_test_mvp_plans_produce_expected_units()
 	_test_empty_factory_requires_player_wiring()
@@ -250,6 +252,92 @@ func _test_factory_tick_does_not_refill_freed_line() -> void:
 	_expect(source.output_buffer == null, "dispatch on the following tick should clear the output buffer")
 
 
+func _test_factory_replay_is_independent_of_insertion_order() -> void:
+	var forward := _build_determinism_factory(false)
+	var reverse := _build_determinism_factory(true)
+	for _tick in 240:
+		forward.tick()
+		reverse.tick()
+	_expect(
+		_factory_runtime_signature(forward) == _factory_runtime_signature(reverse),
+		"equivalent factories should replay identically regardless of insertion order"
+	)
+
+
+func _build_determinism_factory(reverse_order: bool) -> FactorySimulation:
+	var simulation := FactorySimulation.new()
+	var factory_nodes: Array[FactoryNodeModel] = [
+		FactoryNodeModel.new(
+			&"source", FactoryNodeModel.NodeKind.SOURCE,
+			{"primitive_id": "ring", "interval_ticks": 4}
+		),
+		FactoryNodeModel.new(
+			&"rotator", FactoryNodeModel.NodeKind.ROTATOR,
+			{"steps": 1, "processing_ticks": 2}
+		),
+		FactoryNodeModel.new(
+			&"colorizer", FactoryNodeModel.NodeKind.COLORIZER,
+			{"color_id": "blue", "processing_ticks": 3}
+		),
+		FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER),
+	]
+	var factory_lines: Array[FactoryLineModel] = [
+		FactoryLineModel.new(&"a", &"source", &"rotator", 0, 2),
+		FactoryLineModel.new(&"b", &"rotator", &"colorizer", 0, 3),
+		FactoryLineModel.new(&"c", &"colorizer", &"summoner", 0, 2),
+	]
+	if reverse_order:
+		factory_nodes.reverse()
+		factory_lines.reverse()
+	for node in factory_nodes:
+		simulation.add_node(node)
+	for line in factory_lines:
+		simulation.connect_nodes(line)
+	var target := GlyphModel.new([
+		GlyphComponentModel.new(&"ring", Vector2i.ZERO, 1, 1, &"blue"),
+	])
+	simulation.add_recipe(SigilRecipeModel.new(&"azure_ring", target, &"sentinel"))
+	return simulation
+
+
+func _factory_runtime_signature(simulation: FactorySimulation) -> String:
+	var parts := PackedStringArray([
+		"tick=%d" % simulation.tick_index,
+		"discarded=%d" % simulation.discarded_glyphs,
+	])
+	for event in simulation.summon_events:
+		parts.append("summon=%d:%s" % [event["tick"], event["unit_id"]])
+	var node_ids := simulation.nodes.keys()
+	node_ids.sort()
+	for node_id in node_ids:
+		var node: FactoryNodeModel = simulation.nodes[node_id]
+		var inputs := PackedStringArray()
+		for glyph in node.input_buffers:
+			inputs.append(_glyph_hash_or_empty(glyph))
+		parts.append("node=%s:%d:%d:%s:%s:%s" % [
+			node_id,
+			node.source_timer,
+			node.remaining_processing_ticks,
+			",".join(inputs),
+			_glyph_hash_or_empty(node.processing_glyph),
+			_glyph_hash_or_empty(node.output_buffer),
+		])
+	var line_ids := simulation.lines.keys()
+	line_ids.sort()
+	for line_id in line_ids:
+		var line: FactoryLineModel = simulation.lines[line_id]
+		parts.append("line=%s:%d:%s" % [
+			line_id,
+			line.remaining_ticks,
+			_glyph_hash_or_empty(line.payload),
+		])
+	return "|".join(parts)
+
+
+func _glyph_hash_or_empty(glyph) -> String:
+	return "-" if glyph == null else glyph.canonical_hash()
+
+
 func _test_factory_pipeline_summons_matching_unit() -> void:
 	var simulation := FactorySimulation.new()
 	var source := FactoryNodeModel.new(
@@ -423,6 +511,19 @@ func _test_factory_graph_validation_reports_dangling_nodes() -> void:
 	_expect(not result["ok"], "dangling factory equipment should fail validation")
 	_expect(result["errors"].has("missing_input:dangling:0"), "validation should identify missing input")
 	_expect(result["errors"].has("missing_output:dangling"), "validation should identify missing output")
+
+
+func _test_factory_validation_order_is_stable() -> void:
+	var forward := FactorySimulation.new()
+	var reverse := FactorySimulation.new()
+	for node_id in [&"z_node", &"a_node"]:
+		forward.add_node(FactoryNodeModel.new(node_id, FactoryNodeModel.NodeKind.ROTATOR))
+	for node_id in [&"a_node", &"z_node"]:
+		reverse.add_node(FactoryNodeModel.new(node_id, FactoryNodeModel.NodeKind.ROTATOR))
+	_expect(
+		forward.validate_graph()["errors"] == reverse.validate_graph()["errors"],
+		"graph validation diagnostics should not depend on insertion order"
+	)
 
 
 func _test_factory_flow_diagnostics_distinguish_blockages() -> void:

@@ -74,12 +74,14 @@ func validate_graph() -> Dictionary:
 	var errors: Array[String] = []
 	var has_source := false
 	var has_summoner := false
-	for node in nodes.values():
+	for node_id in _sorted_keys(nodes):
+		var node: FactoryNodeModel = nodes[node_id]
 		has_source = has_source or node.kind == FactoryNodeModel.NodeKind.SOURCE
 		has_summoner = has_summoner or node.kind == FactoryNodeModel.NodeKind.SUMMONER
 		for port in node.required_input_count():
 			var has_input := false
-			for line in lines.values():
+			for line_id in _sorted_keys(lines):
+				var line: FactoryLineModel = lines[line_id]
 				if line.to_node_id == node.id and line.to_port == port:
 					has_input = true
 					break
@@ -87,7 +89,8 @@ func validate_graph() -> Dictionary:
 				errors.append("missing_input:%s:%d" % [node.id, port])
 		if node.kind != FactoryNodeModel.NodeKind.SUMMONER:
 			var has_output := false
-			for line in lines.values():
+			for line_id in _sorted_keys(lines):
+				var line: FactoryLineModel = lines[line_id]
 				if line.from_node_id == node.id:
 					has_output = true
 					break
