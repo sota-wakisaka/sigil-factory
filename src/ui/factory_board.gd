@@ -24,6 +24,7 @@ var plan_id: StringName = MvpContent.PLAN_SCOUT
 var simulation: FactorySimulation
 var node_positions: Dictionary = {}
 var observed_event_count := 0
+var observed_failure_count := 0
 var editing := false
 var pending_plan_id: StringName
 var preview_simulation: FactorySimulation
@@ -52,6 +53,7 @@ func configure(next_plan_id: StringName) -> void:
 	_apply_run_upgrades(simulation)
 	node_positions = MvpContent.layout_for_plan(plan_id)
 	observed_event_count = 0
+	observed_failure_count = 0
 	editing = false
 	preview_simulation = null
 	selected_node_id = &""
@@ -450,6 +452,7 @@ func commit_edit() -> void:
 	simulation = preview_simulation
 	node_positions = preview_node_positions
 	observed_event_count = simulation.summon_events.size()
+	observed_failure_count = simulation.summon_failure_events.size()
 	editing = false
 	preview_simulation = null
 	undo_history.clear()
@@ -498,7 +501,17 @@ func advance_tick() -> void:
 		var event := simulation.summon_events[observed_event_count]
 		observed_event_count += 1
 		summon_produced.emit(event["unit_id"])
+	while observed_failure_count < simulation.summon_failure_events.size():
+		var event := simulation.summon_failure_events[observed_failure_count]
+		observed_failure_count += 1
+		connection_message = _summon_failure_message(event)
 	queue_redraw()
+
+
+func _summon_failure_message(event: Dictionary) -> String:
+	var diagnostics: PackedStringArray = event.get("diagnostics", PackedStringArray())
+	var reason := "原因不明" if diagnostics.is_empty() else " / ".join(diagnostics)
+	return "召喚失敗 // %s" % reason
 
 
 func _draw() -> void:
@@ -549,16 +562,6 @@ func _draw() -> void:
 			11,
 			Color(0.66, 0.72, 0.84)
 		)
-		if connection_message != "":
-			draw_string(
-				ThemeDB.fallback_font,
-				Vector2(18, 22),
-				connection_message,
-				HORIZONTAL_ALIGNMENT_LEFT,
-				-1,
-				12,
-				SELECTED_COLOR
-			)
 		draw_string(
 			ThemeDB.fallback_font,
 			Vector2(18, 43),
@@ -567,6 +570,16 @@ func _draw() -> void:
 			size.x - 36.0,
 			12,
 			Color(0.54, 0.86, 0.7)
+		)
+	if connection_message != "":
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(18, 22),
+			connection_message,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			12,
+			SELECTED_COLOR
 		)
 
 

@@ -8,6 +8,7 @@ var nodes: Dictionary = {}
 var lines: Dictionary = {}
 var recipes: Array[SigilRecipeModel] = []
 var summon_events: Array[Dictionary] = []
+var summon_failure_events: Array[Dictionary] = []
 var discarded_glyphs := 0
 var tick_index := 0
 
@@ -126,6 +127,7 @@ func duplicate_state() -> FactorySimulation:
 		copied_line.remaining_ticks = line.remaining_ticks
 		result.lines[copied_line.id] = copied_line
 	result.summon_events = summon_events.duplicate(true)
+	result.summon_failure_events = summon_failure_events.duplicate(true)
 	result.discarded_glyphs = discarded_glyphs
 	result.tick_index = tick_index
 	return result
@@ -229,6 +231,9 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 	var glyph: GlyphModel = node.input_buffers[0]
 	node.input_buffers[0] = null
 	glyph.production_context.record_node(&"summoner", false)
+	var closest_recipe_id: StringName = &""
+	var closest_diagnostics := PackedStringArray()
+	var closest_score := 2147483647
 	for recipe in recipes:
 		var result := SigilMatcher.compare(glyph, recipe.glyph)
 		if result["is_match"]:
@@ -240,7 +245,21 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 				"production_context": glyph.production_context.to_dictionary(),
 			})
 			return
+		var diagnostics: PackedStringArray = result["diagnostics"]
+		if diagnostics.size() < closest_score:
+			closest_score = diagnostics.size()
+			closest_recipe_id = recipe.id
+			closest_diagnostics = diagnostics.duplicate()
 	discarded_glyphs += 1
+	if recipes.is_empty():
+		closest_diagnostics = PackedStringArray(["獲得済みシジルがありません"])
+	summon_failure_events.append({
+		"tick": tick_index,
+		"summoner_id": node.id,
+		"glyph_hash": glyph.canonical_hash(),
+		"closest_recipe_id": closest_recipe_id,
+		"diagnostics": closest_diagnostics,
+	})
 
 
 func _consume_inputs(node: FactoryNodeModel) -> GlyphModel:

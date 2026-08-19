@@ -29,6 +29,7 @@ func _initialize() -> void:
 	_test_complete_overlap_is_rejected()
 	_test_factory_tick_prevents_same_tick_multistage_processing()
 	_test_factory_pipeline_summons_matching_unit()
+	_test_factory_records_closest_summon_failure()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
 	_test_factory_rejects_implicit_fan_out()
@@ -50,6 +51,7 @@ func _initialize() -> void:
 	_test_factory_configuration_discards_work_transactionally()
 	_test_factory_rewiring_discards_work_transactionally()
 	_test_factory_board_connections_change_output()
+	_test_factory_board_shows_summon_failure_reason()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
 	_test_run_upgrade_accelerates_ring_source()
@@ -244,6 +246,36 @@ func _test_factory_pipeline_summons_matching_unit() -> void:
 		_expect(context["visited_node_kinds"].has(&"source"), "production context should retain source traversal")
 		_expect(context["visited_node_kinds"].has(&"summoner"), "production context should retain summoner traversal")
 		_expect(context["source_ids"].has(&"source"), "production context should retain source identity")
+
+
+func _test_factory_records_closest_summon_failure() -> void:
+	var simulation := FactorySimulation.new()
+	var source := FactoryNodeModel.new(
+		&"source",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"primitive_id": "ring", "interval_ticks": 1}
+	)
+	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
+	simulation.add_node(source)
+	simulation.add_node(summoner)
+	simulation.connect_nodes(FactoryLineModel.new(&"line", &"source", &"summoner"))
+	var target := GlyphModel.new([
+		GlyphComponentModel.new(&"ring", Vector2i.ZERO, 1, 1, &"blue"),
+	])
+	simulation.add_recipe(SigilRecipeModel.new(&"azure_ring", target, &"sentinel"))
+
+	for _tick in 8:
+		simulation.tick()
+
+	_expect(not simulation.summon_failure_events.is_empty(), "recipe mismatch should create a summon failure event")
+	if not simulation.summon_failure_events.is_empty():
+		var event: Dictionary = simulation.summon_failure_events[0]
+		var diagnostics: PackedStringArray = event["diagnostics"]
+		_expect(event["closest_recipe_id"] == &"azure_ring", "failure should identify the closest recipe")
+		_expect(diagnostics.has("回転が違います"), "failure should retain rotation diagnostics")
+		_expect(diagnostics.has("色が違います"), "failure should retain color diagnostics")
+		_expect(String(event["glyph_hash"]) != "", "failure should identify the rejected glyph")
+	_expect(simulation.discarded_glyphs > 0, "failed summons should still count discarded glyphs")
 
 
 func _test_combiner_waits_for_both_inputs() -> void:
@@ -596,6 +628,28 @@ func _test_factory_board_connections_change_output() -> void:
 			produced_scout = true
 			break
 	_expect(produced_scout, "edited factory graph should change its summoned unit")
+	board.free()
+
+
+func _test_factory_board_shows_summon_failure_reason() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_EMPTY)
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	_expect(board.configure_selected_node(1), "failure feedback test should switch the source to spike")
+	var result := board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
+	_expect(result["ok"], "failure feedback test should connect source to summoner")
+	board.set_interaction_enabled(false)
+	for _tick in 80:
+		board.advance_tick()
+		if not board.simulation.summon_failure_events.is_empty():
+			break
+	_expect("召喚失敗" in board.connection_message, "factory board should expose summon failure during battle")
+	_expect(
+		"部品不足" in board.connection_message or "余分な部品" in board.connection_message,
+		"factory board should explain the recipe mismatch"
+	)
 	board.free()
 
 
