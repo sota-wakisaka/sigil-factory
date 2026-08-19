@@ -23,14 +23,18 @@ func _init(
 
 
 func canonical_key() -> String:
-	return "%s|%d,%d|%d|%d|%s" % [
-		primitive_id,
+	return "p%s|%d,%d|%d|%d|c%s" % [
+		_frame(String(primitive_id)),
 		position.x,
 		position.y,
 		posmod(rotation_step, 4),
 		scale_step,
-		color_id,
+		_frame(String(color_id)),
 	]
+
+
+static func _frame(value: String) -> String:
+	return "%d:%s" % [value.length(), value]
 
 
 func copy() -> GlyphComponentModel:

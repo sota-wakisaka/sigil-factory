@@ -19,7 +19,7 @@ Design documents:
 - Selection inspector for source material, rotation, and color configuration
 - Deterministic fixed-tick glyph factory simulation
 - Authoritative graph validation for restored or externally constructed factory data
-- Canonical binary Combine structure with hierarchy-aware sigil matching
+- Collision-safe canonical binary Combine structure with hierarchy-aware sigil matching
 - Unique recipe IDs and canonical structures with acquisition-order-independent registration
 - Completed-sigil ghost preview for the currently selected production plan
 - Pre-battle production preview with the closest recipe and first mismatch correction

@@ -56,8 +56,8 @@ func canonical_serialization() -> String:
 		if keys.is_empty():
 			return "E"
 		if keys.size() == 1:
-			return "P(%s)" % keys[0]
-		return "L[%s]" % ",".join(keys)
+			return "P(%s)" % _frame(keys[0])
+		return "L[%s]" % _frame_sequence(keys)
 	var child_serializations: Array[String] = []
 	for child in combine_children:
 		child_serializations.append(child.canonical_serialization())
@@ -65,7 +65,7 @@ func canonical_serialization() -> String:
 		func(a: String, b: String) -> bool:
 			return _canonical_serialization_less(a, b)
 	)
-	return "C(%s)" % ",".join(child_serializations)
+	return "C(%s)" % _frame_sequence(child_serializations)
 
 
 func canonical_hash() -> String:
@@ -85,6 +85,17 @@ static func _canonical_serialization_less(first: String, second: String) -> bool
 	if first_hash != second_hash:
 		return first_hash < second_hash
 	return first < second
+
+
+static func _frame_sequence(values: Array[String]) -> String:
+	var framed_values: Array[String] = []
+	for value in values:
+		framed_values.append(_frame(value))
+	return ",".join(framed_values)
+
+
+static func _frame(value: String) -> String:
+	return "%d:%s" % [value.length(), value]
 
 
 func complete_overlap_primitive_ids() -> Array[StringName]:

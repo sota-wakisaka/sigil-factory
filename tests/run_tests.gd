@@ -21,6 +21,7 @@ var failures := 0
 
 func _initialize() -> void:
 	_test_exact_match_is_order_independent()
+	_test_canonical_encoding_frames_delimiter_ids()
 	_test_attribute_diagnostics()
 	_test_missing_and_extra_components()
 	_test_diagnostics_are_stable_for_duplicate_primitives()
@@ -95,6 +96,37 @@ func _test_exact_match_is_order_independent() -> void:
 	var actual := GlyphModel.new([second, first])
 	var result := SigilMatcher.compare(actual, target)
 	_expect(result["is_match"], "component order should not affect matching")
+
+
+func _test_canonical_encoding_frames_delimiter_ids() -> void:
+	var embedded_structure := GlyphModel.new([
+		GlyphComponentModel.new(&"a|0,0|0|1|b", Vector2i.ZERO, 0, 1, &"c"),
+	])
+	var shifted_structure := GlyphModel.new([
+		GlyphComponentModel.new(&"a", Vector2i.ZERO, 0, 1, &"b|0,0|0|1|c"),
+	])
+	_expect(
+		embedded_structure.canonical_serialization() != shifted_structure.canonical_serialization(),
+		"length-framed IDs should prevent delimiter-based canonical collisions"
+	)
+	_expect(
+		not SigilMatcher.compare(embedded_structure, shifted_structure)["is_match"],
+		"delimiter-containing IDs should not cause distinct glyphs to match"
+	)
+	var combined := GlyphModel.combine(embedded_structure, shifted_structure)
+	_expect(
+		not combined.has_complete_overlap(),
+		"delimiter-containing IDs should not create false complete-overlap diagnostics"
+	)
+	var simulation := FactorySimulation.new()
+	_expect(
+		simulation.add_recipe(SigilRecipeModel.new(&"embedded", embedded_structure, &"scout")),
+		"first delimiter-containing recipe should register"
+	)
+	_expect(
+		simulation.add_recipe(SigilRecipeModel.new(&"shifted", shifted_structure, &"sentinel")),
+		"distinct delimiter-containing recipe should not be rejected as a canonical duplicate"
+	)
 
 
 func _test_attribute_diagnostics() -> void:
@@ -189,22 +221,55 @@ func _test_combine_structure_is_order_independent() -> void:
 
 
 func _test_combine_children_use_hash_then_serialization_order() -> void:
-	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
-	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
-	var ring_serialization := ring.canonical_serialization()
-	var spike_serialization := spike.canonical_serialization()
-	_expect(
-		spike_serialization.sha256_text() < ring_serialization.sha256_text(),
-		"test fixtures should have hash order opposite to their lexical order"
+	var first: GlyphModel
+	var second: GlyphModel
+	for first_index in 64:
+		var candidate_first := GlyphModel.new([
+			GlyphComponentModel.new(StringName("fixture_%02d" % first_index)),
+		])
+		for second_index in range(first_index + 1, 64):
+			var candidate_second := GlyphModel.new([
+				GlyphComponentModel.new(StringName("fixture_%02d" % second_index)),
+			])
+			var first_serialization := candidate_first.canonical_serialization()
+			var second_serialization := candidate_second.canonical_serialization()
+			if (
+				(first_serialization < second_serialization)
+				!= (first_serialization.sha256_text() < second_serialization.sha256_text())
+			):
+				first = candidate_first
+				second = candidate_second
+				break
+		if first != null:
+			break
+	_expect(first != null and second != null, "test should find fixtures with opposing lexical and hash order")
+	if first == null or second == null:
+		return
+	var first_serialization := first.canonical_serialization()
+	var second_serialization := second.canonical_serialization()
+	var hash_first_serialization := (
+		first_serialization
+		if first_serialization.sha256_text() < second_serialization.sha256_text()
+		else second_serialization
 	)
-	var combined := GlyphModel.combine(ring, spike)
+	var hash_second_serialization := (
+		second_serialization
+		if hash_first_serialization == first_serialization
+		else first_serialization
+	)
+	var combined := GlyphModel.combine(first, second)
 	_expect(
 		combined.canonical_serialization()
-		== "C(%s,%s)" % [spike_serialization, ring_serialization],
+		== "C(%d:%s,%d:%s)" % [
+			hash_first_serialization.length(),
+			hash_first_serialization,
+			hash_second_serialization.length(),
+			hash_second_serialization,
+		],
 		"Combine serialization should order children by canonical hash"
 	)
 	_expect(
-		combined.combine_children[0].canonical_serialization() == spike_serialization,
+		combined.combine_children[0].canonical_serialization() == hash_first_serialization,
 		"Combine internal child order should match canonical serialization order"
 	)
 
