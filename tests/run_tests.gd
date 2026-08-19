@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_test_production_context_does_not_affect_matching()
 	_test_rotation_is_normalized_to_quarter_turns()
 	_test_complete_overlap_is_rejected()
+	_test_factory_tick_prevents_same_tick_multistage_processing()
 	_test_factory_pipeline_summons_matching_unit()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
@@ -156,6 +157,42 @@ func _test_complete_overlap_is_rejected() -> void:
 		"完全重複" in result["diagnostics"][0],
 		"fully overlapping primitives should report a direct diagnostic"
 	)
+
+
+func _test_factory_tick_prevents_same_tick_multistage_processing() -> void:
+	var simulation := FactorySimulation.new()
+	var source := FactoryNodeModel.new(
+		&"source",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"primitive_id": "ring", "interval_ticks": 1}
+	)
+	var rotator := FactoryNodeModel.new(
+		&"rotator",
+		FactoryNodeModel.NodeKind.ROTATOR,
+		{"steps": 1, "processing_ticks": 1}
+	)
+	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
+	for node in [source, rotator, summoner]:
+		simulation.add_node(node)
+	simulation.connect_nodes(FactoryLineModel.new(&"source_line", &"source", &"rotator", 0, 1))
+	simulation.connect_nodes(FactoryLineModel.new(&"summon_line", &"rotator", &"summoner", 0, 1))
+	simulation.add_recipe(SigilRecipeModel.new(
+		&"turned_ring",
+		GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, 1)]),
+		&"sentinel"
+	))
+
+	simulation.tick()
+	_expect(rotator.input_buffers[0] == null, "source output should still be travelling after its creation tick")
+	simulation.tick()
+	_expect(rotator.input_buffers[0] != null, "line should deliver to the processor on the next tick")
+	_expect(rotator.output_buffer == null, "a newly delivered glyph should not be processed in the same tick")
+	simulation.tick()
+	_expect(summoner.input_buffers[0] == null, "processed output should still be travelling after processing")
+	simulation.tick()
+	_expect(simulation.summon_events.is_empty(), "a newly delivered glyph should not summon in the same tick")
+	simulation.tick()
+	_expect(simulation.summon_events.size() == 1, "the glyph should summon on the following tick")
 
 
 func _test_factory_pipeline_summons_matching_unit() -> void:

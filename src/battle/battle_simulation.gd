@@ -13,7 +13,7 @@ const ENEMY_LEADER_POSITION := 970.0
 const ENEMY_SHIELD_POSITION := 760.0
 const ENEMY_SHIELD_MAX_HEALTH := 12000.0
 const PLAYER_LEADER_MAX_HEALTH := 1200.0
-const ENEMY_LEADER_MAX_HEALTH := 1000.0
+const ENEMY_LEADER_MAX_HEALTH := 800.0
 
 var specs: Dictionary = {}
 var units: Array[BattleUnitModel] = []

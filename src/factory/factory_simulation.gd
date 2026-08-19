@@ -131,8 +131,8 @@ func duplicate_state() -> FactorySimulation:
 
 func tick() -> void:
 	tick_index += 1
-	_advance_lines()
 	_advance_nodes()
+	_advance_lines()
 	_dispatch_outputs()
 
 
