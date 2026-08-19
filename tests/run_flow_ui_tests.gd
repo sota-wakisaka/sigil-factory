@@ -44,7 +44,10 @@ func _initialize() -> void:
 	var node_count_before_palette: int = main.factory_board.simulation.nodes.size()
 	main.get_node("FactoryPalette/RingButton").pressed.emit()
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette + 1, "palette should add factory equipment")
-	_expect("配線未完成" in main.factory_board.cached_production_preview, "dangling equipment should invalidate production preview")
+	_expect(
+		"出力が未接続" in main.factory_board.cached_production_preview,
+		"dangling equipment should invalidate production preview with a specific reason"
+	)
 	_expect(not main.inspector_option.disabled, "selected configurable equipment should enable its inspector")
 	main.inspector_option.item_selected.emit(1)
 	var selected_source: FactoryNodeModel = main.factory_board.simulation.nodes[main.factory_board.selected_node_id]

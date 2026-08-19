@@ -344,10 +344,16 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 	var counts := {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
-		return {"ok": false, "counts": counts, "discarded": 0, "first_failure": {}}
+		return {"ok": false, "counts": counts, "discarded": 0, "first_failure": {}, "errors": []}
 	var validation := display_simulation.validate_graph()
 	if not validation["ok"]:
-		return {"ok": false, "counts": counts, "discarded": 0, "first_failure": {}}
+		return {
+			"ok": false,
+			"counts": counts,
+			"discarded": 0,
+			"first_failure": {},
+			"errors": validation["errors"].duplicate(),
+		}
 	var preview := display_simulation.duplicate_state()
 	var event_start := preview.summon_events.size()
 	var failure_start := preview.summon_failure_events.size()
@@ -365,6 +371,7 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 		"counts": counts,
 		"discarded": preview.discarded_glyphs - discarded_start,
 		"first_failure": first_failure,
+		"errors": [],
 	}
 
 
@@ -969,6 +976,32 @@ func _validation_message(errors: Array) -> String:
 		return "工場魔力が上限を超えています"
 	if error == "multiple_summoners":
 		return "召喚器は現MVPでは1基だけ配置できます"
+	if error == "cycle":
+		return "配線が循環しています。循環するラインを解除してください"
+	if error.begins_with("missing_from_node:") or error.begins_with("missing_to_node:"):
+		return "接続先が存在しないラインがあります。壊れたラインを解除してください"
+	if error.begins_with("invalid_port:"):
+		return "存在しない入力ポートへのラインがあります。接続をやり直してください"
+	if error.begins_with("occupied_input:"):
+		return "1つの入力に複数ラインが接続されています"
+	if error.begins_with("occupied_output:"):
+		return "通常設備の出力が分岐しています。余分なラインを解除してください"
+	if error.begins_with("missing_source_primitive:"):
+		return "素材源「%s」の素材設定がありません" % error.get_slice(":", 1)
+	if error.begins_with("invalid_source_interval:"):
+		return "素材源「%s」の生成間隔が不正です" % error.get_slice(":", 1)
+	if error.begins_with("invalid_processing_ticks:"):
+		return "設備「%s」の処理時間が不正です" % error.get_slice(":", 1)
+	if error.begins_with("invalid_rotation_steps:"):
+		return "回転器「%s」の回転設定は90°・180°・270°から選んでください" % error.get_slice(":", 1)
+	if error.begins_with("invalid_translation_offset:"):
+		return "移動器「%s」の移動設定が不正です" % error.get_slice(":", 1)
+	if error.begins_with("missing_color_id:"):
+		return "着色器「%s」の色設定がありません" % error.get_slice(":", 1)
+	if error.begins_with("missing_node_id:") or error.begins_with("node_key_mismatch:") or error.begins_with("invalid_node_kind:"):
+		return "設備データのIDまたは種類が破損しています"
+	if error.begins_with("missing_line_id:") or error.begins_with("line_key_mismatch:"):
+		return "ラインデータのIDが破損しています"
 	return "工場の配線を確認してください"
 
 
@@ -985,7 +1018,7 @@ func _push_undo_snapshot() -> void:
 func _refresh_production_preview() -> void:
 	var result := production_preview()
 	if not result["ok"]:
-		cached_production_preview = "32秒予測 // 配線未完成"
+		cached_production_preview = "32秒予測 // %s" % _validation_message(result.get("errors", []))
 		factory_changed.emit()
 		return
 	var counts: Dictionary = result["counts"]

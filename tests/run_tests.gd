@@ -82,6 +82,7 @@ func _initialize() -> void:
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
 	_test_factory_production_preview_explains_first_mismatch()
+	_test_factory_board_explains_restored_validation_errors()
 	_test_sigil_ghost_tracks_plan_recipe()
 	_test_run_upgrade_accelerates_ring_source()
 	_test_run_flow_covers_one_route()
@@ -1544,6 +1545,33 @@ func _test_factory_production_preview_explains_first_mismatch() -> void:
 	_expect(
 		board.simulation.summon_failure_events.size() == failure_count_before,
 		"mismatch preview should not add failures to the real factory"
+	)
+	board.free()
+
+
+func _test_factory_board_explains_restored_validation_errors() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_SCOUT)
+	board.simulation.nodes[&"ring_source"].config["primitive_id"] = ""
+	var validation := board.validation_result()
+	_expect(not validation["ok"], "invalid restored source configuration should block factory start")
+	_expect(
+		validation["message"] == "素材源「ring_source」の素材設定がありません",
+		"factory start rejection should name the invalid source setting"
+	)
+	board._refresh_production_preview()
+	_expect(
+		"素材源「ring_source」の素材設定がありません" in board.cached_production_preview,
+		"production preview should show the same actionable validation reason"
+	)
+	_expect(
+		board._validation_message(["cycle"]) == "配線が循環しています。循環するラインを解除してください",
+		"restored cycle should have an actionable player-facing message"
+	)
+	_expect(
+		"出力が分岐" in board._validation_message(["occupied_output:source"]),
+		"restored implicit fan-out should explain the wiring violation"
 	)
 	board.free()
 
