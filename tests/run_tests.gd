@@ -74,6 +74,7 @@ func _initialize() -> void:
 	_test_factory_board_holds_transient_flow_warning()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
+	_test_factory_production_preview_explains_first_mismatch()
 	_test_sigil_ghost_tracks_plan_recipe()
 	_test_run_upgrade_accelerates_ring_source()
 	_test_run_flow_covers_one_route()
@@ -1257,6 +1258,39 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	board.set_interaction_enabled(true)
 	board.add_node_from_palette(&"rotator")
 	_expect(not board.production_preview()["ok"], "incomplete custom graph should not produce a preview")
+	board.free()
+
+
+func _test_factory_production_preview_explains_first_mismatch() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_EMPTY)
+	board.simulation.nodes[&"ring_source"].config["primitive_id"] = "spike"
+	board.simulation.nodes[&"ring_source"].config["interval_ticks"] = 18
+	board.simulation.connect_nodes(
+		FactoryLineModel.new(&"preview_mismatch", &"ring_source", &"summoner")
+	)
+	var tick_before := board.simulation.tick_index
+	var failure_count_before := board.simulation.summon_failure_events.size()
+	var preview := board.production_preview(160)
+	_expect(preview["ok"], "wired mismatching factory should still produce a preview")
+	_expect(preview["discarded"] > 0, "mismatching factory preview should count rejected glyphs")
+	var first_failure: Dictionary = preview["first_failure"]
+	_expect(not first_failure.is_empty(), "mismatching factory preview should expose its first failure")
+	if not first_failure.is_empty():
+		_expect(
+			first_failure["closest_recipe_id"] == &"bound_colossus",
+			"preview should identify the closest recipe before battle"
+		)
+		var diagnostics: PackedStringArray = first_failure["diagnostics"]
+		_expect(diagnostics[0] == "部品不足: ring", "preview should retain the highest-priority correction")
+	board._refresh_production_preview()
+	_expect("巨像: 部品不足 環" in board.cached_production_preview, "preview UI should explain the first correction")
+	_expect(board.simulation.tick_index == tick_before, "mismatch preview should not advance the real factory")
+	_expect(
+		board.simulation.summon_failure_events.size() == failure_count_before,
+		"mismatch preview should not add failures to the real factory"
+	)
 	board.free()
 
 

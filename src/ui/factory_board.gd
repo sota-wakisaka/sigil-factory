@@ -344,22 +344,27 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 	var counts := {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
-		return {"ok": false, "counts": counts, "discarded": 0}
+		return {"ok": false, "counts": counts, "discarded": 0, "first_failure": {}}
 	var validation := display_simulation.validate_graph()
 	if not validation["ok"]:
-		return {"ok": false, "counts": counts, "discarded": 0}
+		return {"ok": false, "counts": counts, "discarded": 0, "first_failure": {}}
 	var preview := display_simulation.duplicate_state()
 	var event_start := preview.summon_events.size()
+	var failure_start := preview.summon_failure_events.size()
 	var discarded_start := preview.discarded_glyphs
 	for _tick in maxi(ticks, 0):
 		preview.tick()
 	for event_index in range(event_start, preview.summon_events.size()):
 		var unit_id: StringName = preview.summon_events[event_index]["unit_id"]
 		counts[unit_id] = int(counts.get(unit_id, 0)) + 1
+	var first_failure: Dictionary = {}
+	if preview.summon_failure_events.size() > failure_start:
+		first_failure = preview.summon_failure_events[failure_start].duplicate(true)
 	return {
 		"ok": true,
 		"counts": counts,
 		"discarded": preview.discarded_glyphs - discarded_start,
+		"first_failure": first_failure,
 	}
 
 
@@ -984,13 +989,39 @@ func _refresh_production_preview() -> void:
 		factory_changed.emit()
 		return
 	var counts: Dictionary = result["counts"]
-	cached_production_preview = "32秒予測 // 斥候 %d  衛兵 %d  巨像 %d  不一致 %d" % [
-		counts[&"scout"],
-		counts[&"sentinel"],
-		counts[&"golem"],
-		result["discarded"],
-	]
+	var first_failure: Dictionary = result["first_failure"]
+	if first_failure.is_empty():
+		cached_production_preview = "32秒予測 // 斥候 %d  衛兵 %d  巨像 %d  不一致 0" % [
+			counts[&"scout"],
+			counts[&"sentinel"],
+			counts[&"golem"],
+		]
+	else:
+		cached_production_preview = "32秒 // 斥%d 衛%d 巨%d 不%d // %s" % [
+			counts[&"scout"],
+			counts[&"sentinel"],
+			counts[&"golem"],
+			result["discarded"],
+			_preview_failure_summary(first_failure),
+		]
 	factory_changed.emit()
+
+
+func _preview_failure_summary(event: Dictionary) -> String:
+	var diagnostics: PackedStringArray = event.get("diagnostics", PackedStringArray())
+	var reason := "原因不明" if diagnostics.is_empty() else _localize_preview_diagnostic(diagnostics[0])
+	var recipe_id: StringName = event.get("closest_recipe_id", &"")
+	if recipe_id == &"":
+		return reason
+	return "%s: %s" % [String(MvpContent.sigil_name(recipe_id)).trim_suffix("シジル"), reason]
+
+
+func _localize_preview_diagnostic(diagnostic: String) -> String:
+	for prefix in ["部品不足: ", "余分な部品: "]:
+		if diagnostic.begins_with(prefix):
+			var primitive_id := StringName(diagnostic.trim_prefix(prefix))
+			return "%s %s" % [prefix.trim_suffix(": "), _primitive_name(primitive_id)]
+	return diagnostic
 
 
 func _apply_run_upgrades(target_simulation: FactorySimulation) -> void:

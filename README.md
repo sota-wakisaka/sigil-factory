@@ -21,6 +21,7 @@ Design documents:
 - Canonical binary Combine structure with hierarchy-aware sigil matching
 - Unique recipe IDs and canonical structures with acquisition-order-independent registration
 - Completed-sigil ghost preview for the currently selected production plan
+- Pre-battle production preview with the closest recipe and first mismatch correction
 - Production provenance for processing count, traversed node kinds, and source IDs
 - Quarter-turn normalization of orientation and root-relative position, plus rejection of fully overlapping primitives
 - Tick-start input and line snapshots that prevent same-tick cascading or slot reuse
@@ -73,7 +74,9 @@ cannot start and display the first missing connection. **Undo** restores placeme
 wiring, additions, and deletions made during the current edit session.
 Select a source, rotator, or colorizer to change its setting in the inspector.
 While editing, a non-destructive 32-second simulation preview reports expected
-scout, sentinel, and golem output plus unmatched glyphs.
+scout, sentinel, and golem output plus unmatched glyphs. When the preview finds
+a rejected glyph, it also names the closest known sigil and its highest-priority
+correction before battle begins.
 
 During production, rejected glyphs report actionable structural differences such
 as missing parts, rotation, or color. Factory equipment and lines also distinguish
