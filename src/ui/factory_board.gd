@@ -132,6 +132,14 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 		_:
 			return &""
 	var display_simulation := _display_simulation()
+	var node_cost := MvpContent.node_mana_cost(kind)
+	if mana_used(display_simulation) + node_cost > MvpContent.FACTORY_MANA_MAX:
+		connection_message = "設備を追加できません: 魔力不足（必要%d / 空き%d）" % [
+			node_cost,
+			mana_available(display_simulation),
+		]
+		queue_redraw()
+		return &""
 	_push_undo_snapshot()
 	var node_id := StringName("%s_user_%d" % [prefix, node_serial])
 	while display_simulation.nodes.has(node_id):
@@ -206,8 +214,33 @@ func undo() -> bool:
 
 func validation_result() -> Dictionary:
 	var result := _display_simulation().validate_graph()
+	if mana_used(_display_simulation()) > MvpContent.FACTORY_MANA_MAX:
+		result["ok"] = false
+		result["errors"].append("mana_exceeded")
 	result["message"] = _validation_message(result["errors"])
 	return result
+
+
+func mana_used(source_simulation: FactorySimulation = null) -> int:
+	var target_simulation := source_simulation if source_simulation != null else _display_simulation()
+	if target_simulation == null:
+		return 0
+	var total := 0
+	for node in target_simulation.nodes.values():
+		total += MvpContent.node_mana_cost(node.kind)
+	return total
+
+
+func mana_available(source_simulation: FactorySimulation = null) -> int:
+	return maxi(MvpContent.FACTORY_MANA_MAX - mana_used(source_simulation), 0)
+
+
+func mana_status_text() -> String:
+	return "魔力 %d/%d // 空き%d" % [
+		mana_used(),
+		MvpContent.FACTORY_MANA_MAX,
+		mana_available(),
+	]
 
 
 func set_run_upgrades(upgrades: Array[StringName]) -> void:
@@ -694,6 +727,15 @@ func _draw() -> void:
 			12,
 			Color(0.54, 0.86, 0.7)
 		)
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(18, 62),
+			mana_status_text(),
+			HORIZONTAL_ALIGNMENT_RIGHT,
+			size.x - 36.0,
+			12,
+			WARNING_COLOR if mana_available() < 15 else Color(0.52, 0.68, 0.82)
+		)
 	if connection_message != "":
 		draw_string(
 			ThemeDB.fallback_font,
@@ -907,6 +949,8 @@ func _validation_message(errors: Array) -> String:
 		return "入力が未接続の設備があります"
 	if error.begins_with("missing_output:"):
 		return "出力が未接続の設備があります"
+	if error == "mana_exceeded":
+		return "工場魔力が上限を超えています"
 	return "工場の配線を確認してください"
 
 

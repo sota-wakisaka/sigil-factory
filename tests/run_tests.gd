@@ -59,6 +59,7 @@ func _initialize() -> void:
 	_test_factory_edit_preserves_custom_graph()
 	_test_factory_nodes_can_be_repositioned()
 	_test_factory_editor_undo_restores_graph()
+	_test_factory_mana_budget_limits_and_refunds_nodes()
 	_test_factory_node_configuration_is_undoable()
 	_test_factory_configuration_discards_work_transactionally()
 	_test_factory_rewiring_discards_work_transactionally()
@@ -908,6 +909,35 @@ func _test_factory_editor_undo_restores_graph() -> void:
 	_expect(board.simulation.nodes.size() == original_node_count, "undo should restore the previous graph")
 	_expect(not board.simulation.nodes.has(added_id), "undo should remove the newly added node")
 	board.free()
+
+
+func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_EMPTY)
+	board.set_interaction_enabled(true)
+	_expect(board.mana_used() == 40, "empty workshop source and summoner should use 40 mana")
+	for _index in 4:
+		_expect(board.add_node_from_palette(&"rotator") != &"", "factory should accept equipment within its mana budget")
+	_expect(board.mana_used() == MvpContent.FACTORY_MANA_MAX, "four processors should fill the remaining workshop mana")
+	var node_count_at_limit := board.simulation.nodes.size()
+	_expect(board.add_node_from_palette(&"rotator") == &"", "factory should reject equipment beyond its mana budget")
+	_expect(board.simulation.nodes.size() == node_count_at_limit, "rejected equipment should not mutate the factory graph")
+	_expect("魔力不足" in board.connection_message, "budget rejection should explain required and available mana")
+	_expect(board.remove_selected_node(), "removing the last affordable node should refund its mana")
+	_expect(board.mana_available() == 15, "removing a processor should refund its full fixed cost")
+	_expect(board.add_node_from_palette(&"colorizer") != &"", "refunded mana should be immediately reusable")
+	_expect(board.mana_used() == MvpContent.FACTORY_MANA_MAX, "replacement equipment should consume the refunded capacity")
+	var over_budget := FactoryNodeModel.new(&"forced_source", FactoryNodeModel.NodeKind.SOURCE)
+	board.simulation.add_node(over_budget)
+	var validation := board.validation_result()
+	_expect(not validation["ok"], "forced over-budget graph should fail final validation")
+	_expect(validation["errors"].has("mana_exceeded"), "validation should identify mana overflow explicitly")
+	board.free()
+
+	var golem_board := FactoryBoard.new()
+	golem_board.configure(MvpContent.PLAN_GOLEM)
+	_expect(golem_board.mana_used() == 95, "complete golem template should fit with five mana remaining")
+	golem_board.free()
 
 
 func _test_factory_node_configuration_is_undoable() -> void:

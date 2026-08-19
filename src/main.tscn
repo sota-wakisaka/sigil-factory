@@ -132,37 +132,37 @@ alignment = 1
 [node name="RingButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
-tooltip_text = "環グリフを一定周期で生成する素材源を追加"
+tooltip_text = "環グリフを一定周期で生成する素材源を追加（魔力20）"
 text = "環素材"
 
 [node name="SpikeButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
-tooltip_text = "棘グリフを一定周期で生成する素材源を追加"
+tooltip_text = "棘グリフを一定周期で生成する素材源を追加（魔力20）"
 text = "棘素材"
 
 [node name="RotateButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
-tooltip_text = "入力グリフ全体を90度回転する加工器を追加"
+tooltip_text = "入力グリフ全体を90度回転する加工器を追加（魔力15）"
 text = "回転"
 
 [node name="ColorButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
-tooltip_text = "入力グリフ全体を青色にする加工器を追加"
+tooltip_text = "入力グリフ全体を青色にする加工器を追加（魔力15）"
 text = "着色"
 
 [node name="CombineButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
-tooltip_text = "2つの入力グリフを1つにまとめる合成器を追加"
+tooltip_text = "2つの入力グリフを1つにまとめる合成器を追加（魔力20）"
 text = "合成"
 
 [node name="SummonButton" type="Button" parent="FactoryPalette"]
 custom_minimum_size = Vector2(64, 38)
 layout_mode = 2
-tooltip_text = "完成グリフをシジルと照合して召喚する設備を追加"
+tooltip_text = "完成グリフをシジルと照合して召喚する設備を追加（魔力20）"
 text = "召喚"
 
 [node name="DeleteButton" type="Button" parent="FactoryPalette"]

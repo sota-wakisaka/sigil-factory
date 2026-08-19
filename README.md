@@ -14,6 +14,7 @@ Design documents:
 - Click-through run flow from route selection to the next route
 - Draggable factory equipment with interactive input/output port wiring
 - Equipment palette for adding and deleting sources, processors, combiners, and summoners
+- Fixed 100-mana equipment capacity with immediate refunds when nodes are removed
 - Selection inspector for source material, rotation, and color configuration
 - Deterministic fixed-tick glyph factory simulation
 - Canonical binary Combine structure with hierarchy-aware sigil matching

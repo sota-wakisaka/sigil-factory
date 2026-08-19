@@ -15,6 +15,7 @@ const PLAN_SCOUT := &"scout"
 const PLAN_SENTINEL := &"sentinel"
 const PLAN_GOLEM := &"golem"
 const PLAN_EMPTY := &"empty"
+const FACTORY_MANA_MAX := 100
 
 
 static func build_battle() -> BattleSimulation:
@@ -189,6 +190,18 @@ static func node_name(kind: FactoryNodeModel.NodeKind) -> String:
 		FactoryNodeModel.NodeKind.SUMMONER:
 			return "召喚器"
 	return "設備"
+
+
+static func node_mana_cost(kind: FactoryNodeModel.NodeKind) -> int:
+	match kind:
+		FactoryNodeModel.NodeKind.SOURCE:
+			return 20
+		FactoryNodeModel.NodeKind.COMBINER:
+			return 20
+		FactoryNodeModel.NodeKind.SUMMONER:
+			return 20
+		_:
+			return 15
 
 
 static func _build_scout_factory(simulation: FactorySimulation) -> void:

@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_expect(not main.phase_overlay.visible, "factory build should expose the workspace")
 	_expect(main.factory_board.plan_id == MvpContent.PLAN_EMPTY, "first factory build should start from the guided empty workshop")
 	_expect(main.sigil_ghost.recipe_id == &"open_ring", "empty workshop should show the first scout sigil goal")
+	_expect(main.factory_board.mana_status_text() == "魔力 40/100 // 空き60", "factory build should disclose fixed mana capacity")
 	_expect("戦闘を開始" in main.pause_button.tooltip_text, "main action tooltip should explain build confirmation")
 	_expect("構築ガイド" in main.plan_label.text, "empty workshop should explain its first connection")
 	_expect(main.factory_board.is_guided_connection_pending(), "empty workshop should highlight its first connection")
