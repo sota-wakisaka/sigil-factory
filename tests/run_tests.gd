@@ -2156,6 +2156,8 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 		"line tooltip should copy the actual transported CanonicalGlyph"
 	)
 	_expect(board._get_tooltip(Vector2(8, 8)) == "", "empty board space should not show a Glyph tooltip")
+	_expect(board.node_frame_kind(&"ring_source") == &"source_hex", "source should use a dedicated non-rectangular frame")
+	_expect(board.node_frame_kind(&"summoner") == &"summon_circle", "summoner should use a dedicated circular frame")
 	board.free()
 
 
@@ -2204,7 +2206,7 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	var input_click := InputEventMouseButton.new()
 	input_click.button_index = MOUSE_BUTTON_LEFT
 	input_click.pressed = true
-	input_click.position = board.node_local_position(&"summoner") - Vector2(48, 0)
+	input_click.position = board._input_port_position(&"summoner", 0)
 	board._gui_input(input_click)
 	_expect(board.simulation.lines.size() == 1, "clicking the target input port should complete wiring")
 	_expect(not board.is_guided_connection_pending(), "first connection guide should clear after wiring")

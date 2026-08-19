@@ -863,8 +863,6 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 	for node_id in display_simulation.nodes:
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
 		var center := _scaled_position(display_positions.get(node_id, Vector2.ZERO))
-		var rect := Rect2(center - NODE_HALF_SIZE, NODE_HALF_SIZE * 2.0)
-		draw_rect(rect, NODE_COLOR, true)
 		var node_state := display_simulation.node_flow_state(node_id)
 		var border_color := NODE_BORDER
 		if node_state == &"output_blocked":
@@ -873,35 +871,95 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 			border_color = WAITING_COLOR
 		if node_id == selected_node_id:
 			border_color = SELECTED_COLOR
-		draw_rect(rect, border_color, false, 3.0 if node_id == selected_node_id else 2.0)
+		_draw_node_frame(node, center, border_color, node_id == selected_node_id)
 		_draw_node_activity_progress(node, center, display_simulation.tick_index > 0)
 		var label := _node_label(node)
 		draw_string(
 			font,
-			center + Vector2(-font.get_string_size(label).x * 0.5, 5),
+			center + Vector2(-font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x * 0.5, -8),
 			label,
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
-			15,
-			Color(0.82, 0.9, 1.0)
+			11,
+			Color(0.62, 0.74, 0.84)
 		)
 		var visible_glyph := _visible_node_active_glyph(node)
 		if visible_glyph != null:
-			_draw_mini_glyph(visible_glyph, center + Vector2(0, 20), node_glyph_draw_scale(visible_glyph))
+			_draw_mini_glyph(visible_glyph, center + Vector2(0, 13), node_glyph_draw_scale(visible_glyph))
 		elif cached_node_output_glyphs.has(node_id):
 			var predicted_glyph: GlyphModel = cached_node_output_glyphs[node_id]
 			_draw_mini_glyph(
 				predicted_glyph,
-				center + Vector2(0, 20),
+				center + Vector2(0, 13),
 				node_glyph_draw_scale(predicted_glyph),
 				0.68
 			)
 		else:
 			var source_glyph := source_glyph_for_node(node_id)
 			if source_glyph != null:
-				_draw_mini_glyph(source_glyph, center + Vector2(0, 20), 1.05)
+				_draw_mini_glyph(source_glyph, center + Vector2(0, 13), 1.28)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
+
+
+func node_frame_kind(node_id: StringName) -> StringName:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return &"missing"
+	match display_simulation.nodes[node_id].kind:
+		FactoryNodeModel.NodeKind.SOURCE:
+			return &"source_hex"
+		FactoryNodeModel.NodeKind.COMBINER:
+			return &"combine_hex"
+		FactoryNodeModel.NodeKind.SUMMONER:
+			return &"summon_circle"
+		_:
+			return &"processor_chamfer"
+
+
+func _draw_node_frame(node: FactoryNodeModel, center: Vector2, border_color: Color, selected: bool) -> void:
+	var stroke := 3.0 if selected else 2.0
+	if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
+		draw_circle(center, 40.0, NODE_COLOR)
+		draw_arc(center, 40.0, 0.0, TAU, 36, border_color, stroke, true)
+		draw_arc(center, 31.0, 0.0, TAU, 32, Color(border_color, 0.35), 1.0, true)
+		return
+	var points := PackedVector2Array()
+	if node.kind == FactoryNodeModel.NodeKind.SOURCE:
+		points = PackedVector2Array([
+			center + Vector2(-38, -30), center + Vector2(38, -30), center + Vector2(48, 0),
+			center + Vector2(38, 30), center + Vector2(-38, 30), center + Vector2(-48, 0),
+		])
+	elif node.kind == FactoryNodeModel.NodeKind.COMBINER:
+		points = PackedVector2Array([
+			center + Vector2(-32, -30), center + Vector2(32, -30), center + Vector2(48, 0),
+			center + Vector2(32, 30), center + Vector2(-32, 30), center + Vector2(-48, 0),
+		])
+	else:
+		points = PackedVector2Array([
+			center + Vector2(-38, -30), center + Vector2(38, -30), center + Vector2(48, -20),
+			center + Vector2(48, 20), center + Vector2(38, 30), center + Vector2(-38, 30),
+			center + Vector2(-48, 20), center + Vector2(-48, -20),
+		])
+	draw_colored_polygon(points, NODE_COLOR)
+	var outline := points.duplicate()
+	outline.append(points[0])
+	draw_polyline(outline, border_color, stroke, true)
+	_draw_node_role_mark(node, center)
+
+
+func _draw_node_role_mark(node: FactoryNodeModel, center: Vector2) -> void:
+	var mark_center := center + Vector2(-34, -16)
+	match node.kind:
+		FactoryNodeModel.NodeKind.ROTATOR:
+			draw_arc(mark_center, 6.0, -0.7, 4.4, 16, Color(0.5, 0.76, 0.94, 0.78), 1.5, true)
+			draw_line(mark_center + Vector2(-6, -2), mark_center + Vector2(-2, -6), Color(0.5, 0.76, 0.94, 0.78), 1.5, true)
+		FactoryNodeModel.NodeKind.COLORIZER:
+			var color_id := StringName(node.config.get("color_id", "white"))
+			draw_circle(mark_center, 4.5, GlyphPainterModel.component_color(color_id))
+		FactoryNodeModel.NodeKind.COMBINER:
+			draw_arc(mark_center + Vector2(-3, 0), 5.0, 0.0, TAU, 16, Color(0.5, 0.76, 0.94, 0.7), 1.3, true)
+			draw_arc(mark_center + Vector2(4, 0), 5.0, 0.0, TAU, 16, Color(0.5, 0.76, 0.94, 0.7), 1.3, true)
 
 
 func node_activity_progress(node_id: StringName) -> float:
@@ -1242,7 +1300,8 @@ func _input_port_position(node_id: StringName, port: int) -> Vector2:
 	var y_offset := 0.0
 	if node.required_input_count() == 2:
 		y_offset = -13.0 if port == 0 else 13.0
-	return node_local_position(node_id) + Vector2(-NODE_HALF_SIZE.x, y_offset)
+	var x_offset := -40.0 if node.kind == FactoryNodeModel.NodeKind.SUMMONER else -NODE_HALF_SIZE.x
+	return node_local_position(node_id) + Vector2(x_offset, y_offset)
 
 
 func _output_port_at(local_position: Vector2) -> StringName:
