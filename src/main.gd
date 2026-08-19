@@ -301,8 +301,9 @@ func _on_battle_finished(winner: int) -> void:
 	if winner == BattleSimulation.Side.PLAYER:
 		_enter_victory()
 	else:
-		status_label.text = "DEFEAT // %s" % _defeat_reason()
-		plan_label.text = "敗因分析 // %s" % _defeat_reason()
+		var reason := _defeat_reason()
+		status_label.text = "DEFEAT // %s" % reason
+		plan_label.text = "敗因分析 // %s // %s" % [reason, _defeat_advice()]
 		debug_victory_button.text = "再挑戦"
 		debug_victory_button.visible = true
 
@@ -468,6 +469,31 @@ func _defeat_reason() -> String:
 	if battle.is_enemy_shield_active():
 		return "時間内に敵防壁を突破できませんでした"
 	return "防壁突破後、敵リーダーへの火力が不足しました"
+
+
+func _defeat_advice() -> String:
+	var scout_count := int(produced_units.get(&"scout", 0))
+	var sentinel_count := int(produced_units.get(&"sentinel", 0))
+	var golem_count := int(produced_units.get(&"golem", 0))
+	var total_produced := scout_count + sentinel_count + golem_count
+	var discarded := factory_board.simulation.discarded_glyphs
+	if total_produced == 0:
+		return (
+			"改善: 配線 // 成功召喚0・廃棄/不一致%d。完成見本と失敗差分を確認" % discarded
+			if discarded > 0
+			else "改善: 生産量 // 成功召喚0。配線を完成させ32秒予測を確認"
+		)
+	if discarded >= maxi(int(total_produced / 5), 2):
+		return "改善: 配線 // 廃棄/不一致%d。完成見本と召喚失敗差分を確認" % discarded
+	if factory_change_count == 0:
+		return "改善: 判断・相性 // 再構成0回。群体兵で衛兵、装甲兵で巨像へ切替"
+	if sentinel_count == 0:
+		return "改善: 兵種相性 // 衛兵0。群体兵の60秒警告で衛兵術式へ切替"
+	if golem_count == 0:
+		return "改善: 兵種相性 // 巨像0。装甲兵の60秒警告で巨像術式へ切替"
+	if battle_board.simulation.is_enemy_shield_active():
+		return "改善: 生産量 // 防壁突破前。32秒予測で召喚数が増える構成を選択"
+	return "改善: 対リーダー火力 // 装甲波以降の巨像生産を早める"
 
 
 func _update_progress() -> void:

@@ -123,9 +123,21 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "next route should reach factory build again")
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	main.pause_button.pressed.emit()
+	main.produced_units = {&"scout": 30, &"sentinel": 0, &"golem": 0}
 	main.battle_board.simulation.tick_index = main.battle_board.simulation.battle_duration_ticks - 1
 	main.battle_board.advance_tick()
 	_expect("DEFEAT" in main.status_label.text, "time limit should display defeat analysis")
+	_expect("再構成0回" in main.plan_label.text, "defeat analysis should identify a missed reconfiguration decision")
+	_expect("群体兵で衛兵、装甲兵で巨像" in main.plan_label.text, "defeat analysis should recommend concrete counter production")
+	main.factory_change_count = 1
+	main.produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
+	main.factory_board.simulation.discarded_glyphs = 3
+	_expect("改善: 配線" in main._defeat_advice(), "zero successful summons with discards should identify wiring or matching")
+	main.produced_units = {&"scout": 20, &"sentinel": 0, &"golem": 5}
+	main.factory_board.simulation.discarded_glyphs = 0
+	_expect("衛兵0" in main._defeat_advice(), "missing swarm counter should be identified explicitly")
+	main.produced_units = {&"scout": 20, &"sentinel": 5, &"golem": 0}
+	_expect("巨像0" in main._defeat_advice(), "missing armor counter should be identified explicitly")
 	_expect(main.debug_victory_button.text == "再挑戦", "defeat should turn the temporary action into retry")
 	main.debug_victory_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "retry should return to factory build")

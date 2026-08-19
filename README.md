@@ -37,6 +37,7 @@ Design documents:
 - Victory, reward, next-route, defeat, and instant retry flow
 - Persistent run rewards for source, processor, or transport speed
 - Wave labels, matchup guidance, hit feedback, and post-battle analysis
+- Defeat advice classified from summon output, mismatches, reconfiguration, and missing counters
 - Before/after production impact shown when battle resumes
 
 The MVP now preserves glyph production provenance through transport, processing,
