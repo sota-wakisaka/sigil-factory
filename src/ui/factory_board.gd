@@ -899,7 +899,6 @@ func transport_glyph_draw_scale(glyph: GlyphModel) -> float:
 
 
 func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
-	var font := ThemeDB.fallback_font
 	for node_id in display_simulation.nodes:
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
 		var center := _scaled_position(display_positions.get(node_id, Vector2.ZERO))
@@ -913,16 +912,6 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 			border_color = SELECTED_COLOR
 		_draw_node_frame(node, center, border_color, node_id == selected_node_id)
 		_draw_node_activity_progress(node, center, display_simulation.tick_index > 0)
-		var label := _node_label(node)
-		draw_string(
-			font,
-			center + Vector2(-font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x * 0.5, -8),
-			label,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			11,
-			Color(0.62, 0.74, 0.84)
-		)
 		var visible_glyph := _visible_node_active_glyph(node)
 		if visible_glyph != null:
 			_draw_mini_glyph(visible_glyph, center + Vector2(0, 13), node_glyph_draw_scale(visible_glyph))
@@ -940,6 +929,10 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 				_draw_mini_glyph(source_glyph, center + Vector2(0, 13), 1.28)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
+
+
+func persistent_node_label_count() -> int:
+	return 0
 
 
 func _draw_production_summary() -> void:
