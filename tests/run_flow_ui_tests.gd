@@ -103,6 +103,16 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "Space should confirm edits and resume battle")
 	_expect("変更効果" in main.plan_label.text, "battle resume should explain the production effect of reconfiguration")
 	_expect("斥候" in main.plan_label.text and "衛兵" in main.plan_label.text, "production effect should name changed unit outputs")
+	_expect("変更追跡 0/15秒" in main.plan_label.text, "battle resume should begin a bounded impact observation window")
+	main.battle_board.simulation.tick_index += 75
+	main.battle_board.simulation.player_kills += 3
+	main.battle_board.simulation.enemy_kills += 1
+	main.battle_board.simulation.enemy_shield_health -= 120.0
+	main._refresh_status()
+	_expect("変更後15秒" in main.plan_label.text, "impact observation should become a fixed result after fifteen seconds")
+	_expect("敵撃破 +3" in main.plan_label.text, "impact result should report enemies defeated after the change")
+	_expect("味方損失 +1" in main.plan_label.text, "impact result should report allied losses after the change")
+	_expect("目標ダメージ 120" in main.plan_label.text, "impact result should report objective damage after the change")
 
 	main.debug_victory_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.VICTORY, "placeholder completion should defeat the leader")

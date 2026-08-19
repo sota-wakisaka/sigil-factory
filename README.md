@@ -42,6 +42,7 @@ Design documents:
 - Wave labels, matchup guidance, hit feedback, and post-battle analysis
 - Defeat advice classified from summon output, mismatches, reconfiguration, and missing counters
 - Before/after production impact shown when battle resumes
+- Fifteen-second post-change observation of enemy kills, allied losses, and objective damage
 
 The MVP now preserves glyph production provenance through transport, processing,
 copying, and Combine operations. Provenance is exposed on summon events for future
@@ -83,6 +84,9 @@ as missing parts, rotation, or color. Factory equipment and lines also distingui
 missing combiner material, full target buffers, and blocked outputs. Time-stop
 edits list the count, processed type, and affected equipment or transport line
 for work in progress that will be discarded before the change is committed.
+After a committed reconfiguration resumes battle, a 15-second observation window
+records enemy defeats, allied losses, and damage dealt to the shield or leader so
+the player can compare the production prediction with the immediate battle result.
 
 The first factory step opens an unwired workshop containing a ring source and a
 summoner. Connecting its two highlighted ports produces the first scout. The

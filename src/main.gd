@@ -11,6 +11,7 @@ const GRID_SPACING := 32
 const TICK_SECONDS := 0.2
 const FORECAST_TICKS := 120
 const MAJOR_FORECAST_TICKS := 300
+const FACTORY_CHANGE_TRACKING_TICKS := 75
 const BATTLE_SPEEDS := [1.0, 2.0, 4.0]
 const FLOW_STEPS := [
 	"ルート選択", "ステージ情報", "工場構築", "リアルタイム戦闘",
@@ -48,6 +49,8 @@ var selected_route_name := "中央ルート"
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 var pre_edit_production_counts: Dictionary = {}
 var last_factory_change_summary := ""
+var factory_change_battle_baseline: Dictionary = {}
+var last_factory_change_battle_impact := ""
 
 
 func _ready() -> void:
@@ -149,6 +152,7 @@ func _on_main_action() -> void:
 			return
 		factory_board.commit_edit()
 		_update_factory_change_summary()
+		_begin_factory_change_tracking()
 		factory_change_count += 1
 		flow.resume_battle()
 		_apply_phase()
@@ -265,6 +269,61 @@ func _update_factory_change_summary() -> void:
 	pre_edit_production_counts.clear()
 
 
+func _begin_factory_change_tracking() -> void:
+	var battle := battle_board.simulation
+	factory_change_battle_baseline = {
+		"tick": battle.tick_index,
+		"player_kills": battle.player_kills,
+		"enemy_kills": battle.enemy_kills,
+		"objective_health": battle.enemy_shield_health + battle.enemy_leader_health,
+	}
+	last_factory_change_battle_impact = ""
+
+
+func _refresh_factory_change_tracking() -> void:
+	if factory_change_battle_baseline.is_empty():
+		return
+	var battle := battle_board.simulation
+	var elapsed_ticks: int = maxi(
+		battle.tick_index - int(factory_change_battle_baseline["tick"]),
+		0
+	)
+	var impact := _factory_change_impact_text(
+		battle.player_kills - int(factory_change_battle_baseline["player_kills"]),
+		battle.enemy_kills - int(factory_change_battle_baseline["enemy_kills"]),
+		float(factory_change_battle_baseline["objective_health"])
+			- battle.enemy_shield_health
+			- battle.enemy_leader_health
+	)
+	if elapsed_ticks >= FACTORY_CHANGE_TRACKING_TICKS:
+		last_factory_change_battle_impact = "変更後15秒 // %s" % impact
+		factory_change_battle_baseline.clear()
+	else:
+		last_factory_change_battle_impact = "変更追跡 %d/15秒 // %s" % [
+			int(float(elapsed_ticks) * TICK_SECONDS),
+			impact,
+		]
+
+
+func _factory_change_impact_text(enemy_defeated: int, allies_lost: int, objective_damage: float) -> String:
+	return "敵撃破 +%d / 味方損失 +%d / 目標ダメージ %.0f" % [
+		maxi(enemy_defeated, 0),
+		maxi(allies_lost, 0),
+		maxf(objective_damage, 0.0),
+	]
+
+
+func _refresh_battle_plan_label() -> void:
+	plan_label.text = "稼働術式: %s // %s" % [
+		MvpContent.plan_name(factory_board.plan_id),
+		MvpContent.plan_description(factory_board.plan_id),
+	]
+	if last_factory_change_summary != "":
+		plan_label.text += "\n" + last_factory_change_summary
+	if last_factory_change_battle_impact != "":
+		plan_label.text += "\n" + last_factory_change_battle_impact
+
+
 func current_battle_speed() -> float:
 	return BATTLE_SPEEDS[battle_speed_index]
 
@@ -325,6 +384,8 @@ func _reset_stage() -> void:
 	factory_change_count = 0
 	pre_edit_production_counts.clear()
 	last_factory_change_summary = ""
+	factory_change_battle_baseline.clear()
+	last_factory_change_battle_impact = ""
 
 
 func _apply_phase() -> void:
@@ -373,9 +434,7 @@ func _apply_phase() -> void:
 			pause_button.tooltip_text = "工場を再構成するため、工場と戦場の時間を停止します"
 			debug_victory_button.text = "検証用: 戦闘をスキップ"
 			debug_victory_button.visible = true
-			plan_label.text = "稼働術式: %s // %s" % [MvpContent.plan_name(factory_board.plan_id), MvpContent.plan_description(factory_board.plan_id)]
-			if last_factory_change_summary != "":
-				plan_label.text += "\n" + last_factory_change_summary
+			_refresh_battle_plan_label()
 			_refresh_status()
 		RunFlow.Phase.FACTORY_RECONFIGURE:
 			_set_plan_buttons_enabled(true)
@@ -526,6 +585,9 @@ func _set_factory_palette_enabled(enabled: bool) -> void:
 
 func _refresh_status() -> void:
 	var battle := battle_board.simulation
+	_refresh_factory_change_tracking()
+	if flow.phase == RunFlow.Phase.BATTLE:
+		_refresh_battle_plan_label()
 	var remaining_seconds := maxf(
 		float(battle.battle_duration_ticks - battle.tick_index) * TICK_SECONDS,
 		0.0
