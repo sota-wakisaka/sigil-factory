@@ -163,9 +163,9 @@ func _select_plan(plan_id: StringName) -> void:
 	if flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		factory_board.preview_plan(plan_id)
 		plan_label.text = "仮術式: %s // %s // 未確定" % [MvpContent.plan_name(plan_id), MvpContent.plan_description(plan_id)]
-		var pending_discard := factory_board.pending_discard_count()
-		if pending_discard > 0:
-			plan_label.text += " // 仕掛品%d個を廃棄予定" % pending_discard
+		var discard_notice := factory_board.pending_discard_notice()
+		if discard_notice != "":
+			plan_label.text += " // " + discard_notice
 	else:
 		factory_board.configure(plan_id)
 		var state := "構築中" if flow.phase == RunFlow.Phase.FACTORY_BUILD else "稼働術式"
@@ -212,9 +212,9 @@ func _refresh_factory_inspector() -> void:
 func _on_inspector_option_selected(index: int) -> void:
 	if factory_board.configure_selected_node(index):
 		plan_label.text = "カスタム工場 // 設備設定を変更しました"
-		var pending_discard := factory_board.pending_discard_count()
-		if pending_discard > 0:
-			plan_label.text += " // 仕掛品%d個を廃棄予定" % pending_discard
+		var discard_notice := factory_board.pending_discard_notice()
+		if discard_notice != "":
+			plan_label.text += " // " + discard_notice
 
 
 func _cancel_edit() -> void:
@@ -380,7 +380,10 @@ func _apply_phase() -> void:
 			pause_button.text = "変更を確定・戦闘再開"
 			pause_button.tooltip_text = "有効な工場変更を一括確定し、リアルタイム戦闘を再開します"
 			cancel_button.disabled = false
+			var work_summary := factory_board.work_in_progress_summary()
 			plan_label.text = "時間停止中 // 工場・召喚門を再構成 // 仕掛品 %d個" % factory_board.work_in_progress_count()
+			if work_summary != "":
+				plan_label.text += "（%s）" % work_summary
 			status_label.text = "術式を選び、変更を確定するとリアルタイム戦闘へ戻ります"
 		RunFlow.Phase.VICTORY:
 			pause_button.disabled = true

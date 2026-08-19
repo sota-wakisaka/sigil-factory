@@ -164,7 +164,7 @@ func remove_factory_node(node_id: StringName) -> bool:
 	if connecting_from_node_id == node_id:
 		connecting_from_node_id = &""
 	connection_message = (
-		"設備を削除しました（仕掛品%d個を廃棄予定）" % discarded_now
+		"設備を削除しました（%s）" % pending_discard_notice()
 		if discarded_now > 0
 		else "設備を削除しました"
 	)
@@ -279,7 +279,7 @@ func configure_selected_node(option_index: int) -> bool:
 		FactoryNodeModel.NodeKind.COLORIZER:
 			node.config["color_id"] = ["blue", "red", "white"][option_index]
 	connection_message = (
-		"設備設定を変更しました（仕掛品%d個を廃棄予定）" % discarded_now
+		"設備設定を変更しました（%s）" % pending_discard_notice()
 		if discarded_now > 0
 		else "設備設定を変更しました"
 	)
@@ -344,7 +344,7 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 			discarded_now += 1
 	connection_message = _connection_result_text(result)
 	if discarded_now > 0:
-		connection_message += "（仕掛品%d個を廃棄予定）" % discarded_now
+		connection_message += "（%s）" % pending_discard_notice()
 	_refresh_production_preview()
 	queue_redraw()
 	return result
@@ -360,7 +360,7 @@ func disconnect_input(to_node_id: StringName, to_port: int) -> bool:
 			var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
 			display_simulation.disconnect_line(line.id)
 			connection_message = (
-				"接続を解除しました（仕掛品%d個を廃棄予定）" % discarded_now
+				"接続を解除しました（%s）" % pending_discard_notice()
 				if discarded_now > 0
 				else "接続を解除しました"
 			)
@@ -474,23 +474,81 @@ func cancel_edit() -> void:
 
 
 func work_in_progress_count() -> int:
-	if simulation == null:
-		return 0
-	var count := 0
-	for node in simulation.nodes.values():
-		for glyph in node.input_buffers:
-			count += int(glyph != null)
-		count += int(node.output_buffer != null)
-		count += int(node.processing_glyph != null)
-	for line in simulation.lines.values():
-		count += int(line.payload != null)
-	return count
+	return _work_in_progress_glyphs(simulation).size()
+
+
+func work_in_progress_summary() -> String:
+	var counts := {}
+	for glyph in _work_in_progress_glyphs(simulation):
+		var label := _glyph_type_label(glyph)
+		counts[label] = int(counts.get(label, 0)) + 1
+	var labels := counts.keys()
+	labels.sort()
+	var parts := PackedStringArray()
+	for label in labels:
+		parts.append("%s×%d" % [label, counts[label]])
+	return "、".join(parts)
 
 
 func pending_discard_count() -> int:
 	if not editing or preview_simulation == null or simulation == null:
 		return 0
 	return maxi(preview_simulation.discarded_glyphs - simulation.discarded_glyphs, 0)
+
+
+func pending_discard_notice() -> String:
+	var count := pending_discard_count()
+	if count <= 0:
+		return ""
+	var summary := work_in_progress_summary()
+	return (
+		"仕掛品%d個を廃棄予定" % count
+		if summary == ""
+		else "仕掛品%d個（%s）を廃棄予定" % [count, summary]
+	)
+
+
+func _work_in_progress_glyphs(source_simulation: FactorySimulation) -> Array:
+	var glyphs: Array = []
+	if source_simulation == null:
+		return glyphs
+	for node in source_simulation.nodes.values():
+		for glyph in node.input_buffers:
+			if glyph != null:
+				glyphs.append(glyph)
+		if node.output_buffer != null:
+			glyphs.append(node.output_buffer)
+		if node.processing_glyph != null:
+			glyphs.append(node.processing_glyph)
+	for line in source_simulation.lines.values():
+		if line.payload != null:
+			glyphs.append(line.payload)
+	return glyphs
+
+
+func _glyph_type_label(glyph: GlyphModel) -> String:
+	var component_labels := PackedStringArray()
+	for component in glyph.components:
+		var attributes := PackedStringArray([_primitive_name(component.primitive_id)])
+		if component.color_id != &"white":
+			attributes.append(_color_name(component.color_id))
+		if component.rotation_step != 0:
+			attributes.append("%d°" % (component.rotation_step * 90))
+		if component.scale_step != 1:
+			attributes.append("倍率%d" % component.scale_step)
+		if component.position != Vector2i.ZERO:
+			attributes.append("位置%d,%d" % [component.position.x, component.position.y])
+		component_labels.append("・".join(attributes))
+	component_labels.sort()
+	return "+".join(component_labels)
+
+
+func _primitive_name(primitive_id: StringName) -> String:
+	return {&"ring": "環", &"spike": "棘", &"branch": "枝"}.get(primitive_id, String(primitive_id))
+
+
+func _color_name(color_id: StringName) -> String:
+	return {&"blue": "青", &"red": "赤", &"white": "白"}.get(color_id, String(color_id))
 
 
 func advance_tick() -> void:

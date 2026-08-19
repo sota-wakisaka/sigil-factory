@@ -575,11 +575,13 @@ func _test_factory_configuration_discards_work_transactionally() -> void:
 		board.advance_tick()
 	var committed_work_in_progress := board.work_in_progress_count()
 	_expect(committed_work_in_progress > 0, "configuration test should begin with work in progress")
+	_expect("環" in board.work_in_progress_summary(), "work in progress summary should name its glyph type")
 	board.begin_edit()
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
 	_expect(board.configure_selected_node(1), "source configuration should change during time stop")
 	_expect(board.pending_discard_count() == committed_work_in_progress, "configuration should disclose all pending discards")
+	_expect("環" in board.pending_discard_notice(), "discard notice should name the discarded glyph type")
 	_expect(board.preview_simulation.discarded_glyphs == committed_work_in_progress, "preview should count discarded work")
 	_expect(board.undo(), "configuration discard should be undoable")
 	_expect(board.pending_discard_count() == 0, "undo should remove pending discard count")
