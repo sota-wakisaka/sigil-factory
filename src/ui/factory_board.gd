@@ -820,15 +820,7 @@ func _draw() -> void:
 			Color(0.46, 0.82, 1.0)
 		)
 	if interaction_enabled:
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(18, size.y - 12),
-			"ドラッグ: 配置  /  ●出力→○入力: 接続  /  右クリック: 解除",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			12,
-			Color(0.52, 0.65, 0.76)
-		)
+		_draw_interaction_legend()
 		if cached_production_valid:
 			_draw_production_summary()
 		else:
@@ -979,6 +971,45 @@ func _draw_production_summary() -> void:
 		draw_circle(warning_center, 9.0, WARNING_COLOR)
 		draw_line(warning_center + Vector2(-4, -4), warning_center + Vector2(4, 4), Color.WHITE, 1.8, true)
 		draw_line(warning_center + Vector2(-4, 4), warning_center + Vector2(4, -4), Color.WHITE, 1.8, true)
+
+
+func interaction_legend_count() -> int:
+	return 3
+
+
+func _draw_interaction_legend() -> void:
+	var y := size.y - 18.0
+	var icon_color := Color(0.4, 0.68, 0.86, 0.82)
+	var muted := Color(0.16, 0.28, 0.38, 0.7)
+	for index in interaction_legend_count():
+		var rect := Rect2(Vector2(18.0 + index * 78.0, y - 15.0), Vector2(66.0, 28.0))
+		draw_rect(rect, Color(0.025, 0.045, 0.068, 0.84), true)
+		draw_rect(rect, muted, false, 1.0)
+	var move_center := Vector2(51.0, y - 1.0)
+	draw_rect(Rect2(move_center - Vector2(8, 5), Vector2(16, 10)), Color(0.08, 0.13, 0.19), true)
+	draw_rect(Rect2(move_center - Vector2(8, 5), Vector2(16, 10)), icon_color, false, 1.2)
+	var move_directions: Array[Vector2] = [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]
+	for direction in move_directions:
+		var tip: Vector2 = move_center + direction * 11.0
+		draw_line(move_center + direction * 7.0, tip, icon_color, 1.4, true)
+		var normal := Vector2(-direction.y, direction.x)
+		draw_line(tip, tip - direction * 3.0 + normal * 2.0, icon_color, 1.2, true)
+		draw_line(tip, tip - direction * 3.0 - normal * 2.0, icon_color, 1.2, true)
+	var link_left := Vector2(110.0, y - 1.0)
+	var link_right := Vector2(143.0, y - 1.0)
+	draw_circle(link_left, 5.0, icon_color)
+	draw_arc(link_right, 6.0, 0.0, TAU, 18, icon_color, 1.5, true)
+	draw_line(link_left + Vector2(6, 0), link_right - Vector2(7, 0), icon_color, 1.5, true)
+	draw_line(link_right - Vector2(7, 0), link_right - Vector2(11, -3), icon_color, 1.2, true)
+	draw_line(link_right - Vector2(7, 0), link_right - Vector2(11, 3), icon_color, 1.2, true)
+	var cut_left := Vector2(188.0, y - 1.0)
+	var cut_right := Vector2(221.0, y - 1.0)
+	draw_arc(cut_left, 5.0, 0.0, TAU, 18, icon_color, 1.5, true)
+	draw_arc(cut_right, 5.0, 0.0, TAU, 18, icon_color, 1.5, true)
+	draw_dashed_line(cut_left + Vector2(6, 0), cut_right - Vector2(6, 0), Color(0.92, 0.4, 0.34), 1.4, 3.0)
+	var cut_center := cut_left.lerp(cut_right, 0.5)
+	draw_line(cut_center + Vector2(-4, -4), cut_center + Vector2(4, 4), Color(0.96, 0.42, 0.36), 1.5, true)
+	draw_line(cut_center + Vector2(-4, 4), cut_center + Vector2(4, -4), Color(0.96, 0.42, 0.36), 1.5, true)
 
 
 func _draw_mana_meter() -> void:

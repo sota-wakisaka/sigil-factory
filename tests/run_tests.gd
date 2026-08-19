@@ -2260,6 +2260,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	board.set_interaction_enabled(true)
 	_expect(board.palette_availability(&"ring_source")["available"], "affordable source should be available in the visual palette")
 	_expect(board.palette_availability(&"summoner")["reason"] == &"summoner_limit", "existing summoner should visibly block another summoner")
+	_expect(board.interaction_legend_count() == 3, "factory should replace the permanent instruction sentence with three gesture icons")
 	_expect(preview["ok"], "complete factory should produce a preview")
 	_expect(preview["counts"][&"scout"] > 0, "scout factory preview should report scouts")
 	_expect(
