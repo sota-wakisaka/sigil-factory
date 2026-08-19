@@ -19,9 +19,9 @@ func _init(
 		else GlyphProductionContextModel.new()
 	)
 	for child in initial_combine_children:
-		combine_children.append(child.copy())
+		combine_children.append(child.copy() if child is GlyphModel else child)
 	for component in initial_components:
-		components.append(component.copy())
+		components.append(component.copy() if component is GlyphComponentModel else component)
 	if not combine_children.is_empty():
 		_rebuild_components_from_children()
 
@@ -87,7 +87,12 @@ func _structure_validation_errors(path: String, active_ancestors: Dictionary) ->
 		if components.size() != 1:
 			errors.append("primitive_arity:%s:%d" % [path, components.size()])
 		else:
-			var component: GlyphComponentModel = components[0]
+			var component_value = components[0]
+			if not component_value is GlyphComponentModel:
+				errors.append("invalid_component:%s" % path)
+				active_ancestors.erase(instance_key)
+				return errors
+			var component: GlyphComponentModel = component_value
 			if component.primitive_id == &"":
 				errors.append("missing_primitive_id:%s" % path)
 			if component.color_id == &"":
@@ -146,7 +151,10 @@ static func _frame(value: String) -> String:
 func complete_overlap_primitive_ids() -> Array[StringName]:
 	var seen: Dictionary = {}
 	var overlapping: Array[StringName] = []
-	for component in components:
+	for component_value in components:
+		if not component_value is GlyphComponentModel:
+			continue
+		var component: GlyphComponentModel = component_value
 		var key := component.canonical_key()
 		if seen.has(key):
 			if not overlapping.has(component.primitive_id):
@@ -201,6 +209,9 @@ func copy() -> GlyphModel:
 
 func _rebuild_components_from_children() -> void:
 	components.clear()
-	for child in combine_children:
+	for child_value in combine_children:
+		if not child_value is GlyphModel:
+			continue
+		var child: GlyphModel = child_value
 		for component in child.components:
-			components.append(component.copy())
+			components.append(component.copy() if component is GlyphComponentModel else component)

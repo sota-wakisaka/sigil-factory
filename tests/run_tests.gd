@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_test_recipe_registration_rejects_missing_objects()
 	_test_mvp_recipe_set_validation_reports_content_location()
 	_test_factory_rejects_invalid_recipe_structures()
+	_test_glyph_preserves_invalid_restored_elements_for_diagnostics()
 	_test_factory_owns_registered_recipe_data()
 	_test_factory_owns_registered_node_data()
 	_test_node_registration_reports_stable_errors()
@@ -873,6 +874,29 @@ func _test_factory_rejects_invalid_recipe_structures() -> void:
 	_expect(
 		simulation.add_recipe(SigilRecipeModel.new(&"valid_nested", GlyphModel.combine(ring, GlyphModel.combine(spike, branch)), &"golem")),
 		"valid nested binary Combine recipe should remain accepted"
+	)
+
+
+func _test_glyph_preserves_invalid_restored_elements_for_diagnostics() -> void:
+	var missing_components: Array[GlyphComponentModel] = [null]
+	var missing_component := GlyphModel.new(missing_components)
+	_expect(
+		missing_component.structure_validation_errors() == PackedStringArray(["invalid_component:root"]),
+		"Glyph construction should retain a null component for structural diagnostics"
+	)
+	_expect(
+		missing_component.copy().structure_validation_errors() == PackedStringArray(["invalid_component:root"]),
+		"Glyph copying should retain a null component without dereferencing it"
+	)
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var missing_child := GlyphModel.new([], null, [null, ring])
+	_expect(
+		missing_child.structure_validation_errors() == PackedStringArray(["invalid_child:root.0"]),
+		"Glyph construction should retain a null Combine child with its path"
+	)
+	_expect(
+		missing_child.copy().structure_validation_errors() == PackedStringArray(["invalid_child:root.0"]),
+		"Glyph copying should retain a null Combine child without dereferencing it"
 	)
 
 
