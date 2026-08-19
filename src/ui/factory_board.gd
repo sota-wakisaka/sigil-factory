@@ -148,15 +148,24 @@ func remove_factory_node(node_id: StringName) -> bool:
 		return false
 	var display_simulation := _display_simulation()
 	_push_undo_snapshot()
+	var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
 	if not display_simulation.remove_node(node_id):
-		undo_history.pop_back()
+		var snapshot: Dictionary = undo_history.pop_back()
+		if editing:
+			preview_simulation = snapshot["simulation"]
+		else:
+			simulation = snapshot["simulation"]
 		return false
 	_display_positions().erase(node_id)
 	if selected_node_id == node_id:
 		selected_node_id = &""
 	if connecting_from_node_id == node_id:
 		connecting_from_node_id = &""
-	connection_message = "設備を削除しました"
+	connection_message = (
+		"設備を削除しました（仕掛品%d個を廃棄予定）" % discarded_now
+		if discarded_now > 0
+		else "設備を削除しました"
+	)
 	_refresh_production_preview()
 	selection_changed.emit()
 	queue_redraw()
@@ -325,7 +334,15 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 		display_simulation.connect_nodes(removed_line)
 	if not result["ok"]:
 		undo_history.pop_back()
+	var discarded_now := 0
+	if result["ok"] and editing:
+		discarded_now = display_simulation.discard_all_work_in_progress()
+		if removed_line != null and removed_line.payload != null:
+			display_simulation.discarded_glyphs += 1
+			discarded_now += 1
 	connection_message = _connection_result_text(result)
+	if discarded_now > 0:
+		connection_message += "（仕掛品%d個を廃棄予定）" % discarded_now
 	_refresh_production_preview()
 	queue_redraw()
 	return result
@@ -338,8 +355,13 @@ func disconnect_input(to_node_id: StringName, to_port: int) -> bool:
 	for line in display_simulation.lines.values():
 		if line.to_node_id == to_node_id and line.to_port == to_port:
 			_push_undo_snapshot()
+			var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
 			display_simulation.disconnect_line(line.id)
-			connection_message = "接続を解除しました"
+			connection_message = (
+				"接続を解除しました（仕掛品%d個を廃棄予定）" % discarded_now
+				if discarded_now > 0
+				else "接続を解除しました"
+			)
 			_refresh_production_preview()
 			queue_redraw()
 			return true

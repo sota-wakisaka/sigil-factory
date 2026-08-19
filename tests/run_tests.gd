@@ -48,6 +48,7 @@ func _initialize() -> void:
 	_test_factory_editor_undo_restores_graph()
 	_test_factory_node_configuration_is_undoable()
 	_test_factory_configuration_discards_work_transactionally()
+	_test_factory_rewiring_discards_work_transactionally()
 	_test_factory_board_connections_change_output()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
@@ -554,6 +555,27 @@ func _test_factory_configuration_discards_work_transactionally() -> void:
 	board.cancel_edit()
 	_expect(board.work_in_progress_count() == committed_work_in_progress, "cancel should restore configured work in progress")
 	_expect(board.simulation.discarded_glyphs == 0, "cancel should not commit configuration discards")
+	board.free()
+
+
+func _test_factory_rewiring_discards_work_transactionally() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SCOUT)
+	for _tick in 18:
+		board.advance_tick()
+	var committed_work_in_progress := board.work_in_progress_count()
+	_expect(committed_work_in_progress > 0, "rewiring test should begin with work in progress")
+	board.begin_edit()
+	board.set_interaction_enabled(true)
+	_expect(board.disconnect_input(&"summoner", 0), "time stop should allow disconnecting the active route")
+	_expect(board.pending_discard_count() == committed_work_in_progress, "rewiring should disclose pending discards")
+	_expect(board.preview_simulation.lines.is_empty(), "preview should contain the disconnected route")
+	_expect(board.undo(), "rewiring discard should be undoable")
+	_expect(board.pending_discard_count() == 0, "rewiring undo should remove pending discards")
+	_expect(board.preview_simulation.lines.size() == 1, "rewiring undo should restore the route")
+	board.cancel_edit()
+	_expect(board.work_in_progress_count() == committed_work_in_progress, "rewiring cancel should restore work in progress")
+	_expect(board.simulation.discarded_glyphs == 0, "rewiring cancel should not commit discards")
 	board.free()
 
 
