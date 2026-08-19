@@ -85,6 +85,36 @@ func remove_node(node_id: StringName) -> bool:
 
 func validate_graph() -> Dictionary:
 	var errors: Array[String] = []
+	var structurally_valid_line_ids: Dictionary = {}
+	var input_line_counts: Dictionary = {}
+	var output_line_counts: Dictionary = {}
+	for line_id in _sorted_keys(lines):
+		var line: FactoryLineModel = lines[line_id]
+		var line_is_valid := true
+		if not nodes.has(line.from_node_id):
+			errors.append("missing_from_node:%s" % line_id)
+			line_is_valid = false
+		if not nodes.has(line.to_node_id):
+			errors.append("missing_to_node:%s" % line_id)
+			line_is_valid = false
+		if not line_is_valid:
+			continue
+		var target: FactoryNodeModel = nodes[line.to_node_id]
+		if line.to_port < 0 or line.to_port >= target.required_input_count():
+			errors.append("invalid_port:%s" % line_id)
+			continue
+		structurally_valid_line_ids[line_id] = true
+		var input_key := _input_key(line.to_node_id, line.to_port)
+		input_line_counts[input_key] = int(input_line_counts.get(input_key, 0)) + 1
+		output_line_counts[line.from_node_id] = int(output_line_counts.get(line.from_node_id, 0)) + 1
+	for input_key in _sorted_keys(input_line_counts):
+		if int(input_line_counts[input_key]) > 1:
+			errors.append("occupied_input:%s" % input_key)
+	for node_id in _sorted_keys(output_line_counts):
+		if int(output_line_counts[node_id]) > 1:
+			errors.append("occupied_output:%s" % node_id)
+	if _has_cycle():
+		errors.append("cycle")
 	var has_source := false
 	var summoner_count := 0
 	for node_id in _sorted_keys(nodes):
@@ -93,7 +123,7 @@ func validate_graph() -> Dictionary:
 		summoner_count += int(node.kind == FactoryNodeModel.NodeKind.SUMMONER)
 		for port in node.required_input_count():
 			var has_input := false
-			for line_id in _sorted_keys(lines):
+			for line_id in _sorted_keys(structurally_valid_line_ids):
 				var line: FactoryLineModel = lines[line_id]
 				if line.to_node_id == node.id and line.to_port == port:
 					has_input = true
@@ -102,7 +132,7 @@ func validate_graph() -> Dictionary:
 				errors.append("missing_input:%s:%d" % [node.id, port])
 		if node.kind != FactoryNodeModel.NodeKind.SUMMONER:
 			var has_output := false
-			for line_id in _sorted_keys(lines):
+			for line_id in _sorted_keys(structurally_valid_line_ids):
 				var line: FactoryLineModel = lines[line_id]
 				if line.from_node_id == node.id:
 					has_output = true

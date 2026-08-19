@@ -47,6 +47,8 @@ func _initialize() -> void:
 	_test_factory_disconnects_lines()
 	_test_factory_removes_node_and_connected_lines()
 	_test_factory_graph_validation_reports_dangling_nodes()
+	_test_factory_validation_rejects_externally_injected_lines()
+	_test_factory_validation_rejects_externally_injected_cycle()
 	_test_factory_validation_order_is_stable()
 	_test_factory_flow_diagnostics_distinguish_blockages()
 	_test_mvp_plans_produce_expected_units()
@@ -729,6 +731,55 @@ func _test_factory_graph_validation_reports_dangling_nodes() -> void:
 	_expect(result["errors"].has("missing_output:dangling"), "validation should identify missing output")
 
 
+func _test_factory_validation_rejects_externally_injected_lines() -> void:
+	var simulation := FactorySimulation.new()
+	var source := FactoryNodeModel.new(&"source", FactoryNodeModel.NodeKind.SOURCE)
+	var second_source := FactoryNodeModel.new(&"second_source", FactoryNodeModel.NodeKind.SOURCE)
+	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
+	for node in [source, second_source, summoner]:
+		simulation.add_node(node)
+	simulation.lines[&"a_valid"] = FactoryLineModel.new(&"a_valid", &"source", &"summoner", 0)
+	simulation.lines[&"b_duplicate_input"] = FactoryLineModel.new(
+		&"b_duplicate_input", &"second_source", &"summoner", 0
+	)
+	simulation.lines[&"c_duplicate_output"] = FactoryLineModel.new(
+		&"c_duplicate_output", &"source", &"summoner", 0
+	)
+	simulation.lines[&"d_invalid_port"] = FactoryLineModel.new(
+		&"d_invalid_port", &"second_source", &"summoner", 2
+	)
+	simulation.lines[&"e_missing_from"] = FactoryLineModel.new(
+		&"e_missing_from", &"missing", &"summoner", 0
+	)
+	simulation.lines[&"f_missing_to"] = FactoryLineModel.new(
+		&"f_missing_to", &"second_source", &"missing", 0
+	)
+	var result := simulation.validate_graph()
+	_expect(not result["ok"], "authoritative validation should reject externally injected invalid lines")
+	_expect(result["errors"].has("occupied_input:summoner:0"), "validation should reject duplicate input wiring")
+	_expect(result["errors"].has("occupied_output:source"), "validation should reject implicit output fan-out")
+	_expect(result["errors"].has("invalid_port:d_invalid_port"), "validation should reject out-of-range ports")
+	_expect(result["errors"].has("missing_from_node:e_missing_from"), "validation should reject missing source nodes")
+	_expect(result["errors"].has("missing_to_node:f_missing_to"), "validation should reject missing target nodes")
+
+
+func _test_factory_validation_rejects_externally_injected_cycle() -> void:
+	var simulation := FactorySimulation.new()
+	var source := FactoryNodeModel.new(&"source", FactoryNodeModel.NodeKind.SOURCE)
+	var first := FactoryNodeModel.new(&"first", FactoryNodeModel.NodeKind.ROTATOR)
+	var second := FactoryNodeModel.new(&"second", FactoryNodeModel.NodeKind.COLORIZER)
+	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
+	for node in [source, first, second, summoner]:
+		simulation.add_node(node)
+	simulation.lines[&"source_first"] = FactoryLineModel.new(&"source_first", &"source", &"first")
+	simulation.lines[&"first_second"] = FactoryLineModel.new(&"first_second", &"first", &"second")
+	simulation.lines[&"second_first"] = FactoryLineModel.new(&"second_first", &"second", &"first")
+	simulation.lines[&"second_summoner"] = FactoryLineModel.new(&"second_summoner", &"second", &"summoner")
+	var result := simulation.validate_graph()
+	_expect(not result["ok"], "authoritative validation should reject externally injected cycles")
+	_expect(result["errors"].has("cycle"), "validation should identify an injected cycle")
+
+
 func _test_factory_validation_order_is_stable() -> void:
 	var forward := FactorySimulation.new()
 	var reverse := FactorySimulation.new()
@@ -736,9 +787,18 @@ func _test_factory_validation_order_is_stable() -> void:
 		forward.add_node(FactoryNodeModel.new(node_id, FactoryNodeModel.NodeKind.ROTATOR))
 	for node_id in [&"a_node", &"z_node"]:
 		reverse.add_node(FactoryNodeModel.new(node_id, FactoryNodeModel.NodeKind.ROTATOR))
+	var injected_lines := [
+		FactoryLineModel.new(&"z_line", &"missing", &"a_node"),
+		FactoryLineModel.new(&"a_line", &"z_node", &"missing"),
+	]
+	for line in injected_lines:
+		forward.lines[line.id] = line
+	injected_lines.reverse()
+	for line in injected_lines:
+		reverse.lines[line.id] = line
 	_expect(
 		forward.validate_graph()["errors"] == reverse.validate_graph()["errors"],
-		"graph validation diagnostics should not depend on insertion order"
+		"graph validation diagnostics should not depend on node or line insertion order"
 	)
 
 

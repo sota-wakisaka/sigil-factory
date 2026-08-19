@@ -18,6 +18,7 @@ Design documents:
 - A single generic summoner enforced by both palette actions and graph validation
 - Selection inspector for source material, rotation, and color configuration
 - Deterministic fixed-tick glyph factory simulation
+- Authoritative graph validation for restored or externally constructed factory data
 - Canonical binary Combine structure with hierarchy-aware sigil matching
 - Unique recipe IDs and canonical structures with acquisition-order-independent registration
 - Completed-sigil ghost preview for the currently selected production plan
