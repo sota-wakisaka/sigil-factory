@@ -86,10 +86,14 @@ static func recipes() -> Array[SigilRecipeModel]:
 		),
 		SigilRecipeModel.new(
 			&"bound_colossus",
-			GlyphModel.new([
-				GlyphComponentModel.new(&"ring", Vector2i.ZERO, 0, 1, &"blue"),
-				GlyphComponentModel.new(&"spike", Vector2i.ZERO, 0, 1, &"blue"),
-			]),
+			GlyphModel.combine(
+				GlyphModel.new([
+					GlyphComponentModel.new(&"ring", Vector2i.ZERO, 0, 1, &"blue"),
+				]),
+				GlyphModel.new([
+					GlyphComponentModel.new(&"spike", Vector2i.ZERO, 0, 1, &"blue"),
+				])
+			),
 			&"golem"
 		),
 	]

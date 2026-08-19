@@ -176,6 +176,11 @@ func _test_factory_pipeline_summons_matching_unit() -> void:
 			simulation.summon_events[0]["unit_id"] == &"sentinel",
 			"matching recipe should summon its configured unit"
 		)
+		var context: Dictionary = simulation.summon_events[0]["production_context"]
+		_expect(context["processing_count"] == 2, "production context should count rotator and colorizer")
+		_expect(context["visited_node_kinds"].has(&"source"), "production context should retain source traversal")
+		_expect(context["visited_node_kinds"].has(&"summoner"), "production context should retain summoner traversal")
+		_expect(context["source_ids"].has(&"source"), "production context should retain source identity")
 
 
 func _test_combiner_waits_for_both_inputs() -> void:
@@ -205,10 +210,10 @@ func _test_combiner_waits_for_both_inputs() -> void:
 	simulation.connect_nodes(FactoryLineModel.new(&"ring", &"ring_source", &"combiner", 0))
 	simulation.connect_nodes(FactoryLineModel.new(&"spike", &"spike_source", &"combiner", 1))
 	simulation.connect_nodes(FactoryLineModel.new(&"out", &"combiner", &"summoner"))
-	var target := GlyphModel.new([
-		GlyphComponentModel.new(&"ring"),
-		GlyphComponentModel.new(&"spike"),
-	])
+	var target := GlyphModel.combine(
+		GlyphModel.new([GlyphComponentModel.new(&"ring")]),
+		GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	)
 	simulation.add_recipe(SigilRecipeModel.new(&"bound_pair", target, &"golem"))
 
 	for _tick in 12:
@@ -216,6 +221,11 @@ func _test_combiner_waits_for_both_inputs() -> void:
 
 	_expect(not simulation.summon_events.is_empty(), "combiner should produce after both inputs arrive")
 	_expect(simulation.discarded_glyphs == 0, "valid combined glyph should not be discarded")
+	if not simulation.summon_events.is_empty():
+		var context: Dictionary = simulation.summon_events[0]["production_context"]
+		_expect(context["processing_count"] == 1, "combiner should add one processing step")
+		_expect(context["visited_node_kinds"].has(&"combiner"), "combined provenance should retain combiner traversal")
+		_expect(context["source_ids"].size() == 2, "combined provenance should merge both source identities")
 
 
 func _test_factory_rejects_cycles() -> void:

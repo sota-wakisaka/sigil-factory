@@ -175,7 +175,10 @@ func _tick_source(node: FactoryNodeModel) -> void:
 		1,
 		StringName(node.config.get("color_id", "white"))
 	)
-	node.output_buffer = GlyphModel.new([component])
+	var glyph := GlyphModel.new([component])
+	glyph.production_context.record_node(&"source", false)
+	glyph.production_context.record_source(node.id)
+	node.output_buffer = glyph
 
 
 func _tick_processor(node: FactoryNodeModel) -> void:
@@ -200,6 +203,7 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 		return
 	var glyph: GlyphModel = node.input_buffers[0]
 	node.input_buffers[0] = null
+	glyph.production_context.record_node(&"summoner", false)
 	for recipe in recipes:
 		var result := SigilMatcher.compare(glyph, recipe.glyph)
 		if result["is_match"]:
@@ -208,6 +212,7 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 				"recipe_id": recipe.id,
 				"unit_id": recipe.unit_id,
 				"summoner_id": node.id,
+				"production_context": glyph.production_context.to_dictionary(),
 			})
 			return
 	discarded_glyphs += 1
@@ -215,10 +220,7 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 
 func _consume_inputs(node: FactoryNodeModel) -> GlyphModel:
 	if node.kind == FactoryNodeModel.NodeKind.COMBINER:
-		var combined := GlyphModel.new()
-		for glyph in node.input_buffers:
-			for component in glyph.components:
-				combined.components.append(component.copy())
+		var combined := GlyphModel.combine(node.input_buffers[0], node.input_buffers[1])
 		for index in node.input_buffers.size():
 			node.input_buffers[index] = null
 		return combined
@@ -233,17 +235,32 @@ func _apply_node_operation(node: FactoryNodeModel, glyph: GlyphModel) -> GlyphMo
 	match node.kind:
 		FactoryNodeModel.NodeKind.ROTATOR:
 			var steps := int(node.config.get("steps", 1))
-			for component in result.components:
-				component.rotation_step = posmod(component.rotation_step + steps, 4)
+			result.rotate(steps)
 		FactoryNodeModel.NodeKind.TRANSLATOR:
 			var offset: Vector2i = node.config.get("offset", Vector2i.ZERO)
-			for component in result.components:
-				component.position += offset
+			result.translate(offset)
 		FactoryNodeModel.NodeKind.COLORIZER:
 			var color_id := StringName(node.config.get("color_id", "white"))
-			for component in result.components:
-				component.color_id = color_id
+			result.recolor(color_id)
+	result.production_context.record_node(_node_kind_id(node.kind), true)
 	return result
+
+
+func _node_kind_id(kind: FactoryNodeModel.NodeKind) -> StringName:
+	match kind:
+		FactoryNodeModel.NodeKind.SOURCE:
+			return &"source"
+		FactoryNodeModel.NodeKind.ROTATOR:
+			return &"rotator"
+		FactoryNodeModel.NodeKind.TRANSLATOR:
+			return &"translator"
+		FactoryNodeModel.NodeKind.COLORIZER:
+			return &"colorizer"
+		FactoryNodeModel.NodeKind.COMBINER:
+			return &"combiner"
+		FactoryNodeModel.NodeKind.SUMMONER:
+			return &"summoner"
+	return &"unknown"
 
 
 func _dispatch_outputs() -> void:
