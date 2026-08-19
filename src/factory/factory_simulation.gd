@@ -9,6 +9,8 @@ var lines: Dictionary = {}
 var recipes: Array[SigilRecipeModel] = []
 var summon_events: Array[Dictionary] = []
 var summon_failure_events: Array[Dictionary] = []
+var blocked_line_ids: Array[StringName] = []
+var blocked_output_node_ids: Array[StringName] = []
 var discarded_glyphs := 0
 var tick_index := 0
 
@@ -126,6 +128,8 @@ func line_flow_state(line_id: StringName) -> StringName:
 	var line: FactoryLineModel = lines[line_id]
 	if line.payload == null:
 		return &"empty"
+	if blocked_line_ids.has(line_id):
+		return &"buffer_full"
 	if line.remaining_ticks > 0:
 		return &"transporting"
 	var target: FactoryNodeModel = nodes.get(line.to_node_id)
@@ -139,6 +143,8 @@ func node_flow_state(node_id: StringName) -> StringName:
 		return &"missing"
 	var node: FactoryNodeModel = nodes[node_id]
 	if node.output_buffer != null:
+		if blocked_output_node_ids.has(node_id):
+			return &"output_blocked"
 		var outgoing := _outgoing_line_ids(node_id)
 		var can_dispatch := false
 		for line_id in outgoing:
@@ -184,6 +190,8 @@ func duplicate_state() -> FactorySimulation:
 		result.lines[copied_line.id] = copied_line
 	result.summon_events = summon_events.duplicate(true)
 	result.summon_failure_events = summon_failure_events.duplicate(true)
+	result.blocked_line_ids = blocked_line_ids.duplicate()
+	result.blocked_output_node_ids = blocked_output_node_ids.duplicate()
 	result.discarded_glyphs = discarded_glyphs
 	result.tick_index = tick_index
 	return result
@@ -209,6 +217,8 @@ func discard_all_work_in_progress() -> int:
 			line.payload = null
 		line.remaining_ticks = 0
 	discarded_glyphs += discarded_now
+	blocked_line_ids.clear()
+	blocked_output_node_ids.clear()
 	return discarded_now
 
 
@@ -216,6 +226,8 @@ func tick() -> void:
 	tick_index += 1
 	var input_acceptance := _snapshot_input_acceptance()
 	var line_availability := _snapshot_line_availability()
+	blocked_line_ids.clear()
+	blocked_output_node_ids.clear()
 	_advance_nodes()
 	_advance_lines(input_acceptance)
 	_dispatch_outputs(line_availability)
@@ -256,6 +268,8 @@ func _advance_lines(input_acceptance: Dictionary) -> void:
 		)
 		if accepted_at_tick_start and target.accept(line.to_port, line.payload):
 			line.payload = null
+		else:
+			blocked_line_ids.append(line_id)
 
 
 func _advance_nodes() -> void:
@@ -415,13 +429,17 @@ func _dispatch_outputs(line_availability: Dictionary) -> void:
 		var node: FactoryNodeModel = nodes[node_id]
 		if node.output_buffer == null:
 			continue
+		var dispatched := false
 		for line_id in _outgoing_line_ids(node.id):
 			if not bool(line_availability.get(line_id, false)):
 				continue
 			var line: FactoryLineModel = lines[line_id]
 			if line.send(node.output_buffer):
 				node.output_buffer = null
+				dispatched = true
 				break
+		if not dispatched:
+			blocked_output_node_ids.append(node_id)
 
 
 func _outgoing_line_ids(node_id: StringName) -> Array:

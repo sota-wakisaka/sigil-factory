@@ -357,6 +357,11 @@ func _test_factory_tick_uses_starting_input_availability() -> void:
 	simulation.tick()
 	_expect(rotator.input_buffers[0] == null, "an input consumed this tick should remain unavailable to arriving cargo")
 	_expect(line.payload != null, "cargo should wait when its target input was full at tick start")
+	_expect(simulation.line_flow_state(&"line") == &"buffer_full", "snapshot-rejected cargo should retain a buffer-full diagnostic")
+	_expect(
+		simulation.duplicate_state().line_flow_state(&"line") == &"buffer_full",
+		"duplicated preview state should preserve the actual line blockage reason"
+	)
 	simulation.tick()
 	_expect(rotator.input_buffers[0] != null, "waiting cargo should arrive on the next tick after input becomes available")
 
@@ -377,6 +382,11 @@ func _test_factory_tick_does_not_refill_freed_line() -> void:
 	simulation.tick()
 	_expect(line.payload == null, "cargo should leave a line when its target was free at tick start")
 	_expect(source.output_buffer != null, "a line freed this tick should not be refilled until the next tick")
+	_expect(simulation.node_flow_state(&"source") == &"output_blocked", "snapshot-held output should retain an output-blocked diagnostic")
+	_expect(
+		simulation.duplicate_state().node_flow_state(&"source") == &"output_blocked",
+		"duplicated preview state should preserve the actual output blockage reason"
+	)
 	simulation.tick()
 	_expect(line.payload != null, "the held output should dispatch once the line starts a tick empty")
 	_expect(source.output_buffer == null, "dispatch on the following tick should clear the output buffer")
