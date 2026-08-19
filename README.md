@@ -16,6 +16,8 @@ Design documents:
 - Equipment palette for adding and deleting sources, processors, combiners, and summoners
 - Selection inspector for source material, rotation, and color configuration
 - Deterministic fixed-tick glyph factory simulation
+- Canonical binary Combine structure with hierarchy-aware sigil matching
+- Production provenance for processing count, traversed node kinds, and source IDs
 - Three production plans: fast scouts, anti-swarm sentinels, and anti-armor golems
 - Transactional factory changes made during time stop
 - One-dimensional automatic battle with unit roles, lifetimes, and leader objectives
@@ -23,6 +25,10 @@ Design documents:
 - Victory, reward, next-route, defeat, and instant retry flow
 - Persistent run rewards for source, processor, or transport speed
 - Wave labels, matchup guidance, hit feedback, and post-battle analysis
+
+The MVP now preserves glyph production provenance through transport, processing,
+copying, and Combine operations. Provenance is exposed on summon events for future
+relic effects but does not affect structural sigil matching.
 
 Route selection currently offers three placeholder branches that share the same
 battle. The stage briefing, reward choice, reward persistence, and next-route
