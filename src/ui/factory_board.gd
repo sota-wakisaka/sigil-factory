@@ -1188,6 +1188,17 @@ func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_glyph = null
 	tooltip_title = ""
 	tooltip_context = ""
+	var summary_unit := production_summary_unit_at(at_position)
+	if summary_unit != &"":
+		for recipe in MvpContent.recipes():
+			if recipe.unit_id != summary_unit:
+				continue
+			_set_glyph_tooltip(
+				recipe.glyph,
+				"32秒予測 // %s" % String(MvpContent.sigil_name(recipe.id)).trim_suffix("シジル"),
+				"生産見込み %d体" % cached_production_counts.get(summary_unit, 0)
+			)
+			return "glyph_preview"
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return ""
@@ -1218,6 +1229,17 @@ func _get_tooltip(at_position: Vector2) -> String:
 		_set_glyph_tooltip(line.payload, "%s → %s" % [from_label, to_label], "輸送中Glyph")
 		return "glyph_preview"
 	return ""
+
+
+func production_summary_unit_at(at_position: Vector2) -> StringName:
+	if not interaction_enabled or not cached_production_valid:
+		return &""
+	var unit_order: Array[StringName] = [&"scout", &"sentinel", &"golem"]
+	for index in unit_order.size():
+		var center := Vector2(size.x - 208.0 + index * 66.0, 28.0)
+		if at_position.distance_to(center) <= 23.0:
+			return unit_order[index]
+	return &""
 
 
 func _set_glyph_tooltip(next_glyph: GlyphModel, next_title: String, next_context: String) -> void:

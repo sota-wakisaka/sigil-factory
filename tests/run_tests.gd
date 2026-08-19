@@ -2262,6 +2262,11 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(board.palette_availability(&"summoner")["reason"] == &"summoner_limit", "existing summoner should visibly block another summoner")
 	_expect(board.interaction_legend_count() == 3, "factory should replace the permanent instruction sentence with three gesture icons")
 	_expect(board.persistent_node_label_count() == 0, "factory node silhouettes and Glyphs should replace overlapping persistent node names")
+	board.size = Vector2(1196, 401)
+	var summary_center := Vector2(board.size.x - 208.0, 28.0)
+	_expect(board.production_summary_unit_at(summary_center) == &"scout", "production Glyph should expose a stable hover target")
+	_expect(board._get_tooltip(summary_center) == "glyph_preview", "production Glyph should open the same large visual tooltip as factory Glyphs")
+	_expect(board.tooltip_glyph != null and "生産見込み" in board.tooltip_context, "production tooltip should pair its CanonicalGlyph with the forecast count")
 	_expect(preview["ok"], "complete factory should produce a preview")
 	_expect(preview["counts"][&"scout"] > 0, "scout factory preview should report scouts")
 	_expect(
