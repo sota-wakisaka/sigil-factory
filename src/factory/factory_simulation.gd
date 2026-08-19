@@ -12,6 +12,7 @@ var summon_failure_events: Array[Dictionary] = []
 var blocked_line_ids: Array[StringName] = []
 var blocked_output_node_ids: Array[StringName] = []
 var last_runtime_glyph_errors: Array[String] = []
+var last_runtime_recipe_errors: Array[String] = []
 var discarded_glyphs := 0
 var tick_index := 0
 
@@ -158,6 +159,7 @@ func validate_graph() -> Dictionary:
 		var configured_node: FactoryNodeModel = nodes[node_key]
 		errors.append_array(_node_configuration_errors(node_key, configured_node))
 	errors.append_array(work_in_progress_validation_errors())
+	errors.append_array(_recipe_state_validation_errors())
 	var structurally_valid_line_ids: Dictionary = {}
 	var input_line_counts: Dictionary = {}
 	var output_line_counts: Dictionary = {}
@@ -400,6 +402,7 @@ func _duplicate_state_unchecked() -> FactorySimulation:
 	result.blocked_line_ids = blocked_line_ids.duplicate()
 	result.blocked_output_node_ids = blocked_output_node_ids.duplicate()
 	result.last_runtime_glyph_errors = last_runtime_glyph_errors.duplicate()
+	result.last_runtime_recipe_errors = last_runtime_recipe_errors.duplicate()
 	result.discarded_glyphs = discarded_glyphs
 	result.tick_index = tick_index
 	return result
@@ -469,7 +472,8 @@ func _runtime_glyph_is_valid(glyph_value) -> bool:
 
 func tick() -> void:
 	last_runtime_glyph_errors = work_in_progress_validation_errors()
-	if not last_runtime_glyph_errors.is_empty():
+	last_runtime_recipe_errors = _recipe_state_validation_errors()
+	if not last_runtime_glyph_errors.is_empty() or not last_runtime_recipe_errors.is_empty():
 		return
 	tick_index += 1
 	var input_acceptance := _snapshot_input_acceptance()

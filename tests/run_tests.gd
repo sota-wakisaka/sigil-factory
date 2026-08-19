@@ -68,6 +68,7 @@ func _initialize() -> void:
 	_test_factory_validation_rejects_externally_injected_cycle()
 	_test_factory_validation_rejects_invalid_restored_configuration()
 	_test_factory_validation_rejects_invalid_work_in_progress()
+	_test_factory_tick_preserves_work_during_corrupt_recipe_state()
 	_test_factory_validation_order_is_stable()
 	_test_factory_flow_diagnostics_distinguish_blockages()
 	_test_mvp_plans_produce_expected_units()
@@ -1396,6 +1397,52 @@ func _test_factory_validation_rejects_invalid_work_in_progress() -> void:
 	_expect(
 		"仕掛品データが破損" in board.cached_production_preview,
 		"production preview should explain invalid restored work in progress"
+	)
+	board.free()
+
+
+func _test_factory_tick_preserves_work_during_corrupt_recipe_state() -> void:
+	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
+	var summoner: FactoryNodeModel = simulation.nodes[&"summoner"]
+	var waiting := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	summoner.input_buffers[0] = waiting
+	var corrupted_recipe: SigilRecipeModel = simulation.recipes[0]
+	var original_glyph := corrupted_recipe.glyph
+	corrupted_recipe.glyph = null
+	var tick_before := simulation.tick_index
+	var discarded_before := simulation.discarded_glyphs
+	simulation.tick()
+	var expected_errors: Array[String] = [
+		"invalid_recipe:recipe[0]=azure_guard:missing_glyph",
+	]
+	_expect(simulation.tick_index == tick_before, "corrupt recipe state should stop fixed-tick time")
+	_expect(summoner.input_buffers[0] == waiting, "stopped recipe validation should preserve the waiting Glyph")
+	_expect(simulation.discarded_glyphs == discarded_before, "corrupt recipe state should not discard valid work")
+	_expect(
+		simulation.last_runtime_recipe_errors == expected_errors,
+		"stopped tick should retain the corrupt recipe registry location"
+	)
+	var validation := simulation.validate_graph()
+	_expect(not validation["ok"], "corrupt recipe registry should block graph execution")
+	_expect(validation["errors"].has(expected_errors[0]), "graph validation should share the recipe corruption reason")
+	corrupted_recipe.glyph = original_glyph
+	simulation.tick()
+	_expect(simulation.tick_index == tick_before + 1, "restoring the recipe should resume fixed-tick time")
+	_expect(simulation.last_runtime_recipe_errors.is_empty(), "successful resumed tick should clear recipe errors")
+
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SCOUT)
+	board.simulation.recipes[0].glyph = null
+	var board_validation := board.validation_result()
+	_expect(not board_validation["ok"], "factory board should block a corrupted acquired recipe")
+	_expect(
+		board_validation["message"] == "取得済みシジルデータが破損しています。ランデータを再読み込みしてください",
+		"factory board should explain recipe corruption separately from wiring errors"
+	)
+	board._refresh_production_preview()
+	_expect(
+		"取得済みシジルデータが破損" in board.cached_production_preview,
+		"32-second preview should share the recipe corruption explanation"
 	)
 	board.free()
 

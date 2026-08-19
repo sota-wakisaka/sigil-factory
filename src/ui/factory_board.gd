@@ -1267,6 +1267,8 @@ func _validation_message(errors: Array) -> String:
 		return "ラインデータのIDが破損しています"
 	if error.begins_with("invalid_glyph:"):
 		return "工場内の仕掛品データが破損しています。仕掛品を廃棄して再構築してください"
+	if error.begins_with("invalid_recipe:"):
+		return "取得済みシジルデータが破損しています。ランデータを再読み込みしてください"
 	return "工場の配線を確認してください"
 
 
