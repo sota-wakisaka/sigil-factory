@@ -212,6 +212,9 @@ func _refresh_factory_inspector() -> void:
 func _on_inspector_option_selected(index: int) -> void:
 	if factory_board.configure_selected_node(index):
 		plan_label.text = "カスタム工場 // 設備設定を変更しました"
+		var pending_discard := factory_board.pending_discard_count()
+		if pending_discard > 0:
+			plan_label.text += " // 仕掛品%d個を廃棄予定" % pending_discard
 
 
 func _cancel_edit() -> void:

@@ -238,29 +238,40 @@ func configure_selected_node(option_index: int) -> bool:
 	if not interaction_enabled or selected_node_id == &"" or not display_simulation.nodes.has(selected_node_id):
 		return false
 	var node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
-	_push_undo_snapshot()
+	var config_changed := false
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
 			if option_index < 0 or option_index > 1:
-				undo_history.pop_back()
 				return false
+			config_changed = String(node.config.get("primitive_id", "ring")) != ("spike" if option_index == 1 else "ring")
+		FactoryNodeModel.NodeKind.ROTATOR:
+			if option_index < 0 or option_index > 2:
+				return false
+			config_changed = int(node.config.get("steps", 1)) != option_index + 1
+		FactoryNodeModel.NodeKind.COLORIZER:
+			if option_index < 0 or option_index > 2:
+				return false
+			config_changed = String(node.config.get("color_id", "blue")) != ["blue", "red", "white"][option_index]
+		_:
+			return false
+	if not config_changed:
+		return false
+	_push_undo_snapshot()
+	var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
+	match node.kind:
+		FactoryNodeModel.NodeKind.SOURCE:
 			node.config["primitive_id"] = "spike" if option_index == 1 else "ring"
 			node.config["interval_ticks"] = 54 if option_index == 1 else 18
 			_apply_node_upgrades(node)
 		FactoryNodeModel.NodeKind.ROTATOR:
-			if option_index < 0 or option_index > 2:
-				undo_history.pop_back()
-				return false
 			node.config["steps"] = option_index + 1
 		FactoryNodeModel.NodeKind.COLORIZER:
-			if option_index < 0 or option_index > 2:
-				undo_history.pop_back()
-				return false
 			node.config["color_id"] = ["blue", "red", "white"][option_index]
-		_:
-			undo_history.pop_back()
-			return false
-	connection_message = "設備設定を変更しました"
+	connection_message = (
+		"設備設定を変更しました（仕掛品%d個を廃棄予定）" % discarded_now
+		if discarded_now > 0
+		else "設備設定を変更しました"
+	)
 	_refresh_production_preview()
 	selection_changed.emit()
 	queue_redraw()

@@ -131,6 +131,29 @@ func duplicate_state() -> FactorySimulation:
 	return result
 
 
+func discard_all_work_in_progress() -> int:
+	var discarded_now := 0
+	for node in nodes.values():
+		for port in node.input_buffers.size():
+			if node.input_buffers[port] != null:
+				discarded_now += 1
+				node.input_buffers[port] = null
+		if node.output_buffer != null:
+			discarded_now += 1
+			node.output_buffer = null
+		if node.processing_glyph != null:
+			discarded_now += 1
+			node.processing_glyph = null
+		node.remaining_processing_ticks = 0
+	for line in lines.values():
+		if line.payload != null:
+			discarded_now += 1
+			line.payload = null
+		line.remaining_ticks = 0
+	discarded_glyphs += discarded_now
+	return discarded_now
+
+
 func tick() -> void:
 	tick_index += 1
 	_advance_nodes()

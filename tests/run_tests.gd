@@ -47,6 +47,7 @@ func _initialize() -> void:
 	_test_factory_nodes_can_be_repositioned()
 	_test_factory_editor_undo_restores_graph()
 	_test_factory_node_configuration_is_undoable()
+	_test_factory_configuration_discards_work_transactionally()
 	_test_factory_board_connections_change_output()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
@@ -531,6 +532,28 @@ func _test_factory_node_configuration_is_undoable() -> void:
 	_expect(board.simulation.nodes[rotator_id].config["steps"] == 1, "undo should restore the previous node setting")
 	board.configure(MvpContent.PLAN_SCOUT)
 	_expect(board.selected_node_id == &"", "switching factory templates should clear stale inspector selection")
+	board.free()
+
+
+func _test_factory_configuration_discards_work_transactionally() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SCOUT)
+	for _tick in 18:
+		board.advance_tick()
+	var committed_work_in_progress := board.work_in_progress_count()
+	_expect(committed_work_in_progress > 0, "configuration test should begin with work in progress")
+	board.begin_edit()
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	_expect(board.configure_selected_node(1), "source configuration should change during time stop")
+	_expect(board.pending_discard_count() == committed_work_in_progress, "configuration should disclose all pending discards")
+	_expect(board.preview_simulation.discarded_glyphs == committed_work_in_progress, "preview should count discarded work")
+	_expect(board.undo(), "configuration discard should be undoable")
+	_expect(board.pending_discard_count() == 0, "undo should remove pending discard count")
+	_expect(board.preview_simulation != null, "undo should preserve the edit transaction")
+	board.cancel_edit()
+	_expect(board.work_in_progress_count() == committed_work_in_progress, "cancel should restore configured work in progress")
+	_expect(board.simulation.discarded_glyphs == 0, "cancel should not commit configuration discards")
 	board.free()
 
 
