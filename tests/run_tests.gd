@@ -90,6 +90,7 @@ func _initialize() -> void:
 	_test_factory_board_replaces_failure_with_success()
 	_test_factory_board_shows_distinct_flow_warning()
 	_test_factory_board_holds_transient_flow_warning()
+	_test_factory_board_exposes_visible_work_in_progress_glyphs()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
 	_test_factory_production_preview_explains_first_mismatch()
@@ -1868,6 +1869,37 @@ func _test_factory_board_holds_transient_flow_warning() -> void:
 		_expect(board.flow_warning_message != "", "resolved warning should remain visible for its minimum hold time")
 	board.advance_tick()
 	_expect(board.flow_warning_message == "", "resolved warning should clear exactly after its hold time")
+	board.free()
+
+
+func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SENTINEL)
+	var rotator: FactoryNodeModel = board.simulation.nodes[&"rotator"]
+	var input_glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var output_glyph := GlyphModel.new([GlyphComponentModel.new(&"spike", Vector2i.ZERO, 1, 1, &"blue")])
+	rotator.input_buffers[0] = input_glyph
+	_expect(
+		board.visible_glyph_for_node(&"rotator") == input_glyph,
+		"node glyph display should fall back to buffered input while waiting"
+	)
+	rotator.output_buffer = output_glyph
+	_expect(
+		board.visible_glyph_for_node(&"rotator") == output_glyph,
+		"node glyph display should prioritize processed output"
+	)
+	var line: FactoryLineModel = board.simulation.lines[&"line_1"]
+	line.payload = output_glyph
+	_expect(
+		board.visible_glyph_for_line(&"line_1") == output_glyph,
+		"line glyph display should expose the transported structure"
+	)
+	var invalid := GlyphModel.new([GlyphComponentModel.new(&"ring"), GlyphComponentModel.new(&"spike")])
+	line.payload = invalid
+	_expect(
+		board.visible_glyph_for_line(&"line_1") == null,
+		"invalid transported Glyph should stay with corruption diagnostics instead of being drawn"
+	)
 	board.free()
 
 
