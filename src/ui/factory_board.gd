@@ -24,6 +24,8 @@ const MATCH_COLOR := Color(0.36, 1.0, 0.58, 1.0)
 const NODE_HALF_SIZE := Vector2(48, 30)
 const REFERENCE_SIZE := Vector2(820, 395)
 const PORT_RADIUS := 7.0
+const FACTORY_LINE_WIDTH := 2.0
+const TRANSPORT_GLYPH_HALO_RADIUS := 13.0
 const PRODUCTION_PREVIEW_TICKS := 160
 const FLOW_WARNING_HOLD_TICKS := 5
 
@@ -837,12 +839,12 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		var start := _scaled_position(display_positions.get(line.from_node_id, Vector2.ZERO)) + Vector2(NODE_HALF_SIZE.x, 0)
 		var finish := _input_port_position(line.to_node_id, line.to_port)
 		var line_color := WARNING_COLOR if display_simulation.line_flow_state(line_id) == &"buffer_full" else LINE_COLOR
-		draw_line(start, finish, line_color, 4.0, true)
+		draw_line(start, finish, line_color, FACTORY_LINE_WIDTH, true)
 		_draw_flow_arrow(start, finish, line_color)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
 			var glyph_center := start.lerp(finish, progress)
-			_draw_mini_glyph(line.payload, glyph_center, 0.72)
+			_draw_transport_glyph(line.payload, glyph_center)
 			_draw_recipe_match_marker(glyph_center, line_recipe_match_state(line_id), 11.0)
 
 
@@ -854,8 +856,22 @@ func _draw_flow_arrow(start: Vector2, finish: Vector2, color: Color) -> void:
 	var tip := center + direction * 8.0
 	var wing_origin := center - direction * 5.0
 	var normal := Vector2(-direction.y, direction.x) * 6.0
-	draw_line(tip, wing_origin + normal, color, 2.5, true)
-	draw_line(tip, wing_origin - normal, color, 2.5, true)
+	draw_line(tip, wing_origin + normal, color, 1.5, true)
+	draw_line(tip, wing_origin - normal, color, 1.5, true)
+
+
+func _draw_transport_glyph(glyph: GlyphModel, center: Vector2) -> void:
+	if not GlyphPainterModel.can_draw(glyph):
+		return
+	draw_circle(center, TRANSPORT_GLYPH_HALO_RADIUS, Color(0.012, 0.024, 0.038, 0.94))
+	draw_arc(center, TRANSPORT_GLYPH_HALO_RADIUS, 0.0, TAU, 24, Color(0.22, 0.42, 0.56, 0.42), 1.0, true)
+	_draw_mini_glyph(glyph, center, transport_glyph_draw_scale(glyph))
+
+
+func transport_glyph_draw_scale(glyph: GlyphModel) -> float:
+	if glyph != null and not glyph.combine_children.is_empty():
+		return 0.85
+	return 1.5
 
 
 func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
@@ -1107,8 +1123,8 @@ func _make_custom_tooltip(_for_text: String):
 
 func node_glyph_draw_scale(glyph: GlyphModel) -> float:
 	if glyph != null and not glyph.combine_children.is_empty():
-		return 0.55
-	return 0.82
+		return 0.7
+	return 1.1
 
 
 func visible_glyph_for_line(line_id: StringName) -> GlyphModel:
@@ -1219,7 +1235,7 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 		if node.required_input_count() == 2:
 			y_offset = -13.0 if port == 0 else 13.0
 		var glyph_center := center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset)
-		_draw_mini_glyph(glyph, glyph_center, 0.5)
+		_draw_mini_glyph(glyph, glyph_center, 0.68)
 		if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
 			_draw_recipe_match_marker(glyph_center, input_recipe_match_state(node.id, port), 9.0)
 

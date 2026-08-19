@@ -2058,6 +2058,13 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		board.visible_glyph_for_line(&"line_1") == output_glyph,
 		"line glyph display should expose the transported structure"
 	)
+	_expect(FactoryBoard.FACTORY_LINE_WIDTH <= 2.0, "factory conduit should stay visually weaker than transported Glyph strokes")
+	_expect(board.transport_glyph_draw_scale(output_glyph) >= 1.5, "single-Primitive transport Glyph should be readable on the full-width board")
+	var combined_transport := GlyphModel.combine(input_glyph, output_glyph)
+	_expect(
+		board.transport_glyph_draw_scale(combined_transport) < board.transport_glyph_draw_scale(output_glyph),
+		"combined transport Glyph should use a separate scale that keeps its circle inside the halo"
+	)
 	var invalid := GlyphModel.new([GlyphComponentModel.new(&"ring"), GlyphComponentModel.new(&"spike")])
 	line.payload = invalid
 	_expect(
