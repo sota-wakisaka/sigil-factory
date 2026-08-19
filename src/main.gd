@@ -85,6 +85,8 @@ func _ready() -> void:
 	factory_board.selection_changed.connect(_refresh_factory_inspector)
 	factory_board.factory_changed.connect(_refresh_empty_factory_guidance)
 	factory_board.factory_changed.connect(_refresh_factory_goal_candidate)
+	factory_board.factory_changed.connect(_refresh_factory_palette_state)
+	factory_board.selection_changed.connect(_refresh_factory_palette_state)
 	inspector_option.item_selected.connect(_on_inspector_option_selected)
 	battle_board.battle_finished.connect(_on_battle_finished)
 	_select_plan(MvpContent.PLAN_SCOUT)
@@ -615,8 +617,22 @@ func _set_plan_buttons_enabled(enabled: bool) -> void:
 
 
 func _set_factory_palette_enabled(enabled: bool) -> void:
+	if not enabled:
+		for button in $FactoryPalette.get_children():
+			button.disabled = true
+		return
+	_refresh_factory_palette_state()
+
+
+func _refresh_factory_palette_state() -> void:
 	for button in $FactoryPalette.get_children():
-		button.disabled = not enabled
+		match button.equipment_kind:
+			&"delete":
+				button.disabled = not factory_board.interaction_enabled or factory_board.selected_node_id == &""
+			&"undo":
+				button.disabled = not factory_board.can_undo()
+			_:
+				button.disabled = not factory_board.palette_availability(button.equipment_kind)["available"]
 
 
 func _refresh_status() -> void:

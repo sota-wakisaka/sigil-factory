@@ -59,6 +59,9 @@ func _initialize() -> void:
 	_expect(main.sigil_ghost.candidate_state == &"match", "template output should immediately compare against its selected target")
 	_expect(main.factory_board.interaction_enabled, "factory build should enable node placement")
 	_expect(not main.get_node("FactoryPalette/RingButton").disabled, "factory build should enable the equipment palette")
+	_expect(main.get_node("FactoryPalette/SummonButton").disabled, "palette should visually block the one-summoner limit before click")
+	_expect(main.get_node("FactoryPalette/DeleteButton").disabled, "delete should stay unavailable until a node is selected")
+	_expect(main.get_node("FactoryPalette/UndoButton").disabled, "undo should stay unavailable without edit history")
 	_expect(main.get_node("FactoryPalette/RingButton").preview_glyph != null, "source palette choice should use its Primitive as the main icon")
 	_expect(main.get_node("FactoryPalette/RingButton").text == "", "palette choice should not rely on the native text label")
 	_expect(main.get_node("FactoryPalette/SummonButton").equipment_kind == &"summoner", "summoner palette choice should expose its dedicated vector icon kind")
@@ -74,6 +77,8 @@ func _initialize() -> void:
 	_expect("斥候" in main.factory_board.cached_production_preview, "factory build should preview expected production")
 	var node_count_before_palette: int = main.factory_board.simulation.nodes.size()
 	main.get_node("FactoryPalette/RingButton").pressed.emit()
+	_expect(not main.get_node("FactoryPalette/DeleteButton").disabled, "adding a node should immediately enable delete for its selection")
+	_expect(not main.get_node("FactoryPalette/UndoButton").disabled, "adding a node should immediately enable undo")
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette + 1, "palette should add factory equipment")
 	_expect(
 		"出力が未接続" in main.factory_board.cached_production_preview,

@@ -2257,6 +2257,9 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(board.cached_production_counts == preview["counts"], "visual production summary should preserve exact forecast counts")
 	_expect(board.cached_production_discarded == preview["discarded"], "visual production summary should preserve the mismatch count")
 	_expect(is_equal_approx(board.mana_fill_ratio(), float(board.mana_used()) / 100.0), "mana meter should reflect the fixed factory capacity")
+	board.set_interaction_enabled(true)
+	_expect(board.palette_availability(&"ring_source")["available"], "affordable source should be available in the visual palette")
+	_expect(board.palette_availability(&"summoner")["reason"] == &"summoner_limit", "existing summoner should visibly block another summoner")
 	_expect(preview["ok"], "complete factory should produce a preview")
 	_expect(preview["counts"][&"scout"] > 0, "scout factory preview should report scouts")
 	_expect(

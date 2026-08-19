@@ -266,6 +266,35 @@ func mana_fill_ratio(source_simulation: FactorySimulation = null) -> float:
 	return clampf(float(mana_used(source_simulation)) / float(MvpContent.FACTORY_MANA_MAX), 0.0, 1.0)
 
 
+func palette_availability(template_id: StringName) -> Dictionary:
+	if not interaction_enabled:
+		return {"available": false, "reason": &"locked"}
+	var kind := FactoryNodeModel.NodeKind.SOURCE
+	match template_id:
+		&"ring_source", &"spike_source":
+			kind = FactoryNodeModel.NodeKind.SOURCE
+		&"rotator":
+			kind = FactoryNodeModel.NodeKind.ROTATOR
+		&"colorizer":
+			kind = FactoryNodeModel.NodeKind.COLORIZER
+		&"combiner":
+			kind = FactoryNodeModel.NodeKind.COMBINER
+		&"summoner":
+			kind = FactoryNodeModel.NodeKind.SUMMONER
+		_:
+			return {"available": false, "reason": &"unknown"}
+	var display_simulation := _display_simulation()
+	if kind == FactoryNodeModel.NodeKind.SUMMONER and _summoner_count(display_simulation) >= 1:
+		return {"available": false, "reason": &"summoner_limit"}
+	if mana_used(display_simulation) + MvpContent.node_mana_cost(kind) > MvpContent.FACTORY_MANA_MAX:
+		return {"available": false, "reason": &"mana"}
+	return {"available": true, "reason": &""}
+
+
+func can_undo() -> bool:
+	return interaction_enabled and not undo_history.is_empty()
+
+
 func mana_status_text() -> String:
 	return "魔力 %d/%d // 空き%d" % [
 		mana_used(),

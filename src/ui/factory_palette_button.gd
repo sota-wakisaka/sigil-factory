@@ -34,6 +34,15 @@ func _draw() -> void:
 		10,
 		Color(0.66, 0.76, 0.84, 1.0)
 	)
+	if disabled:
+		_draw_unavailable_overlay()
+
+
+func _draw_unavailable_overlay() -> void:
+	var center := Vector2(size.x - 11.0, 10.0)
+	draw_circle(center, 7.0, Color(0.055, 0.07, 0.09, 0.96))
+	draw_arc(center, 7.0, 0.0, TAU, 18, Color(0.88, 0.38, 0.34, 0.92), 1.2, true)
+	draw_line(center + Vector2(-4, 4), center + Vector2(4, -4), Color(0.96, 0.45, 0.4), 1.6, true)
 
 
 func _draw_equipment_icon(center: Vector2) -> void:
