@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_test_factory_records_closest_summon_failure()
 	_test_factory_closest_recipe_is_order_independent()
 	_test_factory_rejects_ambiguous_recipes()
+	_test_factory_rejects_invalid_recipe_structures()
 	_test_factory_owns_registered_recipe_data()
 	_test_factory_duplicate_owns_recipe_data()
 	_test_combiner_waits_for_both_inputs()
@@ -699,6 +700,48 @@ func _test_factory_rejects_ambiguous_recipes() -> void:
 		"accepted recipes should use stable ID order instead of acquisition order"
 	)
 	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 3, "all MVP recipes should have unique IDs and structures")
+
+
+func _test_factory_rejects_invalid_recipe_structures() -> void:
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	var branch := GlyphModel.new([GlyphComponentModel.new(&"branch")])
+	var invalid_recipes: Array[SigilRecipeModel] = [
+		SigilRecipeModel.new(&"", ring, &"scout"),
+		SigilRecipeModel.new(&"missing_unit", ring, &""),
+		SigilRecipeModel.new(&"empty", GlyphModel.new(), &"scout"),
+		SigilRecipeModel.new(
+			&"flat_multiple",
+			GlyphModel.new([GlyphComponentModel.new(&"ring"), GlyphComponentModel.new(&"spike")]),
+			&"golem"
+		),
+		SigilRecipeModel.new(&"unary_combine", GlyphModel.new([], null, [ring]), &"scout"),
+		SigilRecipeModel.new(&"ternary_combine", GlyphModel.new([], null, [ring, spike, branch]), &"golem"),
+		SigilRecipeModel.new(
+			&"missing_primitive",
+			GlyphModel.new([GlyphComponentModel.new(&"")]),
+			&"scout"
+		),
+		SigilRecipeModel.new(
+			&"missing_color",
+			GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, 0, 1, &"")]),
+			&"scout"
+		),
+		SigilRecipeModel.new(
+			&"invalid_scale",
+			GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, 0, 0)]),
+			&"scout"
+		),
+		SigilRecipeModel.new(&"overlap", GlyphModel.combine(ring, ring), &"scout"),
+	]
+	var simulation := FactorySimulation.new()
+	for recipe in invalid_recipes:
+		_expect(not simulation.add_recipe(recipe), "invalid recipe %s should be rejected" % recipe.id)
+	_expect(simulation.recipes.is_empty(), "invalid recipe definitions should never enter the registry")
+	_expect(
+		simulation.add_recipe(SigilRecipeModel.new(&"valid_nested", GlyphModel.combine(ring, GlyphModel.combine(spike, branch)), &"golem")),
+		"valid nested binary Combine recipe should remain accepted"
+	)
 
 
 func _test_factory_owns_registered_recipe_data() -> void:

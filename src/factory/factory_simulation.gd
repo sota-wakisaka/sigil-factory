@@ -23,6 +23,8 @@ func add_node(node: FactoryNodeModel) -> bool:
 
 
 func add_recipe(recipe: SigilRecipeModel) -> bool:
+	if recipe.id == &"" or recipe.unit_id == &"" or not recipe.glyph.is_structure_valid():
+		return false
 	var candidate_serialization := recipe.glyph.canonical_serialization()
 	for existing in recipes:
 		if existing.id == recipe.id:

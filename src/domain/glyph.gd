@@ -72,6 +72,34 @@ func canonical_hash() -> String:
 	return canonical_serialization().sha256_text()
 
 
+func structure_validation_errors(path: String = "root") -> PackedStringArray:
+	var errors := PackedStringArray()
+	if combine_children.is_empty():
+		if components.size() != 1:
+			errors.append("primitive_arity:%s:%d" % [path, components.size()])
+		else:
+			var component: GlyphComponentModel = components[0]
+			if component.primitive_id == &"":
+				errors.append("missing_primitive_id:%s" % path)
+			if component.color_id == &"":
+				errors.append("missing_color_id:%s" % path)
+			if component.scale_step < 1:
+				errors.append("invalid_scale:%s:%d" % [path, component.scale_step])
+	else:
+		if combine_children.size() != 2:
+			errors.append("combine_arity:%s:%d" % [path, combine_children.size()])
+		for child_index in combine_children.size():
+			var child: GlyphModel = combine_children[child_index]
+			errors.append_array(child.structure_validation_errors("%s.%d" % [path, child_index]))
+	if path == "root" and has_complete_overlap():
+		errors.append("complete_overlap:%s" % ",".join(complete_overlap_primitive_ids()))
+	return errors
+
+
+func is_structure_valid() -> bool:
+	return structure_validation_errors().is_empty()
+
+
 static func _canonical_child_less(first: GlyphModel, second: GlyphModel) -> bool:
 	return _canonical_serialization_less(
 		first.canonical_serialization(),

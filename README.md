@@ -20,6 +20,7 @@ Design documents:
 - Deterministic fixed-tick glyph factory simulation
 - Authoritative graph validation for restored or externally constructed factory data
 - Collision-safe canonical binary Combine structure with hierarchy-aware sigil matching
+- Recipe-boundary validation for primitive leaves, binary Combine arity, and component fields
 - Unique recipe IDs and canonical structures with acquisition-order-independent registration
 - Owned recipe snapshots that isolate runtime factories and non-destructive previews
 - Completed-sigil ghost preview for the currently selected production plan
