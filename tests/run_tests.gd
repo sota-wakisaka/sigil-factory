@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_test_factory_records_closest_summon_failure()
 	_test_factory_closest_recipe_is_order_independent()
 	_test_factory_rejects_ambiguous_recipes()
+	_test_recipe_registration_reports_stable_errors()
 	_test_factory_rejects_invalid_recipe_structures()
 	_test_factory_owns_registered_recipe_data()
 	_test_factory_duplicate_owns_recipe_data()
@@ -703,6 +704,37 @@ func _test_factory_rejects_ambiguous_recipes() -> void:
 		"accepted recipes should use stable ID order instead of acquisition order"
 	)
 	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 3, "all MVP recipes should have unique IDs and structures")
+
+
+func _test_recipe_registration_reports_stable_errors() -> void:
+	var simulation := FactorySimulation.new()
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	_expect(
+		simulation.add_recipe(SigilRecipeModel.new(&"ring_recipe", ring, &"scout")),
+		"registration diagnostic fixture should register"
+	)
+	var duplicate_result := simulation.recipe_registration_result(
+		SigilRecipeModel.new(&"ring_recipe", ring, &"sentinel")
+	)
+	_expect(
+		duplicate_result["errors"] == PackedStringArray([
+			"duplicate_recipe_id",
+			"duplicate_glyph_structure",
+		]),
+		"recipe registration should report ID and structure duplicates in stable priority order"
+	)
+	var invalid_result := simulation.recipe_registration_result(
+		SigilRecipeModel.new(&"", GlyphModel.new(), &"")
+	)
+	_expect(
+		invalid_result["errors"] == PackedStringArray([
+			"missing_recipe_id",
+			"missing_unit_id",
+			"glyph:primitive_arity:root:0",
+		]),
+		"recipe registration should report required fields before structural errors"
+	)
+	_expect(simulation.recipes.size() == 1, "registration diagnostics should not mutate the recipe registry")
 
 
 func _test_factory_rejects_invalid_recipe_structures() -> void:

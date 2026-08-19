@@ -23,20 +23,37 @@ func add_node(node: FactoryNodeModel) -> bool:
 
 
 func add_recipe(recipe: SigilRecipeModel) -> bool:
-	if recipe.id == &"" or recipe.unit_id == &"" or not recipe.glyph.is_structure_valid():
+	if not recipe_registration_result(recipe)["ok"]:
 		return false
-	var candidate_serialization := recipe.glyph.canonical_serialization()
-	for existing in recipes:
-		if existing.id == recipe.id:
-			return false
-		if existing.glyph.canonical_serialization() == candidate_serialization:
-			return false
 	recipes.append(recipe.copy())
 	recipes.sort_custom(
 		func(first: SigilRecipeModel, second: SigilRecipeModel) -> bool:
 			return String(first.id) < String(second.id)
 	)
 	return true
+
+
+func recipe_registration_result(recipe: SigilRecipeModel) -> Dictionary:
+	var errors := PackedStringArray()
+	if recipe.id == &"":
+		errors.append("missing_recipe_id")
+	if recipe.unit_id == &"":
+		errors.append("missing_unit_id")
+	var structure_errors := recipe.glyph.structure_validation_errors()
+	for structure_error in structure_errors:
+		errors.append("glyph:%s" % structure_error)
+	if not structure_errors.is_empty():
+		return {"ok": false, "errors": errors}
+	var candidate_serialization := recipe.glyph.canonical_serialization()
+	for existing in recipes:
+		if existing.id == recipe.id and not errors.has("duplicate_recipe_id"):
+			errors.append("duplicate_recipe_id")
+		if (
+			existing.glyph.canonical_serialization() == candidate_serialization
+			and not errors.has("duplicate_glyph_structure")
+		):
+			errors.append("duplicate_glyph_structure")
+	return {"ok": errors.is_empty(), "errors": errors}
 
 
 func connect_nodes(line: FactoryLineModel) -> Dictionary:
