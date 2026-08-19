@@ -97,6 +97,24 @@ func wave_status_text() -> String:
 	return "最終攻勢 // 防壁・敵リーダー"
 
 
+func capacity_status_text() -> String:
+	if simulation == null:
+		return "戦場容量 --"
+	var player_count := simulation.active_unit_count(BattleSimulation.Side.PLAYER)
+	var enemy_count := simulation.active_unit_count(BattleSimulation.Side.ENEMY)
+	var text := "戦場容量 青%d/%d  赤%d/%d" % [
+		player_count,
+		BattleSimulation.MAX_UNITS_PER_SIDE,
+		enemy_count,
+		BattleSimulation.MAX_UNITS_PER_SIDE,
+	]
+	var player_rejected := int(simulation.rejected_spawns.get(BattleSimulation.Side.PLAYER, 0))
+	var enemy_rejected := int(simulation.rejected_spawns.get(BattleSimulation.Side.ENEMY, 0))
+	if player_rejected + enemy_rejected > 0:
+		text += " // 上限拒否 青%d 赤%d" % [player_rejected, enemy_rejected]
+	return text
+
+
 func _counter_for(enemy_id: StringName) -> String:
 	match enemy_id:
 		&"raider":
@@ -129,6 +147,15 @@ func _draw() -> void:
 	_draw_leader(Vector2(size.x - 35, lane_y), false)
 	for unit in simulation.units:
 		_draw_unit(unit, lane_y)
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(18, size.y - 36.0),
+		capacity_status_text(),
+		HORIZONTAL_ALIGNMENT_CENTER,
+		size.x - 36.0,
+		11,
+		Color(0.48, 0.58, 0.7)
+	)
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(18, size.y - 16.0),

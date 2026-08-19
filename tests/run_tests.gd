@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_test_preferred_attack_marks_weakness_feedback()
 	_test_enemy_shield_takes_damage_and_opens()
 	_test_battle_ends_at_time_limit()
+	_test_battle_enforces_spawn_capacity_and_rate()
 	_test_threat_forecast_respects_horizon()
 	_test_major_change_forecast_uses_long_horizon()
 	_test_factory_edit_is_transactional()
@@ -822,6 +823,43 @@ func _test_battle_ends_at_time_limit() -> void:
 	battle.tick()
 	_expect(battle.is_finished(), "battle should end when its time limit expires")
 	_expect(battle.winner() == BattleSimulation.Side.ENEMY, "failing to defeat the leader in time should lose the stage")
+
+
+func _test_battle_enforces_spawn_capacity_and_rate() -> void:
+	var rate_battle := BattleSimulation.new()
+	var durable := UnitSpecModel.new(&"durable", 100.0, 1.0, 100, 0.0, 1.0, 0.0, 1, &"", 1.0, 10000)
+	rate_battle.add_spec(durable)
+	for _index in BattleSimulation.MAX_SPAWNS_PER_SIDE_PER_TICK:
+		_expect(rate_battle.spawn_player(&"durable"), "spawns through the per-tick limit should succeed")
+	_expect(not rate_battle.spawn_player(&"durable"), "spawn beyond the same-tick rate limit should be rejected")
+	_expect(
+		rate_battle.battle_events[-1]["reason"] == &"rate_cap",
+		"same-tick rejection should retain its rate-cap reason"
+	)
+	rate_battle.tick()
+	_expect(rate_battle.spawn_player(&"durable"), "spawn rate budget should reset on the next battle tick")
+	var rate_board := BattleBoard.new()
+	rate_board.simulation = rate_battle
+	_expect("上限拒否 青1" in rate_board.capacity_status_text(), "battlefield should disclose rejected player summons")
+	rate_board.free()
+
+	var capacity_battle := BattleSimulation.new()
+	capacity_battle.add_spec(durable)
+	var batches := int(BattleSimulation.MAX_UNITS_PER_SIDE / BattleSimulation.MAX_SPAWNS_PER_SIDE_PER_TICK)
+	for batch in batches:
+		for _index in BattleSimulation.MAX_SPAWNS_PER_SIDE_PER_TICK:
+			_expect(capacity_battle.spawn_player(&"durable"), "spawns below the simultaneous unit cap should succeed")
+		if batch < batches - 1:
+			capacity_battle.tick()
+	_expect(
+		capacity_battle.active_unit_count(BattleSimulation.Side.PLAYER) == BattleSimulation.MAX_UNITS_PER_SIDE,
+		"battle should reach but never exceed its per-side simultaneous unit cap"
+	)
+	_expect(not capacity_battle.spawn_player(&"durable"), "spawn beyond the simultaneous unit cap should be rejected")
+	_expect(
+		capacity_battle.battle_events[-1]["reason"] == &"unit_cap",
+		"simultaneous-count rejection should retain its unit-cap reason"
+	)
 
 
 func _test_threat_forecast_respects_horizon() -> void:

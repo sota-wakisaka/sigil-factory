@@ -32,6 +32,7 @@ Design documents:
 - One-second minimum hold time for transient factory warning text
 - Direction arrows and blockage coloring on factory transport lines
 - One-dimensional automatic battle with unit roles, lifetimes, and leader objectives
+- Per-side 48-unit and eight-spawns-per-tick safety limits with visible rejection counts
 - 24-second enemy threat forecast across a three-minute standard encounter
 - 60-second advance warnings for major swarm, armor, and final wave changes
 - Victory, reward, next-route, defeat, and instant retry flow

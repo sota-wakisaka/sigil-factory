@@ -14,6 +14,8 @@ const ENEMY_SHIELD_POSITION := 760.0
 const ENEMY_SHIELD_MAX_HEALTH := 12000.0
 const PLAYER_LEADER_MAX_HEALTH := 1200.0
 const ENEMY_LEADER_MAX_HEALTH := 800.0
+const MAX_UNITS_PER_SIDE := 48
+const MAX_SPAWNS_PER_SIDE_PER_TICK := 8
 
 var specs: Dictionary = {}
 var units: Array[BattleUnitModel] = []
@@ -29,6 +31,9 @@ var battle_duration_ticks := 900
 var player_kills := 0
 var enemy_kills := 0
 var battle_events: Array[Dictionary] = []
+var rejected_spawns: Dictionary = {Side.PLAYER: 0, Side.ENEMY: 0}
+var spawn_budget_tick_index := -1
+var successful_spawns_this_tick: Dictionary = {Side.PLAYER: 0, Side.ENEMY: 0}
 var last_enemy_shield_damage := 0.0
 var enemy_shield_flash_ticks := 0
 
@@ -106,12 +111,25 @@ func is_enemy_shield_active() -> bool:
 	return enemy_shield_health > 0.0 and tick_index < enemy_leader_vulnerable_tick
 
 
+func active_unit_count(side: int) -> int:
+	var count := 0
+	for unit in units:
+		count += int(unit.side == side and unit.is_alive())
+	return count
+
+
 func _spawn_unit(unit_id: StringName, side: int, position: float) -> bool:
 	if not specs.has(unit_id):
 		return false
+	_ensure_spawn_budget()
+	if active_unit_count(side) >= MAX_UNITS_PER_SIDE:
+		return _reject_spawn(unit_id, side, &"unit_cap")
+	if int(successful_spawns_this_tick.get(side, 0)) >= MAX_SPAWNS_PER_SIDE_PER_TICK:
+		return _reject_spawn(unit_id, side, &"rate_cap")
 	var unit := BattleUnitModel.new(next_instance_id, specs[unit_id], side, position)
 	next_instance_id += 1
 	units.append(unit)
+	successful_spawns_this_tick[side] = int(successful_spawns_this_tick.get(side, 0)) + 1
 	battle_events.append({
 		"type": "spawn",
 		"tick": tick_index,
@@ -120,6 +138,25 @@ func _spawn_unit(unit_id: StringName, side: int, position: float) -> bool:
 		"instance_id": unit.instance_id,
 	})
 	return true
+
+
+func _ensure_spawn_budget() -> void:
+	if spawn_budget_tick_index == tick_index:
+		return
+	spawn_budget_tick_index = tick_index
+	successful_spawns_this_tick = {Side.PLAYER: 0, Side.ENEMY: 0}
+
+
+func _reject_spawn(unit_id: StringName, side: int, reason: StringName) -> bool:
+	rejected_spawns[side] = int(rejected_spawns.get(side, 0)) + 1
+	battle_events.append({
+		"type": "spawn_rejected",
+		"tick": tick_index,
+		"unit_id": unit_id,
+		"side": side,
+		"reason": reason,
+	})
+	return false
 
 
 func _spawn_scheduled_enemies() -> void:

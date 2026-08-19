@@ -73,6 +73,7 @@ func _initialize() -> void:
 	_expect("編成警告 60s: 群体兵→衛兵" in main.threat_label.text, "battle should warn major wave changes sixty seconds ahead")
 	_expect(main.threat_label.get_minimum_size().x <= main.size.x, "combined long and near forecasts should fit the default viewport")
 	_expect(main.battle_board.wave_status_text() == "前線形成", "battlefield should identify the current wave phase")
+	_expect("戦場容量 青0/48  赤0/48" in main.battle_board.capacity_status_text(), "battlefield should disclose per-side unit capacity")
 	_expect(not main.speed_button.disabled, "battle should enable speed controls")
 	_expect("時間を停止" in main.pause_button.tooltip_text, "main action tooltip should explain time stop during battle")
 	var speed_key := InputEventKey.new()
