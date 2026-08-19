@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/factory_board.gd" id="2_factory"]
 [ext_resource type="Script" path="res://src/ui/battle_board.gd" id="3_battle"]
 [ext_resource type="Script" path="res://src/ui/sigil_ghost.gd" id="4_ghost"]
 [ext_resource type="Script" path="res://src/ui/sigil_plan_button.gd" id="5_plan_button"]
+[ext_resource type="Script" path="res://src/ui/factory_palette_button.gd" id="6_palette_button"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -141,7 +142,7 @@ layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_top = 548.0
-offset_bottom = 582.0
+offset_bottom = 576.0
 grow_horizontal = 2
 theme_override_colors/font_color = Color(0.66, 0.9, 0.78, 1)
 theme_override_font_sizes/font_size = 17
@@ -152,66 +153,82 @@ vertical_alignment = 1
 [node name="FactoryPalette" type="HBoxContainer" parent="."]
 layout_mode = 0
 offset_left = 42.0
-offset_top = 584.0
+offset_top = 578.0
 offset_right = 610.0
-offset_bottom = 622.0
+offset_bottom = 628.0
 theme_override_constants/separation = 4
 alignment = 1
 
 [node name="RingButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 38)
+custom_minimum_size = Vector2(64, 50)
 layout_mode = 2
 tooltip_text = "環グリフを一定周期で生成する素材源を追加（魔力20）"
-text = "環素材"
+script = ExtResource("6_palette_button")
+equipment_kind = &"ring_source"
+caption = "環"
 
 [node name="SpikeButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 38)
+custom_minimum_size = Vector2(64, 50)
 layout_mode = 2
 tooltip_text = "棘グリフを一定周期で生成する素材源を追加（魔力20）"
-text = "棘素材"
+script = ExtResource("6_palette_button")
+equipment_kind = &"spike_source"
+caption = "棘"
 
 [node name="RotateButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 38)
+custom_minimum_size = Vector2(64, 50)
 layout_mode = 2
 tooltip_text = "回転器を追加（魔力15）。選択後に90°・180°・270°を設定できます"
-text = "回転"
+script = ExtResource("6_palette_button")
+equipment_kind = &"rotator"
+caption = "回転"
 
 [node name="ColorButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 38)
+custom_minimum_size = Vector2(64, 50)
 layout_mode = 2
 tooltip_text = "着色器を追加（魔力15）。選択後に青・赤・白を設定できます"
-text = "着色"
+script = ExtResource("6_palette_button")
+equipment_kind = &"colorizer"
+caption = "着色"
 
 [node name="CombineButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 38)
+custom_minimum_size = Vector2(64, 50)
 layout_mode = 2
 tooltip_text = "2つの入力グリフを1つにまとめる合成器を追加（魔力20）"
-text = "合成"
+script = ExtResource("6_palette_button")
+equipment_kind = &"combiner"
+caption = "合成"
 
 [node name="SummonButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 38)
+custom_minimum_size = Vector2(64, 50)
 layout_mode = 2
 tooltip_text = "召喚器がない場合、完成グリフを照合する汎用召喚器を1基追加（魔力20）"
-text = "召喚"
+script = ExtResource("6_palette_button")
+equipment_kind = &"summoner"
+caption = "召喚"
 
 [node name="DeleteButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 38)
+custom_minimum_size = Vector2(64, 50)
 layout_mode = 2
 tooltip_text = "現在選択している設備と接続線を削除"
-text = "削除"
+script = ExtResource("6_palette_button")
+equipment_kind = &"delete"
+caption = "削除"
 
 [node name="UndoButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 38)
+custom_minimum_size = Vector2(64, 50)
 layout_mode = 2
 tooltip_text = "現在の編集セッションで行った直前の操作を元に戻す"
-text = "元に戻す"
+script = ExtResource("6_palette_button")
+equipment_kind = &"undo"
+caption = "Undo"
 
 [node name="FactoryInspector" type="HBoxContainer" parent="."]
 layout_mode = 0
 offset_left = 630.0
-offset_top = 584.0
+offset_top = 578.0
 offset_right = 1238.0
-offset_bottom = 622.0
+offset_bottom = 628.0
 theme_override_constants/separation = 12
 alignment = 1
 
