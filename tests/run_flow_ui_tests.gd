@@ -92,8 +92,11 @@ func _initialize() -> void:
 	_expect(main.factory_board.interaction_enabled, "time stop should enable node placement")
 	_expect("戦闘を再開" in main.pause_button.tooltip_text, "main action tooltip should explain edit confirmation")
 	_expect(main.speed_button.disabled, "time stop should disable speed controls")
+	main.get_node("Toolbar/SentinelButton").pressed.emit()
 	main._unhandled_key_input(action_key)
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "Space should confirm edits and resume battle")
+	_expect("変更効果" in main.plan_label.text, "battle resume should explain the production effect of reconfiguration")
+	_expect("斥候" in main.plan_label.text and "衛兵" in main.plan_label.text, "production effect should name changed unit outputs")
 
 	main.debug_victory_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.VICTORY, "placeholder completion should defeat the leader")

@@ -43,6 +43,8 @@ var factory_change_count := 0
 var acquired_rewards: Array[StringName] = []
 var selected_route_name := "中央ルート"
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
+var pre_edit_production_counts: Dictionary = {}
+var last_factory_change_summary := ""
 
 
 func _ready() -> void:
@@ -135,6 +137,7 @@ func _on_main_action() -> void:
 		flow.advance()
 		_apply_phase()
 	elif flow.phase == RunFlow.Phase.BATTLE and flow.pause_for_reconfiguration():
+		_capture_pre_edit_production()
 		time_stop_count += 1
 		factory_board.begin_edit()
 		_apply_phase()
@@ -142,6 +145,7 @@ func _on_main_action() -> void:
 		if not _factory_is_valid("変更を確定できません"):
 			return
 		factory_board.commit_edit()
+		_update_factory_change_summary()
 		factory_change_count += 1
 		flow.resume_battle()
 		_apply_phase()
@@ -211,8 +215,44 @@ func _cancel_edit() -> void:
 	if flow.phase != RunFlow.Phase.FACTORY_RECONFIGURE:
 		return
 	factory_board.cancel_edit()
+	pre_edit_production_counts.clear()
+	last_factory_change_summary = "変更効果 // 変更を破棄したため生産構成は変更していません"
 	flow.resume_battle()
 	_apply_phase()
+
+
+func _capture_pre_edit_production() -> void:
+	var preview := factory_board.production_preview()
+	pre_edit_production_counts = (
+		preview["counts"].duplicate()
+		if preview["ok"]
+		else {}
+	)
+
+
+func _update_factory_change_summary() -> void:
+	var preview := factory_board.production_preview()
+	if pre_edit_production_counts.is_empty() or not preview["ok"]:
+		last_factory_change_summary = ""
+		pre_edit_production_counts.clear()
+		return
+	var labels := {
+		&"scout": "斥候",
+		&"sentinel": "衛兵",
+		&"golem": "巨像",
+	}
+	var changes := PackedStringArray()
+	for unit_id in [&"scout", &"sentinel", &"golem"]:
+		var before := int(pre_edit_production_counts.get(unit_id, 0))
+		var after := int(preview["counts"].get(unit_id, 0))
+		if before != after:
+			changes.append("%s %d→%d" % [labels[unit_id], before, after])
+	last_factory_change_summary = (
+		"変更効果 // 次の32秒: %s" % " / ".join(changes)
+		if not changes.is_empty()
+		else "変更効果 // 次の32秒の生産予測は変化なし"
+	)
+	pre_edit_production_counts.clear()
 
 
 func current_battle_speed() -> float:
@@ -272,6 +312,8 @@ func _reset_stage() -> void:
 	battle_speed_index = 0
 	time_stop_count = 0
 	factory_change_count = 0
+	pre_edit_production_counts.clear()
+	last_factory_change_summary = ""
 
 
 func _apply_phase() -> void:
@@ -321,6 +363,8 @@ func _apply_phase() -> void:
 			debug_victory_button.text = "検証用: 戦闘をスキップ"
 			debug_victory_button.visible = true
 			plan_label.text = "稼働術式: %s // %s" % [MvpContent.plan_name(factory_board.plan_id), MvpContent.plan_description(factory_board.plan_id)]
+			if last_factory_change_summary != "":
+				plan_label.text += "\n" + last_factory_change_summary
 			_refresh_status()
 		RunFlow.Phase.FACTORY_RECONFIGURE:
 			_set_plan_buttons_enabled(true)
