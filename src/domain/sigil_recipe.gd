@@ -12,7 +12,7 @@ func _init(
 	initial_unit_id: StringName
 ) -> void:
 	id = initial_id
-	glyph = initial_glyph.copy()
+	glyph = initial_glyph.copy() if initial_glyph != null else null
 	unit_id = initial_unit_id
 
 

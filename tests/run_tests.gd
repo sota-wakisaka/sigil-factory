@@ -758,15 +758,15 @@ func _test_recipe_registration_rejects_missing_objects() -> void:
 		simulation.recipe_registration_result(null)["errors"] == PackedStringArray(["missing_recipe"]),
 		"recipe registration should reject a missing recipe without dereferencing it"
 	)
-	var missing_glyph := SigilRecipeModel.new(
-		&"missing_glyph",
-		GlyphModel.new([GlyphComponentModel.new(&"ring")]),
-		&"scout"
-	)
-	missing_glyph.glyph = null
+	var missing_glyph := SigilRecipeModel.new(&"missing_glyph", null, &"scout")
 	_expect(
 		simulation.recipe_registration_result(missing_glyph)["errors"] == PackedStringArray(["missing_glyph"]),
-		"recipe registration should reject a missing Glyph before structural validation"
+		"recipe construction should preserve a missing Glyph for registration diagnostics"
+	)
+	var missing_glyph_copy := missing_glyph.copy()
+	_expect(
+		missing_glyph_copy.glyph == null and missing_glyph_copy.id == &"missing_glyph",
+		"copying invalid restored recipe metadata should not dereference its missing Glyph"
 	)
 	var stored := SigilRecipeModel.new(
 		&"stored_ring",
