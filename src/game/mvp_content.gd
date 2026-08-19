@@ -152,6 +152,18 @@ static func plan_description(plan_id: StringName) -> String:
 			return "初動 // 高速生産・短寿命"
 
 
+static func sigil_name(recipe_id: StringName) -> String:
+	match recipe_id:
+		&"open_ring":
+			return "斥候シジル"
+		&"azure_guard":
+			return "衛兵シジル"
+		&"bound_colossus":
+			return "巨像シジル"
+		_:
+			return String(recipe_id)
+
+
 static func node_name(kind: FactoryNodeModel.NodeKind) -> String:
 	match kind:
 		FactoryNodeModel.NodeKind.SOURCE:

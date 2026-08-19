@@ -602,7 +602,10 @@ func advance_tick() -> void:
 func _summon_failure_message(event: Dictionary) -> String:
 	var diagnostics: PackedStringArray = event.get("diagnostics", PackedStringArray())
 	var reason := "原因不明" if diagnostics.is_empty() else " / ".join(diagnostics)
-	return "召喚失敗 // %s" % reason
+	var recipe_id: StringName = event.get("closest_recipe_id", &"")
+	if recipe_id == &"":
+		return "召喚失敗 // %s" % reason
+	return "召喚失敗 // %sとの差分: %s" % [MvpContent.sigil_name(recipe_id), reason]
 
 
 func _refresh_flow_warning() -> void:

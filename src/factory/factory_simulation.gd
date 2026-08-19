@@ -314,7 +314,7 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 	glyph.production_context.record_node(&"summoner", false)
 	var closest_recipe_id: StringName = &""
 	var closest_diagnostics := PackedStringArray()
-	var closest_score := 2147483647
+	var closest_rank := 2147483647
 	for recipe in recipes:
 		var result := SigilMatcher.compare(glyph, recipe.glyph)
 		if result["is_match"]:
@@ -327,8 +327,15 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 			})
 			return
 		var diagnostics: PackedStringArray = result["diagnostics"]
-		if diagnostics.size() < closest_score:
-			closest_score = diagnostics.size()
+		var rank := _summon_failure_rank(diagnostics)
+		if (
+			rank < closest_rank
+			or (
+				rank == closest_rank
+				and (closest_recipe_id == &"" or String(recipe.id) < String(closest_recipe_id))
+			)
+		):
+			closest_rank = rank
 			closest_recipe_id = recipe.id
 			closest_diagnostics = diagnostics.duplicate()
 	discarded_glyphs += 1
@@ -341,6 +348,21 @@ func _tick_summoner(node: FactoryNodeModel) -> void:
 		"closest_recipe_id": closest_recipe_id,
 		"diagnostics": closest_diagnostics,
 	})
+
+
+func _summon_failure_rank(diagnostics: PackedStringArray) -> int:
+	var structural_differences := 0
+	var attribute_differences := 0
+	for diagnostic in diagnostics:
+		if (
+			diagnostic.begins_with("部品不足:")
+			or diagnostic.begins_with("余分な部品:")
+			or diagnostic == "合成階層が違います"
+		):
+			structural_differences += 1
+		else:
+			attribute_differences += 1
+	return structural_differences * 100 + attribute_differences
 
 
 func _consume_inputs(node: FactoryNodeModel) -> GlyphModel:

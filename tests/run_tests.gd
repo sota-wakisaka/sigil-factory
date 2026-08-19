@@ -38,6 +38,7 @@ func _initialize() -> void:
 	_test_factory_replay_is_independent_of_insertion_order()
 	_test_factory_pipeline_summons_matching_unit()
 	_test_factory_records_closest_summon_failure()
+	_test_factory_closest_recipe_is_order_independent()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
 	_test_factory_rejects_implicit_fan_out()
@@ -545,6 +546,44 @@ func _test_factory_records_closest_summon_failure() -> void:
 	_expect(simulation.discarded_glyphs > 0, "failed summons should still count discarded glyphs")
 
 
+func _test_factory_closest_recipe_is_order_independent() -> void:
+	var selected_recipe_ids := PackedStringArray()
+	for reverse_order in [false, true]:
+		var simulation := FactorySimulation.new()
+		var source := FactoryNodeModel.new(
+			&"source",
+			FactoryNodeModel.NodeKind.SOURCE,
+			{"primitive_id": "ring", "interval_ticks": 1}
+		)
+		var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
+		simulation.add_node(source)
+		simulation.add_node(summoner)
+		simulation.connect_nodes(FactoryLineModel.new(&"line", &"source", &"summoner"))
+		var recipes: Array[SigilRecipeModel] = [
+			SigilRecipeModel.new(
+				&"z_recipe",
+				GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, 0, 1, &"red")]),
+				&"sentinel"
+			),
+			SigilRecipeModel.new(
+				&"a_recipe",
+				GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, 0, 1, &"blue")]),
+				&"scout"
+			),
+		]
+		if reverse_order:
+			recipes.reverse()
+		for recipe in recipes:
+			simulation.add_recipe(recipe)
+		for _tick in 8:
+			simulation.tick()
+		selected_recipe_ids.append(String(simulation.summon_failure_events[0]["closest_recipe_id"]))
+	_expect(
+		selected_recipe_ids == PackedStringArray(["a_recipe", "a_recipe"]),
+		"equal-rank closest recipe selection should use recipe ID instead of acquisition order"
+	)
+
+
 func _test_combiner_waits_for_both_inputs() -> void:
 	var simulation := FactorySimulation.new()
 	var ring_source := FactoryNodeModel.new(
@@ -957,6 +996,7 @@ func _test_factory_board_shows_summon_failure_reason() -> void:
 		if not board.simulation.summon_failure_events.is_empty():
 			break
 	_expect("召喚失敗" in board.connection_message, "factory board should expose summon failure during battle")
+	_expect("巨像シジルとの差分" in board.connection_message, "factory board should name the closest known recipe")
 	_expect(
 		"部品不足" in board.connection_message or "余分な部品" in board.connection_message,
 		"factory board should explain the recipe mismatch"
