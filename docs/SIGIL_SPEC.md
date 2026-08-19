@@ -31,7 +31,35 @@ Glyph =
 - `Transform`: 移動・回転・拡縮・着色
 - `Combine`: 2つのグリフの合成
 
+`Transform` は加工中の概念モデルとして使用するが、正規化後の構造には独立ノードとして残さない。
 操作履歴そのものではなく、最終状態と合成階層を保存する。
+
+### 1.3 構造データと生産由来情報
+
+工場内を流れる実体は、シジル一致判定に使う構造と、リリックなどの効果判定に使う生産由来情報を分離して持つ。
+
+```text
+RuntimeGlyph {
+  structure: CanonicalGlyph
+  productionContext: ProductionContext
+}
+
+ProductionContext {
+  processingCount
+  visitedNodeKinds[]
+  sourceIds[]
+}
+```
+
+- `structure` は最終的なPrimitive状態とCombine階層だけを保持する
+- `productionContext` は加工回数、通過した設備種別、素材源IDなどを保持する
+- 一致判定・完全重複判定・描画キャッシュキーには `productionContext` を含めない
+- 「加工工程が少ない」「分配器を通過した」などのリリック判定には `productionContext` を使用する
+- 設備を通過するたびに元データを変更せず、新しいContextを生成する
+- Combineでは両入力の回数を合算し、設備種別と素材源IDは安定順序で重複を除いて統合する
+- 召喚時に構造とContextを召喚イベントへ渡し、召喚後のグリフ実体とともに破棄する
+
+この分離により、同じ見た目・同じ構造のグリフは常に同じシジルへ一致しながら、製造経路に意味を持つ強化も実装できる。
 
 ---
 
@@ -322,7 +350,7 @@ Move(+1, 0) → Move(-1, 0)
 
 ### 7.2 最終状態を保持する
 
-Primitiveには加工履歴ではなく、最終的な状態を保持する。
+Primitiveの葉には加工履歴ではなく、最終的な状態を保持する。
 
 概念例:
 
@@ -357,6 +385,43 @@ A + (B + C)
 ```
 
 は合成円の見た目も異なるため、別シジルとして保持する。
+
+### 7.4 正規形と座標系
+
+正規化後の `CanonicalGlyph` は、Combine階層とPrimitiveの葉だけで構成する。
+
+```text
+CanonicalGlyph =
+  PrimitiveLeaf(PrimitiveState)
+  | CombineNode(CanonicalGlyph, CanonicalGlyph)
+```
+
+- 全PrimitiveStateはグリフ共通のルート座標系で保持する
+- グリフの原点は常に `(0, 0)` とし、Combine時にも変更しない
+- Move / Rotate / Scaleは原点を基準に全子Primitiveへ再帰的に合成し、葉の最終状態へ畳み込む
+- Colorは対象以下の全子Primitiveの最終 `colorId` へ畳み込む
+- Combineノード自体にはTransformを保持しない
+- 合成円の中心・半径と接続線は、正規化後の子Primitive群と階層から描画時に算出する
+
+Combineの2入力は意味上可換とし、入力ポート番号や到着順を正規形へ含めない。各子を次の安定キーで昇順に並べる。
+
+```text
+childKey = hash(canonicalSerialize(child))
+```
+
+ハッシュ衝突時はハッシュ値だけで同一判定せず、正規化シリアライズ本体を辞書順で比較する。
+正規化シリアライズでは、Primitive ID、離散位置、正規化回転、倍率段階、色ID、子構造を固定順序で出力する。
+浮動小数点の描画座標は使用せず、ゲームデータ上の離散IDまたは整数ステップを出力する。
+
+正規化処理の順序は以下で固定する。
+
+1. Transformを葉のPrimitiveStateへ畳み込む
+2. 回転・移動・倍率・色を定義済みの離散値へ正規化する
+3. 各Combineの子を安定キーで並べる
+4. 完全重複を検証する
+5. 正規化シリアライズと構造ハッシュを生成する
+
+一致判定では構造ハッシュを高速な事前比較に使用し、最終的には正規化シリアライズまたは構造本体を比較する。
 
 ---
 
