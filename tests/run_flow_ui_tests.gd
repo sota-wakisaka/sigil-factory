@@ -7,6 +7,10 @@ var failures := 0
 
 
 func _initialize() -> void:
+	_expect(
+		float(ProjectSettings.get_setting("gui/timers/tooltip_delay_sec")) <= 0.25,
+		"visual Glyph tooltips should appear without interrupting factory inspection"
+	)
 	var scene: PackedScene = load("res://src/main.tscn")
 	var main := scene.instantiate()
 	root.add_child(main)
