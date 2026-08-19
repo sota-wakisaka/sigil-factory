@@ -52,6 +52,9 @@ var flow_warning_message := ""
 var flow_warning_hold_ticks := 0
 var undo_history: Array[Dictionary] = []
 var cached_production_preview := ""
+var cached_production_counts: Dictionary = {}
+var cached_production_discarded := 0
+var cached_production_valid := false
 var cached_node_output_glyphs: Dictionary = {}
 var tooltip_glyph: GlyphModel
 var tooltip_title := ""
@@ -257,6 +260,10 @@ func mana_used(source_simulation: FactorySimulation = null) -> int:
 
 func mana_available(source_simulation: FactorySimulation = null) -> int:
 	return maxi(MvpContent.FACTORY_MANA_MAX - mana_used(source_simulation), 0)
+
+
+func mana_fill_ratio(source_simulation: FactorySimulation = null) -> float:
+	return clampf(float(mana_used(source_simulation)) / float(MvpContent.FACTORY_MANA_MAX), 0.0, 1.0)
 
 
 func mana_status_text() -> String:
@@ -793,24 +800,19 @@ func _draw() -> void:
 			12,
 			Color(0.52, 0.65, 0.76)
 		)
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(18, 43),
-			cached_production_preview,
-			HORIZONTAL_ALIGNMENT_RIGHT,
-			size.x - 36.0,
-			12,
-			Color(0.54, 0.86, 0.7)
-		)
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(18, 62),
-			mana_status_text(),
-			HORIZONTAL_ALIGNMENT_RIGHT,
-			size.x - 36.0,
-			12,
-			WARNING_COLOR if mana_available() < 15 else Color(0.52, 0.68, 0.82)
-		)
+		if cached_production_valid:
+			_draw_production_summary()
+		else:
+			draw_string(
+				ThemeDB.fallback_font,
+				Vector2(18, 35),
+				cached_production_preview,
+				HORIZONTAL_ALIGNMENT_RIGHT,
+				size.x - 36.0,
+				12,
+				WARNING_COLOR
+			)
+		_draw_mana_meter()
 	if connection_message != "":
 		draw_string(
 			ThemeDB.fallback_font,
@@ -918,6 +920,63 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		_draw_ports(node, center)
 
 
+func _draw_production_summary() -> void:
+	var clock_center := Vector2(size.x - 258.0, 28.0)
+	draw_arc(clock_center, 9.0, 0.0, TAU, 20, Color(0.4, 0.62, 0.76, 0.78), 1.5, true)
+	draw_line(clock_center, clock_center + Vector2(0, -5), Color(0.58, 0.78, 0.92), 1.5, true)
+	draw_line(clock_center, clock_center + Vector2(4, 2), Color(0.58, 0.78, 0.92), 1.5, true)
+	var recipe_by_unit := {}
+	for recipe in MvpContent.recipes():
+		recipe_by_unit[recipe.unit_id] = recipe.glyph
+	var unit_order: Array[StringName] = [&"scout", &"sentinel", &"golem"]
+	for index in unit_order.size():
+		var unit_id := unit_order[index]
+		var center := Vector2(size.x - 208.0 + index * 66.0, 28.0)
+		var glyph: GlyphModel = recipe_by_unit.get(unit_id)
+		if GlyphPainterModel.can_draw(glyph):
+			var scale := 0.72 if not glyph.combine_children.is_empty() else 1.22
+			GlyphPainterModel.draw_glyph(self, glyph, center, scale)
+		draw_string(
+			ThemeDB.fallback_font,
+			center + Vector2(15, 5),
+			str(cached_production_counts.get(unit_id, 0)),
+			HORIZONTAL_ALIGNMENT_LEFT,
+			22.0,
+			12,
+			Color(0.54, 0.86, 0.7)
+		)
+	if cached_production_discarded > 0:
+		var warning_center := Vector2(size.x - 18.0, 28.0)
+		draw_circle(warning_center, 9.0, WARNING_COLOR)
+		draw_line(warning_center + Vector2(-4, -4), warning_center + Vector2(4, 4), Color.WHITE, 1.8, true)
+		draw_line(warning_center + Vector2(-4, 4), warning_center + Vector2(4, -4), Color.WHITE, 1.8, true)
+
+
+func _draw_mana_meter() -> void:
+	var meter_rect := Rect2(Vector2(size.x - 276.0, 50.0), Vector2(244.0, 10.0))
+	var used_ratio := mana_fill_ratio()
+	var fill_color := WARNING_COLOR if mana_available() < 15 else Color(0.28, 0.66, 0.95)
+	draw_rect(meter_rect, Color(0.06, 0.1, 0.15, 0.96), true)
+	draw_rect(Rect2(meter_rect.position, Vector2(meter_rect.size.x * used_ratio, meter_rect.size.y)), fill_color, true)
+	draw_rect(meter_rect, Color(0.38, 0.58, 0.72, 0.72), false, 1.0)
+	draw_string(
+		ThemeDB.fallback_font,
+		meter_rect.position + Vector2(-46, 9),
+		"◆",
+		HORIZONTAL_ALIGNMENT_CENTER,
+		36.0,
+		12,
+		fill_color
+	)
+	draw_string(
+		ThemeDB.fallback_font,
+		meter_rect.position + Vector2(meter_rect.size.x - 52.0, 9),
+		"%d/%d" % [mana_used(), MvpContent.FACTORY_MANA_MAX],
+		HORIZONTAL_ALIGNMENT_CENTER,
+		52.0,
+		10,
+		Color(0.84, 0.92, 1.0)
+	)
 func node_frame_kind(node_id: StringName) -> StringName:
 	var display_simulation := _display_simulation()
 	if display_simulation == null or not display_simulation.nodes.has(node_id):
@@ -1462,12 +1521,18 @@ func _push_undo_snapshot() -> void:
 func _refresh_production_preview() -> void:
 	var result := production_preview()
 	if not result["ok"]:
+		cached_production_valid = false
+		cached_production_counts.clear()
+		cached_production_discarded = 0
 		cached_node_output_glyphs.clear()
 		cached_production_preview = "32秒予測 // %s" % _validation_message(result.get("errors", []))
 		factory_changed.emit()
 		return
 	var counts: Dictionary = result["counts"]
 	var first_failure: Dictionary = result["first_failure"]
+	cached_production_valid = true
+	cached_production_counts = counts.duplicate()
+	cached_production_discarded = result["discarded"]
 	cached_node_output_glyphs = result["node_outputs"].duplicate()
 	if first_failure.is_empty():
 		cached_production_preview = "32秒予測 // 斥候 %d  衛兵 %d  巨像 %d  不一致 0" % [

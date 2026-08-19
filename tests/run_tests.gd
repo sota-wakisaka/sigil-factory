@@ -2252,6 +2252,11 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	board.configure(MvpContent.PLAN_SCOUT)
 	var tick_before := board.simulation.tick_index
 	var preview := board.production_preview(160)
+	board._refresh_production_preview()
+	_expect(board.cached_production_valid, "valid production preview should expose visual summary state")
+	_expect(board.cached_production_counts == preview["counts"], "visual production summary should preserve exact forecast counts")
+	_expect(board.cached_production_discarded == preview["discarded"], "visual production summary should preserve the mismatch count")
+	_expect(is_equal_approx(board.mana_fill_ratio(), float(board.mana_used()) / 100.0), "mana meter should reflect the fixed factory capacity")
 	_expect(preview["ok"], "complete factory should produce a preview")
 	_expect(preview["counts"][&"scout"] > 0, "scout factory preview should report scouts")
 	_expect(
