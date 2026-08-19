@@ -23,6 +23,7 @@ func _initialize() -> void:
 	_test_attribute_diagnostics()
 	_test_missing_and_extra_components()
 	_test_combine_structure_is_order_independent()
+	_test_combine_children_use_hash_then_serialization_order()
 	_test_combine_hierarchy_affects_matching()
 	_test_production_context_does_not_affect_matching()
 	_test_rotation_is_normalized_to_quarter_turns()
@@ -122,6 +123,27 @@ func _test_combine_structure_is_order_independent() -> void:
 		"combine input order should not affect canonical structure"
 	)
 	_expect(first.canonical_hash() == second.canonical_hash(), "equal structures should share a stable hash")
+
+
+func _test_combine_children_use_hash_then_serialization_order() -> void:
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	var ring_serialization := ring.canonical_serialization()
+	var spike_serialization := spike.canonical_serialization()
+	_expect(
+		spike_serialization.sha256_text() < ring_serialization.sha256_text(),
+		"test fixtures should have hash order opposite to their lexical order"
+	)
+	var combined := GlyphModel.combine(ring, spike)
+	_expect(
+		combined.canonical_serialization()
+		== "C(%s,%s)" % [spike_serialization, ring_serialization],
+		"Combine serialization should order children by canonical hash"
+	)
+	_expect(
+		combined.combine_children[0].canonical_serialization() == spike_serialization,
+		"Combine internal child order should match canonical serialization order"
+	)
 
 
 func _test_combine_hierarchy_affects_matching() -> void:

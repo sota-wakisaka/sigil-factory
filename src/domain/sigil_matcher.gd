@@ -19,7 +19,10 @@ static func compare(actual: GlyphModel, target: GlyphModel) -> Dictionary:
 				"シジル定義エラー: 完全重複: %s" % ", ".join(target_overlaps),
 			]),
 		}
-	if actual.canonical_serialization() == target.canonical_serialization():
+	var actual_serialization := actual.canonical_serialization()
+	var target_serialization := target.canonical_serialization()
+	var hashes_match := actual_serialization.sha256_text() == target_serialization.sha256_text()
+	if hashes_match and actual_serialization == target_serialization:
 		return {
 			"is_match": true,
 			"diagnostics": PackedStringArray(),

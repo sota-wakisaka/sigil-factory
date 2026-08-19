@@ -30,7 +30,7 @@ static func combine(first: GlyphModel, second: GlyphModel) -> GlyphModel:
 	var children: Array = [first.copy(), second.copy()]
 	children.sort_custom(
 		func(a: GlyphModel, b: GlyphModel) -> bool:
-			return a.canonical_serialization() < b.canonical_serialization()
+			return _canonical_child_less(a, b)
 	)
 	return GlyphModel.new(
 		[],
@@ -58,15 +58,33 @@ func canonical_serialization() -> String:
 		if keys.size() == 1:
 			return "P(%s)" % keys[0]
 		return "L[%s]" % ",".join(keys)
-	var child_serializations := PackedStringArray()
+	var child_serializations: Array[String] = []
 	for child in combine_children:
 		child_serializations.append(child.canonical_serialization())
-	child_serializations.sort()
+	child_serializations.sort_custom(
+		func(a: String, b: String) -> bool:
+			return _canonical_serialization_less(a, b)
+	)
 	return "C(%s)" % ",".join(child_serializations)
 
 
 func canonical_hash() -> String:
 	return canonical_serialization().sha256_text()
+
+
+static func _canonical_child_less(first: GlyphModel, second: GlyphModel) -> bool:
+	return _canonical_serialization_less(
+		first.canonical_serialization(),
+		second.canonical_serialization()
+	)
+
+
+static func _canonical_serialization_less(first: String, second: String) -> bool:
+	var first_hash := first.sha256_text()
+	var second_hash := second.sha256_text()
+	if first_hash != second_hash:
+		return first_hash < second_hash
+	return first < second
 
 
 func complete_overlap_primitive_ids() -> Array[StringName]:
