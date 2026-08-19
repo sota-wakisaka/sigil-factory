@@ -44,8 +44,10 @@ func _initialize() -> void:
 	var guided_result: Dictionary = main.factory_board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
 	_expect(guided_result["ok"], "guided factory connection should succeed")
 	_expect(main.plan_label.text == "✓ 構築可能", "first connection should replace the guide with compact completion feedback")
+	_expect(main.sigil_ghost.candidate_state == &"match", "completed starter wiring should visually match factory output against the target")
 	_expect(main.factory_board.disconnect_input(&"summoner", 0), "guided connection should be removable")
 	_expect(main.plan_label.text == "◇ 配線待ち", "removing the first connection should restore the compact pending state")
+	_expect(main.sigil_ghost.candidate_state == &"missing", "broken wiring should clear the final candidate comparison")
 	main.factory_board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	_expect(main.get_node("Toolbar/ScoutButton").button_pressed, "selected sigil plan should be highlighted")
@@ -54,6 +56,7 @@ func _initialize() -> void:
 		main.get_node("Toolbar/ScoutButton").glyph.canonical_serialization() == main.sigil_ghost.glyph.canonical_serialization(),
 		"selected plan button and persistent goal should draw the same CanonicalGlyph"
 	)
+	_expect(main.sigil_ghost.candidate_state == &"match", "template output should immediately compare against its selected target")
 	_expect(main.factory_board.interaction_enabled, "factory build should enable node placement")
 	_expect(not main.get_node("FactoryPalette/RingButton").disabled, "factory build should enable the equipment palette")
 	_expect(main.get_node("FactoryPalette/RingButton").preview_glyph != null, "source palette choice should use its Primitive as the main icon")

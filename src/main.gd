@@ -84,6 +84,7 @@ func _ready() -> void:
 	factory_board.summon_produced.connect(_on_summon_produced)
 	factory_board.selection_changed.connect(_refresh_factory_inspector)
 	factory_board.factory_changed.connect(_refresh_empty_factory_guidance)
+	factory_board.factory_changed.connect(_refresh_factory_goal_candidate)
 	inspector_option.item_selected.connect(_on_inspector_option_selected)
 	battle_board.battle_finished.connect(_on_battle_finished)
 	_select_plan(MvpContent.PLAN_SCOUT)
@@ -114,6 +115,7 @@ func _process(delta: float) -> void:
 	while elapsed_since_tick >= TICK_SECONDS:
 		elapsed_since_tick -= TICK_SECONDS
 		factory_board.advance_tick()
+		_refresh_factory_goal_candidate()
 		battle_board.advance_tick()
 	_refresh_status()
 
@@ -242,6 +244,10 @@ func _refresh_factory_inspector() -> void:
 	inspector_option.disabled = details["options"].is_empty() or not factory_board.interaction_enabled
 	if details["selected_index"] >= 0:
 		inspector_option.select(details["selected_index"])
+
+
+func _refresh_factory_goal_candidate() -> void:
+	sigil_ghost.show_candidate(factory_board.final_summoner_candidate_glyph())
 
 
 func _on_inspector_option_selected(index: int) -> void:

@@ -2133,6 +2133,7 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(1196, 401)
 	board.configure(MvpContent.PLAN_EMPTY)
+	_expect(board.final_summoner_candidate_glyph() == null, "unwired factory should not invent a final candidate Glyph")
 	var source_center := board.node_local_position(&"ring_source")
 	_expect(board._get_tooltip(source_center) == "glyph_preview", "source equipment should offer a visual Glyph tooltip")
 	_expect(board.tooltip_context == "素材Primitive", "unconnected source tooltip should identify its material Primitive")
@@ -2145,6 +2146,12 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	_expect(source_tooltip.custom_minimum_size.x >= 300.0, "factory Glyph tooltip should provide a readable large preview")
 	source_tooltip.free()
 	board.configure(MvpContent.PLAN_SCOUT)
+	var predicted_candidate := board.final_summoner_candidate_glyph()
+	_expect(predicted_candidate != null, "valid factory should expose its predicted final summoner candidate")
+	_expect(
+		predicted_candidate.canonical_serialization() == MvpContent.recipes()[0].glyph.canonical_serialization(),
+		"predicted final candidate should preserve the produced CanonicalGlyph"
+	)
 	var transported := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	board.simulation.lines[&"line_1"].payload = transported
 	var line_start := board.node_local_position(&"ring_source") + Vector2(FactoryBoard.NODE_HALF_SIZE.x, 0)
@@ -2323,7 +2330,19 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	)
 	target_tooltip.free()
 	_expect(ghost.recipe_id == &"azure_guard", "sigil ghost should retain the displayed recipe ID")
-	_expect(ghost.glyph_draw_scale() == 2.0, "single-Primitive completion ghost should use the larger readable scale")
+	_expect(ghost.glyph_draw_scale() == 1.75, "single-Primitive completion target should stay readable beside the factory candidate")
+	ghost.show_candidate(ghost.glyph)
+	_expect(ghost.candidate_state == &"match", "identical factory candidate should show a positive comparison state")
+	var mismatching_candidate := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	ghost.show_candidate(mismatching_candidate)
+	_expect(ghost.candidate_state == &"mismatch", "different factory candidate should show a negative comparison state")
+	_expect(ghost._get_tooltip(Vector2(240, 25)) == "candidate", "candidate half of the goal card should have its own large tooltip")
+	_expect(
+		ghost.tooltip_glyph.canonical_serialization() == mismatching_candidate.canonical_serialization(),
+		"candidate tooltip should use the compared CanonicalGlyph"
+	)
+	ghost.show_candidate(null)
+	_expect(ghost.candidate_state == &"missing", "missing factory candidate should leave an empty comparison slot")
 	var expected: SigilRecipeModel
 	for recipe in MvpContent.recipes():
 		if recipe.id == &"azure_guard":
@@ -2338,7 +2357,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	_expect(not ghost.show_recipe(&"missing_recipe"), "sigil ghost should reject an unknown recipe")
 	_expect(ghost.recipe_id == &"azure_guard", "unknown recipe should not erase the current ghost")
 	_expect(ghost.show_recipe(&"bound_colossus"), "sigil ghost should accept the combined recipe")
-	_expect(ghost.glyph_draw_scale() == 1.15, "combined completion ghost should keep its outer ring inside the panel")
+	_expect(ghost.glyph_draw_scale() == 0.95, "combined completion target should keep its outer ring inside the comparison panel")
 	ghost.free()
 
 
