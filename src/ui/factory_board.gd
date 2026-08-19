@@ -9,6 +9,8 @@ const MvpContent := preload("res://src/game/mvp_content.gd")
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
 const FactoryLineModel := preload("res://src/factory/factory_line.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
+const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
+const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 
 const PANEL_COLOR := Color(0.035, 0.055, 0.085, 0.96)
 const NODE_COLOR := Color(0.08, 0.12, 0.18, 1.0)
@@ -49,6 +51,9 @@ var flow_warning_hold_ticks := 0
 var undo_history: Array[Dictionary] = []
 var cached_production_preview := ""
 var cached_node_output_glyphs: Dictionary = {}
+var tooltip_glyph: GlyphModel
+var tooltip_title := ""
+var tooltip_context := ""
 var run_upgrades: Array[StringName] = []
 var last_corrupt_discard_count := 0
 
@@ -891,6 +896,10 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 				node_glyph_draw_scale(predicted_glyph),
 				0.68
 			)
+		else:
+			var source_glyph := source_glyph_for_node(node_id)
+			if source_glyph != null:
+				_draw_mini_glyph(source_glyph, center + Vector2(0, 20), 1.05)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
 
@@ -944,6 +953,69 @@ func visible_glyph_for_node(node_id: StringName) -> GlyphModel:
 
 func predicted_output_glyph_for_node(node_id: StringName) -> GlyphModel:
 	return cached_node_output_glyphs.get(node_id)
+
+
+func source_glyph_for_node(node_id: StringName) -> GlyphModel:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return null
+	var node: FactoryNodeModel = display_simulation.nodes[node_id]
+	if node.kind != FactoryNodeModel.NodeKind.SOURCE:
+		return null
+	var primitive_id := StringName(node.config.get("primitive_id", ""))
+	if primitive_id == &"":
+		return null
+	return GlyphModel.new([GlyphComponentModel.new(primitive_id)])
+
+
+func _get_tooltip(at_position: Vector2) -> String:
+	tooltip_glyph = null
+	tooltip_title = ""
+	tooltip_context = ""
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return ""
+	var node_id := _node_at(at_position)
+	if node_id != &"":
+		var node: FactoryNodeModel = display_simulation.nodes[node_id]
+		var visible_glyph := _visible_node_glyph(node)
+		if visible_glyph != null:
+			_set_glyph_tooltip(visible_glyph, _node_label(node), "設備内の現在Glyph")
+		elif cached_node_output_glyphs.has(node_id):
+			_set_glyph_tooltip(cached_node_output_glyphs[node_id], _node_label(node), "32秒予測の出力Glyph")
+		else:
+			var source_glyph := source_glyph_for_node(node_id)
+			if source_glyph != null:
+				_set_glyph_tooltip(source_glyph, _node_label(node), "素材Primitive")
+		return "glyph_preview" if tooltip_glyph != null else ""
+	for line_id in display_simulation.lines:
+		var line: FactoryLineModel = display_simulation.lines[line_id]
+		if line.payload == null or not GlyphPainterModel.can_draw(line.payload):
+			continue
+		var start := _scaled_position(_display_positions().get(line.from_node_id, Vector2.ZERO)) + Vector2(NODE_HALF_SIZE.x, 0)
+		var finish := _input_port_position(line.to_node_id, line.to_port)
+		var closest := Geometry2D.get_closest_point_to_segment(at_position, start, finish)
+		if at_position.distance_to(closest) > 14.0:
+			continue
+		var from_label := _node_label(display_simulation.nodes[line.from_node_id])
+		var to_label := _node_label(display_simulation.nodes[line.to_node_id])
+		_set_glyph_tooltip(line.payload, "%s → %s" % [from_label, to_label], "輸送中Glyph")
+		return "glyph_preview"
+	return ""
+
+
+func _set_glyph_tooltip(next_glyph: GlyphModel, next_title: String, next_context: String) -> void:
+	if not GlyphPainterModel.can_draw(next_glyph):
+		return
+	tooltip_glyph = next_glyph.copy()
+	tooltip_title = next_title
+	tooltip_context = next_context
+
+
+func _make_custom_tooltip(_for_text: String):
+	var preview := GlyphTooltipModel.new()
+	preview.configure(tooltip_glyph, tooltip_title, tooltip_context)
+	return preview
 
 
 func node_glyph_draw_scale(glyph: GlyphModel) -> float:

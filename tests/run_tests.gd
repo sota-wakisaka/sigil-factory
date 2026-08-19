@@ -97,6 +97,7 @@ func _initialize() -> void:
 	_test_factory_board_shows_distinct_flow_warning()
 	_test_factory_board_holds_transient_flow_warning()
 	_test_factory_board_exposes_visible_work_in_progress_glyphs()
+	_test_factory_board_offers_visual_glyph_tooltips()
 	_test_factory_board_exposes_node_activity_progress()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_production_preview_is_non_destructive()
@@ -2126,6 +2127,36 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		"input Glyph lookup should reject an out-of-range port"
 	)
 	combine_board.free()
+
+
+func _test_factory_board_offers_visual_glyph_tooltips() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(1196, 401)
+	board.configure(MvpContent.PLAN_EMPTY)
+	var source_center := board.node_local_position(&"ring_source")
+	_expect(board._get_tooltip(source_center) == "glyph_preview", "source equipment should offer a visual Glyph tooltip")
+	_expect(board.tooltip_context == "素材Primitive", "unconnected source tooltip should identify its material Primitive")
+	_expect(
+		board.source_glyph_for_node(&"ring_source").canonical_serialization() == board.tooltip_glyph.canonical_serialization(),
+		"source tooltip should use the same CanonicalGlyph as the persistent node symbol"
+	)
+	var source_tooltip = board._make_custom_tooltip("glyph_preview")
+	_expect(source_tooltip.get_script() == GlyphTooltipModel, "factory hover should reuse the large visual Glyph tooltip")
+	_expect(source_tooltip.custom_minimum_size.x >= 300.0, "factory Glyph tooltip should provide a readable large preview")
+	source_tooltip.free()
+	board.configure(MvpContent.PLAN_SCOUT)
+	var transported := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	board.simulation.lines[&"line_1"].payload = transported
+	var line_start := board.node_local_position(&"ring_source") + Vector2(FactoryBoard.NODE_HALF_SIZE.x, 0)
+	var line_finish := board.node_local_position(&"summoner") - Vector2(FactoryBoard.NODE_HALF_SIZE.x, 0)
+	_expect(board._get_tooltip(line_start.lerp(line_finish, 0.5)) == "glyph_preview", "transport line should offer a visual Glyph tooltip")
+	_expect(board.tooltip_context == "輸送中Glyph", "line tooltip should identify the Glyph as transported work")
+	_expect(
+		board.tooltip_glyph.canonical_serialization() == transported.canonical_serialization(),
+		"line tooltip should copy the actual transported CanonicalGlyph"
+	)
+	_expect(board._get_tooltip(Vector2(8, 8)) == "", "empty board space should not show a Glyph tooltip")
+	board.free()
 
 
 func _test_factory_board_exposes_node_activity_progress() -> void:
