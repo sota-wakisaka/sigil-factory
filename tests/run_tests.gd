@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_test_factory_pipeline_summons_matching_unit()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
+	_test_factory_rejects_implicit_fan_out()
 	_test_factory_disconnects_lines()
 	_test_factory_removes_node_and_connected_lines()
 	_test_factory_graph_validation_reports_dangling_nodes()
@@ -296,6 +297,20 @@ func _test_factory_rejects_cycles() -> void:
 	var second := simulation.connect_nodes(FactoryLineModel.new(&"back", &"color", &"rotate"))
 	_expect(first["ok"], "first DAG connection should be accepted")
 	_expect(not second["ok"] and second["error"] == "cycle", "cycle should be rejected")
+
+
+func _test_factory_rejects_implicit_fan_out() -> void:
+	var simulation := FactorySimulation.new()
+	simulation.add_node(FactoryNodeModel.new(&"source", FactoryNodeModel.NodeKind.SOURCE))
+	simulation.add_node(FactoryNodeModel.new(&"first", FactoryNodeModel.NodeKind.SUMMONER))
+	simulation.add_node(FactoryNodeModel.new(&"second", FactoryNodeModel.NodeKind.SUMMONER))
+	var first := simulation.connect_nodes(FactoryLineModel.new(&"first_line", &"source", &"first"))
+	var second := simulation.connect_nodes(FactoryLineModel.new(&"second_line", &"source", &"second"))
+	_expect(first["ok"], "a node output should accept its first connection")
+	_expect(
+		not second["ok"] and second["error"] == "occupied_output",
+		"a normal node output should not create an implicit splitter"
+	)
 
 
 func _test_factory_disconnects_lines() -> void:

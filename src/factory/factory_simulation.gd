@@ -38,6 +38,8 @@ func connect_nodes(line: FactoryLineModel) -> Dictionary:
 			and existing_line.to_port == line.to_port
 		):
 			return _connection_error("occupied_port")
+		if existing_line.from_node_id == line.from_node_id:
+			return _connection_error("occupied_output")
 
 	lines[line.id] = line
 	if _has_cycle():

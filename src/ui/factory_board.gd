@@ -674,6 +674,10 @@ func _connection_result_text(result: Dictionary) -> String:
 			return "接続できません: 回路が循環します"
 		"invalid_port":
 			return "接続できません: 入力ポートがありません"
+		"occupied_port":
+			return "接続できません: 入力はすでに接続されています"
+		"occupied_output":
+			return "接続できません: 出力はすでに接続されています。分岐器はMVP対象外です"
 		"self_connection":
 			return "接続できません: 同じ設備には接続できません"
 		_:
