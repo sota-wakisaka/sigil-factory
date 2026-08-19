@@ -2283,8 +2283,8 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(color_preview != null, "factory board should cache the predicted colored output")
 	if source_preview != null and rotation_preview != null and color_preview != null:
 		_expect(
-			sentinel_board.node_glyph_draw_scale(source_preview) > 0.8,
-			"single-Primitive node ghosts should use a legible factory scale"
+			sentinel_board.node_glyph_draw_scale(source_preview) >= 1.5,
+			"label-free node should spend its interior space on a legible single-Primitive Glyph"
 		)
 		_expect(source_preview.components[0].rotation_step == 0, "source prediction should retain the raw orientation")
 		_expect(rotation_preview.components[0].rotation_step == 1, "rotator prediction should expose its quarter turn")

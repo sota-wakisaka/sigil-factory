@@ -914,19 +914,19 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		_draw_node_activity_progress(node, center, display_simulation.tick_index > 0)
 		var visible_glyph := _visible_node_active_glyph(node)
 		if visible_glyph != null:
-			_draw_mini_glyph(visible_glyph, center + Vector2(0, 13), node_glyph_draw_scale(visible_glyph))
+			_draw_mini_glyph(visible_glyph, center + Vector2(0, 3), node_glyph_draw_scale(visible_glyph))
 		elif cached_node_output_glyphs.has(node_id):
 			var predicted_glyph: GlyphModel = cached_node_output_glyphs[node_id]
 			_draw_mini_glyph(
 				predicted_glyph,
-				center + Vector2(0, 13),
+				center + Vector2(0, 3),
 				node_glyph_draw_scale(predicted_glyph),
-				0.68
+				0.82
 			)
 		else:
 			var source_glyph := source_glyph_for_node(node_id)
 			if source_glyph != null:
-				_draw_mini_glyph(source_glyph, center + Vector2(0, 13), 1.28)
+				_draw_mini_glyph(source_glyph, center + Vector2(0, 3), 1.55)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
 
@@ -1236,8 +1236,8 @@ func _make_custom_tooltip(_for_text: String):
 
 func node_glyph_draw_scale(glyph: GlyphModel) -> float:
 	if glyph != null and not glyph.combine_children.is_empty():
-		return 0.7
-	return 1.1
+		return 0.9
+	return 1.55
 
 
 func visible_glyph_for_line(line_id: StringName) -> GlyphModel:
@@ -1348,7 +1348,7 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 		if node.required_input_count() == 2:
 			y_offset = -13.0 if port == 0 else 13.0
 		var glyph_center := center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset)
-		_draw_mini_glyph(glyph, glyph_center, 0.68)
+		_draw_mini_glyph(glyph, glyph_center, 0.85)
 		if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
 			_draw_recipe_match_marker(glyph_center, input_recipe_match_state(node.id, port), 9.0)
 
