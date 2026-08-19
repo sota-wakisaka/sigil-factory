@@ -47,6 +47,7 @@ func _initialize() -> void:
 	_test_factory_rejects_invalid_recipe_structures()
 	_test_factory_owns_registered_recipe_data()
 	_test_factory_duplicate_owns_recipe_data()
+	_test_factory_duplicate_reports_invalid_state()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
 	_test_factory_rejects_implicit_fan_out()
@@ -859,6 +860,42 @@ func _test_factory_duplicate_owns_recipe_data() -> void:
 		original.glyph.components[0].color_id == &"white",
 		"duplicate glyph mutation should not affect the original"
 	)
+
+
+func _test_factory_duplicate_reports_invalid_state() -> void:
+	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
+	var invalid_glyph := GlyphModel.new([
+		GlyphComponentModel.new(&"ring"),
+		GlyphComponentModel.new(&"spike"),
+	])
+	simulation.nodes[&"ring_source"].output_buffer = invalid_glyph
+	var tick_before := simulation.tick_index
+	var result := simulation.duplicate_state_result()
+	_expect(not result["ok"], "invalid work in progress should reject state duplication")
+	_expect(result["state"] == null, "rejected state duplication should not expose a partial copy")
+	_expect(
+		result["errors"] == ["invalid_glyph:node[ring_source].output:primitive_arity:root:2"],
+		"state duplication should locate the invalid glyph before deep copying"
+	)
+	_expect(simulation.tick_index == tick_before, "rejected state duplication should not mutate time")
+	_expect(
+		simulation.nodes[&"ring_source"].output_buffer == invalid_glyph,
+		"rejected state duplication should leave the original work in progress untouched"
+	)
+	simulation.nodes[&"ring_source"].output_buffer = null
+	var valid_result := simulation.duplicate_state_result()
+	_expect(valid_result["ok"], "valid factory state should still duplicate through the result API")
+	_expect(valid_result["state"] != simulation, "successful state duplication should return an independent factory")
+
+	var mutated_recipe: SigilRecipeModel = simulation.recipes[0]
+	mutated_recipe.glyph.combine_children = [mutated_recipe.glyph, mutated_recipe.glyph]
+	var recipe_result := simulation.duplicate_state_result()
+	_expect(not recipe_result["ok"], "a corrupted registered recipe should reject state duplication safely")
+	_expect(
+		String(recipe_result["errors"][0]).begins_with("invalid_recipe:recipe[0]="),
+		"recipe duplication failure should identify the registry location"
+	)
+	mutated_recipe.glyph.combine_children = []
 
 
 func _test_combiner_waits_for_both_inputs() -> void:

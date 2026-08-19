@@ -298,7 +298,44 @@ func node_flow_state(node_id: StringName) -> StringName:
 	return &"running"
 
 
+func duplicate_state_result() -> Dictionary:
+	var errors := work_in_progress_validation_errors()
+	errors.append_array(_recipe_state_validation_errors())
+	if not errors.is_empty():
+		return {"ok": false, "state": null, "errors": errors}
+	return {"ok": true, "state": _duplicate_state_unchecked(), "errors": []}
+
+
 func duplicate_state() -> FactorySimulation:
+	var result := duplicate_state_result()
+	if not result["ok"]:
+		push_error("Cannot duplicate invalid factory state: %s" % ", ".join(result["errors"]))
+		return null
+	return result["state"]
+
+
+func _recipe_state_validation_errors() -> Array[String]:
+	var errors: Array[String] = []
+	var validator := FactorySimulation.new()
+	for recipe_index in recipes.size():
+		var recipe: SigilRecipeModel = recipes[recipe_index]
+		if recipe == null:
+			errors.append("invalid_recipe:recipe[%d]=<null>:missing_recipe" % recipe_index)
+			continue
+		var registration := validator.recipe_registration_result(recipe)
+		if not registration["ok"]:
+			var recipe_label := String(recipe.id) if recipe.id != &"" else "<empty>"
+			for registration_error in registration["errors"]:
+				errors.append(
+					"invalid_recipe:recipe[%d]=%s:%s"
+					% [recipe_index, recipe_label, registration_error]
+				)
+			continue
+		validator.add_recipe(recipe)
+	return errors
+
+
+func _duplicate_state_unchecked() -> FactorySimulation:
 	var result := FactorySimulation.new()
 	for recipe in recipes:
 		result.add_recipe(recipe)

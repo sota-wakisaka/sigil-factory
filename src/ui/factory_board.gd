@@ -355,7 +355,16 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 			"first_failure": {},
 			"errors": validation["errors"].duplicate(),
 		}
-	var preview := display_simulation.duplicate_state()
+	var duplication := display_simulation.duplicate_state_result()
+	if not duplication["ok"]:
+		return {
+			"ok": false,
+			"counts": counts,
+			"discarded": 0,
+			"first_failure": {},
+			"errors": duplication["errors"].duplicate(),
+		}
+	var preview: FactorySimulation = duplication["state"]
 	var event_start := preview.summon_events.size()
 	var failure_start := preview.summon_failure_events.size()
 	var discarded_start := preview.discarded_glyphs
@@ -483,9 +492,13 @@ func begin_edit() -> void:
 	if not runtime_errors.is_empty():
 		last_corrupt_discard_count = simulation.discard_invalid_work_in_progress()
 		connection_message = "破損仕掛品 %d個を廃棄して編集状態へ復旧しました" % last_corrupt_discard_count
+	var duplication := simulation.duplicate_state_result()
+	if not duplication["ok"]:
+		connection_message = "工場状態を複製できません // %s" % _validation_message(duplication["errors"])
+		return
 	editing = true
 	pending_plan_id = plan_id
-	preview_simulation = simulation.duplicate_state()
+	preview_simulation = duplication["state"]
 	preview_node_positions = node_positions.duplicate(true)
 	selected_node_id = &""
 	connecting_from_node_id = &""
@@ -1017,8 +1030,12 @@ func _push_undo_snapshot() -> void:
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return
+	var duplication := display_simulation.duplicate_state_result()
+	if not duplication["ok"]:
+		connection_message = "工場状態を保存できません // %s" % _validation_message(duplication["errors"])
+		return
 	undo_history.append({
-		"simulation": display_simulation.duplicate_state(),
+		"simulation": duplication["state"],
 		"positions": _display_positions().duplicate(true),
 	})
 
