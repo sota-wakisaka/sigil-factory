@@ -14,6 +14,7 @@ const ThreatEventModel := preload("res://src/battle/threat_event.gd")
 const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const FactoryBoard := preload("res://src/ui/factory_board.gd")
 const SigilGhost := preload("res://src/ui/sigil_ghost.gd")
+const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const RunFlow := preload("res://src/game/run_flow.gd")
 
 var failures := 0
@@ -47,6 +48,7 @@ func _initialize() -> void:
 	_test_mvp_recipe_set_validation_reports_content_location()
 	_test_factory_rejects_invalid_recipe_structures()
 	_test_glyph_preserves_invalid_restored_elements_for_diagnostics()
+	_test_shared_glyph_painter_rejects_invalid_structures()
 	_test_factory_owns_registered_recipe_data()
 	_test_factory_owns_registered_node_data()
 	_test_node_registration_reports_stable_errors()
@@ -898,6 +900,17 @@ func _test_glyph_preserves_invalid_restored_elements_for_diagnostics() -> void:
 	_expect(
 		missing_child.copy().structure_validation_errors() == PackedStringArray(["invalid_child:root.0"]),
 		"Glyph copying should retain a null Combine child without dereferencing it"
+	)
+
+
+func _test_shared_glyph_painter_rejects_invalid_structures() -> void:
+	var valid := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var invalid := GlyphModel.new([GlyphComponentModel.new(&"ring"), GlyphComponentModel.new(&"spike")])
+	_expect(GlyphPainterModel.can_draw(valid), "shared Glyph painter should accept a valid structure")
+	_expect(not GlyphPainterModel.can_draw(invalid), "shared Glyph painter should reject an invalid structure")
+	_expect(
+		GlyphPainterModel.component_color(&"blue") == GlyphPainterModel.BLUE_GLYPH,
+		"shared Glyph painter should own the color mapping used by every factory view"
 	)
 
 

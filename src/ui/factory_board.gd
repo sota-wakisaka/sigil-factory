@@ -8,15 +8,13 @@ signal factory_changed
 const MvpContent := preload("res://src/game/mvp_content.gd")
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
 const FactoryLineModel := preload("res://src/factory/factory_line.gd")
+const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 
 const PANEL_COLOR := Color(0.035, 0.055, 0.085, 0.96)
 const NODE_COLOR := Color(0.08, 0.12, 0.18, 1.0)
 const NODE_BORDER := Color(0.38, 0.62, 0.82, 0.9)
 const LINE_COLOR := Color(0.24, 0.48, 0.68, 0.75)
 const GLYPH_COLOR := Color(0.35, 0.86, 1.0, 1.0)
-const WHITE_GLYPH := Color(0.76, 0.88, 1.0, 0.96)
-const BLUE_GLYPH := Color(0.28, 0.8, 1.0, 1.0)
-const RED_GLYPH := Color(1.0, 0.4, 0.42, 1.0)
 const SELECTED_COLOR := Color(1.0, 0.78, 0.3, 1.0)
 const WARNING_COLOR := Color(1.0, 0.38, 0.28, 1.0)
 const WAITING_COLOR := Color(1.0, 0.72, 0.24, 1.0)
@@ -819,7 +817,7 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		_draw_flow_arrow(start, finish, line_color)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
-			_draw_mini_glyph(line.payload, start.lerp(finish, progress), 0.85)
+			_draw_mini_glyph(line.payload, start.lerp(finish, progress), 0.55)
 
 
 func _draw_flow_arrow(start: Vector2, finish: Vector2, color: Color) -> void:
@@ -862,7 +860,7 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		)
 		var visible_glyph := _visible_node_active_glyph(node)
 		if visible_glyph != null:
-			_draw_mini_glyph(visible_glyph, center + Vector2(0, 21), 0.62)
+			_draw_mini_glyph(visible_glyph, center + Vector2(0, 21), 0.43)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
 
@@ -932,49 +930,11 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 		var y_offset := 0.0
 		if node.required_input_count() == 2:
 			y_offset = -13.0 if port == 0 else 13.0
-		_draw_mini_glyph(glyph, center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset), 0.5)
+		_draw_mini_glyph(glyph, center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset), 0.35)
 
 
 func _draw_mini_glyph(glyph: GlyphModel, center: Vector2, scale: float) -> void:
-	if glyph == null or not glyph.structure_validation_errors().is_empty():
-		return
-	if not glyph.combine_children.is_empty():
-		draw_arc(center, 8.0 * scale, 0.0, TAU, 20, Color(0.55, 0.74, 0.9, 0.8), 1.4, true)
-	for component in glyph.components:
-		_draw_mini_component(component, center + Vector2(component.position) * 4.0 * scale, scale)
-
-
-func _draw_mini_component(component: GlyphComponentModel, center: Vector2, scale: float) -> void:
-	var color := _mini_component_color(component.color_id)
-	var angle := float(component.rotation_step) * PI * 0.5
-	var radius := (4.0 + float(maxi(component.scale_step - 1, 0)) * 1.5) * scale
-	match component.primitive_id:
-		&"ring":
-			draw_arc(center, radius, angle + 0.4, angle + TAU - 0.4, 16, color, 1.8, true)
-		&"spike":
-			var direction := Vector2.RIGHT.rotated(angle)
-			var normal := Vector2(-direction.y, direction.x)
-			draw_colored_polygon(PackedVector2Array([
-				center + direction * (radius + scale),
-				center - direction * radius + normal * radius * 0.65,
-				center - direction * radius - normal * radius * 0.65,
-			]), color)
-		&"branch":
-			var direction := Vector2.RIGHT.rotated(angle)
-			var normal := Vector2(-direction.y, direction.x)
-			draw_line(center - direction * radius, center + direction * radius, color, 1.8, true)
-			draw_line(center, center + normal * radius * 0.7, color, 1.4, true)
-		_:
-			draw_circle(center, radius, color, false, 1.8, true)
-
-
-func _mini_component_color(color_id: StringName) -> Color:
-	match color_id:
-		&"blue":
-			return BLUE_GLYPH
-		&"red":
-			return RED_GLYPH
-	return WHITE_GLYPH
+	GlyphPainterModel.draw_glyph(self, glyph, center, scale)
 
 
 func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
