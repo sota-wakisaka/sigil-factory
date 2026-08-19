@@ -840,11 +840,7 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
 			var glyph_center := start.lerp(finish, progress)
 			_draw_mini_glyph(line.payload, glyph_center, 0.72)
-			var match_state := line_recipe_match_state(line_id)
-			if match_state == &"match":
-				draw_arc(glyph_center, 11.0, 0.0, TAU, 24, MATCH_COLOR, 2.0, true)
-			elif match_state == &"mismatch":
-				draw_arc(glyph_center, 11.0, 0.0, TAU, 24, WARNING_COLOR, 2.0, true)
+			_draw_recipe_match_marker(glyph_center, line_recipe_match_state(line_id), 11.0)
 
 
 func _draw_flow_arrow(start: Vector2, finish: Vector2, color: Color) -> void:
@@ -980,10 +976,41 @@ func line_recipe_match_state(line_id: StringName) -> StringName:
 		return &"not_applicable"
 	if line.payload == null:
 		return &"empty"
-	var result := display_simulation.recipe_match_result(line.payload)
+	return _recipe_match_state_for_glyph(display_simulation, line.payload)
+
+
+func input_recipe_match_state(node_id: StringName, port: int) -> StringName:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return &"missing"
+	var node: FactoryNodeModel = display_simulation.nodes[node_id]
+	if node.kind != FactoryNodeModel.NodeKind.SUMMONER:
+		return &"not_applicable"
+	if port < 0 or port >= node.input_buffers.size():
+		return &"invalid"
+	if node.input_buffers[port] == null:
+		return &"empty"
+	return _recipe_match_state_for_glyph(display_simulation, node.input_buffers[port])
+
+
+func _recipe_match_state_for_glyph(
+	display_simulation: FactorySimulation,
+	glyph_value
+) -> StringName:
+	if not glyph_value is GlyphModel:
+		return &"invalid"
+	var result := display_simulation.recipe_match_result(glyph_value)
 	if not result["ok"]:
 		return &"invalid"
 	return &"match" if result["is_match"] else &"mismatch"
+
+
+func recipe_match_marker_symbol(match_state: StringName) -> StringName:
+	if match_state == &"match":
+		return &"check"
+	if match_state == &"mismatch":
+		return &"cross"
+	return &""
 
 
 func visible_input_glyph_for_node(node_id: StringName, port: int) -> GlyphModel:
@@ -1034,7 +1061,30 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 		var y_offset := 0.0
 		if node.required_input_count() == 2:
 			y_offset = -13.0 if port == 0 else 13.0
-		_draw_mini_glyph(glyph, center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset), 0.5)
+		var glyph_center := center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset)
+		_draw_mini_glyph(glyph, glyph_center, 0.5)
+		if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
+			_draw_recipe_match_marker(glyph_center, input_recipe_match_state(node.id, port), 9.0)
+
+
+func _draw_recipe_match_marker(
+	center: Vector2,
+	match_state: StringName,
+	radius: float
+) -> void:
+	var symbol := recipe_match_marker_symbol(match_state)
+	if symbol == &"":
+		return
+	var color := MATCH_COLOR if symbol == &"check" else WARNING_COLOR
+	draw_arc(center, radius, 0.0, TAU, 24, color, 2.0, true)
+	var badge_center := center + Vector2(radius * 0.72, -radius * 0.72)
+	draw_circle(badge_center, 4.5, color)
+	if symbol == &"check":
+		draw_line(badge_center + Vector2(-2.2, 0.0), badge_center + Vector2(-0.5, 1.8), Color.WHITE, 1.4, true)
+		draw_line(badge_center + Vector2(-0.5, 1.8), badge_center + Vector2(2.5, -2.0), Color.WHITE, 1.4, true)
+	else:
+		draw_line(badge_center + Vector2(-2.0, -2.0), badge_center + Vector2(2.0, 2.0), Color.WHITE, 1.4, true)
+		draw_line(badge_center + Vector2(-2.0, 2.0), badge_center + Vector2(2.0, -2.0), Color.WHITE, 1.4, true)
 
 
 func _draw_mini_glyph(

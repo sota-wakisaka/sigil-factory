@@ -1946,10 +1946,29 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		match_board.line_recipe_match_state(&"line_1") == &"match",
 		"summoner-bound matching Glyph should expose a positive arrival state"
 	)
+	_expect(
+		match_board.recipe_match_marker_symbol(&"match") == &"check",
+		"matching arrival marker should use a check in addition to color"
+	)
 	summon_line.payload = GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	_expect(
 		match_board.line_recipe_match_state(&"line_1") == &"mismatch",
 		"summoner-bound mismatching Glyph should expose a rejected arrival state"
+	)
+	_expect(
+		match_board.recipe_match_marker_symbol(&"mismatch") == &"cross",
+		"mismatching arrival marker should use a cross in addition to color"
+	)
+	var summoner: FactoryNodeModel = match_board.simulation.nodes[&"summoner"]
+	summoner.input_buffers[0] = GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	_expect(
+		match_board.input_recipe_match_state(&"summoner", 0) == &"match",
+		"matching state should remain visible after the Glyph reaches the summoner input"
+	)
+	summoner.input_buffers[0] = GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	_expect(
+		match_board.input_recipe_match_state(&"summoner", 0) == &"mismatch",
+		"mismatch state should remain visible after the Glyph reaches the summoner input"
 	)
 	match_board.free()
 	var combine_board := FactoryBoard.new()
@@ -1963,6 +1982,10 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	_expect(
 		combine_board.line_recipe_match_state(&"line_ring") == &"not_applicable",
 		"intermediate factory lines should not be judged as final recipes"
+	)
+	_expect(
+		combine_board.input_recipe_match_state(&"combiner", 0) == &"not_applicable",
+		"non-summoner inputs should not receive final-recipe markers"
 	)
 	_expect(
 		combine_board.visible_input_glyph_for_node(&"combiner", 0) == ring,
