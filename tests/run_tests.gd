@@ -2039,11 +2039,28 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	var preview := board.production_preview(160)
 	_expect(preview["ok"], "complete factory should produce a preview")
 	_expect(preview["counts"][&"scout"] > 0, "scout factory preview should report scouts")
+	_expect(
+		preview["node_outputs"].has(&"ring_source"),
+		"production preview should capture the source's first output Glyph"
+	)
 	_expect(board.simulation.tick_index == tick_before, "production preview should not advance the real factory")
 	board.set_interaction_enabled(true)
 	board.add_node_from_palette(&"rotator")
 	_expect(not board.production_preview()["ok"], "incomplete custom graph should not produce a preview")
 	board.free()
+	var sentinel_board := FactoryBoard.new()
+	sentinel_board.configure(MvpContent.PLAN_SENTINEL)
+	var source_preview := sentinel_board.predicted_output_glyph_for_node(&"ring_source")
+	var rotation_preview := sentinel_board.predicted_output_glyph_for_node(&"rotator")
+	var color_preview := sentinel_board.predicted_output_glyph_for_node(&"colorizer")
+	_expect(source_preview != null, "factory board should cache the predicted source output")
+	_expect(rotation_preview != null, "factory board should cache the predicted rotated output")
+	_expect(color_preview != null, "factory board should cache the predicted colored output")
+	if source_preview != null and rotation_preview != null and color_preview != null:
+		_expect(source_preview.components[0].rotation_step == 0, "source prediction should retain the raw orientation")
+		_expect(rotation_preview.components[0].rotation_step == 1, "rotator prediction should expose its quarter turn")
+		_expect(color_preview.components[0].color_id == &"blue", "colorizer prediction should expose its output color")
+	sentinel_board.free()
 
 
 func _test_factory_production_preview_explains_first_mismatch() -> void:

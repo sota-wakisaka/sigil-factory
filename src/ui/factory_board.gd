@@ -47,6 +47,7 @@ var flow_warning_message := ""
 var flow_warning_hold_ticks := 0
 var undo_history: Array[Dictionary] = []
 var cached_production_preview := ""
+var cached_node_output_glyphs: Dictionary = {}
 var run_upgrades: Array[StringName] = []
 var last_corrupt_discard_count := 0
 
@@ -353,7 +354,7 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 	var counts := {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
-		return {"ok": false, "counts": counts, "discarded": 0, "first_failure": {}, "errors": []}
+		return {"ok": false, "counts": counts, "discarded": 0, "first_failure": {}, "node_outputs": {}, "errors": []}
 	var validation := display_simulation.validate_graph()
 	if not validation["ok"]:
 		return {
@@ -361,6 +362,7 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 			"counts": counts,
 			"discarded": 0,
 			"first_failure": {},
+			"node_outputs": {},
 			"errors": validation["errors"].duplicate(),
 		}
 	var duplication := display_simulation.duplicate_state_result()
@@ -370,14 +372,17 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 			"counts": counts,
 			"discarded": 0,
 			"first_failure": {},
+			"node_outputs": {},
 			"errors": duplication["errors"].duplicate(),
 		}
 	var preview: FactorySimulation = duplication["state"]
 	var event_start := preview.summon_events.size()
 	var failure_start := preview.summon_failure_events.size()
 	var discarded_start := preview.discarded_glyphs
+	var node_outputs: Dictionary = {}
 	for _tick in maxi(ticks, 0):
 		preview.tick()
+		_capture_preview_node_outputs(preview, node_outputs)
 	for event_index in range(event_start, preview.summon_events.size()):
 		var unit_id: StringName = preview.summon_events[event_index]["unit_id"]
 		counts[unit_id] = int(counts.get(unit_id, 0)) + 1
@@ -389,8 +394,23 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 		"counts": counts,
 		"discarded": preview.discarded_glyphs - discarded_start,
 		"first_failure": first_failure,
+		"node_outputs": node_outputs,
 		"errors": [],
 	}
+
+
+func _capture_preview_node_outputs(preview: FactorySimulation, outputs: Dictionary) -> void:
+	for node_id in preview.nodes:
+		if outputs.has(node_id):
+			continue
+		var node: FactoryNodeModel = preview.nodes[node_id]
+		if node.output_buffer != null and node.output_buffer.structure_validation_errors().is_empty():
+			outputs[node_id] = node.output_buffer.copy()
+	for line in preview.lines.values():
+		if outputs.has(line.from_node_id) or line.payload == null:
+			continue
+		if line.payload.structure_validation_errors().is_empty():
+			outputs[line.from_node_id] = line.payload.copy()
 
 
 func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName, to_port: int) -> Dictionary:
@@ -869,6 +889,8 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 		var visible_glyph := _visible_node_active_glyph(node)
 		if visible_glyph != null:
 			_draw_mini_glyph(visible_glyph, center + Vector2(0, 21), 0.43)
+		elif cached_node_output_glyphs.has(node_id):
+			_draw_mini_glyph(cached_node_output_glyphs[node_id], center + Vector2(0, 21), 0.43, 0.34)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
 
@@ -914,6 +936,10 @@ func visible_glyph_for_node(node_id: StringName) -> GlyphModel:
 	if display_simulation == null or not display_simulation.nodes.has(node_id):
 		return null
 	return _visible_node_glyph(display_simulation.nodes[node_id])
+
+
+func predicted_output_glyph_for_node(node_id: StringName) -> GlyphModel:
+	return cached_node_output_glyphs.get(node_id)
 
 
 func visible_glyph_for_line(line_id: StringName) -> GlyphModel:
@@ -995,8 +1021,13 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 		_draw_mini_glyph(glyph, center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset), 0.35)
 
 
-func _draw_mini_glyph(glyph: GlyphModel, center: Vector2, scale: float) -> void:
-	GlyphPainterModel.draw_glyph(self, glyph, center, scale)
+func _draw_mini_glyph(
+	glyph: GlyphModel,
+	center: Vector2,
+	scale: float,
+	opacity: float = 1.0
+) -> void:
+	GlyphPainterModel.draw_glyph(self, glyph, center, scale, opacity)
 
 
 func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
@@ -1190,11 +1221,13 @@ func _push_undo_snapshot() -> void:
 func _refresh_production_preview() -> void:
 	var result := production_preview()
 	if not result["ok"]:
+		cached_node_output_glyphs.clear()
 		cached_production_preview = "32秒予測 // %s" % _validation_message(result.get("errors", []))
 		factory_changed.emit()
 		return
 	var counts: Dictionary = result["counts"]
 	var first_failure: Dictionary = result["first_failure"]
+	cached_node_output_glyphs = result["node_outputs"].duplicate()
 	if first_failure.is_empty():
 		cached_production_preview = "32秒予測 // 斥候 %d  衛兵 %d  巨像 %d  不一致 0" % [
 			counts[&"scout"],

@@ -15,10 +15,12 @@ static func draw_glyph(
 	canvas: CanvasItem,
 	glyph: GlyphModel,
 	center: Vector2,
-	scale: float = 1.0
+	scale: float = 1.0,
+	opacity: float = 1.0
 ) -> bool:
-	if canvas == null or not can_draw(glyph) or scale <= 0.0:
+	if canvas == null or not can_draw(glyph) or scale <= 0.0 or opacity <= 0.0:
 		return false
+	var normalized_opacity := clampf(opacity, 0.0, 1.0)
 	if not glyph.combine_children.is_empty():
 		canvas.draw_arc(
 			center,
@@ -26,7 +28,7 @@ static func draw_glyph(
 			0.0,
 			TAU,
 			28,
-			COMBINE_COLOR,
+			_with_opacity(COMBINE_COLOR, normalized_opacity),
 			maxf(1.0, 1.4 * scale),
 			true
 		)
@@ -35,7 +37,8 @@ static func draw_glyph(
 			canvas,
 			component,
 			center + Vector2(component.position) * 6.0 * scale,
-			scale
+			scale,
+			normalized_opacity
 		)
 	return true
 
@@ -53,9 +56,10 @@ static func _draw_component(
 	canvas: CanvasItem,
 	component: GlyphComponentModel,
 	center: Vector2,
-	scale: float
+	scale: float,
+	opacity: float
 ) -> void:
-	var color := component_color(component.color_id)
+	var color := _with_opacity(component_color(component.color_id), opacity)
 	var angle := float(component.rotation_step) * PI * 0.5
 	var radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
 	var stroke := maxf(1.0, 2.0 * scale)
@@ -90,3 +94,7 @@ static func _draw_component(
 			)
 		_:
 			canvas.draw_circle(center, radius, color, false, stroke, true)
+
+
+static func _with_opacity(color: Color, opacity: float) -> Color:
+	return Color(color.r, color.g, color.b, color.a * opacity)
