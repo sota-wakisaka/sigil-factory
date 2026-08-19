@@ -22,6 +22,7 @@ var failures := 0
 
 func _initialize() -> void:
 	_test_exact_match_is_order_independent()
+	_test_matcher_rejects_invalid_structures_safely()
 	_test_canonical_encoding_frames_delimiter_ids()
 	_test_attribute_diagnostics()
 	_test_missing_and_extra_components()
@@ -117,6 +118,40 @@ func _test_exact_match_is_order_independent() -> void:
 	var actual := GlyphModel.new([second, first])
 	var result := SigilMatcher.compare(actual, target)
 	_expect(result["is_match"], "component order should not affect matching")
+
+
+func _test_matcher_rejects_invalid_structures_safely() -> void:
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var missing_actual := SigilMatcher.compare(null, ring)
+	_expect(not missing_actual["is_match"], "matcher should reject a missing actual Glyph")
+	_expect(
+		missing_actual["diagnostics"] == PackedStringArray(["入力グリフがありません"]),
+		"missing actual Glyph should return a direct diagnostic"
+	)
+	var missing_target := SigilMatcher.compare(ring, null)
+	_expect(not missing_target["is_match"], "matcher should reject a missing target Glyph")
+	_expect(
+		missing_target["diagnostics"] == PackedStringArray(["シジル定義がありません"]),
+		"missing target Glyph should identify the recipe definition"
+	)
+	var missing_components: Array[GlyphComponentModel] = [null]
+	var invalid_component := GlyphModel.new(missing_components)
+	var invalid_result := SigilMatcher.compare(invalid_component, ring)
+	_expect(not invalid_result["is_match"], "matcher should reject an invalid actual component")
+	_expect(
+		"invalid_component:root" in invalid_result["diagnostics"][0],
+		"invalid actual component should retain its structural path"
+	)
+	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	var cyclic := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	cyclic.combine_children = [cyclic, spike]
+	var cyclic_result := SigilMatcher.compare(cyclic, ring)
+	_expect(not cyclic_result["is_match"], "matcher should reject a cyclic actual Glyph without recursing forever")
+	_expect(
+		"cyclic_structure:root.0" in cyclic_result["diagnostics"][0],
+		"cyclic matcher rejection should retain the recursive path"
+	)
+	cyclic.combine_children.clear()
 
 
 func _test_canonical_encoding_frames_delimiter_ids() -> void:

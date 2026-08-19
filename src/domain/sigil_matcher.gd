@@ -3,6 +3,22 @@ extends RefCounted
 
 
 static func compare(actual: GlyphModel, target: GlyphModel) -> Dictionary:
+	if actual == null:
+		return _invalid_result(PackedStringArray(["入力グリフがありません"]))
+	if target == null:
+		return _invalid_result(PackedStringArray(["シジル定義がありません"]))
+	var actual_structure_diagnostics := _structure_diagnostics(
+		actual.structure_validation_errors(),
+		"入力グリフ構造が不正です"
+	)
+	if not actual_structure_diagnostics.is_empty():
+		return _invalid_result(actual_structure_diagnostics)
+	var target_structure_diagnostics := _structure_diagnostics(
+		target.structure_validation_errors(),
+		"シジル定義エラー"
+	)
+	if not target_structure_diagnostics.is_empty():
+		return _invalid_result(target_structure_diagnostics)
 	var actual_overlaps := actual.complete_overlap_primitive_ids()
 	if not actual_overlaps.is_empty():
 		return {
@@ -71,6 +87,26 @@ static func compare(actual: GlyphModel, target: GlyphModel) -> Dictionary:
 		"is_match": false,
 		"diagnostics": _ordered_diagnostics(diagnostics),
 	}
+
+
+static func _structure_diagnostics(
+	structure_errors: PackedStringArray,
+	prefix: String
+) -> PackedStringArray:
+	var diagnostics := PackedStringArray()
+	for structure_error in structure_errors:
+		if not (
+			structure_error.begins_with("invalid_component:")
+			or structure_error.begins_with("invalid_child:")
+			or structure_error.begins_with("cyclic_structure:")
+		):
+			continue
+		diagnostics.append("%s: %s" % [prefix, structure_error])
+	return diagnostics
+
+
+static func _invalid_result(diagnostics: PackedStringArray) -> Dictionary:
+	return {"is_match": false, "diagnostics": diagnostics}
 
 
 static func _find_closest_component(
