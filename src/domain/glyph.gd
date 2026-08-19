@@ -72,8 +72,17 @@ func canonical_hash() -> String:
 	return canonical_serialization().sha256_text()
 
 
-func structure_validation_errors(path: String = "root") -> PackedStringArray:
+func structure_validation_errors() -> PackedStringArray:
+	return _structure_validation_errors("root", {})
+
+
+func _structure_validation_errors(path: String, active_ancestors: Dictionary) -> PackedStringArray:
 	var errors := PackedStringArray()
+	var instance_key := get_instance_id()
+	if active_ancestors.has(instance_key):
+		errors.append("cyclic_structure:%s" % path)
+		return errors
+	active_ancestors[instance_key] = true
 	if combine_children.is_empty():
 		if components.size() != 1:
 			errors.append("primitive_arity:%s:%d" % [path, components.size()])
@@ -89,10 +98,18 @@ func structure_validation_errors(path: String = "root") -> PackedStringArray:
 		if combine_children.size() != 2:
 			errors.append("combine_arity:%s:%d" % [path, combine_children.size()])
 		for child_index in combine_children.size():
-			var child: GlyphModel = combine_children[child_index]
-			errors.append_array(child.structure_validation_errors("%s.%d" % [path, child_index]))
+			var child_value = combine_children[child_index]
+			if not child_value is GlyphModel:
+				errors.append("invalid_child:%s.%d" % [path, child_index])
+				continue
+			var child: GlyphModel = child_value
+			errors.append_array(child._structure_validation_errors(
+				"%s.%d" % [path, child_index],
+				active_ancestors
+			))
 	if path == "root" and has_complete_overlap():
 		errors.append("complete_overlap:%s" % ",".join(complete_overlap_primitive_ids()))
+	active_ancestors.erase(instance_key)
 	return errors
 
 

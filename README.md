@@ -23,6 +23,7 @@ Design documents:
 - Actionable validation reasons shared by pre-battle production preview and start rejection
 - Collision-safe canonical binary Combine structure with hierarchy-aware sigil matching
 - Recipe-boundary validation for primitive leaves, binary Combine arity, and component fields
+- Cycle-safe Combine validation for malformed restored glyph trees
 - Unique recipe IDs and canonical structures with acquisition-order-independent registration
 - Owned recipe snapshots that isolate runtime factories and non-destructive previews
 - Completed-sigil ghost preview for the currently selected production plan

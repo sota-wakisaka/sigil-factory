@@ -739,6 +739,21 @@ func _test_factory_rejects_invalid_recipe_structures() -> void:
 	var simulation := FactorySimulation.new()
 	for recipe in invalid_recipes:
 		_expect(not simulation.add_recipe(recipe), "invalid recipe %s should be rejected" % recipe.id)
+	var cyclic_recipe := SigilRecipeModel.new(&"cyclic", ring, &"scout")
+	cyclic_recipe.glyph.combine_children = [cyclic_recipe.glyph, spike]
+	_expect(
+		cyclic_recipe.glyph.structure_validation_errors().has("cyclic_structure:root.0"),
+		"cyclic Combine should report its recursive path without recursing forever"
+	)
+	_expect(not simulation.add_recipe(cyclic_recipe), "cyclic Combine recipe should be rejected")
+	cyclic_recipe.glyph.combine_children.clear()
+	var null_child_recipe := SigilRecipeModel.new(&"null_child", ring, &"scout")
+	null_child_recipe.glyph.combine_children = [null, spike]
+	_expect(
+		null_child_recipe.glyph.structure_validation_errors().has("invalid_child:root.0"),
+		"null Combine child should report its path without crashing validation"
+	)
+	_expect(not simulation.add_recipe(null_child_recipe), "null-child Combine recipe should be rejected")
 	_expect(simulation.recipes.is_empty(), "invalid recipe definitions should never enter the registry")
 	_expect(
 		simulation.add_recipe(SigilRecipeModel.new(&"valid_nested", GlyphModel.combine(ring, GlyphModel.combine(spike, branch)), &"golem")),
