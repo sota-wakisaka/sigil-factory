@@ -60,3 +60,16 @@ func has_all_inputs() -> bool:
 			return false
 	return true
 
+
+func copy_state() -> FactoryNodeModel:
+	var result := FactoryNodeModel.new(id, kind, config)
+	for port in mini(input_buffers.size(), result.input_buffers.size()):
+		if input_buffers[port] != null:
+			result.input_buffers[port] = input_buffers[port].copy()
+	if output_buffer != null:
+		result.output_buffer = output_buffer.copy()
+	if processing_glyph != null:
+		result.processing_glyph = processing_glyph.copy()
+	result.remaining_processing_ticks = remaining_processing_ticks
+	result.source_timer = source_timer
+	return result

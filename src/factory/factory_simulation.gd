@@ -17,10 +17,21 @@ var tick_index := 0
 
 
 func add_node(node: FactoryNodeModel) -> bool:
-	if nodes.has(node.id):
+	if node == null or nodes.has(node.id) or not _node_work_in_progress_is_valid(node):
 		return false
-	nodes[node.id] = node
+	var stored_node := node.copy_state()
+	nodes[stored_node.id] = stored_node
 	return true
+
+
+func _node_work_in_progress_is_valid(node: FactoryNodeModel) -> bool:
+	for glyph_value in node.input_buffers:
+		if not _runtime_glyph_is_valid(glyph_value):
+			return false
+	return (
+		_runtime_glyph_is_valid(node.processing_glyph)
+		and _runtime_glyph_is_valid(node.output_buffer)
+	)
 
 
 func add_recipe(recipe: SigilRecipeModel) -> bool:
@@ -341,17 +352,8 @@ func _duplicate_state_unchecked() -> FactorySimulation:
 		result.add_recipe(recipe)
 	for node_id in nodes:
 		var node: FactoryNodeModel = nodes[node_id]
-		var copied_node := FactoryNodeModel.new(node.id, node.kind, node.config)
-		for port in node.input_buffers.size():
-			if node.input_buffers[port] != null:
-				copied_node.input_buffers[port] = node.input_buffers[port].copy()
-		if node.output_buffer != null:
-			copied_node.output_buffer = node.output_buffer.copy()
-		if node.processing_glyph != null:
-			copied_node.processing_glyph = node.processing_glyph.copy()
-		copied_node.remaining_processing_ticks = node.remaining_processing_ticks
-		copied_node.source_timer = node.source_timer
-		result.add_node(copied_node)
+		var copied_node := node.copy_state()
+		result.nodes[copied_node.id] = copied_node
 	for line_id in lines:
 		var line: FactoryLineModel = lines[line_id]
 		var copied_line := line.copy()

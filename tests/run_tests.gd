@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_test_mvp_recipe_set_validation_reports_content_location()
 	_test_factory_rejects_invalid_recipe_structures()
 	_test_factory_owns_registered_recipe_data()
+	_test_factory_owns_registered_node_data()
 	_test_factory_duplicate_owns_recipe_data()
 	_test_factory_duplicate_reports_invalid_state()
 	_test_combiner_waits_for_both_inputs()
@@ -403,6 +404,9 @@ func _test_factory_tick_prevents_same_tick_multistage_processing() -> void:
 	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
 	for node in [source, rotator, summoner]:
 		simulation.add_node(node)
+	source = simulation.nodes[&"source"]
+	rotator = simulation.nodes[&"rotator"]
+	summoner = simulation.nodes[&"summoner"]
 	simulation.connect_nodes(FactoryLineModel.new(&"source_line", &"source", &"rotator", 0, 1))
 	simulation.connect_nodes(FactoryLineModel.new(&"summon_line", &"rotator", &"summoner", 0, 1))
 	simulation.add_recipe(SigilRecipeModel.new(
@@ -434,6 +438,8 @@ func _test_factory_tick_uses_starting_input_availability() -> void:
 	)
 	simulation.add_node(source)
 	simulation.add_node(rotator)
+	source = simulation.nodes[&"source"]
+	rotator = simulation.nodes[&"rotator"]
 	simulation.connect_nodes(FactoryLineModel.new(&"line", &"source", &"rotator", 0, 1))
 	var first := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	var waiting := GlyphModel.new([GlyphComponentModel.new(&"spike")])
@@ -460,6 +466,8 @@ func _test_factory_tick_does_not_refill_freed_line() -> void:
 	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
 	simulation.add_node(source)
 	simulation.add_node(summoner)
+	source = simulation.nodes[&"source"]
+	summoner = simulation.nodes[&"summoner"]
 	simulation.connect_nodes(FactoryLineModel.new(&"line", &"source", &"summoner", 0, 1))
 	var glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	source.output_buffer = glyph.copy()
@@ -842,6 +850,34 @@ func _test_factory_owns_registered_recipe_data() -> void:
 	)
 
 
+func _test_factory_owns_registered_node_data() -> void:
+	var simulation := FactorySimulation.new()
+	var node := FactoryNodeModel.new(
+		&"owned_source",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"primitive_id": "ring", "interval_ticks": 18}
+	)
+	node.output_buffer = GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	node.source_timer = 7
+	_expect(simulation.add_node(node), "node ownership fixture should register")
+	node.id = &"mutated_id"
+	node.config["primitive_id"] = "spike"
+	node.output_buffer.recolor(&"blue")
+	node.source_timer = 99
+	var registered: FactoryNodeModel = simulation.nodes[&"owned_source"]
+	_expect(registered.id == &"owned_source", "registered node ID should not share caller mutation")
+	_expect(registered.config["primitive_id"] == "ring", "registered node config should be owned")
+	_expect(
+		registered.output_buffer.components[0].color_id == &"white",
+		"registered node work in progress should be owned"
+	)
+	_expect(registered.source_timer == 7, "registered node runtime counters should be copied")
+	var invalid_node := FactoryNodeModel.new(&"invalid", FactoryNodeModel.NodeKind.ROTATOR)
+	invalid_node.input_buffers[0] = "not-a-glyph"
+	_expect(not simulation.add_node(invalid_node), "node registration should reject unsafe work in progress")
+	_expect(not simulation.nodes.has(&"invalid"), "rejected node state should not leave a partial registration")
+
+
 func _test_factory_duplicate_owns_recipe_data() -> void:
 	var simulation := FactorySimulation.new()
 	simulation.add_recipe(SigilRecipeModel.new(
@@ -1190,6 +1226,9 @@ func _test_factory_flow_diagnostics_distinguish_blockages() -> void:
 	var combiner := FactoryNodeModel.new(&"combiner", FactoryNodeModel.NodeKind.COMBINER)
 	for node in [source, blocked, combiner]:
 		simulation.add_node(node)
+	source = simulation.nodes[&"source"]
+	blocked = simulation.nodes[&"blocked"]
+	combiner = simulation.nodes[&"combiner"]
 	simulation.connect_nodes(FactoryLineModel.new(&"blocked_line", &"source", &"blocked"))
 	var glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	source.output_buffer = glyph.copy()
@@ -1690,6 +1729,7 @@ func _test_factory_board_holds_transient_flow_warning() -> void:
 	var glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	blocked.output_buffer = glyph
 	board.simulation.add_node(blocked)
+	blocked = board.simulation.nodes[&"blocked"]
 	board.advance_tick()
 	_expect(board.flow_warning_message != "", "transient blockage should create a readable warning")
 	blocked.output_buffer = null
