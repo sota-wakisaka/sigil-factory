@@ -69,6 +69,24 @@ func canonical_hash() -> String:
 	return canonical_serialization().sha256_text()
 
 
+func complete_overlap_primitive_ids() -> Array[StringName]:
+	var seen: Dictionary = {}
+	var overlapping: Array[StringName] = []
+	for component in components:
+		var key := component.canonical_key()
+		if seen.has(key):
+			if not overlapping.has(component.primitive_id):
+				overlapping.append(component.primitive_id)
+		else:
+			seen[key] = true
+	overlapping.sort()
+	return overlapping
+
+
+func has_complete_overlap() -> bool:
+	return not complete_overlap_primitive_ids().is_empty()
+
+
 func rotate(steps: int) -> void:
 	for component in components:
 		component.rotation_step = posmod(component.rotation_step + steps, 4)

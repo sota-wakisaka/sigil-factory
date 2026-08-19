@@ -3,6 +3,22 @@ extends RefCounted
 
 
 static func compare(actual: GlyphModel, target: GlyphModel) -> Dictionary:
+	var actual_overlaps := actual.complete_overlap_primitive_ids()
+	if not actual_overlaps.is_empty():
+		return {
+			"is_match": false,
+			"diagnostics": PackedStringArray([
+				"完全重複した部品があります: %s" % ", ".join(actual_overlaps),
+			]),
+		}
+	var target_overlaps := target.complete_overlap_primitive_ids()
+	if not target_overlaps.is_empty():
+		return {
+			"is_match": false,
+			"diagnostics": PackedStringArray([
+				"シジル定義エラー: 完全重複: %s" % ", ".join(target_overlaps),
+			]),
+		}
 	if actual.canonical_serialization() == target.canonical_serialization():
 		return {
 			"is_match": true,

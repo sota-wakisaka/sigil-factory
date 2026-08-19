@@ -25,6 +25,8 @@ func _initialize() -> void:
 	_test_combine_structure_is_order_independent()
 	_test_combine_hierarchy_affects_matching()
 	_test_production_context_does_not_affect_matching()
+	_test_rotation_is_normalized_to_quarter_turns()
+	_test_complete_overlap_is_rejected()
 	_test_factory_pipeline_summons_matching_unit()
 	_test_combiner_waits_for_both_inputs()
 	_test_factory_rejects_cycles()
@@ -133,6 +135,27 @@ func _test_production_context_does_not_affect_matching() -> void:
 	)
 	_expect(second.production_context.processing_count == 1, "production context should count processing")
 	_expect(second.production_context.has_visited(&"rotator"), "production context should retain node kinds")
+
+
+func _test_rotation_is_normalized_to_quarter_turns() -> void:
+	var first := GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, 1)])
+	var wrapped := GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, 5)])
+	var negative := GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2i.ZERO, -3)])
+	_expect(SigilMatcher.compare(first, wrapped)["is_match"], "rotation should wrap after four quarter turns")
+	_expect(SigilMatcher.compare(first, negative)["is_match"], "negative rotation should normalize into the same cycle")
+
+
+func _test_complete_overlap_is_rejected() -> void:
+	var duplicate := GlyphModel.combine(
+		GlyphModel.new([GlyphComponentModel.new(&"ring")]),
+		GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	)
+	var result := SigilMatcher.compare(duplicate, duplicate)
+	_expect(not result["is_match"], "fully overlapping primitives should never form a valid sigil")
+	_expect(
+		"完全重複" in result["diagnostics"][0],
+		"fully overlapping primitives should report a direct diagnostic"
+	)
 
 
 func _test_factory_pipeline_summons_matching_unit() -> void:

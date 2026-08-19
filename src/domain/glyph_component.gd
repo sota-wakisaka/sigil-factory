@@ -17,7 +17,7 @@ func _init(
 ) -> void:
 	primitive_id = initial_primitive_id
 	position = initial_position
-	rotation_step = initial_rotation_step
+	rotation_step = posmod(initial_rotation_step, 4)
 	scale_step = initial_scale_step
 	color_id = initial_color_id
 
@@ -27,7 +27,7 @@ func canonical_key() -> String:
 		primitive_id,
 		position.x,
 		position.y,
-		rotation_step,
+		posmod(rotation_step, 4),
 		scale_step,
 		color_id,
 	]
@@ -41,4 +41,3 @@ func copy() -> GlyphComponentModel:
 		scale_step,
 		color_id
 	)
-
