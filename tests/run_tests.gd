@@ -53,6 +53,7 @@ func _initialize() -> void:
 	_test_factory_graph_validation_reports_dangling_nodes()
 	_test_factory_validation_rejects_externally_injected_lines()
 	_test_factory_validation_rejects_externally_injected_cycle()
+	_test_factory_validation_rejects_invalid_restored_configuration()
 	_test_factory_validation_order_is_stable()
 	_test_factory_flow_diagnostics_distinguish_blockages()
 	_test_mvp_plans_produce_expected_units()
@@ -928,6 +929,49 @@ func _test_factory_validation_rejects_externally_injected_cycle() -> void:
 	var result := simulation.validate_graph()
 	_expect(not result["ok"], "authoritative validation should reject externally injected cycles")
 	_expect(result["errors"].has("cycle"), "validation should identify an injected cycle")
+
+
+func _test_factory_validation_rejects_invalid_restored_configuration() -> void:
+	var simulation := FactorySimulation.new()
+	var source := FactoryNodeModel.new(
+		&"source_id",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"primitive_id": "", "interval_ticks": 0}
+	)
+	var rotator := FactoryNodeModel.new(
+		&"rotator",
+		FactoryNodeModel.NodeKind.ROTATOR,
+		{"steps": 4, "processing_ticks": 0}
+	)
+	var translator := FactoryNodeModel.new(
+		&"translator",
+		FactoryNodeModel.NodeKind.TRANSLATOR,
+		{"offset": "not-a-vector", "processing_ticks": 1}
+	)
+	var colorizer := FactoryNodeModel.new(
+		&"colorizer",
+		FactoryNodeModel.NodeKind.COLORIZER,
+		{"color_id": "", "processing_ticks": 1}
+	)
+	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
+	simulation.nodes[&"wrong_source_key"] = source
+	for node in [rotator, translator, colorizer, summoner]:
+		simulation.nodes[node.id] = node
+	var mismatched_line := FactoryLineModel.new(&"actual_line_id", &"source_id", &"summoner")
+	simulation.lines[&"wrong_line_key"] = mismatched_line
+	var result := simulation.validate_graph()
+	_expect(not result["ok"], "restored invalid node and line configuration should be rejected")
+	for expected_error in [
+		"node_key_mismatch:wrong_source_key:source_id",
+		"missing_source_primitive:wrong_source_key",
+		"invalid_source_interval:wrong_source_key",
+		"invalid_processing_ticks:rotator",
+		"invalid_rotation_steps:rotator",
+		"invalid_translation_offset:translator",
+		"missing_color_id:colorizer",
+		"line_key_mismatch:wrong_line_key:actual_line_id",
+	]:
+		_expect(result["errors"].has(expected_error), "restored validation should report %s" % expected_error)
 
 
 func _test_factory_validation_order_is_stable() -> void:

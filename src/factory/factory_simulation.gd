@@ -87,12 +87,21 @@ func remove_node(node_id: StringName) -> bool:
 
 func validate_graph() -> Dictionary:
 	var errors: Array[String] = []
+	for node_key in _sorted_keys(nodes):
+		var configured_node: FactoryNodeModel = nodes[node_key]
+		errors.append_array(_node_configuration_errors(node_key, configured_node))
 	var structurally_valid_line_ids: Dictionary = {}
 	var input_line_counts: Dictionary = {}
 	var output_line_counts: Dictionary = {}
 	for line_id in _sorted_keys(lines):
 		var line: FactoryLineModel = lines[line_id]
 		var line_is_valid := true
+		if line.id == &"":
+			errors.append("missing_line_id:%s" % line_id)
+			line_is_valid = false
+		elif line.id != line_id:
+			errors.append("line_key_mismatch:%s:%s" % [line_id, line.id])
+			line_is_valid = false
 		if not nodes.has(line.from_node_id):
 			errors.append("missing_from_node:%s" % line_id)
 			line_is_valid = false
@@ -148,6 +157,39 @@ func validate_graph() -> Dictionary:
 	elif summoner_count > 1:
 		errors.append("multiple_summoners")
 	return {"ok": errors.is_empty(), "errors": errors}
+
+
+func _node_configuration_errors(node_key: StringName, node: FactoryNodeModel) -> Array[String]:
+	var errors: Array[String] = []
+	if node.id == &"":
+		errors.append("missing_node_id:%s" % node_key)
+	elif node.id != node_key:
+		errors.append("node_key_mismatch:%s:%s" % [node_key, node.id])
+	if node.kind < FactoryNodeModel.NodeKind.SOURCE or node.kind > FactoryNodeModel.NodeKind.SUMMONER:
+		errors.append("invalid_node_kind:%s" % node_key)
+		return errors
+	if node.kind == FactoryNodeModel.NodeKind.SOURCE:
+		if StringName(node.config.get("primitive_id", "")) == &"":
+			errors.append("missing_source_primitive:%s" % node_key)
+		if int(node.config.get("interval_ticks", 0)) < 1:
+			errors.append("invalid_source_interval:%s" % node_key)
+		return errors
+	if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
+		return errors
+	if int(node.config.get("processing_ticks", 0)) < 1:
+		errors.append("invalid_processing_ticks:%s" % node_key)
+	match node.kind:
+		FactoryNodeModel.NodeKind.ROTATOR:
+			var steps := int(node.config.get("steps", 0))
+			if steps < 1 or steps > 3:
+				errors.append("invalid_rotation_steps:%s" % node_key)
+		FactoryNodeModel.NodeKind.TRANSLATOR:
+			if typeof(node.config.get("offset", null)) != TYPE_VECTOR2I:
+				errors.append("invalid_translation_offset:%s" % node_key)
+		FactoryNodeModel.NodeKind.COLORIZER:
+			if StringName(node.config.get("color_id", "")) == &"":
+				errors.append("missing_color_id:%s" % node_key)
+	return errors
 
 
 func flow_diagnostics() -> Array[Dictionary]:

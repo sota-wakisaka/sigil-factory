@@ -19,6 +19,7 @@ Design documents:
 - Selection inspector for source material, rotation, and color configuration
 - Deterministic fixed-tick glyph factory simulation
 - Authoritative graph validation for restored or externally constructed factory data
+- Restored node and line identity/configuration validation before fixed-tick execution
 - Collision-safe canonical binary Combine structure with hierarchy-aware sigil matching
 - Recipe-boundary validation for primitive leaves, binary Combine arity, and component fields
 - Unique recipe IDs and canonical structures with acquisition-order-independent registration
