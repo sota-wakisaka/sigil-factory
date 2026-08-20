@@ -11,12 +11,14 @@ const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 @export var manual_layout := false
 
 var glyph: GlyphModel
+var plan_description := ""
 
 
 func _ready() -> void:
 	toggle_mode = true
 	text = ""
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	plan_description = tooltip_text
 	_load_recipe()
 	queue_redraw()
 
@@ -26,7 +28,9 @@ func _load_recipe() -> bool:
 		if recipe.id != recipe_id:
 			continue
 		glyph = recipe.glyph.copy()
-		tooltip_text = "%sの目標シジルを拡大表示" % caption
+		if plan_description == "":
+			plan_description = "%sの工場と目標を選択" % caption
+		tooltip_text = plan_description
 		return true
 	glyph = null
 	return false
@@ -78,5 +82,5 @@ func glyph_draw_scale() -> float:
 
 func _make_custom_tooltip(_for_text: String):
 	var preview := GlyphTooltipModel.new()
-	preview.configure(glyph, "目標候補 // %s" % caption, "クリックで工場と目標を選択")
+	preview.configure(glyph, "目標候補 // %s" % caption, plan_description)
 	return preview

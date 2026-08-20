@@ -8,7 +8,8 @@ const BORDER_COLOR := Color(0.42, 0.7, 0.9, 0.96)
 const TITLE_COLOR := Color(0.82, 0.92, 1.0, 1.0)
 const TEXT_COLOR := Color(0.62, 0.74, 0.84, 1.0)
 const ACCENT_COLOR := Color(0.42, 0.86, 1.0, 1.0)
-const TOOLTIP_SIZE := Vector2(340, 214)
+const TOOLTIP_SIZE := Vector2(380, 244)
+const CONTEXT_LINE_CHARACTERS := 22
 
 var glyph: GlyphModel
 var title := "グリフ"
@@ -39,19 +40,21 @@ func _draw() -> void:
 		17,
 		TITLE_COLOR
 	)
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(18, 49),
-		context,
-		HORIZONTAL_ALIGNMENT_LEFT,
-		size.x - 36.0,
-		12,
-		TEXT_COLOR
-	)
+	var context_rows := context_lines()
+	for index in context_rows.size():
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(18, 49 + index * 16),
+			context_rows[index],
+			HORIZONTAL_ALIGNMENT_LEFT,
+			size.x - 36.0,
+			12,
+			TEXT_COLOR
+		)
 	if glyph == null:
 		draw_string(ThemeDB.fallback_font, Vector2(18, 102), "表示できるGlyphがありません", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, TEXT_COLOR)
 		return
-	var glyph_center := Vector2(92, 124)
+	var glyph_center := Vector2(102, 154)
 	draw_circle(glyph_center, 66.0, Color(0.04, 0.075, 0.11, 0.9))
 	draw_arc(glyph_center, 66.0, 0.0, TAU, 40, Color(0.2, 0.38, 0.52, 0.72), 1.0, true)
 	GlyphPainterModel.draw_glyph(self, glyph, glyph_center, _preview_scale())
@@ -59,22 +62,33 @@ func _draw() -> void:
 	for index in detail_lines.size():
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(176, 82 + index * 22),
+			Vector2(194, 108 + index * 22),
 			detail_lines[index],
 			HORIZONTAL_ALIGNMENT_LEFT,
-			size.x - 192.0,
+			size.x - 210.0,
 			13,
 			ACCENT_COLOR if index == 0 else TEXT_COLOR
 		)
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(176, 191),
+		Vector2(194, 221),
 		"同じ形を召喚器へ",
 		HORIZONTAL_ALIGNMENT_LEFT,
-		size.x - 192.0,
+		size.x - 210.0,
 		12,
 		TITLE_COLOR
 	)
+
+
+func context_lines() -> PackedStringArray:
+	var lines := PackedStringArray()
+	var offset := 0
+	while offset < context.length():
+		lines.append(context.substr(offset, CONTEXT_LINE_CHARACTERS))
+		offset += CONTEXT_LINE_CHARACTERS
+	if lines.is_empty():
+		lines.append("")
+	return lines
 
 
 func _preview_scale() -> float:
