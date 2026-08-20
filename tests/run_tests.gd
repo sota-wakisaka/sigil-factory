@@ -2616,9 +2616,21 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	board.configure(MvpContent.PLAN_SCOUT)
 	var tick_before := board.simulation.tick_index
 	var preview := board.production_preview(160)
+	var scout_offsets: PackedInt32Array = preview["event_offsets"][&"scout"]
+	_expect(scout_offsets.size() == preview["counts"][&"scout"], "production timeline should contain one offset per successful summon")
+	var previous_offset := 0
+	for offset in scout_offsets:
+		_expect(offset >= 1 and offset <= 160, "production timeline offsets should stay relative to the 32-second window")
+		_expect(offset > previous_offset, "production timeline offsets should preserve chronological event order")
+		previous_offset = offset
+	board.simulation.tick_index = 100
+	var shifted_preview := board.production_preview(160)
+	_expect(shifted_preview["event_offsets"][&"scout"] == scout_offsets, "production timeline should use offsets instead of absolute simulation ticks")
+	board.simulation.tick_index = tick_before
 	board._refresh_production_preview()
 	_expect(board.cached_production_valid, "valid production preview should expose visual summary state")
 	_expect(board.cached_production_counts == preview["counts"], "visual production summary should preserve exact forecast counts")
+	_expect(board.cached_production_event_offsets == preview["event_offsets"], "visual production summary should preserve exact summon event timing")
 	_expect(board.cached_production_discarded == preview["discarded"], "visual production summary should preserve the mismatch count")
 	_expect(is_equal_approx(board.mana_fill_ratio(), float(board.mana_used()) / 100.0), "mana meter should reflect the fixed factory capacity")
 	board.set_interaction_enabled(true)
@@ -2629,10 +2641,16 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	board.size = Vector2(1196, 401)
 	var summary_center := board.production_summary_center(0)
 	_expect(board.production_summary_unit_at(summary_center) == &"scout", "production Glyph should expose a stable hover target")
+	_expect(board.production_summary_unit_at(summary_center + Vector2(0, 38)) == &"scout", "production timeline should share the Glyph tooltip hit target")
 	_expect(board.cursor_shape_at(summary_center) == Control.CURSOR_HELP, "production forecast Glyph should advertise its visual details")
 	_expect(board.production_summary_is_goal(&"scout") and not board.production_summary_is_goal(&"golem"), "production summary should visually outline the selected sigil goal")
 	_expect(board._get_tooltip(summary_center) == "glyph_preview", "production Glyph should open the same large visual tooltip as factory Glyphs")
 	_expect(board.tooltip_glyph != null and "生産見込み" in board.tooltip_context, "production tooltip should pair its CanonicalGlyph with the forecast count")
+	_expect("初回" in board.tooltip_context and "間隔" in board.tooltip_context, "production tooltip should expose first arrival and observed cadence without permanent text")
+	_expect(board.production_timing_tooltip(PackedInt32Array()) == "32秒内の召喚なし", "empty timing series should not claim the factory can never summon")
+	_expect("未観測" in board.production_timing_tooltip(PackedInt32Array([20])), "single summon should not invent a cadence")
+	_expect("間隔 2.0秒" in board.production_timing_tooltip(PackedInt32Array([10, 20, 30])), "regular event spacing should expose its observed interval")
+	_expect("2.0–3.0秒" in board.production_timing_tooltip(PackedInt32Array([10, 20, 35])), "variable spacing should expose its observed range instead of an average")
 	var preview_line_center := board._output_port_position(&"ring_source").lerp(board._input_port_position(&"summoner", 0), 0.5)
 	_expect(board.display_glyph_for_line(&"line_1") != null, "empty pre-battle line should expose its predicted CanonicalGlyph")
 	_expect(board._get_tooltip(preview_line_center) == "glyph_comparison" and "32秒予測" in board.tooltip_context, "empty line hover should compare its predicted transport Glyph with the target")
@@ -2663,20 +2681,31 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	comparison_board.set_interaction_enabled(true)
 	var baseline := comparison_board.production_snapshot()
 	var baseline_scout_count := int(baseline["counts"][&"scout"])
+	_expect(baseline["event_offsets"][&"scout"].size() == baseline_scout_count, "comparison snapshot should carry the exact baseline timeline")
 	baseline["counts"][&"scout"] = -1
 	_expect(comparison_board.cached_production_counts[&"scout"] == baseline_scout_count, "production snapshots should not alias the board cache")
 	baseline["counts"][&"scout"] = baseline_scout_count
 	_expect(not comparison_board.set_production_comparison_baseline(baseline), "comparison should only begin inside a transactional edit")
 	_expect(comparison_board.begin_edit(), "valid factory should enter comparison edit")
-	_expect(comparison_board.set_production_comparison_baseline(comparison_board.production_snapshot()), "edit should accept a matching cached production baseline")
+	var edit_baseline := comparison_board.production_snapshot()
+	_expect(comparison_board.set_production_comparison_baseline(edit_baseline), "edit should accept a matching cached production baseline")
+	var mutated_offsets: PackedInt32Array = edit_baseline["event_offsets"][&"scout"]
+	mutated_offsets[0] = -1
+	edit_baseline["event_offsets"][&"scout"] = mutated_offsets
+	_expect(comparison_board.production_event_offsets(&"scout", true)[0] >= 1, "comparison baseline timeline should not alias the caller snapshot")
 	_expect(comparison_board.production_difference_state(&"scout")["state"] == &"unchanged", "time stop should begin with a neutral production comparison")
 	comparison_board.preview_plan(MvpContent.PLAN_GOLEM)
 	_expect(comparison_board.production_difference_state(&"scout")["state"] == &"decrease", "golem proposal should disclose lost scout output before commit")
 	_expect(comparison_board.production_difference_state(&"golem")["state"] == &"increase", "golem proposal should disclose gained golem output before commit")
+	comparison_board._get_tooltip(comparison_board.production_summary_center(2) + Vector2(0, 38))
+	_expect("旧" in comparison_board.tooltip_context and "新" in comparison_board.tooltip_context and "初回" in comparison_board.tooltip_context, "comparison timeline tooltip should distinguish both observed schedules")
 	_expect(comparison_board.undo(), "comparison test should undo the proposed template")
 	_expect(comparison_board.production_difference_state(&"scout")["state"] == &"unchanged", "undo should restore the candidate without moving the baseline")
 	_expect(comparison_board.disconnect_input(&"summoner", 0), "comparison test should allow an invalid disconnected proposal")
 	_expect(comparison_board.production_difference_state(&"scout")["state"] == &"invalid", "invalid proposal should show an unknown candidate instead of a false zero")
+	_expect(comparison_board.production_event_offsets(&"scout").is_empty(), "invalid proposal should clear the stale candidate event timeline")
+	comparison_board._get_tooltip(comparison_board.production_summary_center(0) + Vector2(0, 38))
+	_expect("新 ?" in comparison_board.tooltip_context, "invalid timeline tooltip should not report the last valid candidate timing")
 	_expect(comparison_board.production_summary_unit_at(comparison_board.production_summary_center(0)) == &"scout", "invalid proposal should keep the baseline Glyphs inspectable")
 	_expect(comparison_board.undo(), "comparison test should repair the invalid proposal through undo")
 	_expect(comparison_board.production_difference_state(&"scout")["state"] == &"unchanged", "repair should restore a live comparison against the original baseline")

@@ -35,6 +35,8 @@ const FACTORY_LINE_WIDTH := 2.0
 const TRANSPORT_GLYPH_HALO_RADIUS := 13.0
 const MIN_PREDICTED_LINE_GLYPH_LENGTH := 112.0
 const PRODUCTION_PREVIEW_TICKS := 160
+const PRODUCTION_TICK_SECONDS := 0.2
+const PRODUCTION_TIMELINE_WIDTH := 48.0
 const FLOW_WARNING_HOLD_TICKS := 5
 
 var plan_id: StringName = MvpContent.PLAN_SCOUT
@@ -71,6 +73,7 @@ var flow_warning_hold_ticks := 0
 var undo_history: Array[Dictionary] = []
 var cached_production_preview := ""
 var cached_production_counts: Dictionary = {}
+var cached_production_event_offsets: Dictionary = {}
 var cached_production_discarded := 0
 var cached_production_valid := false
 var cached_validation_errors: Array[String] = []
@@ -517,14 +520,16 @@ func configure_selected_node(option_index: int) -> bool:
 
 func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 	var counts := {&"scout": 0, &"sentinel": 0, &"golem": 0}
+	var event_offsets := _empty_production_event_offsets()
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
-		return {"ok": false, "counts": counts, "discarded": 0, "first_failure": {}, "node_outputs": {}, "errors": []}
+		return {"ok": false, "counts": counts, "event_offsets": event_offsets, "discarded": 0, "first_failure": {}, "node_outputs": {}, "errors": []}
 	var validation := display_simulation.validate_graph()
 	if not validation["ok"]:
 		return {
 			"ok": false,
 			"counts": counts,
+			"event_offsets": event_offsets,
 			"discarded": 0,
 			"first_failure": {},
 			"node_outputs": {},
@@ -535,12 +540,14 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 		return {
 			"ok": false,
 			"counts": counts,
+			"event_offsets": event_offsets,
 			"discarded": 0,
 			"first_failure": {},
 			"node_outputs": {},
 			"errors": duplication["errors"].duplicate(),
 		}
 	var preview: FactorySimulation = duplication["state"]
+	var preview_origin_tick := preview.tick_index
 	var event_start := preview.summon_events.size()
 	var failure_start := preview.summon_failure_events.size()
 	var discarded_start := preview.discarded_glyphs
@@ -549,18 +556,33 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 		preview.tick()
 		_capture_preview_node_outputs(preview, node_outputs)
 	for event_index in range(event_start, preview.summon_events.size()):
-		var unit_id: StringName = preview.summon_events[event_index]["unit_id"]
+		var event: Dictionary = preview.summon_events[event_index]
+		var unit_id: StringName = event["unit_id"]
 		counts[unit_id] = int(counts.get(unit_id, 0)) + 1
+		if not event_offsets.has(unit_id):
+			event_offsets[unit_id] = PackedInt32Array()
+		var offsets: PackedInt32Array = event_offsets[unit_id]
+		offsets.append(int(event["tick"]) - preview_origin_tick)
+		event_offsets[unit_id] = offsets
 	var first_failure: Dictionary = {}
 	if preview.summon_failure_events.size() > failure_start:
 		first_failure = preview.summon_failure_events[failure_start].duplicate(true)
 	return {
 		"ok": true,
 		"counts": counts,
+		"event_offsets": event_offsets,
 		"discarded": preview.discarded_glyphs - discarded_start,
 		"first_failure": first_failure,
 		"node_outputs": node_outputs,
 		"errors": [],
+	}
+
+
+func _empty_production_event_offsets() -> Dictionary:
+	return {
+		&"scout": PackedInt32Array(),
+		&"sentinel": PackedInt32Array(),
+		&"golem": PackedInt32Array(),
 	}
 
 
@@ -569,6 +591,7 @@ func production_snapshot() -> Dictionary:
 		"ok": cached_production_valid,
 		"horizon_ticks": PRODUCTION_PREVIEW_TICKS,
 		"counts": cached_production_counts.duplicate(true),
+		"event_offsets": cached_production_event_offsets.duplicate(true),
 		"discarded": cached_production_discarded,
 		"errors": cached_validation_errors.duplicate(),
 	}
@@ -1492,6 +1515,13 @@ func _draw_production_summary() -> void:
 				Color(0.38, 0.9, 0.68),
 				false
 			)
+			_draw_production_timeline(
+				center,
+				production_event_offsets(unit_id),
+				31.0,
+				false,
+				true
+			)
 	if cached_production_discarded > 0:
 		var warning_center := Vector2(size.x - 18.0, 28.0)
 		draw_circle(warning_center, 9.0, WARNING_COLOR)
@@ -1519,10 +1549,18 @@ func _draw_production_comparison(unit_id: StringName, center: Vector2) -> void:
 		PRODUCTION_COMPARISON_COLOR,
 		true
 	)
+	_draw_production_timeline(
+		center,
+		production_event_offsets(unit_id, true),
+		29.0,
+		true,
+		true
+	)
 	var state: StringName = difference.get("state", &"invalid")
 	if state == &"invalid":
 		_draw_production_unknown_badge(after_center)
 		_draw_production_change_symbol(change_center, state)
+		_draw_production_timeline(center, PackedInt32Array(), 38.0, false, false)
 		return
 	var change_color := PRODUCTION_COMPARISON_COLOR
 	if state == &"increase":
@@ -1536,6 +1574,13 @@ func _draw_production_comparison(unit_id: StringName, center: Vector2) -> void:
 		false
 	)
 	_draw_production_change_symbol(change_center, state)
+	_draw_production_timeline(
+		center,
+		production_event_offsets(unit_id),
+		38.0,
+		false,
+		true
+	)
 
 
 func _draw_production_count_badge(center: Vector2, count: int, color: Color, is_baseline: bool) -> void:
@@ -1578,6 +1623,54 @@ func _draw_production_change_symbol(center: Vector2, state: StringName) -> void:
 		draw_line(center + Vector2(-3, 0), center + Vector2(3, 0), PRODUCTION_COMPARISON_COLOR, 1.3, true)
 		draw_line(center + Vector2(3, 0), center + Vector2(0, -2.5), PRODUCTION_COMPARISON_COLOR, 1.3, true)
 		draw_line(center + Vector2(3, 0), center + Vector2(0, 2.5), PRODUCTION_COMPARISON_COLOR, 1.3, true)
+
+
+func production_event_offsets(unit_id: StringName, baseline: bool = false) -> PackedInt32Array:
+	var source: Dictionary = cached_production_event_offsets
+	if baseline and production_comparison_active:
+		var baseline_offsets: Variant = production_comparison_baseline.get("event_offsets", {})
+		if not baseline_offsets is Dictionary:
+			return PackedInt32Array()
+		source = baseline_offsets
+	return PackedInt32Array(source.get(unit_id, PackedInt32Array()))
+
+
+func _draw_production_timeline(
+	center: Vector2,
+	event_offsets: PackedInt32Array,
+	y_offset: float,
+	is_baseline: bool,
+	is_valid: bool
+) -> void:
+	var start := center + Vector2(-PRODUCTION_TIMELINE_WIDTH * 0.5, y_offset)
+	var finish := center + Vector2(PRODUCTION_TIMELINE_WIDTH * 0.5, y_offset)
+	var color := Color(PRODUCTION_COMPARISON_COLOR, 0.5 if is_baseline else 0.9)
+	if not is_valid:
+		draw_dashed_line(start, finish, Color(WARNING_COLOR, 0.74), 1.0, 4.0)
+		var invalid_center := start.lerp(finish, 0.5)
+		draw_line(invalid_center + Vector2(-2.5, -2.5), invalid_center + Vector2(2.5, 2.5), WARNING_COLOR, 1.2, true)
+		draw_line(invalid_center + Vector2(-2.5, 2.5), invalid_center + Vector2(2.5, -2.5), WARNING_COLOR, 1.2, true)
+		return
+	draw_line(start, finish, color, 1.0 if is_baseline else 1.4, true)
+	draw_line(start + Vector2(0, -2), start + Vector2(0, 2), color, 1.0, true)
+	draw_line(finish + Vector2(0, -2), finish + Vector2(0, 2), color, 1.0, true)
+	for index in event_offsets.size():
+		var ratio := clampf(float(event_offsets[index]) / float(PRODUCTION_PREVIEW_TICKS), 0.0, 1.0)
+		var marker := start.lerp(finish, ratio)
+		if index == 0:
+			var diamond := PackedVector2Array([
+				marker + Vector2(0, -3.5),
+				marker + Vector2(3.5, 0),
+				marker + Vector2(0, 3.5),
+				marker + Vector2(-3.5, 0),
+			])
+			if is_baseline:
+				diamond.append(diamond[0])
+				draw_polyline(diamond, color, 1.0, true)
+			else:
+				draw_colored_polygon(diamond, color)
+		else:
+			draw_line(marker + Vector2(0, -2.5), marker + Vector2(0, 2.5), color, 1.0 if is_baseline else 1.4, true)
 
 
 func interaction_legend_count() -> int:
@@ -1727,7 +1820,7 @@ func _draw_interaction_legend() -> void:
 
 
 func _draw_mana_meter() -> void:
-	var meter_rect := Rect2(Vector2(size.x - 276.0, 50.0), Vector2(244.0, 10.0))
+	var meter_rect := Rect2(Vector2(size.x - 276.0, 78.0), Vector2(244.0, 10.0))
 	var used_ratio := mana_fill_ratio()
 	var fill_color := WARNING_COLOR if mana_available() < 15 else Color(0.28, 0.66, 0.95)
 	draw_rect(meter_rect, Color(0.06, 0.1, 0.15, 0.96), true)
@@ -2172,15 +2265,23 @@ func _get_tooltip(at_position: Vector2) -> String:
 		for recipe in MvpContent.recipes():
 			if recipe.unit_id != summary_unit:
 				continue
-			var context := "生産見込み %d体" % cached_production_counts.get(summary_unit, 0)
+			var context := "生産見込み %d体 // %s" % [
+				cached_production_counts.get(summary_unit, 0),
+				production_timing_tooltip(production_event_offsets(summary_unit)),
+			]
 			if production_comparison_active:
 				var difference := production_difference_state(summary_unit)
 				context = (
-					"%d → ?" % int(difference.get("before", 0))
-					if difference.get("state", &"invalid") == &"invalid"
-					else "%d → %d" % [
+					"旧 %d // %s\n新 ?" % [
 						int(difference.get("before", 0)),
+						production_timing_tooltip(production_event_offsets(summary_unit, true)),
+					]
+					if difference.get("state", &"invalid") == &"invalid"
+					else "旧 %d // %s\n新 %d // %s" % [
+						int(difference.get("before", 0)),
+						production_timing_tooltip(production_event_offsets(summary_unit, true)),
 						int(difference.get("after", 0)),
+						production_timing_tooltip(production_event_offsets(summary_unit)),
 					]
 				)
 			_set_glyph_tooltip(
@@ -2246,9 +2347,37 @@ func production_summary_unit_at(at_position: Vector2) -> StringName:
 	var unit_order: Array[StringName] = [&"scout", &"sentinel", &"golem"]
 	for index in unit_order.size():
 		var center := production_summary_center(index)
-		if at_position.distance_to(center) <= 28.0:
+		if Rect2(center + Vector2(-30, -22), Vector2(60, 92)).has_point(at_position):
 			return unit_order[index]
 	return &""
+
+
+func production_timing_tooltip(event_offsets: PackedInt32Array) -> String:
+	if event_offsets.is_empty():
+		return "32秒内の召喚なし"
+	var first_seconds := float(event_offsets[0]) * PRODUCTION_TICK_SECONDS
+	if event_offsets.size() == 1:
+		return "初回 %.1f秒 // 間隔は未観測" % first_seconds
+	var intervals := PackedInt32Array()
+	for index in range(1, event_offsets.size()):
+		intervals.append(event_offsets[index] - event_offsets[index - 1])
+	var minimum := intervals[0]
+	var maximum := intervals[0]
+	for interval in intervals:
+		minimum = mini(minimum, interval)
+		maximum = maxi(maximum, interval)
+	if minimum == maximum:
+		var interval_seconds := float(minimum) * PRODUCTION_TICK_SECONDS
+		return (
+			"初回 %.1f秒 // 観測間隔 %.1f秒" % [first_seconds, interval_seconds]
+			if intervals.size() == 1
+			else "初回 %.1f秒 // 間隔 %.1f秒" % [first_seconds, interval_seconds]
+		)
+	return "初回 %.1f秒 // 間隔 %.1f–%.1f秒" % [
+		first_seconds,
+		float(minimum) * PRODUCTION_TICK_SECONDS,
+		float(maximum) * PRODUCTION_TICK_SECONDS,
+	]
 
 
 func production_summary_center(index: int) -> Vector2:
@@ -3018,6 +3147,7 @@ func _refresh_production_preview() -> void:
 		cached_production_valid = false
 		cached_validation_errors.assign(result.get("errors", []))
 		cached_production_counts.clear()
+		cached_production_event_offsets = _empty_production_event_offsets()
 		cached_production_discarded = 0
 		cached_node_output_glyphs.clear()
 		cached_production_preview = "32秒予測 // %s" % _validation_message(result.get("errors", []))
@@ -3028,6 +3158,7 @@ func _refresh_production_preview() -> void:
 	cached_production_valid = true
 	cached_validation_errors.clear()
 	cached_production_counts = counts.duplicate()
+	cached_production_event_offsets = result["event_offsets"].duplicate(true)
 	cached_production_discarded = result["discarded"]
 	cached_node_output_glyphs = result["node_outputs"].duplicate()
 	if first_failure.is_empty():
