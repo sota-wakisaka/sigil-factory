@@ -217,10 +217,7 @@ func _factory_is_valid(prefix: String) -> bool:
 
 
 func _select_plan(plan_id: StringName) -> void:
-	sigil_ghost.show_recipe(MvpContent.recipe_id_for_plan(plan_id))
-	_refresh_factory_goal_tools()
-	for button in [$Toolbar/EmptyButton, $Toolbar/ScoutButton, $Toolbar/SentinelButton, $Toolbar/GolemButton]:
-		button.set_plan_selected(button.plan_id == plan_id)
+	_sync_plan_ui(plan_id)
 	if flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		factory_board.preview_plan(plan_id)
 		var feedback := "◇ %s  • 未確定" % MvpContent.plan_name(plan_id)
@@ -234,6 +231,14 @@ func _select_plan(plan_id: StringName) -> void:
 			_refresh_factory_validation_state()
 		else:
 			_set_factory_feedback("◇ %s" % MvpContent.plan_name(plan_id))
+
+
+func _sync_plan_ui(plan_id: StringName) -> void:
+	sigil_ghost.show_recipe(MvpContent.recipe_id_for_plan(plan_id))
+	_refresh_factory_goal_tools()
+	for button in [$Toolbar/EmptyButton, $Toolbar/ScoutButton, $Toolbar/SentinelButton, $Toolbar/GolemButton]:
+		button.set_plan_selected(button.plan_id == plan_id)
+	_refresh_factory_goal_candidate()
 
 
 func _set_factory_feedback(message: String) -> void:
@@ -325,6 +330,7 @@ func _cancel_edit() -> void:
 	if flow.phase != RunFlow.Phase.FACTORY_RECONFIGURE:
 		return
 	factory_board.cancel_edit()
+	_sync_plan_ui(factory_board.plan_id)
 	pre_edit_production_counts.clear()
 	last_factory_change_summary = "変更効果 // 変更を破棄したため生産構成は変更していません"
 	flow.resume_battle()
