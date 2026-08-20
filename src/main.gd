@@ -261,10 +261,12 @@ func _undo_factory_edit() -> void:
 
 func _refresh_factory_inspector() -> void:
 	var details := factory_board.selected_node_details()
+	inspector_label.visible = details["selected"]
 	inspector_label.configure(details["selected"], details["kind"], details["title"])
 	inspector_option.clear()
 	for option in details["options"]:
 		inspector_option.add_item(option)
+	inspector_option.visible = details["selected"] and not details["options"].is_empty()
 	inspector_option.disabled = details["options"].is_empty() or not factory_board.interaction_enabled
 	if details["selected_index"] >= 0:
 		inspector_option.select(details["selected_index"])

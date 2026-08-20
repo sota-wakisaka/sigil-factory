@@ -76,7 +76,8 @@ func _initialize() -> void:
 	_expect(main.get_node("FactoryPalette/SummonButton").disabled, "palette should visually block the one-summoner limit before click")
 	_expect(main.get_node("FactoryPalette/DeleteButton").disabled, "delete should stay unavailable until a node is selected")
 	_expect(main.get_node("FactoryPalette/UndoButton").disabled, "undo should stay unavailable without edit history")
-	_expect(not main.inspector_label.selected, "empty inspector should use an idle target icon instead of persistent instruction text")
+	_expect(not main.inspector_label.visible, "empty inspector should remove its idle target instead of reserving a blank control")
+	_expect(not main.inspector_option.visible, "empty inspector should hide its unusable setting dropdown")
 	_expect(main.get_node("FactoryPalette/RingButton").preview_glyph != null, "source palette choice should use its Primitive as the main icon")
 	_expect(main.get_node("FactoryPalette/RingButton").text == "", "palette choice should not rely on the native text label")
 	_expect(main.get_node("FactoryPalette/SummonButton").equipment_kind == &"summoner", "summoner palette choice should expose its dedicated vector icon kind")
@@ -108,13 +109,13 @@ func _initialize() -> void:
 	main.get_node("FactoryPalette/RingButton").pressed.emit()
 	_expect(not main.get_node("FactoryPalette/DeleteButton").disabled, "adding a node should immediately enable delete for its selection")
 	_expect(not main.get_node("FactoryPalette/UndoButton").disabled, "adding a node should immediately enable undo")
-	_expect(main.inspector_label.selected, "selected equipment should replace the idle target with its equipment silhouette")
+	_expect(main.inspector_label.visible and main.inspector_label.selected, "selected equipment should reveal its equipment silhouette")
 	_expect(main.factory_board.simulation.nodes.size() == node_count_before_palette + 1, "palette should add factory equipment")
 	_expect(
 		"出力が未接続" in main.factory_board.cached_production_preview,
 		"dangling equipment should invalidate production preview with a specific reason"
 	)
-	_expect(not main.inspector_option.disabled, "selected configurable equipment should enable its inspector")
+	_expect(main.inspector_option.visible and not main.inspector_option.disabled, "selected configurable equipment should reveal and enable its inspector")
 	_expect(main.inspector_option.visual_kind == FactoryNodeModel.NodeKind.SOURCE, "source inspector should use its Primitive visual language")
 	_expect(main.inspector_option.visual_index == 0 and main.inspector_option.get_item_text(0) == "環", "source setting should keep text subordinate to the ring icon")
 	_expect(main.inspector_option.get_item_icon(0) != null and main.inspector_option.get_item_icon(1) != null, "source dropdown should keep Primitive icons visible in every choice")
