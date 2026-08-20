@@ -2214,14 +2214,14 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	board.configure(MvpContent.PLAN_EMPTY)
 	_expect(board.final_summoner_candidate_glyph() == null, "unwired factory should not invent a final candidate Glyph")
 	var source_center := board.node_local_position(&"ring_source")
-	_expect(board._get_tooltip(source_center) == "glyph_preview", "source equipment should offer a visual Glyph tooltip")
+	_expect(board._get_tooltip(source_center) == "glyph_comparison", "source equipment should compare its Primitive with the selected target")
 	_expect(board.tooltip_context == "素材Primitive", "unconnected source tooltip should identify its material Primitive")
 	_expect(
 		board.source_glyph_for_node(&"ring_source").canonical_serialization() == board.tooltip_glyph.canonical_serialization(),
 		"source tooltip should use the same CanonicalGlyph as the persistent node symbol"
 	)
-	var source_tooltip = board._make_custom_tooltip("glyph_preview")
-	_expect(source_tooltip.get_script() == GlyphTooltipModel, "factory hover should reuse the large visual Glyph tooltip")
+	var source_tooltip = board._make_custom_tooltip("glyph_comparison")
+	_expect(source_tooltip.get_script() == GlyphComparisonTooltipModel, "factory equipment hover should reuse the large target comparison")
 	_expect(source_tooltip.custom_minimum_size.x >= 300.0, "factory Glyph tooltip should provide a readable large preview")
 	source_tooltip.free()
 	board.configure(MvpContent.PLAN_SCOUT)

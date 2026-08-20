@@ -1568,14 +1568,16 @@ func _get_tooltip(at_position: Vector2) -> String:
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
 		var visible_glyph := _visible_node_glyph(node)
 		if visible_glyph != null:
-			_set_glyph_tooltip(visible_glyph, _node_label(node), "設備内の現在Glyph")
+			_set_comparison_tooltip(visible_glyph, _node_label(node), "設備内の現在Glyph")
 		elif cached_node_output_glyphs.has(node_id):
-			_set_glyph_tooltip(cached_node_output_glyphs[node_id], _node_label(node), "32秒予測の出力Glyph")
+			_set_comparison_tooltip(cached_node_output_glyphs[node_id], _node_label(node), "32秒予測の出力Glyph")
 		else:
 			var source_glyph := source_glyph_for_node(node_id)
 			if source_glyph != null:
-				_set_glyph_tooltip(source_glyph, _node_label(node), "素材Primitive")
-		return "glyph_preview" if tooltip_glyph != null else ""
+				_set_comparison_tooltip(source_glyph, _node_label(node), "素材Primitive")
+		if tooltip_glyph == null:
+			return ""
+		return "glyph_comparison" if tooltip_target_glyph != null else "glyph_preview"
 	for line_id in display_simulation.lines:
 		var line: FactoryLineModel = display_simulation.lines[line_id]
 		var line_glyph := display_glyph_for_line(line_id)
@@ -1625,13 +1627,14 @@ func _set_glyph_tooltip(next_glyph: GlyphModel, next_title: String, next_context
 	tooltip_context = next_context
 
 
-func _set_comparison_tooltip(candidate: GlyphModel, next_title: String, next_context: String) -> void:
+func _set_comparison_tooltip(candidate: GlyphModel, next_title: String, next_context: String) -> bool:
 	_set_glyph_tooltip(candidate, next_title, next_context)
 	var target := _goal_glyph()
 	if not GlyphPainterModel.can_draw(target) or tooltip_glyph == null:
-		return
+		return false
 	tooltip_target_glyph = target.copy()
 	tooltip_comparison_name = "%s // %s" % [next_title, next_context]
+	return true
 
 
 func _make_custom_tooltip(for_text: String):
