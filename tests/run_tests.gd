@@ -2505,6 +2505,7 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	var ghost := SigilGhost.new()
 	_expect(ghost.show_recipe(&"azure_guard"), "sigil ghost should accept a known recipe")
+	_expect(ghost.persistent_label() == "目標", "persistent comparison card should identify its left Glyph as the goal")
 	_expect(ghost.custom_minimum_size.x >= 220.0, "sigil goal should reserve enough width for a readable persistent sample")
 	_expect(ghost.glyph_draw_scale() >= 1.0, "sigil goal should keep its persistent CanonicalGlyph readable")
 	var target_tooltip = ghost._make_custom_tooltip(ghost.tooltip_text)

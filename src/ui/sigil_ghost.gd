@@ -68,7 +68,7 @@ func _draw() -> void:
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(8, size.y * 0.5 + 5),
-		display_name,
+		persistent_label(),
 		HORIZONTAL_ALIGNMENT_LEFT,
 		80.0,
 		12,
@@ -92,6 +92,10 @@ func _draw() -> void:
 	elif candidate_state == &"mismatch":
 		draw_arc(target_center, 20.0, 0.0, TAU, 24, Color(1.0, 0.74, 0.28, 0.72), 1.5, true)
 		draw_arc(candidate_center, 20.0, 0.0, TAU, 24, Color(MISMATCH_COLOR, 0.72), 1.5, true)
+
+
+func persistent_label() -> String:
+	return "目標"
 
 
 func glyph_draw_scale() -> float:
