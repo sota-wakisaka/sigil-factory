@@ -1137,11 +1137,11 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		var start := _output_port_position(line.from_node_id)
 		var finish := _input_port_position(line.to_node_id, line.to_port)
 		var line_color := WARNING_COLOR if display_simulation.line_flow_state(line_id) == &"buffer_full" else LINE_COLOR
-		var goal_state := line_goal_match_state(line_id)
+		var recipe_state := line_recipe_match_state(line_id)
 		if display_simulation.line_flow_state(line_id) != &"buffer_full":
-			if goal_state == &"match":
+			if recipe_state == &"match":
 				line_color = Color(MATCH_COLOR, 0.76)
-			elif goal_state == &"mismatch":
+			elif recipe_state in [&"mismatch", &"invalid"]:
 				line_color = Color(WARNING_COLOR, 0.76)
 		if interaction_enabled and line_id == hovered_line_id:
 			draw_line(start, finish, Color(line_color, 0.28), 8.0, true)
@@ -1149,17 +1149,17 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		_draw_flow_arrow(start, finish, line_color)
 		if display_simulation.line_flow_state(line_id) == &"buffer_full":
 			_draw_line_blocked_marker(start.lerp(finish, 0.58))
-		if goal_state in [&"match", &"mismatch"]:
-			_draw_recipe_match_marker(start.lerp(finish, 0.76), goal_state, 7.0)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
 			var glyph_center := start.lerp(finish, progress)
 			_draw_transport_glyph(line.payload, glyph_center)
-			_draw_recipe_match_marker(glyph_center, line_recipe_match_state(line_id), 11.0)
+			_draw_recipe_match_marker(glyph_center, recipe_state, 11.0)
 		else:
 			var predicted_glyph := predicted_glyph_for_line(line_id)
 			if predicted_glyph != null and line_has_preview_space(start, finish):
-				_draw_predicted_line_glyph(predicted_glyph, start.lerp(finish, 0.28))
+				var predicted_center := start.lerp(finish, 0.28)
+				_draw_predicted_line_glyph(predicted_glyph, predicted_center)
+				_draw_recipe_match_marker(predicted_center, recipe_state, 10.0)
 
 
 func _draw_flow_arrow(start: Vector2, finish: Vector2, color: Color) -> void:
@@ -2162,9 +2162,12 @@ func line_recipe_match_state(line_id: StringName) -> StringName:
 	var target: FactoryNodeModel = display_simulation.nodes[line.to_node_id]
 	if target.kind != FactoryNodeModel.NodeKind.SUMMONER:
 		return &"not_applicable"
-	if line.payload == null:
+	if line.payload != null:
+		return _recipe_match_state_for_glyph(display_simulation, line.payload)
+	var predicted: GlyphModel = cached_node_output_glyphs.get(line.from_node_id)
+	if not GlyphPainterModel.can_draw(predicted):
 		return &"empty"
-	return _recipe_match_state_for_glyph(display_simulation, line.payload)
+	return _recipe_match_state_for_glyph(display_simulation, predicted)
 
 
 func line_goal_match_state(line_id: StringName) -> StringName:

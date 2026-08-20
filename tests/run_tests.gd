@@ -2630,9 +2630,15 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(board.display_glyph_for_line(&"line_1") != null, "empty pre-battle line should expose its predicted CanonicalGlyph")
 	_expect(board._get_tooltip(preview_line_center) == "glyph_comparison" and "32秒予測" in board.tooltip_context, "empty line hover should compare its predicted transport Glyph with the target")
 	_expect(board.line_goal_match_state(&"line_1") == &"match", "summoner path should compare its predicted Glyph with the selected goal before battle")
+	_expect(board.line_recipe_match_state(&"line_1") == &"match", "empty final line should preview the same registered-recipe acceptance used by summoning")
+	board.plan_id = MvpContent.PLAN_SENTINEL
+	_expect(board.line_goal_match_state(&"line_1") == &"mismatch", "a valid owned recipe may intentionally differ from the selected goal")
+	_expect(board.line_recipe_match_state(&"line_1") == &"match", "a valid owned non-goal recipe should remain a successful final-line signal")
+	board.plan_id = MvpContent.PLAN_SCOUT
 	board.selected_node_id = &"ring_source"
 	board.configure_selected_node(1)
 	_expect(board.line_goal_match_state(&"line_1") == &"mismatch", "changing the source should immediately mark the summoner path as a goal mismatch")
+	_expect(board.line_recipe_match_state(&"line_1") == &"mismatch", "a Glyph rejected by every registered recipe should mark the final line as failed")
 	_expect(preview["ok"], "complete factory should produce a preview")
 	_expect(preview["counts"][&"scout"] > 0, "scout factory preview should report scouts")
 	_expect(
