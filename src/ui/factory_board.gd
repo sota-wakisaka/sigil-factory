@@ -40,6 +40,7 @@ var preview_simulation: FactorySimulation
 var preview_node_positions: Dictionary = {}
 var interaction_enabled := false
 var selected_node_id: StringName = &""
+var hovered_node_id: StringName = &""
 var dragging_node := false
 var drag_snapshot_pending := false
 var drag_offset := Vector2.ZERO
@@ -64,6 +65,7 @@ var last_corrupt_discard_count := 0
 
 
 func _ready() -> void:
+	mouse_exited.connect(_clear_node_hover)
 	configure(plan_id)
 
 
@@ -77,6 +79,7 @@ func configure(next_plan_id: StringName) -> void:
 	editing = false
 	preview_simulation = null
 	selected_node_id = &""
+	hovered_node_id = &""
 	dragging_node = false
 	drag_snapshot_pending = false
 	connecting_from_node_id = &""
@@ -95,6 +98,7 @@ func set_interaction_enabled(enabled: bool) -> void:
 		dragging_node = false
 		drag_snapshot_pending = false
 		selected_node_id = &""
+		hovered_node_id = &""
 		connecting_from_node_id = &""
 	selection_changed.emit()
 	queue_redraw()
@@ -521,6 +525,11 @@ func disconnect_input(to_node_id: StringName, to_port: int) -> bool:
 func _gui_input(event: InputEvent) -> void:
 	if not interaction_enabled:
 		return
+	if event is InputEventMouseMotion:
+		var next_hovered := _node_at(event.position)
+		if next_hovered != hovered_node_id:
+			hovered_node_id = next_hovered
+			queue_redraw()
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			var input_port := _input_port_at(event.position)
@@ -563,6 +572,13 @@ func _gui_input(event: InputEvent) -> void:
 		if not input_port.is_empty():
 			disconnect_input(input_port["node_id"], input_port["port"])
 			accept_event()
+
+
+func _clear_node_hover() -> void:
+	if hovered_node_id == &"":
+		return
+	hovered_node_id = &""
+	queue_redraw()
 
 
 func _get_cursor_shape(at_position: Vector2) -> CursorShape:
@@ -902,7 +918,9 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 			border_color = WAITING_COLOR
 		if node_id == selected_node_id:
 			border_color = SELECTED_COLOR
-		_draw_node_frame(node, center, border_color, node_id == selected_node_id)
+		elif node_id == hovered_node_id:
+			border_color = Color(0.56, 0.86, 1.0)
+		_draw_node_frame(node, center, border_color, node_id == selected_node_id or node_id == hovered_node_id)
 		_draw_node_warning_marker(node_state, center)
 		_draw_node_activity_progress(node, center, display_simulation.tick_index > 0)
 		var visible_glyph := _visible_node_active_glyph(node)

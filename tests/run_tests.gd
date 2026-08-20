@@ -1791,6 +1791,13 @@ func _test_factory_nodes_can_be_repositioned() -> void:
 	_expect(not board.move_node(&"ring_source", Vector2(300, 160)), "running factory should reject node movement")
 	board.set_interaction_enabled(true)
 	var node_center := board.node_local_position(&"ring_source")
+	var hover := InputEventMouseMotion.new()
+	hover.position = node_center
+	board._gui_input(hover)
+	_expect(board.hovered_node_id == &"ring_source", "hover should visibly identify draggable equipment before selection")
+	hover.position = Vector2(8, 8)
+	board._gui_input(hover)
+	_expect(board.hovered_node_id == &"", "moving into empty board space should clear equipment hover")
 	var press := InputEventMouseButton.new()
 	press.button_index = MOUSE_BUTTON_LEFT
 	press.pressed = true
