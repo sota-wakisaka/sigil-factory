@@ -70,24 +70,30 @@ static func _collect_combine_visuals(
 ) -> void:
 	if glyph.combine_children.is_empty():
 		return
-	# Combine is anchored to the canonical Glyph origin. This keeps its structure
-	# aligned with Rotate, which also transforms every child around (0, 0).
-	var glyph_center := Vector2.ZERO
+	# A new Combine starts at the canonical origin, then follows any Transform
+	# applied to the completed group together with its children.
+	var glyph_center := Vector2(glyph.combine_origin) * 6.0 * scale
 	var radius := _glyph_content_radius(glyph, glyph_center, scale)
 	radius += float(_combine_depth(glyph) - 1) * 6.0 * scale
 	circles.append({"center": glyph_center, "radius": radius})
 	var children := glyph.combine_children.duplicate()
 	children.sort_custom(_canonical_child_less)
+	var occupied_directions: Array[Vector2] = []
 	for child_index in children.size():
 		var child_value = children[child_index]
 		var child: GlyphModel = child_value
 		var child_center := _glyph_center_offset(child, scale)
 		if glyph_center.distance_to(child_center) >= 2.0 * scale:
+			occupied_directions.append(glyph_center.direction_to(child_center))
 			connections.append({"from": glyph_center, "to": child_center})
 		else:
-			var direction := Vector2.UP.rotated(
-				float(child_index) * TAU / float(children.size())
+			var direction := _coincident_child_direction(
+				child,
+				occupied_directions,
+				children.size(),
+				child_index
 			)
+			occupied_directions.append(direction)
 			var target_length := minf(
 				radius * (0.76 if not child.combine_children.is_empty() else 0.62),
 				(17.0 if not child.combine_children.is_empty() else 14.0) * scale
@@ -111,7 +117,60 @@ static func _canonical_child_less(first, second) -> bool:
 	return first_glyph.canonical_serialization() < second_glyph.canonical_serialization()
 
 
+static func _coincident_child_direction(
+	child: GlyphModel,
+	occupied: Array[Vector2],
+	child_count: int,
+	child_index: int
+) -> Vector2:
+	var direction := _semantic_child_direction(child)
+	var step := TAU / float(maxi(child_count, 2))
+	for _attempt in maxi(child_count, 2):
+		if not _direction_is_occupied(direction, occupied):
+			return direction
+		direction = direction.rotated(step)
+
+	# A malformed or future dense combination can still fall back to a stable
+	# radial slot without looping indefinitely.
+	direction = Vector2.UP.rotated(float(child_index) * step)
+	for _attempt in 24:
+		if not _direction_is_occupied(direction, occupied):
+			return direction
+		direction = direction.rotated(TAU / 24.0)
+	return direction
+
+
+static func _semantic_child_direction(child: GlyphModel) -> Vector2:
+	var total := Vector2.ZERO
+	for component_value in child.components:
+		if not component_value is GlyphComponentModel:
+			continue
+		var component: GlyphComponentModel = component_value
+		if component.position != Vector2i.ZERO:
+			total += Vector2(component.position).normalized()
+			continue
+		var angle: float = {
+			&"ring": -PI * 0.5,
+			&"spike": 0.0,
+			&"branch": PI * 0.75,
+		}.get(component.primitive_id, -PI * 0.5)
+		angle += float(component.rotation_step) * PI * 0.5
+		total += Vector2.RIGHT.rotated(angle)
+	if total.length_squared() <= 0.0001:
+		return Vector2.UP
+	return total.normalized()
+
+
+static func _direction_is_occupied(candidate: Vector2, occupied: Array[Vector2]) -> bool:
+	for direction in occupied:
+		if candidate.dot(direction) > 0.86:
+			return true
+	return false
+
+
 static func _glyph_center_offset(glyph: GlyphModel, scale: float) -> Vector2:
+	if not glyph.combine_children.is_empty():
+		return Vector2(glyph.combine_origin) * 6.0 * scale
 	if glyph.components.is_empty():
 		return Vector2.ZERO
 	var center := Vector2.ZERO

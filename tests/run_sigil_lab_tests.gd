@@ -8,6 +8,7 @@ var failures := 0
 func _initialize() -> void:
 	_test_graph_evaluation()
 	_test_six_way_combine()
+	_test_post_combine_move()
 	_test_connection_guards()
 	_test_owned_results()
 	await _test_lab_scene()
@@ -61,6 +62,26 @@ func _test_six_way_combine() -> void:
 	var result := graph.evaluate_output()
 	_expect(result["ok"], "six connected inputs should produce a valid sigil")
 	_expect(result["glyph"].combine_children.size() == 6, "six-way Combine should preserve all children in one level")
+
+
+func _test_post_combine_move() -> void:
+	var graph = SigilGraphModel.new()
+	graph.add_node(&"ring", SigilGraphModel.SOURCE, {"primitive_id": &"ring"})
+	graph.add_node(&"spike", SigilGraphModel.SOURCE, {"primitive_id": &"spike"})
+	graph.add_node(&"left", SigilGraphModel.MOVE, {"offset": Vector2i(-2, 0)})
+	graph.add_node(&"right", SigilGraphModel.MOVE, {"offset": Vector2i(2, 0)})
+	graph.add_node(&"combine", SigilGraphModel.COMBINE)
+	graph.add_node(&"group_move", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)})
+	graph.add_node(&"output", SigilGraphModel.OUTPUT)
+	graph.connect_nodes(&"ring", 0, &"left", 0)
+	graph.connect_nodes(&"spike", 0, &"right", 0)
+	graph.connect_nodes(&"left", 0, &"combine", 0)
+	graph.connect_nodes(&"right", 0, &"combine", 1)
+	graph.connect_nodes(&"combine", 0, &"group_move", 0)
+	graph.connect_nodes(&"group_move", 0, &"output", 0)
+	var result := graph.evaluate_output()
+	_expect(result["ok"], "a moved completed group should remain a valid Lab output")
+	_expect(result["glyph"].combine_origin == Vector2i(0, -4), "Lab Move should carry the completed Combine center with it")
 
 
 func _test_connection_guards() -> void:

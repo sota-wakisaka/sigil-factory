@@ -36,6 +36,7 @@ func _initialize() -> void:
 	_test_production_context_does_not_affect_matching()
 	_test_rotation_is_normalized_to_quarter_turns()
 	_test_combined_rotation_transforms_positions_and_orientation()
+	_test_combined_move_transforms_structure_center()
 	_test_transform_history_folds_into_final_state()
 	_test_complete_overlap_is_rejected()
 	_test_factory_tick_prevents_same_tick_multistage_processing()
@@ -329,7 +330,7 @@ func _test_combine_children_use_hash_then_serialization_order() -> void:
 	var combined := GlyphModel.combine(first, second)
 	_expect(
 		combined.canonical_serialization()
-		== "C(%d:%s,%d:%s)" % [
+		== "C(3:0,0;%d:%s,%d:%s)" % [
 			hash_first_serialization.length(),
 			hash_first_serialization,
 			hash_second_serialization.length(),
@@ -407,6 +408,36 @@ func _test_combined_rotation_transforms_positions_and_orientation() -> void:
 	_expect(
 		combined.canonical_serialization() == original_serialization,
 		"four quarter turns should restore the complete combined canonical structure"
+	)
+
+
+func _test_combined_move_transforms_structure_center() -> void:
+	var ring := GlyphModel.new([
+		GlyphComponentModel.new(&"ring", Vector2i(-2, 0)),
+	])
+	var spike := GlyphModel.new([
+		GlyphComponentModel.new(&"spike", Vector2i(2, 0)),
+	])
+	var combined := GlyphModel.combine(ring, spike)
+	combined.translate(Vector2i(0, -4))
+	_expect(combined.combine_origin == Vector2i(0, -4), "moving a completed Combine should move its structural center")
+	var visuals := GlyphPainterModel.combine_visuals(combined)
+	_expect(visuals["circles"][0]["center"] == Vector2(0, -24), "the Combine circle should follow the moved center")
+	for connection in visuals["connections"]:
+		_expect(connection["from"] == Vector2(0, -24), "moved Combine spokes should begin at the moved center")
+	var owned_copy := combined.copy()
+	_expect(owned_copy.combine_origin == combined.combine_origin, "Glyph copies should preserve every Combine center")
+	combined.rotate(1)
+	_expect(combined.combine_origin == Vector2i(4, 0), "rotating a moved Combine should rotate its center around the root origin")
+
+	var moved_ring := ring.copy()
+	var moved_spike := spike.copy()
+	moved_ring.translate(Vector2i(0, -4))
+	moved_spike.translate(Vector2i(0, -4))
+	var moved_before_combine := GlyphModel.combine(moved_ring, moved_spike)
+	_expect(
+		not SigilMatcher.compare(owned_copy, moved_before_combine)["is_match"],
+		"moving a completed group should remain distinct from moving its children before Combine"
 	)
 
 

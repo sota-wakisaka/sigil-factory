@@ -5,6 +5,7 @@ const GlyphProductionContextModel := preload("res://src/domain/glyph_production_
 
 var components: Array[GlyphComponentModel] = []
 var combine_children: Array = []
+var combine_origin := Vector2i.ZERO
 var production_context: GlyphProductionContextModel
 
 const MIN_COMBINE_CHILDREN := 2
@@ -14,8 +15,10 @@ const MAX_COMBINE_CHILDREN := 6
 func _init(
 	initial_components: Array[GlyphComponentModel] = [],
 	initial_production_context: GlyphProductionContextModel = null,
-	initial_combine_children: Array = []
+	initial_combine_children: Array = [],
+	initial_combine_origin: Vector2i = Vector2i.ZERO
 ) -> void:
+	combine_origin = initial_combine_origin
 	production_context = (
 		initial_production_context.copy()
 		if initial_production_context != null
@@ -79,7 +82,8 @@ func canonical_serialization() -> String:
 		func(a: String, b: String) -> bool:
 			return _canonical_serialization_less(a, b)
 	)
-	return "C(%s)" % _frame_sequence(child_serializations)
+	var origin_serialization := "%d,%d" % [combine_origin.x, combine_origin.y]
+	return "C(%s;%s)" % [_frame(origin_serialization), _frame_sequence(child_serializations)]
 
 
 func canonical_hash() -> String:
@@ -188,6 +192,8 @@ func has_complete_overlap() -> bool:
 
 func rotate(steps: int) -> void:
 	var normalized_steps := posmod(steps, 4)
+	if not combine_children.is_empty():
+		combine_origin = _rotate_position(combine_origin, normalized_steps)
 	for component in components:
 		component.position = _rotate_position(component.position, normalized_steps)
 		component.rotation_step = posmod(component.rotation_step + normalized_steps, 4)
@@ -207,6 +213,8 @@ func _rotate_position(position: Vector2i, steps: int) -> Vector2i:
 
 
 func translate(offset: Vector2i) -> void:
+	if not combine_children.is_empty():
+		combine_origin += offset
 	for component in components:
 		component.position += offset
 	for child in combine_children:
@@ -221,7 +229,7 @@ func recolor(color_id: StringName) -> void:
 
 
 func copy() -> GlyphModel:
-	return GlyphModel.new(components, production_context, combine_children)
+	return GlyphModel.new(components, production_context, combine_children, combine_origin)
 
 
 func _rebuild_components_from_children() -> void:
