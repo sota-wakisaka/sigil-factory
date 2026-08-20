@@ -1710,6 +1710,8 @@ func _test_factory_edit_is_transactional() -> void:
 	board.preview_plan(MvpContent.PLAN_GOLEM)
 	_expect(board.plan_id == MvpContent.PLAN_SCOUT, "preview should not change committed plan")
 	_expect(board.display_plan_id() == MvpContent.PLAN_GOLEM, "factory visuals should use the pending goal during reconfiguration")
+	_expect(board.node_edit_state(&"ring_source") == &"changed", "preset preview should mark changed shared equipment")
+	_expect(board.node_edit_state(&"combiner") == &"added", "preset preview should mark newly added equipment")
 	_expect(board.production_summary_is_goal(&"golem") and not board.production_summary_is_goal(&"scout"), "production summary should emphasize the pending goal instead of the committed one")
 	_expect(board.line_goal_match_state(&"line_summon") == &"match", "final line should compare against the pending goal Glyph")
 	_expect(board.simulation == original_simulation, "preview should not replace running factory")
@@ -2022,6 +2024,7 @@ func _test_source_configuration_resets_generation_progress() -> void:
 	_expect(preview_source.source_timer == 0, "changing source Primitive should reset incompatible generation progress")
 	board.cancel_edit()
 	_expect(board.display_plan_id() == MvpContent.PLAN_SCOUT, "cancel should restore the committed goal for factory visuals")
+	_expect(board.node_edit_state(&"ring_source") == &"unchanged" and board.removed_edit_node_ids().is_empty(), "leaving edit mode should clear all node difference markers")
 	_expect(
 		committed_source.source_timer == 53 and committed_source.config["primitive_id"] == "spike",
 		"canceling source reconfiguration should preserve the committed Primitive and progress"

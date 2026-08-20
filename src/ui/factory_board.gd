@@ -23,6 +23,9 @@ const SELECTED_COLOR := Color(1.0, 0.78, 0.3, 1.0)
 const WARNING_COLOR := Color(1.0, 0.38, 0.28, 1.0)
 const WAITING_COLOR := Color(1.0, 0.72, 0.24, 1.0)
 const MATCH_COLOR := Color(0.36, 1.0, 0.58, 1.0)
+const EDIT_ADDED_COLOR := Color(0.24, 0.9, 0.92, 0.96)
+const EDIT_CHANGED_COLOR := Color(1.0, 0.72, 0.24, 0.96)
+const EDIT_REMOVED_COLOR := Color(1.0, 0.34, 0.3, 0.92)
 const NODE_HALF_SIZE := Vector2(48, 30)
 const REFERENCE_SIZE := Vector2(820, 395)
 const PORT_RADIUS := 7.0
@@ -1037,6 +1040,7 @@ func _draw() -> void:
 		_draw_blocked_placement()
 	if editing:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.18, 0.62, 0.9, 0.055), true)
+		_draw_node_edit_differences()
 		_draw_edit_summary()
 	if interaction_enabled:
 		_draw_interaction_legend()
@@ -1521,6 +1525,76 @@ func node_frame_kind(node_id: StringName) -> StringName:
 			return &"summon_circle"
 		_:
 			return &"processor_chamfer"
+
+
+func node_edit_state(node_id: StringName) -> StringName:
+	if not editing or preview_simulation == null or not preview_simulation.nodes.has(node_id):
+		return &"unchanged"
+	if not simulation.nodes.has(node_id):
+		return &"added"
+	var preview_node: FactoryNodeModel = preview_simulation.nodes[node_id]
+	var committed_node: FactoryNodeModel = simulation.nodes[node_id]
+	var preview_position: Vector2 = preview_node_positions.get(node_id, Vector2.ZERO)
+	var committed_position: Vector2 = node_positions.get(node_id, Vector2.ZERO)
+	if (
+		preview_node.kind != committed_node.kind
+		or preview_node.config != committed_node.config
+		or not preview_position.is_equal_approx(committed_position)
+	):
+		return &"changed"
+	return &"unchanged"
+
+
+func removed_edit_node_ids() -> Array:
+	var result: Array = []
+	if not editing or preview_simulation == null:
+		return result
+	for node_id in simulation.nodes:
+		if not preview_simulation.nodes.has(node_id):
+			result.append(node_id)
+	result.sort()
+	return result
+
+
+func _draw_node_edit_differences() -> void:
+	for node_id in preview_simulation.nodes:
+		var state := node_edit_state(node_id)
+		if state == &"unchanged":
+			continue
+		var center := node_local_position(node_id)
+		var color := EDIT_ADDED_COLOR if state == &"added" else EDIT_CHANGED_COLOR
+		_draw_edit_ring(center, color, state == &"changed")
+		_draw_edit_state_badge(center + Vector2(43, -31), state, color)
+	for node_id in removed_edit_node_ids():
+		var center := _scaled_position(node_positions.get(node_id, Vector2.ZERO))
+		_draw_edit_ring(center, EDIT_REMOVED_COLOR, true)
+		_draw_edit_state_badge(center + Vector2(43, -31), &"removed", EDIT_REMOVED_COLOR)
+
+
+func _draw_edit_ring(center: Vector2, color: Color, dashed: bool) -> void:
+	if not dashed:
+		draw_arc(center, 53.0, 0.0, TAU, 40, color, 2.0, true)
+		return
+	for segment in 16:
+		var start_angle := float(segment) * TAU / 16.0
+		draw_arc(center, 53.0, start_angle, start_angle + TAU / 32.0, 3, color, 2.0, true)
+
+
+func _draw_edit_state_badge(center: Vector2, state: StringName, color: Color) -> void:
+	draw_circle(center, 7.0, Color(PANEL_COLOR, 0.98))
+	draw_arc(center, 7.0, 0.0, TAU, 20, color, 1.4, true)
+	if state == &"added":
+		draw_line(center + Vector2(-3.5, 0), center + Vector2(3.5, 0), color, 1.6, true)
+		draw_line(center + Vector2(0, -3.5), center + Vector2(0, 3.5), color, 1.6, true)
+	elif state == &"changed":
+		var diamond := PackedVector2Array([
+			center + Vector2(0, -4), center + Vector2(4, 0),
+			center + Vector2(0, 4), center + Vector2(-4, 0), center + Vector2(0, -4),
+		])
+		draw_polyline(diamond, color, 1.4, true)
+	else:
+		draw_line(center + Vector2(-3, -3), center + Vector2(3, 3), color, 1.6, true)
+		draw_line(center + Vector2(-3, 3), center + Vector2(3, -3), color, 1.6, true)
 
 
 func _draw_node_frame(node: FactoryNodeModel, center: Vector2, border_color: Color, selected: bool) -> void:
