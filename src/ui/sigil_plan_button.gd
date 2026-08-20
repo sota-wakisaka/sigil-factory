@@ -51,8 +51,13 @@ func _draw() -> void:
 		accent
 	)
 	if glyph != null:
-		var scale := 0.82 if not glyph.combine_children.is_empty() else 1.65
-		GlyphPainterModel.draw_glyph(self, glyph, Vector2(size.x - 29.0, size.y * 0.5), scale)
+		GlyphPainterModel.draw_glyph(self, glyph, Vector2(size.x - 29.0, size.y * 0.5), glyph_draw_scale())
+
+
+func glyph_draw_scale() -> float:
+	if glyph != null and not glyph.combine_children.is_empty():
+		return 1.55
+	return 1.5
 
 
 func _make_custom_tooltip(_for_text: String):

@@ -43,6 +43,8 @@ func _initialize() -> void:
 	_expect(main.sigil_ghost.recipe_id == &"open_ring", "empty workshop should show the first scout sigil goal")
 	_expect(main.get_node("Toolbar/EmptyButton").button_pressed, "current factory plan should remain visually selected")
 	_expect(main.get_node("Toolbar/EmptyButton").glyph != null, "manual plan button should show its target CanonicalGlyph")
+	_expect(main.get_node("Toolbar/EmptyButton").glyph_draw_scale() >= 1.4, "single-Primitive plan Glyph should remain readable without hover")
+	_expect(main.get_node("Toolbar/GolemButton").glyph_draw_scale() >= 1.4, "combined plan Glyph should reserve a similarly readable button footprint")
 	_expect(main.factory_board.mana_status_text() == "魔力 40/100 // 空き60", "factory build should disclose fixed mana capacity")
 	_expect("戦闘を開始" in main.pause_button.tooltip_text, "main action tooltip should explain build confirmation")
 	_expect(main.pause_button.action_kind == "start" and main.pause_button.text == "戦闘開始", "factory build should use a compact play action")
