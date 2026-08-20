@@ -1793,6 +1793,8 @@ func _test_factory_nodes_can_be_repositioned() -> void:
 	var node_center := board.node_local_position(&"ring_source")
 	var summoner_center := board.node_local_position(&"summoner")
 	_expect(not board.placement_is_valid(&"ring_source", summoner_center), "drag placement should reject equipment overlap")
+	_expect(not board.placement_is_valid(&"ring_source", Vector2(board.size.x - 120, 40)), "drag placement should keep equipment out of the production and mana HUD")
+	_expect(not board.placement_is_valid(&"ring_source", Vector2(120, board.size.y - 20)), "drag placement should keep equipment out of the interaction legend")
 	_expect(not board.move_node(&"ring_source", summoner_center), "overlapping drag should leave the equipment at its last valid position")
 	_expect(board.node_local_position(&"ring_source").is_equal_approx(node_center), "rejected overlap should preserve the original equipment position")
 	var hover := InputEventMouseMotion.new()

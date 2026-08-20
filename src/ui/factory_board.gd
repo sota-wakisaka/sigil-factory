@@ -144,7 +144,10 @@ func placement_is_valid(node_id: StringName, local_position: Vector2) -> bool:
 	var positions := _display_positions()
 	if not positions.has(node_id):
 		return false
-	return _reference_position_is_available(_reference_position(_clamped_node_position(local_position)), positions, node_id)
+	var clamped_position := _clamped_node_position(local_position)
+	if _placement_intersects_hud(clamped_position):
+		return false
+	return _reference_position_is_available(_reference_position(clamped_position), positions, node_id)
 
 
 func _clamped_node_position(local_position: Vector2) -> Vector2:
@@ -153,6 +156,20 @@ func _clamped_node_position(local_position: Vector2) -> Vector2:
 		clampf(local_position.x, margin.x, size.x - margin.x),
 		clampf(local_position.y, margin.y, size.y - margin.y)
 	)
+
+
+func _placement_intersects_hud(local_position: Vector2) -> bool:
+	var node_rect := Rect2(local_position - NODE_HALF_SIZE - Vector2(5, 5), NODE_HALF_SIZE * 2.0 + Vector2(10, 10))
+	var reserved := [
+		Rect2(Vector2(size.x - 320.0, 0), Vector2(320.0, 72.0)),
+		Rect2(Vector2(0, size.y - 48.0), Vector2(300.0, 48.0)),
+	]
+	if editing:
+		reserved.append(Rect2(Vector2.ZERO, Vector2(430.0, 62.0)))
+	for reserved_rect in reserved:
+		if node_rect.intersects(reserved_rect):
+			return true
+	return false
 
 
 func node_local_position(node_id: StringName) -> Vector2:
