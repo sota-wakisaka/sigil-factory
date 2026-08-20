@@ -2520,6 +2520,8 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	port_hover.position = board._input_port_position(&"summoner", 0)
 	board._gui_input(port_hover)
 	_expect(board.hovered_port_kind() == &"input" and board.input_port_connectable(&"summoner", 0), "input hover should combine target feedback with connection validity")
+	_expect(board.connection_preview_state() == &"valid", "connection preview should identify a valid target before click")
+	_expect(board.connection_preview_endpoint() == board._input_port_position(&"summoner", 0), "connection preview should snap to the hovered input port")
 	var input_click := InputEventMouseButton.new()
 	input_click.button_index = MOUSE_BUTTON_LEFT
 	input_click.pressed = true
@@ -2538,6 +2540,17 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	board._gui_input(line_disconnect)
 	_expect(board.simulation.lines.is_empty(), "right-clicking a highlighted line should disconnect it directly")
 	board.free()
+	var invalid_board := FactoryBoard.new()
+	invalid_board.size = Vector2(1196, 401)
+	invalid_board.configure(MvpContent.PLAN_SENTINEL)
+	invalid_board.set_interaction_enabled(true)
+	invalid_board.connecting_from_node_id = &"ring_source"
+	invalid_board.hovered_input_node_id = &"colorizer"
+	invalid_board.hovered_input_port = 0
+	invalid_board.connection_cursor = Vector2(12, 12)
+	_expect(invalid_board.connection_preview_state() == &"invalid", "occupied output should produce an invalid red connection preview")
+	_expect(invalid_board.connection_preview_endpoint() == invalid_board._input_port_position(&"colorizer", 0), "invalid preview should still snap to the rejected port")
+	invalid_board.free()
 
 
 func _test_factory_overlapping_hits_follow_draw_order() -> void:

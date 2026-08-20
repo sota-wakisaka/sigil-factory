@@ -776,6 +776,18 @@ func hovered_port_kind() -> StringName:
 	return &"none"
 
 
+func connection_preview_state() -> StringName:
+	if connecting_from_node_id == &"" or hovered_input_node_id == &"":
+		return &"free"
+	return &"valid" if input_port_connectable(hovered_input_node_id, hovered_input_port) else &"invalid"
+
+
+func connection_preview_endpoint() -> Vector2:
+	if hovered_input_node_id != &"" and hovered_input_port >= 0:
+		return _input_port_position(hovered_input_node_id, hovered_input_port)
+	return connection_cursor
+
+
 func _get_cursor_shape(at_position: Vector2) -> CursorShape:
 	return cursor_shape_at(at_position)
 
@@ -1060,7 +1072,16 @@ func _draw() -> void:
 			8.0
 		)
 	if connecting_from_node_id != &"":
-		draw_line(_output_port_position(connecting_from_node_id), connection_cursor, SELECTED_COLOR, 3.0, true)
+		var connection_endpoint := connection_preview_endpoint()
+		var connection_state := connection_preview_state()
+		var connection_color: Color = {
+			&"valid": MATCH_COLOR,
+			&"invalid": WARNING_COLOR,
+		}.get(connection_state, SELECTED_COLOR)
+		draw_line(_output_port_position(connecting_from_node_id), connection_endpoint, connection_color, 3.0, true)
+		if connection_state == &"invalid":
+			draw_line(connection_endpoint + Vector2(-4, -4), connection_endpoint + Vector2(4, 4), WARNING_COLOR, 2.0, true)
+			draw_line(connection_endpoint + Vector2(-4, 4), connection_endpoint + Vector2(4, -4), WARNING_COLOR, 2.0, true)
 	_draw_nodes(display_simulation, display_positions)
 	if dragging_node and placement_blocked:
 		_draw_blocked_placement()
@@ -2318,7 +2339,7 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 			output_color = SELECTED_COLOR
 		var output_position := _output_port_position(node.id)
 		draw_circle(output_position, PORT_RADIUS, output_color)
-		if output_validation_state(node.id) == &"missing":
+		if output_validation_state(node.id) == &"missing" and connecting_from_node_id != node.id:
 			_draw_validation_port_marker(output_position)
 		if node.id == hovered_output_node_id:
 			draw_arc(output_position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(GLYPH_COLOR, 0.5), 2.2, true)
@@ -2340,7 +2361,10 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 			draw_arc(position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(hover_color, 0.52), 2.2, true)
 		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
 		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, input_color, 2.0)
-		if input_validation_state(node.id, port) == &"missing":
+		if (
+			input_validation_state(node.id, port) == &"missing"
+			and not (connecting_from_node_id != &"" and input_port_connectable(node.id, port))
+		):
 			_draw_validation_port_marker(position)
 
 
