@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://src/ui/sigil_plan_button.gd" id="5_plan_button"]
 [ext_resource type="Script" path="res://src/ui/factory_palette_button.gd" id="6_palette_button"]
 [ext_resource type="Script" path="res://src/ui/flow_action_button.gd" id="7_flow_action"]
+[ext_resource type="Script" path="res://src/ui/factory_setting_option.gd" id="8_setting_option"]
 [ext_resource type="Script" path="res://src/ui/factory_selection_indicator.gd" id="7_selection_indicator"]
 
 [node name="Main" type="Control"]
@@ -256,6 +257,8 @@ script = ExtResource("7_selection_indicator")
 custom_minimum_size = Vector2(140, 50)
 layout_mode = 2
 disabled = true
+alignment = 2
+script = ExtResource("8_setting_option")
 
 [node name="Toolbar" type="HBoxContainer" parent="."]
 layout_mode = 1

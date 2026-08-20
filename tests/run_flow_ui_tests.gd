@@ -111,7 +111,10 @@ func _initialize() -> void:
 		"dangling equipment should invalidate production preview with a specific reason"
 	)
 	_expect(not main.inspector_option.disabled, "selected configurable equipment should enable its inspector")
+	_expect(main.inspector_option.visual_kind == FactoryNodeModel.NodeKind.SOURCE, "source inspector should use its Primitive visual language")
+	_expect(main.inspector_option.visual_index == 0 and main.inspector_option.get_item_text(0) == "環", "source setting should keep text subordinate to the ring icon")
 	main.inspector_option.item_selected.emit(1)
+	_expect(main.inspector_option.visual_index == 1, "setting icon should follow the selected source Primitive")
 	var selected_source: FactoryNodeModel = main.factory_board.simulation.nodes[main.factory_board.selected_node_id]
 	_expect(selected_source.config["primitive_id"] == "spike", "inspector should change a selected source to spike material")
 	main.pause_button.pressed.emit()

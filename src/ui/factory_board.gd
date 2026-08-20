@@ -334,7 +334,7 @@ func selected_node_details() -> Dictionary:
 	var selected_index := -1
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
-			options = PackedStringArray(["環素材", "棘素材"])
+			options = PackedStringArray(["環", "棘"])
 			selected_index = 1 if String(node.config.get("primitive_id", "ring")) == "spike" else 0
 		FactoryNodeModel.NodeKind.ROTATOR:
 			options = PackedStringArray(["90°", "180°", "270°"])
