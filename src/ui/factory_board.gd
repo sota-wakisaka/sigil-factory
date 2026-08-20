@@ -622,28 +622,148 @@ func clear_production_comparison_baseline() -> void:
 
 func production_difference_state(unit_id: StringName) -> Dictionary:
 	if not production_comparison_active:
-		return {"state": &"inactive"}
-	var baseline_counts = production_comparison_baseline.get("counts", {})
-	var before := int(baseline_counts.get(unit_id, 0)) if baseline_counts is Dictionary else 0
-	if not cached_production_valid:
+		return {"validity": &"inactive"}
+	var comparison := compare_production_snapshots(
+		production_comparison_baseline,
+		production_snapshot()
+	)
+	if comparison["validity"] != &"valid":
+		var baseline_counts: Variant = production_comparison_baseline.get("counts", {})
+		var before := int(baseline_counts.get(unit_id, 0)) if baseline_counts is Dictionary else 0
 		return {
-			"state": &"invalid",
+			"validity": &"invalid",
+			"count_state": &"invalid",
+			"timing_state": &"invalid",
 			"before": before,
 			"after": null,
 			"delta": null,
 		}
-	var after := int(cached_production_counts.get(unit_id, 0))
-	var state: StringName = &"unchanged"
-	if after > before:
-		state = &"increase"
-	elif after < before:
-		state = &"decrease"
-	return {
-		"state": state,
-		"before": before,
-		"after": after,
-		"delta": after - before,
+	var units: Dictionary = comparison["units"]
+	if not units.has(unit_id):
+		return {
+			"validity": &"valid",
+			"count_state": &"unchanged",
+			"timing_state": &"unchanged",
+			"before": 0,
+			"after": 0,
+			"delta": 0,
+		}
+	return units[unit_id].duplicate(true)
+
+
+func compare_production_snapshots(before: Dictionary, after: Dictionary) -> Dictionary:
+	var invalid_result := {
+		"validity": &"invalid",
+		"changed": false,
+		"units": {},
+		"discarded": {"state": &"invalid", "before": null, "after": null, "delta": null},
 	}
+	if not bool(before.get("ok", false)) or not bool(after.get("ok", false)):
+		return invalid_result
+	if int(before.get("horizon_ticks", -1)) != int(after.get("horizon_ticks", -2)):
+		return invalid_result
+	var before_counts: Variant = before.get("counts")
+	var after_counts: Variant = after.get("counts")
+	var before_events: Variant = before.get("event_offsets")
+	var after_events: Variant = after.get("event_offsets")
+	if (
+		not before_counts is Dictionary
+		or not after_counts is Dictionary
+		or not before_events is Dictionary
+		or not after_events is Dictionary
+	):
+		return invalid_result
+	var unit_ids: Array[StringName] = []
+	var sources: Array[Dictionary] = [before_counts, after_counts, before_events, after_events]
+	for source in sources:
+		for raw_unit_id in source:
+			var unit_id := StringName(raw_unit_id)
+			if not unit_ids.has(unit_id):
+				unit_ids.append(unit_id)
+	unit_ids.sort()
+	var units := {}
+	var changed := false
+	for unit_id in unit_ids:
+		var before_count := int(before_counts.get(unit_id, 0))
+		var after_count := int(after_counts.get(unit_id, 0))
+		var before_raw: Variant = before_events.get(unit_id, PackedInt32Array())
+		var after_raw: Variant = after_events.get(unit_id, PackedInt32Array())
+		if not before_raw is PackedInt32Array or not after_raw is PackedInt32Array:
+			return invalid_result
+		var before_offsets := PackedInt32Array(before_raw)
+		var after_offsets := PackedInt32Array(after_raw)
+		if before_offsets.size() != before_count or after_offsets.size() != after_count:
+			return invalid_result
+		var count_state: StringName = &"unchanged"
+		if after_count > before_count:
+			count_state = &"increase"
+		elif after_count < before_count:
+			count_state = &"decrease"
+		var timing_state := production_timing_difference_state(before_offsets, after_offsets)
+		if count_state != &"unchanged" or timing_state != &"unchanged":
+			changed = true
+		units[unit_id] = {
+			"validity": &"valid",
+			"count_state": count_state,
+			"timing_state": timing_state,
+			"before": before_count,
+			"after": after_count,
+			"delta": after_count - before_count,
+			"before_offsets": before_offsets.duplicate(),
+			"after_offsets": after_offsets.duplicate(),
+		}
+	var before_discarded := int(before.get("discarded", 0))
+	var after_discarded := int(after.get("discarded", 0))
+	var discarded_state: StringName = &"unchanged"
+	if after_discarded > before_discarded:
+		discarded_state = &"increase"
+	elif after_discarded < before_discarded:
+		discarded_state = &"decrease"
+	if discarded_state != &"unchanged":
+		changed = true
+	return {
+		"validity": &"valid",
+		"changed": changed,
+		"units": units,
+		"discarded": {
+			"state": discarded_state,
+			"before": before_discarded,
+			"after": after_discarded,
+			"delta": after_discarded - before_discarded,
+		},
+	}
+
+
+func production_timing_difference_state(before: PackedInt32Array, after: PackedInt32Array) -> StringName:
+	if before == after:
+		return &"unchanged"
+	if before.is_empty() and not after.is_empty():
+		return &"appeared"
+	if not before.is_empty() and after.is_empty():
+		return &"disappeared"
+	if before.size() != after.size():
+		return &"reshaped"
+	var shift := after[0] - before[0]
+	if shift == 0:
+		return &"reshaped"
+	for index in before.size():
+		if after[index] - before[index] != shift:
+			return &"reshaped"
+	return &"earlier" if shift < 0 else &"later"
+
+
+func production_discard_difference_state() -> Dictionary:
+	if not production_comparison_active:
+		return {"state": &"inactive"}
+	var comparison := compare_production_snapshots(
+		production_comparison_baseline,
+		production_snapshot()
+	)
+	return (
+		comparison["discarded"].duplicate(true)
+		if comparison["validity"] == &"valid"
+		else {"state": &"invalid", "before": int(production_comparison_baseline.get("discarded", 0)), "after": null, "delta": null}
+	)
 
 
 func _capture_preview_node_outputs(preview: FactorySimulation, outputs: Dictionary) -> void:
@@ -1523,20 +1643,44 @@ func _draw_production_summary() -> void:
 				false,
 				true
 			)
-	if cached_production_discarded > 0:
-		var warning_center := Vector2(size.x - 18.0, 28.0)
-		draw_circle(warning_center, 9.0, WARNING_COLOR)
-		draw_line(warning_center + Vector2(-4, -4), warning_center + Vector2(4, 4), Color.WHITE, 1.8, true)
-		draw_line(warning_center + Vector2(-4, 4), warning_center + Vector2(4, -4), Color.WHITE, 1.8, true)
-		draw_string(
-			ThemeDB.fallback_font,
-			warning_center + Vector2(-30, 4),
-			str(cached_production_discarded),
-			HORIZONTAL_ALIGNMENT_RIGHT,
-			18.0,
-			10,
-			WARNING_COLOR
-		)
+	if _should_draw_production_discard_badge():
+		_draw_production_discard_badge()
+
+
+func _should_draw_production_discard_badge() -> bool:
+	if production_comparison_active:
+		var difference := production_discard_difference_state()
+		if difference.get("state", &"invalid") == &"invalid":
+			return int(difference.get("before", 0)) > 0
+		return int(difference.get("before", 0)) > 0 or int(difference.get("after", 0)) > 0
+	return cached_production_valid and cached_production_discarded > 0
+
+
+func _draw_production_discard_badge() -> void:
+	var warning_center := Vector2(size.x - 18.0, 28.0)
+	draw_circle(warning_center, 9.0, WARNING_COLOR)
+	draw_line(warning_center + Vector2(-4, -4), warning_center + Vector2(4, 4), Color.WHITE, 1.8, true)
+	draw_line(warning_center + Vector2(-4, 4), warning_center + Vector2(4, -4), Color.WHITE, 1.8, true)
+	var count_center := Vector2(size.x - 36.0, 28.0)
+	if not production_comparison_active:
+		_draw_production_count_badge(count_center, cached_production_discarded, WARNING_COLOR, false)
+		return
+	var difference := production_discard_difference_state()
+	var before := int(difference.get("before", 0))
+	var state: StringName = difference.get("state", &"invalid")
+	if state == &"unchanged":
+		_draw_production_count_badge(count_center, int(difference.get("after", 0)), WARNING_COLOR, false)
+		return
+	var before_center := count_center + Vector2(0, -12)
+	var after_center := count_center + Vector2(0, 12)
+	_draw_production_count_badge(before_center, before, PRODUCTION_COMPARISON_COLOR, true)
+	if state == &"invalid":
+		_draw_production_unknown_badge(after_center)
+		return
+	var after := int(difference.get("after", 0))
+	var change_color := PRODUCTION_INCREASE_COLOR if state == &"increase" else PRODUCTION_DECREASE_COLOR
+	_draw_production_count_badge(after_center, after, change_color, false)
+	_draw_production_change_symbol(count_center, state)
 
 
 func _draw_production_comparison(unit_id: StringName, center: Vector2) -> void:
@@ -1550,23 +1694,24 @@ func _draw_production_comparison(unit_id: StringName, center: Vector2) -> void:
 		PRODUCTION_COMPARISON_COLOR,
 		true
 	)
-	_draw_production_timeline(
-		center,
-		production_event_offsets(unit_id, true),
-		29.0,
-		true,
-		true
-	)
-	var state: StringName = difference.get("state", &"invalid")
-	if state == &"invalid":
+	var validity: StringName = difference.get("validity", &"invalid")
+	if validity == &"invalid":
+		_draw_production_timeline(
+			center,
+			production_event_offsets(unit_id, true),
+			29.0,
+			true,
+			true
+		)
 		_draw_production_unknown_badge(after_center)
-		_draw_production_change_symbol(change_center, state)
 		_draw_production_timeline(center, PackedInt32Array(), 38.0, false, false)
 		return
+	var count_state: StringName = difference.get("count_state", &"unchanged")
+	var timing_state: StringName = difference.get("timing_state", &"unchanged")
 	var change_color := PRODUCTION_COMPARISON_COLOR
-	if state == &"increase":
+	if count_state == &"increase":
 		change_color = PRODUCTION_INCREASE_COLOR
-	elif state == &"decrease":
+	elif count_state == &"decrease":
 		change_color = PRODUCTION_DECREASE_COLOR
 	_draw_production_count_badge(
 		after_center,
@@ -1574,14 +1719,23 @@ func _draw_production_comparison(unit_id: StringName, center: Vector2) -> void:
 		change_color,
 		false
 	)
-	_draw_production_change_symbol(change_center, state)
-	_draw_production_timeline(
-		center,
-		production_event_offsets(unit_id),
-		38.0,
-		false,
-		true
-	)
+	_draw_production_change_symbol(change_center, count_state)
+	if count_state == &"unchanged" and timing_state == &"unchanged":
+		_draw_production_timeline(center, production_event_offsets(unit_id), 34.0, false, true)
+	else:
+		_draw_production_timeline(
+			center,
+			production_event_offsets(unit_id, true),
+			29.0,
+			true,
+			true
+		)
+		_draw_production_timeline(center, production_event_offsets(unit_id), 38.0, false, true)
+		if count_state == &"unchanged":
+			_draw_production_timing_change_symbol(
+				center + Vector2(PRODUCTION_TIMELINE_WIDTH * 0.5 + 5.0, 33.5),
+				timing_state
+			)
 
 
 func _draw_production_count_badge(center: Vector2, count: int, color: Color, is_baseline: bool) -> void:
@@ -1609,21 +1763,35 @@ func _draw_production_unknown_badge(center: Vector2) -> void:
 	draw_line(center + Vector2(-3, 3), center + Vector2(3, -3), WARNING_COLOR, 1.5, true)
 
 
-func _draw_production_change_symbol(center: Vector2, state: StringName) -> void:
-	if state == &"increase":
+func _draw_production_change_symbol(center: Vector2, count_state: StringName) -> void:
+	if count_state == &"increase":
 		draw_colored_polygon(PackedVector2Array([
 			center + Vector2(0, -4), center + Vector2(-3, 2), center + Vector2(3, 2),
 		]), PRODUCTION_INCREASE_COLOR)
-	elif state == &"decrease":
+	elif count_state == &"decrease":
 		draw_colored_polygon(PackedVector2Array([
 			center + Vector2(0, 4), center + Vector2(-3, -2), center + Vector2(3, -2),
 		]), PRODUCTION_DECREASE_COLOR)
-	elif state == &"unchanged":
-		draw_line(center + Vector2(-3, 0), center + Vector2(3, 0), PRODUCTION_COMPARISON_COLOR, 1.5, true)
-	else:
-		draw_line(center + Vector2(-3, 0), center + Vector2(3, 0), PRODUCTION_COMPARISON_COLOR, 1.3, true)
-		draw_line(center + Vector2(3, 0), center + Vector2(0, -2.5), PRODUCTION_COMPARISON_COLOR, 1.3, true)
-		draw_line(center + Vector2(3, 0), center + Vector2(0, 2.5), PRODUCTION_COMPARISON_COLOR, 1.3, true)
+	elif count_state == &"unchanged":
+		draw_line(center + Vector2(-3, -1.7), center + Vector2(3, -1.7), PRODUCTION_COMPARISON_COLOR, 1.3, true)
+		draw_line(center + Vector2(-3, 1.7), center + Vector2(3, 1.7), PRODUCTION_COMPARISON_COLOR, 1.3, true)
+
+
+func _draw_production_timing_change_symbol(center: Vector2, timing_state: StringName) -> void:
+	if timing_state == &"earlier":
+		draw_line(center + Vector2(2.5, -4), center + Vector2(-2.5, 0), PRODUCTION_COMPARISON_COLOR, 1.5, true)
+		draw_line(center + Vector2(-2.5, 0), center + Vector2(2.5, 4), PRODUCTION_COMPARISON_COLOR, 1.5, true)
+	elif timing_state == &"later":
+		draw_line(center + Vector2(-2.5, -4), center + Vector2(2.5, 0), PRODUCTION_COMPARISON_COLOR, 1.5, true)
+		draw_line(center + Vector2(2.5, 0), center + Vector2(-2.5, 4), PRODUCTION_COMPARISON_COLOR, 1.5, true)
+	elif timing_state == &"reshaped":
+		draw_polyline(PackedVector2Array([
+			center + Vector2(-4, 1.5),
+			center + Vector2(-2, -3),
+			center + Vector2(0, -1.5),
+			center + Vector2(2, 3),
+			center + Vector2(4, 1.5),
+		]), PRODUCTION_COMPARISON_COLOR, 1.5, true)
 
 
 func production_event_offsets(unit_id: StringName, baseline: bool = false) -> PackedInt32Array:
@@ -1748,9 +1916,8 @@ func production_error_at(at_position: Vector2) -> bool:
 func production_discard_badge_at(at_position: Vector2) -> bool:
 	return (
 		interaction_enabled
-		and cached_production_valid
-		and cached_production_discarded > 0
-		and at_position.distance_to(Vector2(size.x - 18.0, 28.0)) <= 18.0
+		and _should_draw_production_discard_badge()
+		and Rect2(Vector2(size.x - 46.0, 6.0), Vector2(44.0, 44.0)).has_point(at_position)
 	)
 
 
@@ -2260,6 +2427,14 @@ func _get_tooltip(at_position: Vector2) -> String:
 	if production_error_at(at_position):
 		return cached_production_preview
 	if production_discard_badge_at(at_position):
+		if production_comparison_active:
+			var discard_difference := production_discard_difference_state()
+			if discard_difference.get("state", &"invalid") == &"invalid":
+				return "32秒予測 // 不一致Glyph %d → ?" % int(discard_difference.get("before", 0))
+			return "32秒予測 // 不一致Glyph %d → %d" % [
+				int(discard_difference.get("before", 0)),
+				int(discard_difference.get("after", 0)),
+			]
 		return "32秒予測 // 不一致Glyph %d個を廃棄" % cached_production_discarded
 	var summary_unit := production_summary_unit_at(at_position)
 	if summary_unit != &"":
@@ -2277,7 +2452,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 						int(difference.get("before", 0)),
 						production_timing_tooltip(production_event_offsets(summary_unit, true)),
 					]
-					if difference.get("state", &"invalid") == &"invalid"
+					if difference.get("validity", &"invalid") == &"invalid"
 					else "旧 %d // %s\n新 %d // %s" % [
 						int(difference.get("before", 0)),
 						production_timing_tooltip(production_event_offsets(summary_unit, true)),
@@ -2348,7 +2523,7 @@ func production_summary_unit_at(at_position: Vector2) -> StringName:
 	var unit_order: Array[StringName] = [&"scout", &"sentinel", &"golem"]
 	for index in unit_order.size():
 		var center := production_summary_center(index)
-		if Rect2(center + Vector2(-30, -22), Vector2(60, 92)).has_point(at_position):
+		if Rect2(center + Vector2(-30, -22), Vector2(64, 92)).has_point(at_position):
 			return unit_order[index]
 	return &""
 

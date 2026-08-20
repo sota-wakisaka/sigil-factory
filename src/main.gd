@@ -57,7 +57,7 @@ var factory_change_count := 0
 var acquired_rewards: Array[StringName] = []
 var selected_route_name := "中央ルート"
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
-var pre_edit_production_counts: Dictionary = {}
+var pre_edit_production_snapshot: Dictionary = {}
 var last_factory_change_summary := ""
 var factory_change_battle_baseline: Dictionary = {}
 var last_factory_change_battle_impact := ""
@@ -202,8 +202,13 @@ func _on_main_action() -> void:
 	elif flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		if not _factory_is_valid("変更を確定できません"):
 			return
+		var candidate_snapshot := factory_board.production_snapshot().duplicate(true)
+		var production_comparison := factory_board.compare_production_snapshots(
+			pre_edit_production_snapshot,
+			candidate_snapshot
+		)
 		factory_board.commit_edit()
-		_update_factory_change_summary()
+		_update_factory_change_summary(production_comparison)
 		_begin_factory_change_tracking()
 		factory_change_count += 1
 		flow.resume_battle()
@@ -338,7 +343,7 @@ func _cancel_edit() -> void:
 		return
 	factory_board.cancel_edit()
 	_sync_plan_ui(factory_board.plan_id)
-	pre_edit_production_counts.clear()
+	pre_edit_production_snapshot.clear()
 	last_factory_change_summary = "変更効果 // 変更を破棄したため生産構成は変更していません"
 	flow.resume_battle()
 	_apply_phase()
@@ -346,19 +351,18 @@ func _cancel_edit() -> void:
 
 func _capture_pre_edit_production() -> void:
 	var preview := factory_board.production_snapshot()
-	pre_edit_production_counts = (
-		preview["counts"].duplicate()
-		if preview["ok"]
+	pre_edit_production_snapshot = (
+		preview.duplicate(true)
+		if preview.get("ok", false)
 		else {}
 	)
 	factory_board.set_production_comparison_baseline(preview)
 
 
-func _update_factory_change_summary() -> void:
-	var preview := factory_board.production_snapshot()
-	if pre_edit_production_counts.is_empty() or not preview["ok"]:
+func _update_factory_change_summary(comparison: Dictionary) -> void:
+	if pre_edit_production_snapshot.is_empty() or comparison.get("validity", &"invalid") != &"valid":
 		last_factory_change_summary = ""
-		pre_edit_production_counts.clear()
+		pre_edit_production_snapshot.clear()
 		return
 	var labels := {
 		&"scout": "斥候",
@@ -366,17 +370,40 @@ func _update_factory_change_summary() -> void:
 		&"golem": "巨像",
 	}
 	var changes := PackedStringArray()
+	var timing_changed := false
 	for unit_id in [&"scout", &"sentinel", &"golem"]:
-		var before := int(pre_edit_production_counts.get(unit_id, 0))
-		var after := int(preview["counts"].get(unit_id, 0))
-		if before != after:
+		var unit_difference: Dictionary = comparison["units"].get(unit_id, {})
+		if unit_difference.is_empty():
+			continue
+		var before := int(unit_difference.get("before", 0))
+		var after := int(unit_difference.get("after", 0))
+		var count_state: StringName = unit_difference.get("count_state", &"unchanged")
+		var timing_state: StringName = unit_difference.get("timing_state", &"unchanged")
+		if count_state != &"unchanged":
 			changes.append("%s %d→%d" % [labels[unit_id], before, after])
-	last_factory_change_summary = (
-		"変更効果 // 次の32秒: %s" % " / ".join(changes)
-		if not changes.is_empty()
-		else "変更効果 // 次の32秒の生産予測は変化なし"
-	)
-	pre_edit_production_counts.clear()
+		if timing_state != &"unchanged":
+			timing_changed = true
+	var discarded: Dictionary = comparison.get("discarded", {})
+	var discarded_changed: bool = discarded.get("state", &"unchanged") != &"unchanged"
+	if changes.is_empty():
+		if timing_changed and discarded_changed:
+			changes.append("召喚時刻・不一致変更")
+		elif timing_changed:
+			changes.append("召喚時刻変更")
+		elif discarded_changed:
+			changes.append("不一致 %d→%d" % [
+				int(discarded.get("before", 0)),
+				int(discarded.get("after", 0)),
+			])
+	elif discarded_changed:
+		changes.append("不一致変更")
+	if not bool(comparison.get("changed", false)):
+		last_factory_change_summary = "変更効果 // 次の32秒の生産予測は変化なし"
+	elif changes.is_empty():
+		last_factory_change_summary = "変更効果 // 32秒予測を更新"
+	else:
+		last_factory_change_summary = "変更効果 // 次の32秒: %s" % " / ".join(changes)
+	pre_edit_production_snapshot.clear()
 
 
 func _begin_factory_change_tracking() -> void:
@@ -492,7 +519,7 @@ func _reset_stage() -> void:
 	battle_speed_index = 0
 	time_stop_count = 0
 	factory_change_count = 0
-	pre_edit_production_counts.clear()
+	pre_edit_production_snapshot.clear()
 	last_factory_change_summary = ""
 	factory_change_battle_baseline.clear()
 	last_factory_change_battle_impact = ""

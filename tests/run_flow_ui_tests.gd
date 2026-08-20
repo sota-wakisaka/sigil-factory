@@ -212,7 +212,36 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "Space should open time-stop reconfiguration")
 	_expect(main.action_error_hold_ticks == 0 and main.action_error_message == "", "successful retry should clear the stale time-stop failure")
 	_expect(main.factory_board.production_comparison_active, "successful time stop should expose a pre-commit production comparison")
-	_expect(main.factory_board.production_difference_state(&"scout")["state"] == &"unchanged", "time stop should begin from the committed production baseline")
+	var initial_difference: Dictionary = main.factory_board.production_difference_state(&"scout")
+	_expect(initial_difference["count_state"] == &"unchanged" and initial_difference["timing_state"] == &"unchanged", "time stop should begin from the committed production baseline")
+	var live_edit_snapshot: Dictionary = main.pre_edit_production_snapshot.duplicate(true)
+	var prior_change_summary: String = main.last_factory_change_summary
+	var summary_before := {
+		"ok": true,
+		"horizon_ticks": 160,
+		"counts": {&"scout": 2},
+		"event_offsets": {&"scout": PackedInt32Array([20, 60])},
+		"discarded": 0,
+	}
+	var summary_after := summary_before.duplicate(true)
+	summary_after["event_offsets"][&"scout"] = PackedInt32Array([20, 50])
+	var timing_only_comparison: Dictionary = main.factory_board.compare_production_snapshots(summary_before, summary_after)
+	main.pre_edit_production_snapshot = summary_before.duplicate(true)
+	main._update_factory_change_summary(timing_only_comparison)
+	_expect("召喚時刻変更" in main.last_factory_change_summary and not "変化なし" in main.last_factory_change_summary, "post-commit status should not contradict a same-count schedule change")
+	summary_after["discarded"] = 2
+	timing_only_comparison = main.factory_board.compare_production_snapshots(summary_before, summary_after)
+	main.pre_edit_production_snapshot = summary_before.duplicate(true)
+	main._update_factory_change_summary(timing_only_comparison)
+	_expect("召喚時刻・不一致変更" in main.last_factory_change_summary, "compound schedule and discard change should remain one compact factual status")
+	summary_after["counts"][&"scout"] = 3
+	summary_after["event_offsets"][&"scout"] = PackedInt32Array([20, 50, 80])
+	timing_only_comparison = main.factory_board.compare_production_snapshots(summary_before, summary_after)
+	main.pre_edit_production_snapshot = summary_before.duplicate(true)
+	main._update_factory_change_summary(timing_only_comparison)
+	_expect("斥候 2→3" in main.last_factory_change_summary and "不一致変更" in main.last_factory_change_summary, "quantity and discard changes should both survive the compact post-commit status")
+	main.pre_edit_production_snapshot = live_edit_snapshot
+	main.last_factory_change_summary = prior_change_summary
 	_expect(main.factory_board.visible and not main.battle_board.visible, "time stop should return to the full-width factory tab")
 	_expect(main.factory_board.interaction_enabled, "time stop should enable node placement")
 	_expect(main.factory_state.state == &"paused", "time stop should use a pause badge while work-in-progress stays in the factory visual summary")
@@ -233,11 +262,12 @@ func _initialize() -> void:
 	main.factory_board.preview_simulation.recipes[0] = preserved_preview_recipe
 	main.get_node("Toolbar/SentinelButton").pressed.emit()
 	_expect(main.sigil_ghost.recipe_id == &"azure_guard", "sentinel selection should update the completed sigil ghost")
-	_expect(main.factory_board.production_difference_state(&"scout")["state"] == &"decrease", "sentinel preview should show scout loss before confirmation")
-	_expect(main.factory_board.production_difference_state(&"sentinel")["state"] == &"increase", "sentinel preview should show sentinel gain before confirmation")
+	_expect(main.factory_board.production_difference_state(&"scout")["count_state"] == &"decrease", "sentinel preview should show scout loss before confirmation")
+	_expect(main.factory_board.production_difference_state(&"sentinel")["count_state"] == &"increase", "sentinel preview should show sentinel gain before confirmation")
 	main.get_node("FactoryPalette/UndoButton").pressed.emit()
 	_expect(main.factory_board.pending_plan_id == MvpContent.PLAN_SCOUT, "undo should restore the plan before a preset preview")
-	_expect(main.factory_board.production_difference_state(&"scout")["state"] == &"unchanged", "preset undo should return the production comparison to baseline")
+	var undone_difference: Dictionary = main.factory_board.production_difference_state(&"scout")
+	_expect(undone_difference["count_state"] == &"unchanged" and undone_difference["timing_state"] == &"unchanged", "preset undo should return the production comparison to baseline")
 	_expect(main.sigil_ghost.recipe_id == &"open_ring" and main.get_node("Toolbar/ScoutButton").button_pressed, "preset undo should restore goal Glyph and plan highlight")
 	main.get_node("Toolbar/SentinelButton").pressed.emit()
 	main._unhandled_key_input(action_key)
@@ -260,7 +290,7 @@ func _initialize() -> void:
 	_expect(main.factory_board.production_comparison_active, "each time stop should capture a fresh production baseline")
 	main.get_node("Toolbar/GolemButton").pressed.emit()
 	_expect(main.sigil_ghost.recipe_id == &"bound_colossus" and main.get_node("Toolbar/GolemButton").button_pressed, "preview should move goal visuals to the proposed plan")
-	_expect(main.factory_board.production_difference_state(&"sentinel")["state"] == &"decrease" and main.factory_board.production_difference_state(&"golem")["state"] == &"increase", "second comparison should use the newly committed sentinel factory as its baseline")
+	_expect(main.factory_board.production_difference_state(&"sentinel")["count_state"] == &"decrease" and main.factory_board.production_difference_state(&"golem")["count_state"] == &"increase", "second comparison should use the newly committed sentinel factory as its baseline")
 	main.cancel_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE and main.factory_board.plan_id == MvpContent.PLAN_SENTINEL, "discard should resume with the committed factory plan")
 	_expect(not main.factory_board.production_comparison_active, "discard should clear the production comparison session")
