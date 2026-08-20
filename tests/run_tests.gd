@@ -2262,6 +2262,9 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		combine_board.tooltip_glyph.canonical_serialization() == ring.canonical_serialization(),
 		"input socket tooltip should preserve the exact predicted Primitive"
 	)
+	var predicted_input_tooltip = combine_board._make_custom_tooltip("glyph_comparison")
+	_expect(predicted_input_tooltip.candidate_label == "入力Glyph", "input comparison should label its right-hand Glyph as an input")
+	predicted_input_tooltip.free()
 	_expect(
 		combine_board.predicted_input_glyph_for_node(&"combiner", 2) == null,
 		"predicted input Glyph lookup should reject an out-of-range port"
@@ -2296,6 +2299,9 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		and not combine_board.tooltip_glyph.combine_children.is_empty(),
 		"combiner center tooltip should keep matching the displayed combined output after one input arrives"
 	)
+	var node_output_tooltip = combine_board._make_custom_tooltip("glyph_comparison")
+	_expect(node_output_tooltip.candidate_label == "設備出力", "node comparison should label its right-hand Glyph as equipment output")
+	node_output_tooltip.free()
 	_expect(
 		combine_board.visible_input_glyph_for_node(&"combiner", 1) == spike,
 		"combiner display should retain the second input Glyph separately"

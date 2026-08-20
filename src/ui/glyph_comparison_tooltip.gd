@@ -13,6 +13,7 @@ const TOOLTIP_SIZE := Vector2(520, 250)
 var target_glyph: GlyphModel
 var candidate_glyph: GlyphModel
 var display_name := ""
+var candidate_label := "工場出力"
 var comparison_state: StringName = &"missing"
 
 
@@ -21,10 +22,16 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-func configure(target: GlyphModel, candidate: GlyphModel, next_display_name: String) -> void:
+func configure(
+	target: GlyphModel,
+	candidate: GlyphModel,
+	next_display_name: String,
+	next_candidate_label: String = "工場出力"
+) -> void:
 	target_glyph = target.copy() if GlyphPainterModel.can_draw(target) else null
 	candidate_glyph = candidate.copy() if GlyphPainterModel.can_draw(candidate) else null
 	display_name = next_display_name
+	candidate_label = next_candidate_label
 	comparison_state = _comparison_state()
 	queue_redraw()
 
@@ -54,7 +61,7 @@ func _draw() -> void:
 	if comparison_state == &"mismatch":
 		_draw_difference_badges()
 	draw_string(ThemeDB.fallback_font, Vector2(112, 226), "目標", HORIZONTAL_ALIGNMENT_CENTER, 60.0, 12, TARGET_COLOR)
-	draw_string(ThemeDB.fallback_font, Vector2(338, 226), "工場出力", HORIZONTAL_ALIGNMENT_CENTER, 80.0, 12, Color(0.68, 0.8, 0.9))
+	draw_string(ThemeDB.fallback_font, Vector2(328, 226), candidate_label, HORIZONTAL_ALIGNMENT_CENTER, 100.0, 12, Color(0.68, 0.8, 0.9))
 
 
 func _draw_preview_backing(center: Vector2, color: Color) -> void:

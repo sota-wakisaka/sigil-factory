@@ -74,6 +74,7 @@ var tooltip_target_glyph: GlyphModel
 var tooltip_title := ""
 var tooltip_context := ""
 var tooltip_comparison_name := ""
+var tooltip_candidate_label := "工場出力"
 var run_upgrades: Array[StringName] = []
 var last_corrupt_discard_count := 0
 
@@ -1656,6 +1657,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_title = ""
 	tooltip_context = ""
 	tooltip_comparison_name = ""
+	tooltip_candidate_label = "工場出力"
 	if connection_feedback_badge_at(at_position):
 		return connection_message
 	if flow_warning_badge_at(at_position):
@@ -1700,7 +1702,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 		_set_comparison_tooltip(
 			input_hit["glyph"],
 			"%s // 入力%d" % [_node_label(input_node), input_hit["port"] + 1],
-			input_context
+			input_context,
+			"入力Glyph"
 		)
 		return "glyph_comparison"
 	var node_id := _node_at(at_position)
@@ -1714,7 +1717,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 			&"source": "素材Primitive",
 		}.get(node_state, "")
 		if node_glyph != null:
-			_set_comparison_tooltip(node_glyph, _node_label(node), node_context)
+			_set_comparison_tooltip(node_glyph, _node_label(node), node_context, "設備出力")
 		if tooltip_glyph == null:
 			return ""
 		return "glyph_comparison" if tooltip_target_glyph != null else "glyph_preview"
@@ -1731,7 +1734,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 		var from_label := _node_label(display_simulation.nodes[line.from_node_id])
 		var to_label := _node_label(display_simulation.nodes[line.to_node_id])
 		var context := "輸送中Glyph" if GlyphPainterModel.can_draw(line.payload) else "32秒予測の輸送Glyph"
-		_set_comparison_tooltip(line_glyph, "%s → %s" % [from_label, to_label], context)
+		_set_comparison_tooltip(line_glyph, "%s → %s" % [from_label, to_label], context, "輸送Glyph")
 		return "glyph_comparison"
 	return ""
 
@@ -1767,20 +1770,26 @@ func _set_glyph_tooltip(next_glyph: GlyphModel, next_title: String, next_context
 	tooltip_context = next_context
 
 
-func _set_comparison_tooltip(candidate: GlyphModel, next_title: String, next_context: String) -> bool:
+func _set_comparison_tooltip(
+	candidate: GlyphModel,
+	next_title: String,
+	next_context: String,
+	next_candidate_label: String = "工場出力"
+) -> bool:
 	_set_glyph_tooltip(candidate, next_title, next_context)
 	var target := _goal_glyph()
 	if not GlyphPainterModel.can_draw(target) or tooltip_glyph == null:
 		return false
 	tooltip_target_glyph = target.copy()
 	tooltip_comparison_name = "%s // %s" % [next_title, next_context]
+	tooltip_candidate_label = next_candidate_label
 	return true
 
 
 func _make_custom_tooltip(for_text: String):
 	if for_text == "glyph_comparison" and tooltip_target_glyph != null and tooltip_glyph != null:
 		var comparison := GlyphComparisonTooltipModel.new()
-		comparison.configure(tooltip_target_glyph, tooltip_glyph, tooltip_comparison_name)
+		comparison.configure(tooltip_target_glyph, tooltip_glyph, tooltip_comparison_name, tooltip_candidate_label)
 		return comparison
 	if for_text != "glyph_preview":
 		var label := Label.new()
