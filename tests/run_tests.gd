@@ -2196,6 +2196,18 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	var combiner: FactoryNodeModel = combine_board.simulation.nodes[&"combiner"]
 	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	_expect(
+		combine_board.predicted_input_glyph_for_node(&"combiner", 0).canonical_serialization() == ring.canonical_serialization(),
+		"combiner should preview the ring expected at its first empty input"
+	)
+	_expect(
+		combine_board.predicted_input_glyph_for_node(&"combiner", 1).canonical_serialization() == spike.canonical_serialization(),
+		"combiner should preview the spike expected at its second empty input"
+	)
+	_expect(
+		combine_board.predicted_input_glyph_for_node(&"combiner", 2) == null,
+		"predicted input Glyph lookup should reject an out-of-range port"
+	)
 	combiner.input_buffers[0] = ring
 	combiner.input_buffers[1] = spike
 	combine_board.simulation.lines[&"line_ring"].payload = ring

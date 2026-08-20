@@ -1831,6 +1831,25 @@ func visible_input_glyph_for_node(node_id: StringName, port: int) -> GlyphModel:
 	return glyph
 
 
+func predicted_input_glyph_for_node(node_id: StringName, port: int) -> GlyphModel:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return null
+	var node: FactoryNodeModel = display_simulation.nodes[node_id]
+	if port < 0 or port >= node.input_buffers.size():
+		return null
+	var line_ids := display_simulation.lines.keys()
+	line_ids.sort()
+	for line_id in line_ids:
+		var line: FactoryLineModel = display_simulation.lines[line_id]
+		if line.to_node_id != node_id or line.to_port != port:
+			continue
+		var predicted: GlyphModel = cached_node_output_glyphs.get(line.from_node_id)
+		if GlyphPainterModel.can_draw(predicted):
+			return predicted
+	return null
+
+
 func _visible_node_glyph(node: FactoryNodeModel) -> GlyphModel:
 	var glyph := _visible_node_active_glyph(node)
 	if glyph == null:
@@ -1854,17 +1873,24 @@ func _visible_node_active_glyph(node: FactoryNodeModel) -> GlyphModel:
 
 func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 	for port in node.input_buffers.size():
-		var glyph_value = node.input_buffers[port]
-		if not glyph_value is GlyphModel:
-			continue
-		var glyph: GlyphModel = glyph_value
-		if not glyph.structure_validation_errors().is_empty():
+		var glyph := visible_input_glyph_for_node(node.id, port)
+		var is_predicted := false
+		if glyph == null:
+			glyph = predicted_input_glyph_for_node(node.id, port)
+			is_predicted = glyph != null
+		if glyph == null:
 			continue
 		var port_position := _input_port_position(node.id, port)
 		var inward := port_position.direction_to(center)
-		var glyph_center := port_position + inward * 14.0
-		_draw_mini_glyph(glyph, glyph_center, 0.85)
-		if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
+		var is_combiner := node.kind == FactoryNodeModel.NodeKind.COMBINER
+		var inset := 28.0 if is_combiner else 14.0
+		var glyph_center := port_position + inward * inset
+		var scale := 1.15 if is_combiner else 0.85
+		if is_combiner:
+			draw_circle(glyph_center, 11.0, Color(PANEL_COLOR, 0.92))
+			draw_arc(glyph_center, 11.0, 0.0, TAU, 20, Color(GLYPH_COLOR, 0.32 if is_predicted else 0.7), 1.3, true)
+		_draw_mini_glyph(glyph, glyph_center, scale, 0.68 if is_predicted else 1.0)
+		if node.kind == FactoryNodeModel.NodeKind.SUMMONER and not is_predicted:
 			_draw_recipe_match_marker(glyph_center, input_recipe_match_state(node.id, port), 9.0)
 
 
