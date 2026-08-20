@@ -1701,6 +1701,7 @@ func _test_factory_edit_is_transactional() -> void:
 	board.size = Vector2(1196, 401)
 	var work_center := Vector2(72, 28)
 	_expect(board.work_in_progress_summary_index_at(work_center) == 0, "time-stop Glyph summary should expose a stable hover target")
+	_expect(board.cursor_shape_at(work_center) == Control.CURSOR_HELP, "time-stop Glyph should advertise its visual details")
 	_expect(board._get_tooltip(work_center) == "glyph_preview", "time-stop Glyph should open a large CanonicalGlyph tooltip")
 	_expect("工場内" in board.tooltip_context, "time-stop Glyph tooltip should retain its grouped item count")
 	board.preview_plan(MvpContent.PLAN_GOLEM)
@@ -1709,6 +1710,7 @@ func _test_factory_edit_is_transactional() -> void:
 	_expect(board.pending_discard_count() == committed_work_in_progress, "preview should disclose discarded work in progress")
 	var discard_badge := board.pending_discard_badge_center()
 	_expect(board.pending_discard_badge_at(discard_badge), "pending discard badge should expose a stable hover target")
+	_expect(board.cursor_shape_at(discard_badge) == Control.CURSOR_HELP, "pending discard badge should advertise its explanation")
 	var discard_connector := board.pending_discard_connector()
 	_expect(
 		not discard_connector.is_empty() and discard_connector["start"].x < discard_connector["finish"].x,
@@ -2095,6 +2097,7 @@ func _test_factory_board_shows_distinct_flow_warning() -> void:
 	_expect(board.warning_marker_symbol(&"buffer_full") == &"stop", "blocked transport should use a stop marker")
 	board.size = Vector2(1196, 401)
 	_expect(board.flow_warning_badge_at(Vector2(28, board.size.y - 18)), "long runtime warning should collapse into a hoverable badge")
+	_expect(board.cursor_shape_at(Vector2(28, board.size.y - 18)) == Control.CURSOR_HELP, "runtime warning badge should advertise its explanation")
 	_expect("出力閉塞" in board._get_tooltip(Vector2(28, board.size.y - 18)), "runtime warning badge should retain the actionable reason on hover")
 	board.free()
 
@@ -2464,6 +2467,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	board.size = Vector2(1196, 401)
 	var summary_center := board.production_summary_center(0)
 	_expect(board.production_summary_unit_at(summary_center) == &"scout", "production Glyph should expose a stable hover target")
+	_expect(board.cursor_shape_at(summary_center) == Control.CURSOR_HELP, "production forecast Glyph should advertise its visual details")
 	_expect(board.production_summary_is_goal(&"scout") and not board.production_summary_is_goal(&"golem"), "production summary should visually outline the selected sigil goal")
 	_expect(board._get_tooltip(summary_center) == "glyph_preview", "production Glyph should open the same large visual tooltip as factory Glyphs")
 	_expect(board.tooltip_glyph != null and "生産見込み" in board.tooltip_context, "production tooltip should pair its CanonicalGlyph with the forecast count")
@@ -2533,6 +2537,7 @@ func _test_factory_production_preview_explains_first_mismatch() -> void:
 	board.size = Vector2(1196, 401)
 	var discard_badge := Vector2(board.size.x - 18.0, 28.0)
 	_expect(board.production_discard_badge_at(discard_badge), "mismatching forecast should expose a hoverable discard-count badge")
+	_expect(board.cursor_shape_at(discard_badge) == Control.CURSOR_HELP, "forecast discard badge should advertise its explanation")
 	_expect("不一致Glyph" in board._get_tooltip(discard_badge), "forecast discard badge should explain the rejected Glyph count on hover")
 	_expect(board.simulation.tick_index == tick_before, "mismatch preview should not advance the real factory")
 	_expect(

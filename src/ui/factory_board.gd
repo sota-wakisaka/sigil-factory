@@ -747,6 +747,8 @@ func _get_cursor_shape(at_position: Vector2) -> CursorShape:
 
 
 func cursor_shape_at(at_position: Vector2) -> CursorShape:
+	if informational_visual_at(at_position):
+		return Control.CURSOR_HELP
 	if not input_glyph_at(at_position).is_empty():
 		return Control.CURSOR_HELP
 	if node_glyph_at(at_position) != &"":
@@ -760,6 +762,18 @@ func cursor_shape_at(at_position: Vector2) -> CursorShape:
 	if _node_at(at_position) != &"":
 		return Control.CURSOR_DRAG
 	return Control.CURSOR_ARROW
+
+
+func informational_visual_at(at_position: Vector2) -> bool:
+	return (
+		connection_feedback_badge_at(at_position)
+		or flow_warning_badge_at(at_position)
+		or pending_discard_badge_at(at_position)
+		or work_in_progress_summary_index_at(at_position) >= 0
+		or production_error_at(at_position)
+		or production_discard_badge_at(at_position)
+		or production_summary_unit_at(at_position) != &""
+	)
 
 
 func begin_edit() -> void:
