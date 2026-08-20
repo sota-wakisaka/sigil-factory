@@ -44,6 +44,7 @@ var hovered_node_id: StringName = &""
 var hovered_output_node_id: StringName = &""
 var hovered_input_node_id: StringName = &""
 var hovered_input_port := -1
+var hovered_line_id: StringName = &""
 var dragging_node := false
 var drag_snapshot_pending := false
 var drag_offset := Vector2.ZERO
@@ -86,6 +87,7 @@ func configure(next_plan_id: StringName) -> void:
 	hovered_output_node_id = &""
 	hovered_input_node_id = &""
 	hovered_input_port = -1
+	hovered_line_id = &""
 	dragging_node = false
 	drag_snapshot_pending = false
 	connecting_from_node_id = &""
@@ -108,6 +110,7 @@ func set_interaction_enabled(enabled: bool) -> void:
 		hovered_output_node_id = &""
 		hovered_input_node_id = &""
 		hovered_input_port = -1
+		hovered_line_id = &""
 		connecting_from_node_id = &""
 	selection_changed.emit()
 	queue_redraw()
@@ -578,15 +581,23 @@ func _gui_input(event: InputEvent) -> void:
 		if not input_port.is_empty():
 			disconnect_input(input_port["node_id"], input_port["port"])
 			accept_event()
+			return
+		var line_id := _line_at(event.position)
+		var display_simulation := _display_simulation()
+		if line_id != &"" and display_simulation != null and display_simulation.lines.has(line_id):
+			var line: FactoryLineModel = display_simulation.lines[line_id]
+			disconnect_input(line.to_node_id, line.to_port)
+			accept_event()
 
 
 func _clear_node_hover() -> void:
-	if hovered_node_id == &"" and hovered_output_node_id == &"" and hovered_input_node_id == &"":
+	if hovered_node_id == &"" and hovered_output_node_id == &"" and hovered_input_node_id == &"" and hovered_line_id == &"":
 		return
 	hovered_node_id = &""
 	hovered_output_node_id = &""
 	hovered_input_node_id = &""
 	hovered_input_port = -1
+	hovered_line_id = &""
 	queue_redraw()
 
 
@@ -596,17 +607,20 @@ func _update_pointer_hover(at_position: Vector2) -> void:
 	var input := _input_port_at(at_position)
 	var next_input_node: StringName = input.get("node_id", &"")
 	var next_input_port := int(input.get("port", -1))
+	var next_line := _line_at(at_position)
 	if (
 		next_node == hovered_node_id
 		and next_output == hovered_output_node_id
 		and next_input_node == hovered_input_node_id
 		and next_input_port == hovered_input_port
+		and next_line == hovered_line_id
 	):
 		return
 	hovered_node_id = next_node
 	hovered_output_node_id = next_output
 	hovered_input_node_id = next_input_node
 	hovered_input_port = next_input_port
+	hovered_line_id = next_line
 	queue_redraw()
 
 
@@ -626,6 +640,8 @@ func cursor_shape_at(at_position: Vector2) -> CursorShape:
 	if not interaction_enabled:
 		return Control.CURSOR_ARROW
 	if _output_port_at(at_position) != &"" or not _input_port_at(at_position).is_empty():
+		return Control.CURSOR_POINTING_HAND
+	if _line_at(at_position) != &"":
 		return Control.CURSOR_POINTING_HAND
 	if _node_at(at_position) != &"":
 		return Control.CURSOR_DRAG
@@ -904,6 +920,8 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 				line_color = Color(MATCH_COLOR, 0.76)
 			elif goal_state == &"mismatch":
 				line_color = Color(WARNING_COLOR, 0.76)
+		if interaction_enabled and line_id == hovered_line_id:
+			draw_line(start, finish, Color(line_color, 0.28), 8.0, true)
 		draw_line(start, finish, line_color, FACTORY_LINE_WIDTH, true)
 		_draw_flow_arrow(start, finish, line_color)
 		if display_simulation.line_flow_state(line_id) == &"buffer_full":
@@ -1861,6 +1879,23 @@ func _input_port_at(local_position: Vector2) -> Dictionary:
 			if local_position.distance_to(_input_port_position(node_id, port)) <= PORT_RADIUS + 4.0:
 				return {"node_id": node_id, "port": port}
 	return {}
+
+
+func _line_at(local_position: Vector2) -> StringName:
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return &""
+	for line_id in display_simulation.lines:
+		var line: FactoryLineModel = display_simulation.lines[line_id]
+		var start := _output_port_position(line.from_node_id)
+		var finish := _input_port_position(line.to_node_id, line.to_port)
+		var segment := finish - start
+		if segment.length_squared() <= 0.001:
+			continue
+		var ratio := clampf((local_position - start).dot(segment) / segment.length_squared(), 0.0, 1.0)
+		if local_position.distance_to(start + segment * ratio) <= 8.0:
+			return line_id
+	return &""
 
 
 func _connection_result_text(result: Dictionary) -> String:

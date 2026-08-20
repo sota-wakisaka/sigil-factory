@@ -2286,6 +2286,16 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	board._gui_input(input_click)
 	_expect(board.simulation.lines.size() == 1, "clicking the target input port should complete wiring")
 	_expect(not board.is_guided_connection_pending(), "first connection guide should clear after wiring")
+	var line_center := board._output_port_position(&"ring_source").lerp(board._input_port_position(&"summoner", 0), 0.5)
+	port_hover.position = line_center
+	board._gui_input(port_hover)
+	_expect(board.hovered_line_id != &"" and board.get_cursor_shape(line_center) == Control.CURSOR_POINTING_HAND, "line hover should expose wiring as an interactive target")
+	var line_disconnect := InputEventMouseButton.new()
+	line_disconnect.button_index = MOUSE_BUTTON_RIGHT
+	line_disconnect.pressed = true
+	line_disconnect.position = line_center
+	board._gui_input(line_disconnect)
+	_expect(board.simulation.lines.is_empty(), "right-clicking a highlighted line should disconnect it directly")
 	board.free()
 
 
