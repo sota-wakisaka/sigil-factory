@@ -1026,6 +1026,15 @@ func _draw_production_summary() -> void:
 		draw_circle(warning_center, 9.0, WARNING_COLOR)
 		draw_line(warning_center + Vector2(-4, -4), warning_center + Vector2(4, 4), Color.WHITE, 1.8, true)
 		draw_line(warning_center + Vector2(-4, 4), warning_center + Vector2(4, -4), Color.WHITE, 1.8, true)
+		draw_string(
+			ThemeDB.fallback_font,
+			warning_center + Vector2(-30, 4),
+			str(cached_production_discarded),
+			HORIZONTAL_ALIGNMENT_RIGHT,
+			18.0,
+			10,
+			WARNING_COLOR
+		)
 
 
 func interaction_legend_count() -> int:
@@ -1090,6 +1099,15 @@ func _draw_edit_summary() -> void:
 
 func production_error_at(at_position: Vector2) -> bool:
 	return interaction_enabled and not cached_production_valid and at_position.distance_to(Vector2(size.x - 18.0, 27.0)) <= 16.0
+
+
+func production_discard_badge_at(at_position: Vector2) -> bool:
+	return (
+		interaction_enabled
+		and cached_production_valid
+		and cached_production_discarded > 0
+		and at_position.distance_to(Vector2(size.x - 18.0, 28.0)) <= 18.0
+	)
 
 
 func work_in_progress_summary_index_at(at_position: Vector2) -> int:
@@ -1334,6 +1352,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 		return "glyph_preview"
 	if production_error_at(at_position):
 		return cached_production_preview
+	if production_discard_badge_at(at_position):
+		return "32秒予測 // 不一致Glyph %d個を廃棄" % cached_production_discarded
 	var summary_unit := production_summary_unit_at(at_position)
 	if summary_unit != &"":
 		for recipe in MvpContent.recipes():

@@ -2349,6 +2349,11 @@ func _test_factory_production_preview_explains_first_mismatch() -> void:
 		_expect(diagnostics[0] == "部品不足: ring", "preview should retain the highest-priority correction")
 	board._refresh_production_preview()
 	_expect("巨像: 部品不足 環" in board.cached_production_preview, "preview UI should explain the first correction")
+	board.set_interaction_enabled(true)
+	board.size = Vector2(1196, 401)
+	var discard_badge := Vector2(board.size.x - 18.0, 28.0)
+	_expect(board.production_discard_badge_at(discard_badge), "mismatching forecast should expose a hoverable discard-count badge")
+	_expect("不一致Glyph" in board._get_tooltip(discard_badge), "forecast discard badge should explain the rejected Glyph count on hover")
 	_expect(board.simulation.tick_index == tick_before, "mismatch preview should not advance the real factory")
 	_expect(
 		board.simulation.summon_failure_events.size() == failure_count_before,
