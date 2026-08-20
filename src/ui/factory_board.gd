@@ -1361,6 +1361,13 @@ func _draw_edit_summary() -> void:
 	var discard_count := pending_discard_count()
 	if discard_count > 0:
 		var center := pending_discard_badge_center()
+		var connector := pending_discard_connector()
+		if not connector.is_empty():
+			var start: Vector2 = connector["start"]
+			var finish: Vector2 = connector["finish"]
+			draw_line(start, finish, Color(WARNING_COLOR, 0.76), 1.5, true)
+			draw_line(finish, finish + Vector2(-5, -3), Color(WARNING_COLOR, 0.76), 1.5, true)
+			draw_line(finish, finish + Vector2(-5, 3), Color(WARNING_COLOR, 0.76), 1.5, true)
 		draw_circle(center, 10.0, WARNING_COLOR)
 		draw_line(center + Vector2(-4, -4), center + Vector2(4, 4), Color.WHITE, 1.8, true)
 		draw_line(center + Vector2(-4, 4), center + Vector2(4, -4), Color.WHITE, 1.8, true)
@@ -1392,6 +1399,19 @@ func work_in_progress_summary_index_at(at_position: Vector2) -> int:
 
 func pending_discard_badge_center() -> Vector2:
 	return Vector2(78.0 + mini(work_in_progress_visual_summary().size(), 6) * 58.0, 28.0)
+
+
+func pending_discard_connector() -> Dictionary:
+	if not editing or pending_discard_count() <= 0:
+		return {}
+	var visible_group_count := mini(work_in_progress_visual_summary().size(), 6)
+	if visible_group_count <= 0:
+		return {}
+	var last_group_center := Vector2(72.0 + (visible_group_count - 1) * 58.0, 28.0)
+	return {
+		"start": last_group_center + Vector2(20, 0),
+		"finish": pending_discard_badge_center() - Vector2(14, 0),
+	}
 
 
 func pending_discard_badge_at(at_position: Vector2) -> bool:

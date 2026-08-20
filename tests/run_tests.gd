@@ -1709,6 +1709,11 @@ func _test_factory_edit_is_transactional() -> void:
 	_expect(board.pending_discard_count() == committed_work_in_progress, "preview should disclose discarded work in progress")
 	var discard_badge := board.pending_discard_badge_center()
 	_expect(board.pending_discard_badge_at(discard_badge), "pending discard badge should expose a stable hover target")
+	var discard_connector := board.pending_discard_connector()
+	_expect(
+		not discard_connector.is_empty() and discard_connector["start"].x < discard_connector["finish"].x,
+		"pending discard should visually connect the preserved work summary to its discard badge"
+	)
 	_expect("影響:" in board._get_tooltip(discard_badge), "pending discard badge should explain the affected equipment on hover")
 	_expect(board.preview_simulation.tick_index == committed_tick, "template preview should preserve factory time")
 	board.cancel_edit()
