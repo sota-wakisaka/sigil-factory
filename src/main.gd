@@ -662,7 +662,7 @@ func _set_plan_buttons_enabled(enabled: bool) -> void:
 func _set_factory_palette_enabled(enabled: bool) -> void:
 	if not enabled:
 		for button in $FactoryPalette.get_children():
-			button.disabled = true
+			button.set_availability(false, &"locked")
 		return
 	_refresh_factory_palette_state()
 
@@ -671,11 +671,13 @@ func _refresh_factory_palette_state() -> void:
 	for button in $FactoryPalette.get_children():
 		match button.equipment_kind:
 			&"delete":
-				button.disabled = not factory_board.interaction_enabled or factory_board.selected_node_id == &""
+				var delete_available := factory_board.interaction_enabled and factory_board.selected_node_id != &""
+				button.set_availability(delete_available, &"selection" if factory_board.interaction_enabled else &"locked")
 			&"undo":
-				button.disabled = not factory_board.can_undo()
+				button.set_availability(factory_board.can_undo(), &"undo_empty" if factory_board.interaction_enabled else &"locked")
 			_:
-				button.disabled = not factory_board.palette_availability(button.equipment_kind)["available"]
+				var availability := factory_board.palette_availability(button.equipment_kind)
+				button.set_availability(availability["available"], availability["reason"])
 
 
 func _refresh_status() -> void:
