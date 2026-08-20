@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://src/ui/sigil_ghost.gd" id="4_ghost"]
 [ext_resource type="Script" path="res://src/ui/sigil_plan_button.gd" id="5_plan_button"]
 [ext_resource type="Script" path="res://src/ui/factory_palette_button.gd" id="6_palette_button"]
+[ext_resource type="Script" path="res://src/ui/flow_action_button.gd" id="7_flow_action"]
 [ext_resource type="Script" path="res://src/ui/factory_selection_indicator.gd" id="7_selection_indicator"]
 
 [node name="Main" type="Control"]
@@ -320,13 +321,16 @@ custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 tooltip_text = "現在のフェーズで次の進行操作を実行します"
 text = "時間停止"
+script = ExtResource("7_flow_action")
 
 [node name="CancelButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 disabled = true
 tooltip_text = "時間停止中の変更をすべて破棄して戦闘へ戻ります"
-text = "変更を破棄"
+text = "破棄"
+script = ExtResource("7_flow_action")
+action_kind = "cancel"
 
 [node name="Hint" type="Label" parent="."]
 visible = false

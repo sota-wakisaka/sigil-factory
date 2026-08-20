@@ -45,6 +45,7 @@ func _initialize() -> void:
 	_expect(main.get_node("Toolbar/EmptyButton").glyph != null, "manual plan button should show its target CanonicalGlyph")
 	_expect(main.factory_board.mana_status_text() == "魔力 40/100 // 空き60", "factory build should disclose fixed mana capacity")
 	_expect("戦闘を開始" in main.pause_button.tooltip_text, "main action tooltip should explain build confirmation")
+	_expect(main.pause_button.action_kind == "start" and main.pause_button.text == "戦闘開始", "factory build should use a compact play action")
 	_expect(main.plan_label.text == "◇ 配線待ち", "empty workshop should use a compact visual state instead of a written instruction")
 	var error_badge_position := Vector2(main.factory_board.size.x - 18.0, 27.0)
 	_expect(main.factory_board.production_error_at(error_badge_position), "invalid production preview should collapse its permanent sentence into a hoverable badge")
@@ -142,6 +143,7 @@ func _initialize() -> void:
 	_expect("戦場容量 青0/48  赤0/48" in main.battle_board.capacity_status_text(), "battlefield should disclose per-side unit capacity")
 	_expect(not main.speed_button.disabled, "battle should enable speed controls")
 	_expect("時間を停止" in main.pause_button.tooltip_text, "main action tooltip should explain time stop during battle")
+	_expect(main.pause_button.action_kind == "pause" and main.pause_button.text == "時間停止", "battle should use a compact pause action")
 	var speed_key := InputEventKey.new()
 	speed_key.keycode = KEY_F
 	speed_key.pressed = true
@@ -164,6 +166,8 @@ func _initialize() -> void:
 	_expect(main.factory_board.interaction_enabled, "time stop should enable node placement")
 	_expect(main.plan_label.text == "Ⅱ", "time stop should move work-in-progress details from permanent text into the factory visual summary")
 	_expect("戦闘を再開" in main.pause_button.tooltip_text, "main action tooltip should explain edit confirmation")
+	_expect(main.pause_button.action_kind == "resume" and main.pause_button.text == "確定・再開", "reconfiguration should pair confirmation with a visual resume action")
+	_expect(main.cancel_button.action_kind == "cancel" and main.cancel_button.text == "破棄", "reconfiguration should keep discard visually distinct and terse")
 	_expect(main.speed_button.disabled, "time stop should disable speed controls")
 	main.get_node("Toolbar/SentinelButton").pressed.emit()
 	_expect(main.sigil_ghost.recipe_id == &"azure_guard", "sentinel selection should update the completed sigil ghost")
