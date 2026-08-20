@@ -1850,6 +1850,14 @@ func predicted_input_glyph_for_node(node_id: StringName, port: int) -> GlyphMode
 	return null
 
 
+func input_glyph_display_state(node_id: StringName, port: int) -> StringName:
+	if visible_input_glyph_for_node(node_id, port) != null:
+		return &"actual"
+	if predicted_input_glyph_for_node(node_id, port) != null:
+		return &"predicted"
+	return &"empty"
+
+
 func _visible_node_glyph(node: FactoryNodeModel) -> GlyphModel:
 	var glyph := _visible_node_active_glyph(node)
 	if glyph == null:
@@ -1887,11 +1895,21 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 		var glyph_center := port_position + inward * inset
 		var scale := 1.15 if is_combiner else 0.85
 		if is_combiner:
-			draw_circle(glyph_center, 11.0, Color(PANEL_COLOR, 0.92))
-			draw_arc(glyph_center, 11.0, 0.0, TAU, 20, Color(GLYPH_COLOR, 0.32 if is_predicted else 0.7), 1.3, true)
+			_draw_combiner_input_socket(glyph_center, is_predicted)
 		_draw_mini_glyph(glyph, glyph_center, scale, 0.68 if is_predicted else 1.0)
 		if node.kind == FactoryNodeModel.NodeKind.SUMMONER and not is_predicted:
 			_draw_recipe_match_marker(glyph_center, input_recipe_match_state(node.id, port), 9.0)
+
+
+func _draw_combiner_input_socket(center: Vector2, is_predicted: bool) -> void:
+	draw_circle(center, 11.0, Color(PANEL_COLOR, 0.92))
+	var color := Color(GLYPH_COLOR, 0.32 if is_predicted else 0.7)
+	if not is_predicted:
+		draw_arc(center, 11.0, 0.0, TAU, 20, color, 1.3, true)
+		return
+	for segment in 8:
+		var start_angle := float(segment) * TAU / 8.0
+		draw_arc(center, 11.0, start_angle, start_angle + TAU / 16.0, 3, color, 1.3, true)
 
 
 func _draw_recipe_match_marker(

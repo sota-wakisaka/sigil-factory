@@ -2205,6 +2205,10 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		"combiner should preview the spike expected at its second empty input"
 	)
 	_expect(
+		combine_board.input_glyph_display_state(&"combiner", 0) == &"predicted",
+		"empty connected combiner input should identify its Glyph as a prediction"
+	)
+	_expect(
 		combine_board.predicted_input_glyph_for_node(&"combiner", 2) == null,
 		"predicted input Glyph lookup should reject an out-of-range port"
 	)
@@ -2222,6 +2226,10 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	_expect(
 		combine_board.visible_input_glyph_for_node(&"combiner", 0) == ring,
 		"combiner display should retain the first input Glyph separately"
+	)
+	_expect(
+		combine_board.input_glyph_display_state(&"combiner", 0) == &"actual",
+		"arrived combiner input should replace its predicted display state"
 	)
 	_expect(
 		combine_board.visible_input_glyph_for_node(&"combiner", 1) == spike,
