@@ -123,9 +123,12 @@ func set_interaction_enabled(enabled: bool) -> void:
 		placement_blocked = false
 		selected_node_id = &""
 		hovered_node_id = &""
+		hovered_node_glyph_id = &""
 		hovered_output_node_id = &""
 		hovered_input_node_id = &""
 		hovered_input_port = -1
+		hovered_input_glyph_node_id = &""
+		hovered_input_glyph_port = -1
 		hovered_line_id = &""
 		connecting_from_node_id = &""
 	selection_changed.emit()

@@ -2292,6 +2292,14 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		and combine_board.hovered_node_id == &"",
 		"input Glyph hover should highlight the socket without highlighting the whole draggable node"
 	)
+	combine_board.set_interaction_enabled(false)
+	_expect(
+		combine_board.hovered_node_glyph_id == &""
+		and combine_board.hovered_input_glyph_node_id == &""
+		and combine_board.hovered_input_glyph_port == -1,
+		"locking factory interaction should clear transient Glyph hover emphasis"
+	)
+	combine_board.set_interaction_enabled(true)
 	_expect(
 		combine_board._get_tooltip(predicted_input_center) == "glyph_comparison"
 		and "32秒予測の入力Glyph" in combine_board.tooltip_context,
