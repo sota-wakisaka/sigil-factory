@@ -1030,7 +1030,7 @@ func _test_shared_glyph_painter_rejects_invalid_structures() -> void:
 	var nested := GlyphModel.combine(GlyphModel.combine(valid, spike), branch)
 	var nested_visuals := GlyphPainterModel.combine_visuals(nested, 2.0)
 	_expect(nested_visuals["circles"].size() == 2, "each nested Combine should produce its own structural circle")
-	_expect(nested_visuals["connections"].size() == 4, "coincident nested Combine children should retain visible structural connections")
+	_expect(nested_visuals["connections"].is_empty(), "coincident nested Combine children should not create artificial spokes")
 	_expect(
 		float(nested_visuals["circles"][0]["radius"]) > float(nested_visuals["circles"][1]["radius"]),
 		"outer Combine circle should remain larger than its nested child circle"
@@ -1041,13 +1041,11 @@ func _test_shared_glyph_painter_rejects_invalid_structures() -> void:
 	_expect(separated_visuals["connections"].size() == 2, "positioned Combine children should draw low-priority structural connections")
 	var coincident := GlyphModel.combine(valid, spike)
 	var coincident_visuals := GlyphPainterModel.combine_visuals(coincident, 2.0)
-	_expect(coincident_visuals["connections"].size() == 2, "coincident Combine children should use deterministic radial connections")
+	_expect(coincident_visuals["connections"].is_empty(), "children at the exact Combine center should not draw misleading connection lines")
 	_expect(
 		coincident_visuals["circles"][0]["center"] == Vector2.ZERO,
 		"Combine circles should stay at the canonical origin instead of the children centroid"
 	)
-	for connection in coincident_visuals["connections"]:
-		_expect(connection["from"] == Vector2.ZERO, "coincident children should also connect from the exact center")
 	var reversed := GlyphModel.new([], null, [spike, valid])
 	_expect(
 		GlyphPainterModel.combine_visuals(reversed, 2.0)["connections"] == coincident_visuals["connections"],
@@ -3329,8 +3327,9 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	var left_grouped := GlyphModel.combine(GlyphModel.combine(ring_leaf, spike_leaf), branch_leaf)
 	var right_grouped := GlyphModel.combine(ring_leaf, GlyphModel.combine(spike_leaf, branch_leaf))
 	_expect(
-		GlyphPainterModel.combine_visuals(left_grouped, 2.0)["connections"] != GlyphPainterModel.combine_visuals(right_grouped, 2.0)["connections"],
-		"coincident structure lines should visibly change when Primitive membership moves between Combine subtrees"
+		GlyphPainterModel.combine_visuals(left_grouped, 2.0)["connections"].is_empty()
+		and GlyphPainterModel.combine_visuals(right_grouped, 2.0)["connections"].is_empty(),
+		"coincident Combine subtrees should rely on their circles instead of invented directional lines"
 	)
 	var hierarchy_comparison = GlyphComparisonTooltipModel.new()
 	hierarchy_comparison.configure(left_grouped, right_grouped, "合成階層")

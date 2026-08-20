@@ -16,8 +16,11 @@ func _initialize() -> void:
 	var lab = scene.instantiate()
 	capture_viewport.add_child(lab)
 	await process_frame
-	if options.get("fixture", "") == "post_combine_move":
+	var fixture := String(options.get("fixture", ""))
+	if fixture == "post_combine_move":
 		_build_post_combine_move_fixture(lab)
+	elif fixture == "coincident_child":
+		_build_coincident_child_fixture(lab)
 	await process_frame
 	await process_frame
 	await RenderingServer.frame_post_draw
@@ -45,6 +48,19 @@ func _build_post_combine_move_fixture(lab) -> void:
 	lab.connect_lab_nodes(right, combine, 1)
 	lab.connect_lab_nodes(combine, group_move)
 	lab.connect_lab_nodes(group_move, output_id)
+
+
+func _build_coincident_child_fixture(lab) -> void:
+	lab.clear_workspace()
+	var ring: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"ring"}, Vector2(30, 170))
+	var ring_move: StringName = lab.add_lab_node(SigilGraphModel.MOVE, {"offset": Vector2i(0, 4)}, Vector2(210, 170))
+	var spike: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"spike"}, Vector2(210, 410))
+	var combine: StringName = lab.add_lab_node(SigilGraphModel.COMBINE, {}, Vector2(450, 240))
+	var output_id: StringName = lab.graph.output_node_id()
+	lab.connect_lab_nodes(ring, ring_move)
+	lab.connect_lab_nodes(ring_move, combine, 0)
+	lab.connect_lab_nodes(spike, combine, 1)
+	lab.connect_lab_nodes(combine, output_id)
 
 
 func _user_options() -> Dictionary:
