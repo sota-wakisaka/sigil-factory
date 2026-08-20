@@ -13,6 +13,7 @@ const TICK_SECONDS := 0.2
 const FORECAST_TICKS := 120
 const MAJOR_FORECAST_TICKS := 300
 const FACTORY_CHANGE_TRACKING_TICKS := 75
+const ACTION_ERROR_HOLD_TICKS := 15
 const BATTLE_SPEEDS := [1.0, 2.0, 4.0]
 const FLOW_STEPS := [
 	"ルート選択", "ステージ情報", "工場構築", "リアルタイム戦闘",
@@ -61,6 +62,8 @@ var last_factory_change_summary := ""
 var factory_change_battle_baseline: Dictionary = {}
 var last_factory_change_battle_impact := ""
 var workspace_view := WorkspaceView.FACTORY
+var action_error_message := ""
+var action_error_hold_ticks := 0
 
 
 func _ready() -> void:
@@ -125,6 +128,8 @@ func _process(delta: float) -> void:
 		factory_board.advance_tick()
 		_refresh_factory_goal_candidate()
 		battle_board.advance_tick()
+		if action_error_hold_ticks > 0:
+			action_error_hold_ticks -= 1
 	_refresh_status()
 
 
@@ -180,10 +185,17 @@ func _on_main_action() -> void:
 			return
 		flow.advance()
 		_apply_phase()
-	elif flow.phase == RunFlow.Phase.BATTLE and flow.pause_for_reconfiguration():
+	elif flow.phase == RunFlow.Phase.BATTLE:
+		if not factory_board.begin_edit():
+			action_error_message = factory_board.connection_message
+			action_error_hold_ticks = ACTION_ERROR_HOLD_TICKS
+			_refresh_status()
+			return
+		if not flow.pause_for_reconfiguration():
+			factory_board.cancel_edit()
+			return
 		_capture_pre_edit_production()
 		time_stop_count += 1
-		factory_board.begin_edit()
 		_apply_phase()
 	elif flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		if not _factory_is_valid("変更を確定できません"):
@@ -700,6 +712,8 @@ func _refresh_status() -> void:
 		if major_forecast == ""
 		else "%s  //  %s" % [major_forecast, near_forecast]
 	)
+	if action_error_hold_ticks > 0:
+		threat_label.text = action_error_message
 	if battle.is_finished():
 		return
 	var enemy_objective := "敵防壁HP %.0f" % battle.enemy_shield_health if battle.is_enemy_shield_active() else "敵リーダーHP %.0f" % battle.enemy_leader_health

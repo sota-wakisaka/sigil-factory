@@ -776,7 +776,7 @@ func informational_visual_at(at_position: Vector2) -> bool:
 	)
 
 
-func begin_edit() -> void:
+func begin_edit() -> bool:
 	last_corrupt_discard_count = 0
 	var runtime_errors := simulation.work_in_progress_validation_errors()
 	if not runtime_errors.is_empty():
@@ -784,8 +784,12 @@ func begin_edit() -> void:
 		connection_message = "破損仕掛品 %d個を廃棄して編集状態へ復旧しました" % last_corrupt_discard_count
 	var duplication := simulation.duplicate_state_result()
 	if not duplication["ok"]:
+		editing = false
+		preview_simulation = null
+		interaction_enabled = false
 		connection_message = "工場状態を複製できません // %s" % _validation_message(duplication["errors"])
-		return
+		queue_redraw()
+		return false
 	editing = true
 	pending_plan_id = plan_id
 	preview_simulation = duplication["state"]
@@ -796,6 +800,7 @@ func begin_edit() -> void:
 	_refresh_production_preview()
 	selection_changed.emit()
 	queue_redraw()
+	return true
 
 
 func preview_plan(next_plan_id: StringName) -> void:

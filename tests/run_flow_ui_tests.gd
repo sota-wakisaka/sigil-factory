@@ -185,6 +185,14 @@ func _initialize() -> void:
 	var action_key := InputEventKey.new()
 	action_key.keycode = KEY_SPACE
 	action_key.pressed = true
+	var preserved_recipe = main.factory_board.simulation.recipes[0]
+	main.factory_board.simulation.recipes[0] = null
+	main._unhandled_key_input(action_key)
+	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "failed factory duplication should keep battle phase active")
+	_expect(not main.factory_board.editing and not main.factory_board.interaction_enabled, "failed factory duplication should not expose the committed factory to direct editing")
+	main._process(0.0)
+	_expect("工場状態を複製できません" in main.threat_label.text, "failed time stop should keep its explanation visible across status refreshes")
+	main.factory_board.simulation.recipes[0] = preserved_recipe
 	main._unhandled_key_input(action_key)
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "Space should open time-stop reconfiguration")
 	_expect(main.factory_board.visible and not main.battle_board.visible, "time stop should return to the full-width factory tab")
