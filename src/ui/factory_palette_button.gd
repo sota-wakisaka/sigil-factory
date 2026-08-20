@@ -3,6 +3,7 @@ extends Button
 
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
+const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 
 @export var equipment_kind: StringName
 @export var caption := "設備"
@@ -45,6 +46,22 @@ func _draw() -> void:
 		_draw_unavailable_overlay()
 	if goal_relevant:
 		_draw_goal_marker()
+
+
+func _make_custom_tooltip(_for_text: String):
+	if preview_glyph == null:
+		return null
+	var context := "一定周期 // ◆%d" % mana_cost
+	var unavailable_reason := _availability_reason_text(availability_reason)
+	if unavailable_reason != "":
+		context = "%s\n%s" % [unavailable_reason, context]
+	var preview := GlyphTooltipModel.new()
+	preview.configure(
+		preview_glyph,
+		"素材Primitive // %s" % caption,
+		context
+	)
+	return preview
 
 
 func set_goal_relevant(relevant: bool) -> void:
