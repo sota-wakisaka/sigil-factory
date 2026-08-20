@@ -1830,6 +1830,15 @@ func _test_factory_editor_undo_restores_graph() -> void:
 	var original_node_count := board.simulation.nodes.size()
 	var added_id := board.add_node_from_palette(&"rotator")
 	_expect(board.simulation.nodes.has(added_id), "palette edit should add a node before undo")
+	var added_position: Vector2 = board.node_positions[added_id]
+	for existing_id in board.node_positions:
+		if existing_id == added_id:
+			continue
+		var existing_position: Vector2 = board.node_positions[existing_id]
+		_expect(
+			absf(added_position.x - existing_position.x) >= 85.0 or absf(added_position.y - existing_position.y) >= 75.0,
+			"palette equipment should choose an open radial slot instead of overlapping the template"
+		)
 	_expect(board.undo(), "factory editor should undo its latest edit")
 	_expect(board.simulation.nodes.size() == original_node_count, "undo should restore the previous graph")
 	_expect(not board.simulation.nodes.has(added_id), "undo should remove the newly added node")

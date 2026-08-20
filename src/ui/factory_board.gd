@@ -192,15 +192,33 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 		queue_redraw()
 		return &""
 	display_simulation.add_node(new_node)
-	var column := posmod(node_serial - 2, 3)
-	var row := posmod((node_serial - 2) / 3, 2)
-	_display_positions()[node_id] = Vector2(250 + column * 150, 135 + row * 125)
+	_display_positions()[node_id] = _next_palette_reference_position(_display_positions())
 	selected_node_id = node_id
 	connection_message = "%sを追加しました" % MvpContent.node_name(kind)
 	_refresh_production_preview()
 	selection_changed.emit()
 	queue_redraw()
 	return node_id
+
+
+func _next_palette_reference_position(positions: Dictionary) -> Vector2:
+	var candidates := [
+		Vector2(650, 125), Vector2(650, 275), Vector2(735, 195),
+		Vector2(520, 70), Vector2(520, 320), Vector2(260, 70),
+		Vector2(260, 320), Vector2(105, 195),
+	]
+	for candidate in candidates:
+		if _reference_position_is_available(candidate, positions):
+			return candidate
+	return Vector2(735, 320)
+
+
+func _reference_position_is_available(candidate: Vector2, positions: Dictionary) -> bool:
+	for existing in positions.values():
+		var existing_position: Vector2 = existing
+		if absf(candidate.x - existing_position.x) < 85.0 and absf(candidate.y - existing_position.y) < 75.0:
+			return false
+	return true
 
 
 func remove_factory_node(node_id: StringName) -> bool:
