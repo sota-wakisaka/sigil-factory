@@ -2793,7 +2793,21 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	)
 	_expect(&"rotation" in attribute_comparison.difference_categories(), "comparison should expose a rotation difference without a written guide")
 	_expect(&"color" in attribute_comparison.difference_categories(), "comparison should expose a color difference without a written guide")
+	_expect(&"combine" not in attribute_comparison.difference_categories(), "single Glyph attribute changes should not masquerade as a Combine hierarchy difference")
 	attribute_comparison.free()
+	var ring_leaf := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var spike_leaf := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	var branch_leaf := GlyphModel.new([GlyphComponentModel.new(&"branch")])
+	var left_grouped := GlyphModel.combine(GlyphModel.combine(ring_leaf, spike_leaf), branch_leaf)
+	var right_grouped := GlyphModel.combine(ring_leaf, GlyphModel.combine(spike_leaf, branch_leaf))
+	_expect(
+		GlyphPainterModel.combine_visuals(left_grouped, 2.0)["connections"] != GlyphPainterModel.combine_visuals(right_grouped, 2.0)["connections"],
+		"coincident structure lines should visibly change when Primitive membership moves between Combine subtrees"
+	)
+	var hierarchy_comparison = GlyphComparisonTooltipModel.new()
+	hierarchy_comparison.configure(left_grouped, right_grouped, "合成階層")
+	_expect(&"combine" in hierarchy_comparison.difference_categories(), "comparison should expose which Primitive belongs to each Combine subtree")
+	hierarchy_comparison.free()
 	ghost.show_candidate(null)
 	_expect(ghost.candidate_state == &"missing", "missing factory candidate should leave an empty comparison slot")
 	ghost.hovered_slot = &"candidate"

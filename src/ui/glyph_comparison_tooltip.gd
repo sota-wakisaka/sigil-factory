@@ -98,7 +98,10 @@ func difference_categories() -> Array[StringName]:
 		result.append(&"color")
 	if _component_signature(target_glyph, &"geometry") != _component_signature(candidate_glyph, &"geometry"):
 		result.append(&"geometry")
-	if _combine_signature(target_glyph) != _combine_signature(candidate_glyph):
+	if (
+		(not target_glyph.combine_children.is_empty() or not candidate_glyph.combine_children.is_empty())
+		and _combine_signature(target_glyph) != _combine_signature(candidate_glyph)
+	):
 		result.append(&"combine")
 	return result
 
@@ -117,7 +120,7 @@ func _component_signature(value: GlyphModel, category: StringName) -> PackedStri
 
 func _combine_signature(value: GlyphModel) -> String:
 	if value.combine_children.is_empty():
-		return "L"
+		return "L(%s)" % value.canonical_serialization()
 	var children := PackedStringArray()
 	for child in value.combine_children:
 		children.append(_combine_signature(child))
