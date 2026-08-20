@@ -1011,7 +1011,7 @@ func _draw_connection_feedback_badge() -> void:
 
 
 func _draw_production_summary() -> void:
-	var clock_center := Vector2(size.x - 258.0, 28.0)
+	var clock_center := Vector2(size.x - 278.0, 28.0)
 	draw_arc(clock_center, 9.0, 0.0, TAU, 20, Color(0.4, 0.62, 0.76, 0.78), 1.5, true)
 	draw_line(clock_center, clock_center + Vector2(0, -5), Color(0.58, 0.78, 0.92), 1.5, true)
 	draw_line(clock_center, clock_center + Vector2(4, 2), Color(0.58, 0.78, 0.92), 1.5, true)
@@ -1021,17 +1021,32 @@ func _draw_production_summary() -> void:
 	var unit_order: Array[StringName] = [&"scout", &"sentinel", &"golem"]
 	for index in unit_order.size():
 		var unit_id := unit_order[index]
-		var center := Vector2(size.x - 208.0 + index * 66.0, 28.0)
+		var center := production_summary_center(index)
 		var glyph: GlyphModel = recipe_by_unit.get(unit_id)
+		var is_goal := production_summary_is_goal(unit_id)
+		draw_circle(center, 18.0, Color(0.025, 0.055, 0.085, 0.94))
+		draw_arc(
+			center,
+			18.0,
+			0.0,
+			TAU,
+			28,
+			MATCH_COLOR if is_goal else Color(0.3, 0.56, 0.74, 0.68),
+			2.2 if is_goal else 1.0,
+			true
+		)
 		if GlyphPainterModel.can_draw(glyph):
-			var scale := 0.72 if not glyph.combine_children.is_empty() else 1.22
+			var scale := 1.3 if glyph.combine_children.is_empty() else 1.15
 			GlyphPainterModel.draw_glyph(self, glyph, center, scale)
+		var count_center := center + Vector2(14, 12)
+		draw_circle(count_center, 8.5, Color(0.02, 0.12, 0.09, 0.96))
+		draw_arc(count_center, 8.5, 0.0, TAU, 20, Color(0.38, 0.9, 0.68), 1.0, true)
 		draw_string(
 			ThemeDB.fallback_font,
-			center + Vector2(15, 5),
+			count_center + Vector2(-8, 4),
 			str(cached_production_counts.get(unit_id, 0)),
-			HORIZONTAL_ALIGNMENT_LEFT,
-			22.0,
+			HORIZONTAL_ALIGNMENT_CENTER,
+			16.0,
 			12,
 			Color(0.54, 0.86, 0.7)
 		)
@@ -1426,10 +1441,22 @@ func production_summary_unit_at(at_position: Vector2) -> StringName:
 		return &""
 	var unit_order: Array[StringName] = [&"scout", &"sentinel", &"golem"]
 	for index in unit_order.size():
-		var center := Vector2(size.x - 208.0 + index * 66.0, 28.0)
-		if at_position.distance_to(center) <= 23.0:
+		var center := production_summary_center(index)
+		if at_position.distance_to(center) <= 28.0:
 			return unit_order[index]
 	return &""
+
+
+func production_summary_center(index: int) -> Vector2:
+	return Vector2(size.x - 220.0 + index * 72.0, 28.0)
+
+
+func production_summary_is_goal(unit_id: StringName) -> bool:
+	var target_recipe_id := MvpContent.recipe_id_for_plan(plan_id)
+	for recipe in MvpContent.recipes():
+		if recipe.id == target_recipe_id:
+			return recipe.unit_id == unit_id
+	return false
 
 
 func _set_glyph_tooltip(next_glyph: GlyphModel, next_title: String, next_context: String) -> void:
