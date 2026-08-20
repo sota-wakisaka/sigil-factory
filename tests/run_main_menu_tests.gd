@@ -2,7 +2,7 @@ extends SceneTree
 
 const MENU_SCENE := "res://src/main_menu.tscn"
 const MVP_SCENE := "res://src/main.tscn"
-const SEAL_LAB_SCENE := "res://experiments/seal_lab/seal_lab.tscn"
+const SIGIL_LAB_SCENE := "res://experiments/sigil_lab/sigil_lab.tscn"
 
 var failures := 0
 
@@ -18,9 +18,9 @@ func _initialize() -> void:
 	if menu == null:
 		_finish()
 		return
-	_expect(menu.mvp_button.visible and menu.seal_lab_button.visible, "both mode choices should be visible")
+	_expect(menu.mvp_button.visible and menu.sigil_lab_button.visible, "both mode choices should be visible")
 	_expect(menu.destination_for(&"mvp") == MVP_SCENE, "MVP choice should target the existing game scene")
-	_expect(menu.destination_for(&"seal_lab") == SEAL_LAB_SCENE, "Seal Lab choice should target the comparison scene")
+	_expect(menu.destination_for(&"sigil_lab") == SIGIL_LAB_SCENE, "Sigil Lab choice should target the editor scene")
 
 	menu.mvp_button.pressed.emit()
 	await scene_changed
@@ -34,20 +34,20 @@ func _initialize() -> void:
 
 	_expect(current_scene != null and current_scene.name == "MainMenu", "MVP return should restore the menu")
 	if current_scene != null:
-		current_scene.seal_lab_button.pressed.emit()
+		current_scene.sigil_lab_button.pressed.emit()
 		await scene_changed
 
-	_expect(current_scene != null and current_scene.name == "SealLab", "Seal Lab button should open Seal Lab")
+	_expect(current_scene != null and current_scene.name == "SigilLab", "Sigil Lab button should open Sigil Lab")
 	if current_scene != null:
 		_expect(
 			current_scene.menu_button != null and current_scene.menu_button.visible,
-			"Seal Lab should expose a menu return button"
+			"Sigil Lab should expose a menu return button"
 		)
 		if current_scene.menu_button != null:
 			current_scene.menu_button.pressed.emit()
 			await scene_changed
 
-	_expect(current_scene != null and current_scene.name == "MainMenu", "Seal Lab return should restore the menu")
+	_expect(current_scene != null and current_scene.name == "MainMenu", "Sigil Lab return should restore the menu")
 	_finish()
 
 

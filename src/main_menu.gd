@@ -2,19 +2,19 @@ class_name SigilFactoryMainMenu
 extends Control
 
 const MVP_SCENE := "res://src/main.tscn"
-const SEAL_LAB_SCENE := "res://experiments/seal_lab/seal_lab.tscn"
+const SIGIL_LAB_SCENE := "res://experiments/sigil_lab/sigil_lab.tscn"
 
 const BACKGROUND := Color("050912")
 const GRID := Color(0.18, 0.34, 0.48, 0.12)
 const ACCENT := Color(0.34, 0.78, 1.0, 0.95)
 
 @onready var mvp_button: Button = $Center/Content/Choices/MvpButton
-@onready var seal_lab_button: Button = $Center/Content/Choices/SealLabButton
+@onready var sigil_lab_button: Button = $Center/Content/Choices/SigilLabButton
 
 
 func _ready() -> void:
 	mvp_button.pressed.connect(_open_scene.bind(MVP_SCENE))
-	seal_lab_button.pressed.connect(_open_scene.bind(SEAL_LAB_SCENE))
+	sigil_lab_button.pressed.connect(_open_scene.bind(SIGIL_LAB_SCENE))
 	mvp_button.grab_focus()
 	queue_redraw()
 
@@ -34,7 +34,7 @@ func _draw() -> void:
 
 
 func destination_for(mode: StringName) -> String:
-	return SEAL_LAB_SCENE if mode == &"seal_lab" else MVP_SCENE
+	return SIGIL_LAB_SCENE if mode == &"sigil_lab" else MVP_SCENE
 
 
 func _open_scene(path: String) -> void:
