@@ -1987,10 +1987,16 @@ func _output_port_position(node_id: StringName) -> Vector2:
 		return node_local_position(node_id) + Vector2(NODE_HALF_SIZE.x, 0)
 	var center := node_local_position(node_id)
 	var direction := Vector2.RIGHT
+	var has_outgoing_line := false
 	for line in display_simulation.lines.values():
 		if line.from_node_id == node_id and display_simulation.nodes.has(line.to_node_id):
 			direction = center.direction_to(node_local_position(line.to_node_id))
+			has_outgoing_line = true
 			break
+	if not has_outgoing_line:
+		var summoner_id := _summoner_node_id(display_simulation)
+		if summoner_id != &"" and summoner_id != node_id:
+			direction = center.direction_to(node_local_position(summoner_id))
 	return center + _port_boundary_offset(display_simulation.nodes[node_id], direction)
 
 
@@ -2002,11 +2008,33 @@ func _input_port_position(node_id: StringName, port: int) -> Vector2:
 		if line.to_node_id == node_id and line.to_port == port and display_simulation.nodes.has(line.from_node_id):
 			var direction := center.direction_to(node_local_position(line.from_node_id))
 			return center + _port_boundary_offset(node, direction)
+	var radial_direction := Vector2.LEFT
+	if connecting_from_node_id != &"" and connecting_from_node_id != node_id and display_simulation.nodes.has(connecting_from_node_id):
+		radial_direction = center.direction_to(node_local_position(connecting_from_node_id))
+	elif node.kind != FactoryNodeModel.NodeKind.SUMMONER:
+		var summoner_id := _summoner_node_id(display_simulation)
+		if summoner_id != &"":
+			radial_direction = -center.direction_to(node_local_position(summoner_id))
+	if radial_direction != Vector2.LEFT or node.required_input_count() > 1:
+		var position := center + _port_boundary_offset(node, radial_direction)
+		if node.required_input_count() > 1:
+			var tangent := Vector2(-radial_direction.y, radial_direction.x).normalized()
+			position += tangent * (-8.0 if port == 0 else 8.0)
+		return position
 	var y_offset := 0.0
 	if node.required_input_count() == 2:
 		y_offset = -13.0 if port == 0 else 13.0
 	var x_offset := -40.0 if node.kind == FactoryNodeModel.NodeKind.SUMMONER else -NODE_HALF_SIZE.x
 	return center + Vector2(x_offset, y_offset)
+
+
+func _summoner_node_id(display_simulation: FactorySimulation) -> StringName:
+	var ids := display_simulation.nodes.keys()
+	ids.sort()
+	for node_id in ids:
+		if display_simulation.nodes[node_id].kind == FactoryNodeModel.NodeKind.SUMMONER:
+			return node_id
+	return &""
 
 
 func _port_boundary_offset(node: FactoryNodeModel, direction: Vector2) -> Vector2:

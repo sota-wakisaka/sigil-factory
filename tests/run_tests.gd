@@ -1851,11 +1851,23 @@ func _test_factory_editor_undo_restores_graph() -> void:
 
 func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
 	var board := FactoryBoard.new()
+	board.size = Vector2(1196, 401)
 	board.configure(MvpContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
 	_expect(board.mana_used() == 40, "empty workshop source and summoner should use 40 mana")
-	for _index in 4:
-		_expect(board.add_node_from_palette(&"rotator") != &"", "factory should accept equipment within its mana budget")
+	var first_added: StringName = &""
+	for index in 4:
+		var added_id := board.add_node_from_palette(&"rotator")
+		_expect(added_id != &"", "factory should accept equipment within its mana budget")
+		if index == 0:
+			first_added = added_id
+	var first_center := board.node_local_position(first_added)
+	var summoner_center := board.node_local_position(&"summoner")
+	_expect(first_center.direction_to(board._output_port_position(first_added)).dot(first_center.direction_to(summoner_center)) > 0.99, "unconnected radial output should face the central summoner")
+	_expect(first_center.direction_to(board._input_port_position(first_added, 0)).dot(first_center.direction_to(summoner_center)) < -0.99, "unconnected radial input should face away from the central summoner")
+	board.connecting_from_node_id = first_added
+	_expect(summoner_center.direction_to(board._input_port_position(&"summoner", 0)).dot(summoner_center.direction_to(first_center)) > 0.99, "wiring target input should turn toward the selected source")
+	board.connecting_from_node_id = &""
 	_expect(board.mana_used() == MvpContent.FACTORY_MANA_MAX, "four processors should fill the remaining workshop mana")
 	var node_count_at_limit := board.simulation.nodes.size()
 	_expect(board.add_node_from_palette(&"rotator") == &"", "factory should reject equipment beyond its mana budget")
