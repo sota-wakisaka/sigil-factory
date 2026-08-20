@@ -812,7 +812,8 @@ func cursor_shape_at(at_position: Vector2) -> CursorShape:
 
 func informational_visual_at(at_position: Vector2) -> bool:
 	return (
-		connection_feedback_badge_at(at_position)
+		edit_difference_at(at_position) != &""
+		or connection_feedback_badge_at(at_position)
 		or flow_warning_badge_at(at_position)
 		or pending_discard_badge_at(at_position)
 		or work_in_progress_summary_index_at(at_position) >= 0
@@ -1617,6 +1618,43 @@ func removed_edit_line_ids() -> Array:
 	return result
 
 
+func edit_difference_at(at_position: Vector2) -> StringName:
+	if not editing or preview_simulation == null:
+		return &""
+	for node_id in preview_simulation.nodes:
+		var state := node_edit_state(node_id)
+		if state != &"unchanged" and at_position.distance_to(node_local_position(node_id) + Vector2(43, -31)) <= 12.0:
+			return state
+	for node_id in removed_edit_node_ids():
+		var center := _scaled_position(node_positions.get(node_id, Vector2.ZERO)) + Vector2(43, -31)
+		if at_position.distance_to(center) <= 12.0:
+			return &"removed"
+	for line_id in preview_simulation.lines:
+		var state := line_edit_state(line_id)
+		if state == &"unchanged":
+			continue
+		var line: FactoryLineModel = preview_simulation.lines[line_id]
+		var center := _output_port_position(line.from_node_id).lerp(_input_port_position(line.to_node_id, line.to_port), 0.5) + Vector2(0, -10)
+		if at_position.distance_to(center) <= 12.0:
+			return state
+	for line_id in removed_edit_line_ids():
+		var endpoints := _committed_line_endpoints(simulation.lines[line_id])
+		if endpoints.is_empty():
+			continue
+		var center: Vector2 = (endpoints["start"] as Vector2).lerp(endpoints["finish"], 0.5) + Vector2(0, -10)
+		if at_position.distance_to(center) <= 12.0:
+			return &"removed"
+	return &""
+
+
+func edit_difference_tooltip(state: StringName) -> String:
+	return {
+		&"added": "追加予定",
+		&"changed": "変更予定",
+		&"removed": "削除予定",
+	}.get(state, "")
+
+
 func _draw_line_edit_differences() -> void:
 	for line_id in preview_simulation.lines:
 		var state := line_edit_state(line_id)
@@ -1892,6 +1930,9 @@ func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_context = ""
 	tooltip_comparison_name = ""
 	tooltip_candidate_label = "工場出力"
+	var edit_difference := edit_difference_at(at_position)
+	if edit_difference != &"":
+		return edit_difference_tooltip(edit_difference)
 	if connection_feedback_badge_at(at_position):
 		return connection_message
 	if flow_warning_badge_at(at_position):
