@@ -2423,7 +2423,7 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	_expect(board.output_validation_state(&"ring_source") == &"missing", "unwired factory should mark the exact missing output port")
 	_expect(board.input_validation_state(&"summoner", 0) == &"missing", "unwired factory should mark the exact missing input port")
 	var missing_input_position := board._input_port_position(&"summoner", 0)
-	_expect("入力が未接続" in board.validation_fault_at(missing_input_position), "missing input marker should explain its local fault on hover")
+	_expect(board.validation_fault_at(missing_input_position) == "入力を接続", "missing input marker should give a short local repair action")
 	_expect(board.cursor_shape_at(missing_input_position) == Control.CURSOR_HELP, "validation marker should advertise its local explanation")
 	board.set_interaction_enabled(true)
 	board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
@@ -2707,7 +2707,7 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 	board._refresh_production_preview()
 	_expect(board.node_validation_state(&"ring_source") == &"configuration", "invalid restored source setting should mark its equipment directly")
 	var invalid_marker := board.node_local_position(&"ring_source") + Vector2(34, -20)
-	_expect("ring_source" in board.validation_fault_at(invalid_marker), "invalid equipment marker should name its exact configuration fault on hover")
+	_expect(board.validation_fault_at(invalid_marker) == "素材を再選択", "invalid equipment marker should give a short local repair action")
 	_expect(
 		"素材源「ring_source」の素材設定がありません" in board.cached_production_preview,
 		"production preview should show the same actionable validation reason"
@@ -2724,6 +2724,15 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 	_expect(board.configure_selected_node(0), "one valid inspector choice should repair an invalid restored source setting")
 	_expect(board.selected_node_details()["selected_index"] == 0, "repaired source setting should select its valid ring option")
 	board.free()
+	var processor_board := FactoryBoard.new()
+	processor_board.configure(MvpContent.PLAN_SENTINEL)
+	processor_board.set_interaction_enabled(true)
+	processor_board.simulation.nodes[&"rotator"].config["processing_ticks"] = 0
+	processor_board.selected_node_id = &"rotator"
+	processor_board._refresh_production_preview()
+	_expect(processor_board.configure_selected_node(0), "reselecting a rotator option should repair its corrupt processing time")
+	_expect(processor_board.simulation.nodes[&"rotator"].config["processing_ticks"] >= 1, "rotator repair should restore a valid processing time")
+	processor_board.free()
 
 
 func _test_sigil_ghost_tracks_plan_recipe() -> void:

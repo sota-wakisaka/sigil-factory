@@ -464,11 +464,17 @@ func configure_selected_node(option_index: int) -> bool:
 		FactoryNodeModel.NodeKind.ROTATOR:
 			if option_index < 0 or option_index > 2:
 				return false
-			config_changed = int(node.config.get("steps", 1)) != option_index + 1
+			config_changed = (
+				int(node.config.get("steps", 0)) != option_index + 1
+				or int(node.config.get("processing_ticks", 0)) < 1
+			)
 		FactoryNodeModel.NodeKind.COLORIZER:
 			if option_index < 0 or option_index > 2:
 				return false
-			config_changed = String(node.config.get("color_id", "blue")) != ["blue", "red", "white"][option_index]
+			config_changed = (
+				String(node.config.get("color_id", "")) != ["blue", "red", "white"][option_index]
+				or int(node.config.get("processing_ticks", 0)) < 1
+			)
 		_:
 			return false
 	if not config_changed:
@@ -483,8 +489,12 @@ func configure_selected_node(option_index: int) -> bool:
 			_apply_node_upgrades(node)
 		FactoryNodeModel.NodeKind.ROTATOR:
 			node.config["steps"] = option_index + 1
+			node.config["processing_ticks"] = 2
+			_apply_node_upgrades(node)
 		FactoryNodeModel.NodeKind.COLORIZER:
 			node.config["color_id"] = ["blue", "red", "white"][option_index]
+			node.config["processing_ticks"] = 2
+			_apply_node_upgrades(node)
 	connection_message = (
 		"設備設定を変更しました（%s）" % pending_discard_notice()
 		if discarded_now > 0
@@ -2451,22 +2461,36 @@ func validation_fault_at(at_position: Vector2) -> String:
 			and output_validation_state(node_id) == &"missing"
 			and at_position.distance_to(_output_port_position(node_id)) <= PORT_RADIUS + 7.0
 		):
-			return _validation_message(["missing_output:%s" % node_id])
+			return "出力を接続"
 		for port in node.required_input_count():
 			if (
 				input_validation_state(node_id, port) == &"missing"
 				and not (connecting_from_node_id != &"" and input_port_connectable(node_id, port))
 				and at_position.distance_to(_input_port_position(node_id, port)) <= PORT_RADIUS + 7.0
 			):
-				return _validation_message(["missing_input:%s:%d" % [node_id, port]])
+				return "入力を接続"
 		if node_validation_state(node_id) == &"configuration":
 			var marker_center := node_local_position(node_id) + Vector2(34, -20)
 			if at_position.distance_to(marker_center) <= 12.0:
 				for error in cached_validation_errors:
 					var parts := error.split(":")
 					if parts.size() >= 2 and parts[1] == String(node_id):
-						return _validation_message([error])
+						return local_validation_instruction(error)
 	return ""
+
+
+func local_validation_instruction(error: String) -> String:
+	if error.begins_with("missing_source_primitive:") or error.begins_with("invalid_source_interval:"):
+		return "素材を再選択"
+	if error.begins_with("invalid_rotation_steps:"):
+		return "回転角を再選択"
+	if error.begins_with("missing_color_id:"):
+		return "色を再選択"
+	if error.begins_with("invalid_processing_ticks:"):
+		return "設備設定を再選択"
+	if error.begins_with("invalid_translation_offset:"):
+		return "移動設定を再選択"
+	return _validation_message([error])
 
 
 func _draw_validation_port_marker(position: Vector2) -> void:
