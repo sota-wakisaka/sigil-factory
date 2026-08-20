@@ -2208,6 +2208,7 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	)
 	match_board.free()
 	var combine_board := FactoryBoard.new()
+	combine_board.size = Vector2(1196, 401)
 	combine_board.configure(MvpContent.PLAN_GOLEM)
 	var combiner: FactoryNodeModel = combine_board.simulation.nodes[&"combiner"]
 	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
@@ -2223,6 +2224,16 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	_expect(
 		combine_board.input_glyph_display_state(&"combiner", 0) == &"predicted",
 		"empty connected combiner input should identify its Glyph as a prediction"
+	)
+	var predicted_input_center := combine_board.input_glyph_center(&"combiner", 0)
+	_expect(
+		combine_board._get_tooltip(predicted_input_center) == "glyph_comparison"
+		and "32秒予測の入力Glyph" in combine_board.tooltip_context,
+		"predicted combiner input should open its own large comparison before the node tooltip"
+	)
+	_expect(
+		combine_board.tooltip_glyph.canonical_serialization() == ring.canonical_serialization(),
+		"input socket tooltip should preserve the exact predicted Primitive"
 	)
 	_expect(
 		combine_board.predicted_input_glyph_for_node(&"combiner", 2) == null,
@@ -2246,6 +2257,11 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	_expect(
 		combine_board.input_glyph_display_state(&"combiner", 0) == &"actual",
 		"arrived combiner input should replace its predicted display state"
+	)
+	_expect(
+		combine_board._get_tooltip(predicted_input_center) == "glyph_comparison"
+		and "到着済み入力Glyph" in combine_board.tooltip_context,
+		"arrived combiner input should identify itself separately from a plan prediction"
 	)
 	_expect(
 		combine_board.visible_input_glyph_for_node(&"combiner", 1) == spike,

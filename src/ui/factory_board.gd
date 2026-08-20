@@ -1623,6 +1623,20 @@ func _get_tooltip(at_position: Vector2) -> String:
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return ""
+	var input_hit := input_glyph_at(at_position)
+	if not input_hit.is_empty():
+		var input_node: FactoryNodeModel = display_simulation.nodes[input_hit["node_id"]]
+		var input_context := (
+			"32秒予測の入力Glyph"
+			if input_hit["state"] == &"predicted"
+			else "到着済み入力Glyph"
+		)
+		_set_comparison_tooltip(
+			input_hit["glyph"],
+			"%s // 入力%d" % [_node_label(input_node), input_hit["port"] + 1],
+			input_context
+		)
+		return "glyph_comparison"
 	var node_id := _node_at(at_position)
 	if node_id != &"":
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
@@ -1900,6 +1914,47 @@ func input_glyph_display_state(node_id: StringName, port: int) -> StringName:
 	return &"empty"
 
 
+func input_glyph_center(node_id: StringName, port: int) -> Vector2:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return Vector2(-INF, -INF)
+	var node: FactoryNodeModel = display_simulation.nodes[node_id]
+	if port < 0 or port >= node.input_buffers.size():
+		return Vector2(-INF, -INF)
+	var center := node_local_position(node_id)
+	var port_position := _input_port_position(node_id, port)
+	var inward := port_position.direction_to(center)
+	var inset := 28.0 if node.kind == FactoryNodeModel.NodeKind.COMBINER else 14.0
+	return port_position + inward * inset
+
+
+func input_glyph_at(at_position: Vector2) -> Dictionary:
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return {}
+	var node_ids := display_simulation.nodes.keys()
+	node_ids.sort()
+	for node_id in node_ids:
+		var node: FactoryNodeModel = display_simulation.nodes[node_id]
+		for port in node.input_buffers.size():
+			var state := input_glyph_display_state(node_id, port)
+			if state == &"empty":
+				continue
+			var center := input_glyph_center(node_id, port)
+			if at_position.distance_to(center) > 13.0:
+				continue
+			var glyph := visible_input_glyph_for_node(node_id, port)
+			if glyph == null:
+				glyph = predicted_input_glyph_for_node(node_id, port)
+			return {
+				"node_id": node_id,
+				"port": port,
+				"glyph": glyph,
+				"state": state,
+			}
+	return {}
+
+
 func _visible_node_glyph(node: FactoryNodeModel) -> GlyphModel:
 	var glyph := _visible_node_active_glyph(node)
 	if glyph == null:
@@ -1930,11 +1985,8 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 			is_predicted = glyph != null
 		if glyph == null:
 			continue
-		var port_position := _input_port_position(node.id, port)
-		var inward := port_position.direction_to(center)
 		var is_combiner := node.kind == FactoryNodeModel.NodeKind.COMBINER
-		var inset := 28.0 if is_combiner else 14.0
-		var glyph_center := port_position + inward * inset
+		var glyph_center := input_glyph_center(node.id, port)
 		var scale := 1.15 if is_combiner else 0.85
 		if is_combiner:
 			_draw_combiner_input_socket(glyph_center, is_predicted)
