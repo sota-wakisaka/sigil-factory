@@ -105,6 +105,7 @@ func _initialize() -> void:
 	_test_factory_board_exposes_visible_work_in_progress_glyphs()
 	_test_factory_board_offers_visual_glyph_tooltips()
 	_test_factory_board_exposes_node_activity_progress()
+	_test_factory_downstream_route_focus_is_non_destructive()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_overlapping_hits_follow_draw_order()
 	_test_factory_production_preview_is_non_destructive()
@@ -2848,6 +2849,8 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	board.add_node_from_palette(&"rotator")
 	_expect(not board.production_preview()["ok"], "incomplete custom graph should not produce a preview")
 	board.free()
+
+
 	var comparison_board := FactoryBoard.new()
 	comparison_board.size = Vector2(1196, 401)
 	comparison_board.configure(MvpContent.PLAN_SCOUT)
@@ -2922,6 +2925,8 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	comparison_board.cancel_edit()
 	_expect(not comparison_board.production_comparison_active, "cancel should clear every comparison decoration")
 	comparison_board.free()
+
+
 	var timing_board := FactoryBoard.new()
 	timing_board.configure(MvpContent.PLAN_SCOUT)
 	timing_board.simulation.tick()
@@ -2956,6 +2961,52 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 		_expect(rotation_preview.components[0].rotation_step == 1, "rotator prediction should expose its quarter turn")
 		_expect(color_preview.components[0].color_id == &"blue", "colorizer prediction should expose its output color")
 	sentinel_board.free()
+
+
+func _test_factory_downstream_route_focus_is_non_destructive() -> void:
+	var sentinel_board := FactoryBoard.new()
+	sentinel_board.configure(MvpContent.PLAN_SENTINEL)
+	var runtime_before := _factory_runtime_signature(sentinel_board.simulation)
+	var production_before := sentinel_board.production_snapshot()
+	var sentinel_route := sentinel_board.focused_downstream_route(&"ring_source")
+	_expect(
+		sentinel_route["node_ids"] == [&"colorizer", &"ring_source", &"rotator", &"summoner"]
+		and sentinel_route["line_ids"] == [&"line_1", &"line_2", &"line_3"]
+		and sentinel_route["reaches_summoner"],
+		"sentinel focus should trace the selected source through every downstream processor to the summoner"
+	)
+	_expect(_factory_runtime_signature(sentinel_board.simulation) == runtime_before and sentinel_board.production_snapshot() == production_before, "route inspection should not mutate simulation or the production forecast")
+	sentinel_board.free()
+
+	var golem_board := FactoryBoard.new()
+	golem_board.configure(MvpContent.PLAN_GOLEM)
+	var ring_route := golem_board.focused_downstream_route(&"ring_source")
+	_expect(
+		ring_route["node_ids"] == [&"colorizer", &"combiner", &"ring_source", &"summoner"]
+		and ring_route["line_ids"] == [&"line_color", &"line_ring", &"line_summon"],
+		"one golem source should focus only its own branch and the shared downstream route"
+	)
+	_expect(not ring_route["node_ids"].has(&"spike_source") and not ring_route["line_ids"].has(&"line_spike"), "route focus should not claim a sibling source branch")
+	golem_board.set_interaction_enabled(true)
+	golem_board.selected_node_id = &"spike_source"
+	golem_board.hovered_node_id = &"ring_source"
+	_expect(golem_board.focused_route_start_node_id() == &"ring_source", "hovered equipment should temporarily take focus priority over selection")
+	_expect(golem_board.node_focus_marker_kind(&"spike_source", &"ring_source") == &"selected" and golem_board.node_focus_marker_kind(&"ring_source", &"ring_source") == &"hover", "filled selection and hollow hover markers should remain distinct without color")
+	golem_board.hovered_node_id = &""
+	_expect(golem_board.focused_route_start_node_id() == &"spike_source", "selection should restore route focus after hover exits")
+	_expect(golem_board.node_focus_marker_kind(&"spike_source", &"spike_source") == &"selected" and golem_board.node_focus_marker_kind(&"ring_source", &"spike_source") == &"none", "hover marker should disappear when the selected route regains focus")
+	golem_board.connecting_from_node_id = &"ring_source"
+	_expect(golem_board.focused_route_start_node_id() == &"", "active rewiring should suppress route focus behind the connection preview")
+	golem_board.connecting_from_node_id = &""
+	_expect(golem_board.disconnect_input(&"colorizer", 0), "route focus fixture should disconnect the shared downstream route")
+	var interrupted_route := golem_board.focused_downstream_route(&"ring_source")
+	_expect(
+		interrupted_route["node_ids"] == [&"combiner", &"ring_source"]
+		and interrupted_route["line_ids"] == [&"line_ring"]
+		and not interrupted_route["reaches_summoner"],
+		"a broken route should focus only the reachable segment up to its dead end"
+	)
+	golem_board.free()
 
 
 func _test_factory_production_preview_explains_first_mismatch() -> void:

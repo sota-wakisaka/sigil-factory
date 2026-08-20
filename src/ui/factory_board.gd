@@ -1455,7 +1455,8 @@ func _draw() -> void:
 	var display_positions := preview_node_positions if editing else node_positions
 	if display_simulation == null:
 		return
-	_draw_lines(display_simulation, display_positions)
+	var focused_route := focused_downstream_route(focused_route_start_node_id(), display_simulation)
+	_draw_lines(display_simulation, display_positions, focused_route)
 	if is_guided_connection_pending():
 		draw_dashed_line(
 			_output_port_position(&"ring_source"),
@@ -1476,7 +1477,7 @@ func _draw() -> void:
 		if connection_state == &"invalid":
 			draw_line(connection_endpoint + Vector2(-4, -4), connection_endpoint + Vector2(4, 4), WARNING_COLOR, 2.0, true)
 			draw_line(connection_endpoint + Vector2(-4, 4), connection_endpoint + Vector2(4, -4), WARNING_COLOR, 2.0, true)
-	_draw_nodes(display_simulation, display_positions)
+	_draw_nodes(display_simulation, display_positions, focused_route)
 	if dragging_node and placement_blocked:
 		_draw_blocked_placement()
 	if editing:
@@ -1497,7 +1498,12 @@ func _draw() -> void:
 		_draw_flow_warning_badge()
 
 
-func _draw_lines(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
+func _draw_lines(
+	display_simulation: FactorySimulation,
+	display_positions: Dictionary,
+	focused_route: Dictionary = {}
+) -> void:
+	var focused_line_ids: Array = focused_route.get("line_ids", [])
 	for line_id in display_simulation.lines:
 		var line: FactoryLineModel = display_simulation.lines[line_id]
 		var start := _output_port_position(line.from_node_id)
@@ -1509,8 +1515,13 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 				line_color = Color(MATCH_COLOR, 0.76)
 			elif recipe_state in [&"mismatch", &"invalid"]:
 				line_color = Color(WARNING_COLOR, 0.76)
+		if focused_line_ids.has(line_id):
+			draw_line(start, finish, Color(0.34, 0.76, 1.0, 0.2), 8.0, true)
 		if interaction_enabled and line_id == hovered_line_id:
-			draw_line(start, finish, Color(line_color, 0.28), 8.0, true)
+			draw_line(start, finish, Color(line_color, 0.28), 12.0, true)
+			var hover_normal := start.direction_to(finish).orthogonal()
+			var hover_center := start.lerp(finish, 0.5)
+			draw_line(hover_center - hover_normal * 6.0, hover_center + hover_normal * 6.0, Color(line_color, 0.86), 1.5, true)
 		draw_line(start, finish, line_color, FACTORY_LINE_WIDTH, true)
 		_draw_flow_arrow(start, finish, line_color)
 		if display_simulation.line_flow_state(line_id) == &"buffer_full":
@@ -1578,7 +1589,13 @@ func transport_glyph_draw_scale(glyph: GlyphModel) -> float:
 	return 1.5
 
 
-func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
+func _draw_nodes(
+	display_simulation: FactorySimulation,
+	display_positions: Dictionary,
+	focused_route: Dictionary = {}
+) -> void:
+	var focused_node_ids: Array = focused_route.get("node_ids", [])
+	var route_start_id: StringName = focused_route.get("start_node_id", &"")
 	for node_id in display_simulation.nodes:
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
 		var center := _scaled_position(display_positions.get(node_id, Vector2.ZERO))
@@ -1592,7 +1609,13 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 			border_color = SELECTED_COLOR
 		elif node_id == hovered_node_id:
 			border_color = Color(0.56, 0.86, 1.0)
-		_draw_node_frame(node, center, border_color, node_id == selected_node_id or node_id == hovered_node_id)
+		_draw_node_frame(
+			node,
+			center,
+			border_color,
+			node_id == selected_node_id or node_id == hovered_node_id,
+			focused_node_ids.has(node_id)
+		)
 		_draw_node_warning_marker(node_state, center)
 		_draw_node_validation_marker(node_id, center)
 		_draw_node_activity_progress(node, center, display_simulation.tick_index > 0)
@@ -1615,6 +1638,7 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 			draw_arc(center + Vector2(0, 3), 18.0, 0.0, TAU, 28, Color(GLYPH_COLOR, 0.72), 2.0, true)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
+		_draw_node_focus_marker(node, center, node_focus_marker_kind(node_id, route_start_id))
 
 
 func persistent_node_label_count() -> int:
@@ -2322,9 +2346,17 @@ func _draw_edit_state_badge(center: Vector2, state: StringName, color: Color) ->
 		draw_line(center + Vector2(-3, 3), center + Vector2(3, -3), color, 1.6, true)
 
 
-func _draw_node_frame(node: FactoryNodeModel, center: Vector2, border_color: Color, selected: bool) -> void:
+func _draw_node_frame(
+	node: FactoryNodeModel,
+	center: Vector2,
+	border_color: Color,
+	selected: bool,
+	route_focused: bool = false
+) -> void:
 	var stroke := 3.0 if selected else 2.0
 	if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
+		if route_focused:
+			draw_arc(center, 43.0, 0.0, TAU, 36, Color(0.34, 0.76, 1.0, 0.2), 7.0, true)
 		draw_circle(center, 40.0, NODE_COLOR)
 		draw_arc(center, 40.0, 0.0, TAU, 36, border_color, stroke, true)
 		draw_arc(center, 31.0, 0.0, TAU, 32, Color(border_color, 0.35), 1.0, true)
@@ -2346,11 +2378,115 @@ func _draw_node_frame(node: FactoryNodeModel, center: Vector2, border_color: Col
 			center + Vector2(48, 20), center + Vector2(38, 30), center + Vector2(-38, 30),
 			center + Vector2(-48, 20), center + Vector2(-48, -20),
 		])
+	if route_focused:
+		var halo := points.duplicate()
+		halo.append(points[0])
+		draw_polyline(halo, Color(0.34, 0.76, 1.0, 0.2), 7.0, true)
 	draw_colored_polygon(points, NODE_COLOR)
 	var outline := points.duplicate()
 	outline.append(points[0])
 	draw_polyline(outline, border_color, stroke, true)
 	_draw_node_role_mark(node, center)
+
+
+func focused_route_start_node_id() -> StringName:
+	if connecting_from_node_id != &"":
+		return &""
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return &""
+	for candidate: StringName in [
+		hovered_node_glyph_id,
+		hovered_input_glyph_node_id,
+		hovered_output_node_id,
+		hovered_input_node_id,
+		hovered_node_id,
+		selected_node_id,
+	]:
+		if candidate != &"" and display_simulation.nodes.has(candidate):
+			return candidate
+	return &""
+
+
+func focused_downstream_route(
+	start_node_id: StringName,
+	source_simulation: FactorySimulation = null
+) -> Dictionary:
+	var display_simulation := source_simulation if source_simulation != null else _display_simulation()
+	if display_simulation == null or start_node_id == &"" or not display_simulation.nodes.has(start_node_id):
+		return {"start_node_id": &"", "node_ids": [], "line_ids": [], "reaches_summoner": false}
+	var sorted_line_ids := display_simulation.lines.keys()
+	sorted_line_ids.sort_custom(_stable_id_less)
+	var node_set := {}
+	node_set[start_node_id] = true
+	var line_set := {}
+	var pending: Array[StringName] = [start_node_id]
+	var reaches_summoner: bool = (
+		display_simulation.nodes[start_node_id].kind == FactoryNodeModel.NodeKind.SUMMONER
+	)
+	while not pending.is_empty():
+		var current_node_id: StringName = pending.pop_front()
+		for line_id in sorted_line_ids:
+			var line: FactoryLineModel = display_simulation.lines[line_id]
+			if line.from_node_id != current_node_id:
+				continue
+			line_set[line_id] = true
+			if node_set.has(line.to_node_id):
+				continue
+			node_set[line.to_node_id] = true
+			pending.append(line.to_node_id)
+			if (
+				display_simulation.nodes.has(line.to_node_id)
+				and display_simulation.nodes[line.to_node_id].kind == FactoryNodeModel.NodeKind.SUMMONER
+			):
+				reaches_summoner = true
+	var node_ids: Array[StringName] = []
+	for node_id in node_set:
+		node_ids.append(node_id)
+	node_ids.sort_custom(_stable_id_less)
+	var line_ids: Array[StringName] = []
+	for line_id in line_set:
+		line_ids.append(line_id)
+	line_ids.sort_custom(_stable_id_less)
+	return {
+		"start_node_id": start_node_id,
+		"node_ids": node_ids,
+		"line_ids": line_ids,
+		"reaches_summoner": reaches_summoner,
+	}
+
+
+func _stable_id_less(left, right) -> bool:
+	return String(left) < String(right)
+
+
+func node_focus_marker_kind(node_id: StringName, route_start_id: StringName = &"") -> StringName:
+	if node_id == selected_node_id:
+		return &"selected"
+	var focus_start := route_start_id if route_start_id != &"" else focused_route_start_node_id()
+	return &"hover" if node_id == focus_start else &"none"
+
+
+func _draw_node_focus_marker(
+	node: FactoryNodeModel,
+	center: Vector2,
+	marker_kind: StringName
+) -> void:
+	if marker_kind == &"none":
+		return
+	var marker_center := center + Vector2(0, -47 if node.kind == FactoryNodeModel.NodeKind.SUMMONER else -38)
+	var marker_color := SELECTED_COLOR if marker_kind == &"selected" else Color(0.56, 0.86, 1.0)
+	var diamond := PackedVector2Array([
+		marker_center + Vector2(0, -4.5),
+		marker_center + Vector2(4.5, 0),
+		marker_center + Vector2(0, 4.5),
+		marker_center + Vector2(-4.5, 0),
+	])
+	if marker_kind == &"selected":
+		draw_colored_polygon(diamond, marker_color)
+	else:
+		diamond.append(diamond[0])
+		draw_polyline(diamond, marker_color, 1.5, true)
 
 
 func _draw_node_role_mark(node: FactoryNodeModel, center: Vector2) -> void:
