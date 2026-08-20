@@ -52,9 +52,28 @@ func _clear_hover_slot() -> void:
 
 
 func hover_slot_at(at_position: Vector2) -> StringName:
-	if (candidate_glyph != null or candidate_origin == &"hypothetical") and at_position.x >= 200.0:
+	if glyph == null or not Rect2(Vector2.ZERO, comparison_slot_size()).has_point(at_position):
+		return &""
+	if candidate_slot_rect().has_point(at_position):
 		return &"candidate"
-	return &"target" if glyph != null else &""
+	return &"target" if target_slot_rect().has_point(at_position) else &""
+
+
+func target_slot_rect() -> Rect2:
+	var slot_size := comparison_slot_size()
+	return Rect2(Vector2.ZERO, Vector2(minf(slot_size.x, 200.0), slot_size.y))
+
+
+func candidate_slot_rect() -> Rect2:
+	var slot_size := comparison_slot_size()
+	return Rect2(Vector2(200.0, 0), Vector2(maxf(slot_size.x - 200.0, 0.0), slot_size.y))
+
+
+func comparison_slot_size() -> Vector2:
+	return Vector2(
+		size.x if size.x > 0.0 else custom_minimum_size.x,
+		size.y if size.y > 0.0 else custom_minimum_size.y
+	)
 
 
 func show_recipe(next_recipe_id: StringName) -> bool:
@@ -90,8 +109,6 @@ func show_candidate(
 		if candidate_origin == &"hypothetical" and next_forecast_state in [&"glyph", &"no_output", &"invalid"]
 		else &"valid"
 	)
-	if candidate_glyph == null and hovered_slot == &"candidate":
-		hovered_slot = &""
 	_refresh_candidate_state()
 	queue_redraw()
 
@@ -220,13 +237,16 @@ func _draw_candidate_marker(center: Vector2) -> void:
 
 
 func _get_tooltip(at_position: Vector2) -> String:
-	if hover_slot_at(at_position) == &"candidate":
-		if candidate_origin == &"hypothetical" and candidate_glyph == null:
-			return (
-				"設定候補 // 予測できません"
-				if candidate_forecast_state == &"invalid"
-				else "設定候補 // 32秒内に出力なし"
-			)
+	var slot := hover_slot_at(at_position)
+	if slot == &"candidate":
+		if candidate_glyph == null:
+			if candidate_origin == &"hypothetical":
+				return (
+					"設定候補 // 予測できません"
+					if candidate_forecast_state == &"invalid"
+					else "設定候補 // 32秒内に出力なし"
+				)
+			return "工場出力 // 候補なし"
 		tooltip_glyph = candidate_glyph
 		tooltip_title = "工場出力候補"
 		tooltip_context = {
@@ -235,6 +255,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 			&"hypothetical": "設定候補 // 未確定",
 		}.get(candidate_origin, "候補なし")
 		return "candidate"
+	if slot != &"target":
+		return ""
 	tooltip_glyph = glyph
 	tooltip_title = "目標シジル // %s" % display_name
 	tooltip_context = "CanonicalGlyphの完成形"
@@ -242,7 +264,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 
 
 func _make_custom_tooltip(for_text: String):
-	if for_text.begins_with("設定候補 //"):
+	if for_text.begins_with("設定候補 //") or for_text == "工場出力 // 候補なし":
 		return null
 	if for_text == "candidate" and candidate_glyph != null:
 		var comparison := GlyphComparisonTooltipModel.new()
@@ -257,6 +279,8 @@ func _make_custom_tooltip(for_text: String):
 			}.get(candidate_origin, "工場出力")
 		)
 		return comparison
+	if tooltip_glyph == null:
+		return null
 	var preview := GlyphTooltipModel.new()
 	preview.configure(
 		tooltip_glyph,

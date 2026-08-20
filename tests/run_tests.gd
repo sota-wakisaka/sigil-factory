@@ -3253,9 +3253,19 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	hierarchy_comparison.free()
 	ghost.show_candidate(null)
 	_expect(ghost.candidate_state == &"missing", "missing factory candidate should leave an empty comparison slot")
+	_expect(ghost.hover_slot_at(Vector2(132, 40)) == &"target" and ghost.hover_slot_at(Vector2(266, 40)) == &"candidate", "empty factory output should preserve separate target and candidate hover geometry")
+	_expect(ghost.hover_slot_at(Vector2(-1, 40)) == &"" and ghost.hover_slot_at(Vector2(321, 40)) == &"" and ghost.hover_slot_at(Vector2(266, 81)) == &"", "goal comparison slots should reject points outside the control")
+	_expect(ghost._get_tooltip(Vector2(266, 40)) == "工場出力 // 候補なし", "empty candidate slot should explain its own missing output instead of the target Glyph")
+	_expect(ghost._make_custom_tooltip("工場出力 // 候補なし") == null, "empty candidate slot should use one native line instead of a null-Glyph custom preview")
+	_expect(ghost._get_tooltip(Vector2(132, 40)) == "target", "empty candidate state should not change the target slot tooltip")
 	ghost.hovered_slot = &"candidate"
 	ghost.show_candidate(null)
-	_expect(ghost.hovered_slot == &"", "clearing the factory candidate should also clear its stale hover emphasis")
+	_expect(ghost.hovered_slot == &"candidate", "clearing the factory candidate should preserve hover on the same empty candidate slot")
+	ghost.show_candidate(null, &"hypothetical", &"no_output")
+	_expect(ghost._get_tooltip(Vector2(266, 40)) == "設定候補 // 32秒内に出力なし", "hypothetical no-output state should retain its more specific forecast tooltip")
+	ghost.show_candidate(null, &"hypothetical", &"invalid")
+	_expect(ghost._get_tooltip(Vector2(266, 40)) == "設定候補 // 予測できません", "invalid hypothetical output should remain distinct from an empty valid forecast")
+	ghost.show_candidate(null)
 	var expected: SigilRecipeModel
 	for recipe in MvpContent.recipes():
 		if recipe.id == &"azure_guard":
