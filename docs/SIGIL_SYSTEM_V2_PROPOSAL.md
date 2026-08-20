@@ -405,8 +405,8 @@ Motif / Boundary > Skeleton > Group Guide > FX
 実装前に、まずSeal Labで次の10案を並べて比較する。
 
 - Motif単体 3種
-- Motif + Boundary 3種
-- core + Orbit field + Boundary 3種
+- 単一演算の低位Seal 3種（Boundary 2種 + Orbit 1種）
+- core + Orbit field + Boundary 3種（3回、4回、半位相）
 - Circuit / Concentricで作るhero seal 1種
 
 この比較で以下を確認する。
