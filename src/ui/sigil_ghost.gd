@@ -19,15 +19,40 @@ var display_name := ""
 var tooltip_glyph: GlyphModel
 var tooltip_title := ""
 var tooltip_context := ""
+var hovered_slot: StringName = &""
 
 
 func _init() -> void:
 	custom_minimum_size = Vector2(320, 80)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_HELP
 
 
 func _ready() -> void:
+	mouse_exited.connect(_clear_hover_slot)
 	if recipe_id == &"":
 		show_recipe(&"open_ring")
+
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		var next_slot := hover_slot_at(event.position)
+		if next_slot != hovered_slot:
+			hovered_slot = next_slot
+			queue_redraw()
+
+
+func _clear_hover_slot() -> void:
+	if hovered_slot == &"":
+		return
+	hovered_slot = &""
+	queue_redraw()
+
+
+func hover_slot_at(at_position: Vector2) -> StringName:
+	if candidate_glyph != null and at_position.x >= 200.0:
+		return &"candidate"
+	return &"target" if glyph != null else &""
 
 
 func show_recipe(next_recipe_id: StringName) -> bool:
@@ -92,6 +117,10 @@ func _draw() -> void:
 	elif candidate_state == &"mismatch":
 		draw_arc(target_center, 29.0, 0.0, TAU, 28, Color(1.0, 0.74, 0.28, 0.72), 1.5, true)
 		draw_arc(candidate_center, 29.0, 0.0, TAU, 28, Color(MISMATCH_COLOR, 0.72), 1.5, true)
+	if hovered_slot == &"target":
+		draw_arc(target_center, 34.0, 0.0, TAU, 32, Color(1.0, 0.78, 0.3, 0.9), 1.5, true)
+	elif hovered_slot == &"candidate":
+		draw_arc(candidate_center, 34.0, 0.0, TAU, 32, Color(0.42, 0.82, 1.0, 0.9), 1.5, true)
 
 
 func persistent_label() -> String:
@@ -124,7 +153,7 @@ func _draw_candidate_marker(center: Vector2) -> void:
 
 
 func _get_tooltip(at_position: Vector2) -> String:
-	if candidate_glyph != null and at_position.x >= 180.0:
+	if hover_slot_at(at_position) == &"candidate":
 		tooltip_glyph = candidate_glyph
 		tooltip_title = "工場出力候補"
 		tooltip_context = "実仕掛品または32秒予測"
@@ -135,8 +164,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 	return "target"
 
 
-func _make_custom_tooltip(_for_text: String):
-	if candidate_glyph != null:
+func _make_custom_tooltip(for_text: String):
+	if for_text == "candidate" and candidate_glyph != null:
 		var comparison := GlyphComparisonTooltipModel.new()
 		comparison.configure(glyph, candidate_glyph, display_name)
 		return comparison

@@ -2657,6 +2657,14 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	var mismatching_candidate := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	ghost.show_candidate(mismatching_candidate)
 	_expect(ghost.candidate_state == &"mismatch", "different factory candidate should show a negative comparison state")
+	_expect(ghost.mouse_default_cursor_shape == Control.CURSOR_HELP, "persistent goal card should advertise its visual inspection")
+	_expect(ghost.hover_slot_at(Vector2(132, 40)) == &"target" and ghost.hover_slot_at(Vector2(266, 40)) == &"candidate", "persistent goal card should distinguish its two visual targets")
+	ghost.hovered_slot = ghost.hover_slot_at(Vector2(132, 40))
+	_expect(ghost.hovered_slot == &"target", "goal card should retain which Glyph receives hover emphasis")
+	_expect(ghost._get_tooltip(Vector2(132, 40)) == "target", "target half should request its own Glyph preview")
+	var target_with_candidate_tooltip = ghost._make_custom_tooltip("target")
+	_expect(target_with_candidate_tooltip.get_script() == GlyphTooltipModel, "target half should stay a single completed-Glyph preview when an output candidate exists")
+	target_with_candidate_tooltip.free()
 	_expect(ghost._get_tooltip(Vector2(240, 25)) == "candidate", "candidate half of the goal card should have its own large tooltip")
 	_expect(
 		ghost.tooltip_glyph.canonical_serialization() == mismatching_candidate.canonical_serialization(),
