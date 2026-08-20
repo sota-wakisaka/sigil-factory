@@ -191,6 +191,8 @@ func _on_main_action() -> void:
 			action_error_hold_ticks = ACTION_ERROR_HOLD_TICKS
 			_refresh_status()
 			return
+		action_error_message = ""
+		action_error_hold_ticks = 0
 		if not flow.pause_for_reconfiguration():
 			factory_board.cancel_edit()
 			return

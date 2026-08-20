@@ -195,6 +195,7 @@ func _initialize() -> void:
 	main.factory_board.simulation.recipes[0] = preserved_recipe
 	main._unhandled_key_input(action_key)
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "Space should open time-stop reconfiguration")
+	_expect(main.action_error_hold_ticks == 0 and main.action_error_message == "", "successful retry should clear the stale time-stop failure")
 	_expect(main.factory_board.visible and not main.battle_board.visible, "time stop should return to the full-width factory tab")
 	_expect(main.factory_board.interaction_enabled, "time stop should enable node placement")
 	_expect(main.factory_state.state == &"paused", "time stop should use a pause badge while work-in-progress stays in the factory visual summary")
