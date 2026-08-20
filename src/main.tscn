@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://src/ui/factory_palette_button.gd" id="6_palette_button"]
 [ext_resource type="Script" path="res://src/ui/flow_action_button.gd" id="7_flow_action"]
 [ext_resource type="Script" path="res://src/ui/factory_setting_option.gd" id="8_setting_option"]
+[ext_resource type="Script" path="res://src/ui/factory_state_indicator.gd" id="9_factory_state"]
 [ext_resource type="Script" path="res://src/ui/factory_selection_indicator.gd" id="7_selection_indicator"]
 
 [node name="Main" type="Control"]
@@ -98,6 +99,14 @@ offset_bottom = 168.0
 theme_override_colors/font_color = Color(0.82, 0.48, 0.58, 1)
 text = "BATTLEFIELD // 戦術盤"
 horizontal_alignment = 1
+
+[node name="FactoryState" type="Control" parent="."]
+layout_mode = 0
+offset_left = 618.0
+offset_top = 51.0
+offset_right = 662.0
+offset_bottom = 75.0
+script = ExtResource("9_factory_state")
 
 [node name="WorkspaceTabs" type="HBoxContainer" parent="."]
 layout_mode = 0

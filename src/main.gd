@@ -28,6 +28,7 @@ enum WorkspaceView {
 @onready var battle_board: BattleBoard = $BattleBoard
 @onready var progress_label: Label = $ProgressLabel
 @onready var plan_label: Label = $PlanLabel
+@onready var factory_state = $FactoryState
 @onready var threat_label: Label = $ThreatLabel
 @onready var status_label: Label = $StatusLabel
 @onready var pause_button: Button = $Toolbar/PauseButton
@@ -111,6 +112,8 @@ func _show_workspace(next_view: WorkspaceView) -> void:
 	speed_button.visible = not show_factory
 	threat_label.visible = not show_factory
 	status_label.visible = not show_factory
+	plan_label.visible = not show_factory
+	factory_state.visible = show_factory
 
 
 func _process(delta: float) -> void:
@@ -206,39 +209,45 @@ func _select_plan(plan_id: StringName) -> void:
 		button.set_plan_selected(button.plan_id == plan_id)
 	if flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		factory_board.preview_plan(plan_id)
-		plan_label.text = "◇ %s  • 未確定" % MvpContent.plan_name(plan_id)
+		var feedback := "◇ %s  • 未確定" % MvpContent.plan_name(plan_id)
 		var discard_notice := factory_board.pending_discard_notice()
 		if discard_notice != "":
-			plan_label.text += " // " + discard_notice
+			feedback += " // " + discard_notice
+		_set_factory_feedback(feedback)
 	else:
 		factory_board.configure(plan_id)
-		plan_label.text = "◇ %s" % MvpContent.plan_name(plan_id)
+		_set_factory_feedback("◇ %s" % MvpContent.plan_name(plan_id))
 	if plan_id == MvpContent.PLAN_EMPTY:
-		plan_label.text = "◇ 配線待ち"
+		_set_factory_feedback("◇ 配線待ち")
+
+
+func _set_factory_feedback(message: String) -> void:
+	plan_label.text = message
+	factory_state.configure(message)
 
 
 func _refresh_empty_factory_guidance() -> void:
 	if flow.phase != RunFlow.Phase.FACTORY_BUILD or factory_board.plan_id != MvpContent.PLAN_EMPTY:
 		return
 	if factory_board.is_guided_connection_pending():
-		plan_label.text = "◇ 配線待ち"
+		_set_factory_feedback("◇ 配線待ち")
 	elif factory_board.validation_result()["ok"]:
-		plan_label.text = "✓ 構築可能"
+		_set_factory_feedback("✓ 構築可能")
 
 
 func _add_factory_node(template_id: StringName) -> void:
 	if factory_board.add_node_from_palette(template_id) != &"":
-		plan_label.text = "◇ 未接続"
+		_set_factory_feedback("◇ 未接続")
 
 
 func _delete_factory_node() -> void:
 	if factory_board.remove_selected_node():
-		plan_label.text = "− 設備削除"
+		_set_factory_feedback("− 設備削除")
 
 
 func _undo_factory_edit() -> void:
 	if factory_board.undo():
-		plan_label.text = "↶ Undo"
+		_set_factory_feedback("↶ Undo")
 
 
 func _refresh_factory_inspector() -> void:
@@ -287,10 +296,11 @@ func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
 
 func _on_inspector_option_selected(index: int) -> void:
 	if factory_board.configure_selected_node(index):
-		plan_label.text = "◇ 設定変更"
+		var feedback := "◇ 設定変更"
 		var discard_notice := factory_board.pending_discard_notice()
 		if discard_notice != "":
-			plan_label.text += " // " + discard_notice
+			feedback += " // " + discard_notice
+		_set_factory_feedback(feedback)
 
 
 func _cancel_edit() -> void:
@@ -512,7 +522,7 @@ func _apply_phase() -> void:
 			pause_button.disabled = false
 			pause_button.configure_action("resume", "確定・再開", "有効な工場変更を一括確定し、リアルタイム戦闘を再開します")
 			cancel_button.disabled = false
-			plan_label.text = "Ⅱ"
+			_set_factory_feedback("Ⅱ")
 			status_label.text = ""
 		RunFlow.Phase.VICTORY:
 			pause_button.disabled = true
