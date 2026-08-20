@@ -47,6 +47,8 @@ var hovered_node_id: StringName = &""
 var hovered_output_node_id: StringName = &""
 var hovered_input_node_id: StringName = &""
 var hovered_input_port := -1
+var hovered_input_glyph_node_id: StringName = &""
+var hovered_input_glyph_port := -1
 var hovered_line_id: StringName = &""
 var dragging_node := false
 var drag_snapshot_pending := false
@@ -677,12 +679,14 @@ func cancel_pending_connection() -> bool:
 
 
 func _clear_node_hover() -> void:
-	if hovered_node_id == &"" and hovered_output_node_id == &"" and hovered_input_node_id == &"" and hovered_line_id == &"":
+	if hovered_node_id == &"" and hovered_output_node_id == &"" and hovered_input_node_id == &"" and hovered_input_glyph_node_id == &"" and hovered_line_id == &"":
 		return
 	hovered_node_id = &""
 	hovered_output_node_id = &""
 	hovered_input_node_id = &""
 	hovered_input_port = -1
+	hovered_input_glyph_node_id = &""
+	hovered_input_glyph_port = -1
 	hovered_line_id = &""
 	queue_redraw()
 
@@ -693,12 +697,19 @@ func _update_pointer_hover(at_position: Vector2) -> void:
 	var input := _input_port_at(at_position)
 	var next_input_node: StringName = input.get("node_id", &"")
 	var next_input_port := int(input.get("port", -1))
+	var input_glyph := input_glyph_at(at_position)
+	var next_input_glyph_node: StringName = input_glyph.get("node_id", &"")
+	var next_input_glyph_port := int(input_glyph.get("port", -1))
+	if next_input_glyph_node != &"":
+		next_node = &""
 	var next_line := _line_at(at_position)
 	if (
 		next_node == hovered_node_id
 		and next_output == hovered_output_node_id
 		and next_input_node == hovered_input_node_id
 		and next_input_port == hovered_input_port
+		and next_input_glyph_node == hovered_input_glyph_node_id
+		and next_input_glyph_port == hovered_input_glyph_port
 		and next_line == hovered_line_id
 	):
 		return
@@ -706,6 +717,8 @@ func _update_pointer_hover(at_position: Vector2) -> void:
 	hovered_output_node_id = next_output
 	hovered_input_node_id = next_input_node
 	hovered_input_port = next_input_port
+	hovered_input_glyph_node_id = next_input_glyph_node
+	hovered_input_glyph_port = next_input_glyph_port
 	hovered_line_id = next_line
 	queue_redraw()
 
@@ -723,6 +736,8 @@ func _get_cursor_shape(at_position: Vector2) -> CursorShape:
 
 
 func cursor_shape_at(at_position: Vector2) -> CursorShape:
+	if not input_glyph_at(at_position).is_empty():
+		return Control.CURSOR_HELP
 	if not interaction_enabled:
 		return Control.CURSOR_ARROW
 	if _output_port_at(at_position) != &"" or not _input_port_at(at_position).is_empty():
@@ -1991,6 +2006,8 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 		if is_combiner:
 			_draw_combiner_input_socket(glyph_center, is_predicted)
 		_draw_mini_glyph(glyph, glyph_center, scale, 0.68 if is_predicted else 1.0)
+		if node.id == hovered_input_glyph_node_id and port == hovered_input_glyph_port:
+			draw_arc(glyph_center, 14.5, 0.0, TAU, 24, Color(GLYPH_COLOR, 0.78), 2.0, true)
 		if node.kind == FactoryNodeModel.NodeKind.SUMMONER and not is_predicted:
 			_draw_recipe_match_marker(glyph_center, input_recipe_match_state(node.id, port), 9.0)
 

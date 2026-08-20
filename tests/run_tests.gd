@@ -2227,6 +2227,18 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	)
 	var predicted_input_center := combine_board.input_glyph_center(&"combiner", 0)
 	_expect(
+		combine_board.cursor_shape_at(predicted_input_center) == Control.CURSOR_HELP,
+		"input Glyph should advertise its detailed hover instead of node dragging"
+	)
+	combine_board.set_interaction_enabled(true)
+	combine_board._update_pointer_hover(predicted_input_center)
+	_expect(
+		combine_board.hovered_input_glyph_node_id == &"combiner"
+		and combine_board.hovered_input_glyph_port == 0
+		and combine_board.hovered_node_id == &"",
+		"input Glyph hover should highlight the socket without highlighting the whole draggable node"
+	)
+	_expect(
 		combine_board._get_tooltip(predicted_input_center) == "glyph_comparison"
 		and "32秒予測の入力Glyph" in combine_board.tooltip_context,
 		"predicted combiner input should open its own large comparison before the node tooltip"
