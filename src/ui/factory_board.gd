@@ -71,6 +71,7 @@ var cached_production_preview := ""
 var cached_production_counts: Dictionary = {}
 var cached_production_discarded := 0
 var cached_production_valid := false
+var cached_validation_errors: Array[String] = []
 var cached_node_output_glyphs: Dictionary = {}
 var tooltip_glyph: GlyphModel
 var tooltip_target_glyph: GlyphModel
@@ -2368,6 +2369,30 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 			draw_arc(position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(hover_color, 0.52), 2.2, true)
 		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
 		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, input_color, 2.0)
+		if input_validation_state(node.id, port) == &"missing":
+			_draw_missing_input_marker(position)
+
+
+func input_validation_state(node_id: StringName, port: int) -> StringName:
+	var expected_error := "missing_input:%s:%d" % [node_id, port]
+	return &"missing" if cached_validation_errors.has(expected_error) else &"valid"
+
+
+func _draw_missing_input_marker(position: Vector2) -> void:
+	for segment in 4:
+		var start_angle := float(segment) * TAU / 4.0
+		draw_arc(
+			position,
+			PORT_RADIUS + 5.0,
+			start_angle,
+			start_angle + TAU / 8.0,
+			4,
+			Color(WARNING_COLOR, 0.92),
+			2.4,
+			true
+		)
+	draw_line(position + Vector2(-3.0, -3.0), position + Vector2(3.0, 3.0), WARNING_COLOR, 1.8, true)
+	draw_line(position + Vector2(-3.0, 3.0), position + Vector2(3.0, -3.0), WARNING_COLOR, 1.8, true)
 
 
 func input_port_connectable(to_node_id: StringName, to_port: int) -> bool:
@@ -2659,6 +2684,7 @@ func _refresh_production_preview() -> void:
 	var result := production_preview()
 	if not result["ok"]:
 		cached_production_valid = false
+		cached_validation_errors.assign(result.get("errors", []))
 		cached_production_counts.clear()
 		cached_production_discarded = 0
 		cached_node_output_glyphs.clear()
@@ -2668,6 +2694,7 @@ func _refresh_production_preview() -> void:
 	var counts: Dictionary = result["counts"]
 	var first_failure: Dictionary = result["first_failure"]
 	cached_production_valid = true
+	cached_validation_errors.clear()
 	cached_production_counts = counts.duplicate()
 	cached_production_discarded = result["discarded"]
 	cached_node_output_glyphs = result["node_outputs"].duplicate()
