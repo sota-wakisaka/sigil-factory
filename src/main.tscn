@@ -293,6 +293,7 @@ script = ExtResource("5_plan_button")
 plan_id = &"empty"
 recipe_id = &"open_ring"
 caption = "手組み"
+manual_layout = true
 
 [node name="ScoutButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(128, 50)

@@ -43,6 +43,8 @@ func _initialize() -> void:
 	_expect(main.sigil_ghost.recipe_id == &"open_ring", "empty workshop should show the first scout sigil goal")
 	_expect(main.get_node("Toolbar/EmptyButton").button_pressed, "current factory plan should remain visually selected")
 	_expect(main.get_node("Toolbar/EmptyButton").glyph != null, "manual plan button should show its target CanonicalGlyph")
+	_expect(main.get_node("Toolbar/EmptyButton").mode_badge_kind() == &"manual_wiring", "manual workshop should carry a wiring badge in addition to its shared target Glyph")
+	_expect(main.get_node("Toolbar/ScoutButton").mode_badge_kind() == &"template", "completed factory choice should remain visually distinct from manual wiring")
 	_expect(main.get_node("Toolbar/EmptyButton").glyph_draw_scale() >= 1.4, "single-Primitive plan Glyph should remain readable without hover")
 	_expect(main.get_node("Toolbar/GolemButton").glyph_draw_scale() >= 1.4, "combined plan Glyph should reserve a similarly readable button footprint")
 	_expect(main.factory_board.mana_status_text() == "魔力 40/100 // 空き60", "factory build should disclose fixed mana capacity")
