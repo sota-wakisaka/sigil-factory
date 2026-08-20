@@ -812,7 +812,8 @@ func cursor_shape_at(at_position: Vector2) -> CursorShape:
 
 func informational_visual_at(at_position: Vector2) -> bool:
 	return (
-		edit_difference_at(at_position) != &""
+		not validation_fault_at(at_position).is_empty()
+		or edit_difference_at(at_position) != &""
 		or connection_feedback_badge_at(at_position)
 		or flow_warning_badge_at(at_position)
 		or pending_discard_badge_at(at_position)
@@ -1930,6 +1931,9 @@ func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_context = ""
 	tooltip_comparison_name = ""
 	tooltip_candidate_label = "工場出力"
+	var validation_fault := validation_fault_at(at_position)
+	if not validation_fault.is_empty():
+		return validation_fault
 	var edit_difference := edit_difference_at(at_position)
 	if edit_difference != &"":
 		return edit_difference_tooltip(edit_difference)
@@ -2433,6 +2437,36 @@ func node_validation_state(node_id: StringName) -> StringName:
 		]:
 			return &"configuration"
 	return &"valid"
+
+
+func validation_fault_at(at_position: Vector2) -> String:
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return ""
+	for node_id in display_simulation.nodes:
+		var node: FactoryNodeModel = display_simulation.nodes[node_id]
+		if (
+			node.kind != FactoryNodeModel.NodeKind.SUMMONER
+			and connecting_from_node_id != node_id
+			and output_validation_state(node_id) == &"missing"
+			and at_position.distance_to(_output_port_position(node_id)) <= PORT_RADIUS + 7.0
+		):
+			return _validation_message(["missing_output:%s" % node_id])
+		for port in node.required_input_count():
+			if (
+				input_validation_state(node_id, port) == &"missing"
+				and not (connecting_from_node_id != &"" and input_port_connectable(node_id, port))
+				and at_position.distance_to(_input_port_position(node_id, port)) <= PORT_RADIUS + 7.0
+			):
+				return _validation_message(["missing_input:%s:%d" % [node_id, port]])
+		if node_validation_state(node_id) == &"configuration":
+			var marker_center := node_local_position(node_id) + Vector2(34, -20)
+			if at_position.distance_to(marker_center) <= 12.0:
+				for error in cached_validation_errors:
+					var parts := error.split(":")
+					if parts.size() >= 2 and parts[1] == String(node_id):
+						return _validation_message([error])
+	return ""
 
 
 func _draw_validation_port_marker(position: Vector2) -> void:
