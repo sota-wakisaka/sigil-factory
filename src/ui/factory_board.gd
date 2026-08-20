@@ -11,6 +11,7 @@ const FactoryLineModel := preload("res://src/factory/factory_line.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
+const SigilMatcherModel := preload("res://src/domain/sigil_matcher.gd")
 
 const PANEL_COLOR := Color(0.035, 0.055, 0.085, 0.96)
 const NODE_COLOR := Color(0.08, 0.12, 0.18, 1.0)
@@ -967,11 +968,16 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 		var finish := _input_port_position(line.to_node_id, line.to_port)
 		var line_color := WARNING_COLOR if display_simulation.line_flow_state(line_id) == &"buffer_full" else LINE_COLOR
 		var goal_state := line_goal_match_state(line_id)
+		var goal_progress := line_goal_progress_level(line_id)
 		if display_simulation.line_flow_state(line_id) != &"buffer_full":
 			if goal_state == &"match":
 				line_color = Color(MATCH_COLOR, 0.76)
 			elif goal_state == &"mismatch":
 				line_color = Color(WARNING_COLOR, 0.76)
+			elif goal_progress == 2:
+				line_color = Color(0.3, 0.84, 0.92, 0.8)
+			elif goal_progress >= 3:
+				line_color = Color(MATCH_COLOR, 0.76)
 		if interaction_enabled and line_id == hovered_line_id:
 			draw_line(start, finish, Color(line_color, 0.28), 8.0, true)
 		draw_line(start, finish, line_color, FACTORY_LINE_WIDTH, true)
@@ -980,6 +986,8 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 			_draw_line_blocked_marker(start.lerp(finish, 0.58))
 		if goal_state in [&"match", &"mismatch"]:
 			_draw_recipe_match_marker(start.lerp(finish, 0.76), goal_state, 7.0)
+		elif goal_progress > 0:
+			_draw_goal_progress_marker(start.lerp(finish, 0.76), goal_progress)
 		if line.payload != null:
 			var progress := 1.0 - float(line.remaining_ticks) / float(line.travel_ticks)
 			var glyph_center := start.lerp(finish, progress)
@@ -997,6 +1005,15 @@ func _draw_flow_arrow(start: Vector2, finish: Vector2, color: Color) -> void:
 	var normal := Vector2(-direction.y, direction.x) * 6.0
 	draw_line(tip, wing_origin + normal, color, 1.5, true)
 	draw_line(tip, wing_origin - normal, color, 1.5, true)
+
+
+func _draw_goal_progress_marker(center: Vector2, level: int) -> void:
+	for index in 3:
+		var dot_center := center + Vector2((index - 1) * 8.0, 0)
+		var filled := index < level
+		var color := MATCH_COLOR if level >= 3 else Color(0.35, 0.82, 0.94)
+		draw_circle(dot_center, 2.8, color if filled else Color(0.06, 0.13, 0.18, 0.95))
+		draw_arc(dot_center, 3.4, 0.0, TAU, 16, Color(color, 0.8), 1.0, true)
 
 
 func _draw_transport_glyph(glyph: GlyphModel, center: Vector2) -> void:
@@ -1686,6 +1703,30 @@ func line_goal_match_state(line_id: StringName) -> StringName:
 			else &"mismatch"
 		)
 	return &"invalid"
+
+
+func line_goal_progress_level(line_id: StringName) -> int:
+	var glyph := display_glyph_for_line(line_id)
+	var target := _goal_glyph()
+	if not GlyphPainterModel.can_draw(glyph) or not GlyphPainterModel.can_draw(target):
+		return 0
+	var result := SigilMatcherModel.compare(glyph, target)
+	if result["is_match"]:
+		return 3
+	var difference_count: int = result["diagnostics"].size()
+	if difference_count <= 1:
+		return 2
+	if difference_count <= 3:
+		return 1
+	return 0
+
+
+func _goal_glyph() -> GlyphModel:
+	var target_recipe_id := MvpContent.recipe_id_for_plan(plan_id)
+	for recipe in MvpContent.recipes():
+		if recipe.id == target_recipe_id:
+			return recipe.glyph
+	return null
 
 
 func input_recipe_match_state(node_id: StringName, port: int) -> StringName:
