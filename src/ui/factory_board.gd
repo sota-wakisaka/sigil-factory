@@ -44,6 +44,7 @@ var preview_node_positions: Dictionary = {}
 var interaction_enabled := false
 var selected_node_id: StringName = &""
 var hovered_node_id: StringName = &""
+var hovered_node_glyph_id: StringName = &""
 var hovered_output_node_id: StringName = &""
 var hovered_input_node_id: StringName = &""
 var hovered_input_port := -1
@@ -679,9 +680,10 @@ func cancel_pending_connection() -> bool:
 
 
 func _clear_node_hover() -> void:
-	if hovered_node_id == &"" and hovered_output_node_id == &"" and hovered_input_node_id == &"" and hovered_input_glyph_node_id == &"" and hovered_line_id == &"":
+	if hovered_node_id == &"" and hovered_node_glyph_id == &"" and hovered_output_node_id == &"" and hovered_input_node_id == &"" and hovered_input_glyph_node_id == &"" and hovered_line_id == &"":
 		return
 	hovered_node_id = &""
+	hovered_node_glyph_id = &""
 	hovered_output_node_id = &""
 	hovered_input_node_id = &""
 	hovered_input_port = -1
@@ -700,11 +702,15 @@ func _update_pointer_hover(at_position: Vector2) -> void:
 	var input_glyph := input_glyph_at(at_position)
 	var next_input_glyph_node: StringName = input_glyph.get("node_id", &"")
 	var next_input_glyph_port := int(input_glyph.get("port", -1))
+	var next_node_glyph := node_glyph_at(at_position)
 	if next_input_glyph_node != &"":
+		next_node_glyph = &""
+	if next_input_glyph_node != &"" or next_node_glyph != &"":
 		next_node = &""
 	var next_line := _line_at(at_position)
 	if (
 		next_node == hovered_node_id
+		and next_node_glyph == hovered_node_glyph_id
 		and next_output == hovered_output_node_id
 		and next_input_node == hovered_input_node_id
 		and next_input_port == hovered_input_port
@@ -714,6 +720,7 @@ func _update_pointer_hover(at_position: Vector2) -> void:
 	):
 		return
 	hovered_node_id = next_node
+	hovered_node_glyph_id = next_node_glyph
 	hovered_output_node_id = next_output
 	hovered_input_node_id = next_input_node
 	hovered_input_port = next_input_port
@@ -737,6 +744,8 @@ func _get_cursor_shape(at_position: Vector2) -> CursorShape:
 
 func cursor_shape_at(at_position: Vector2) -> CursorShape:
 	if not input_glyph_at(at_position).is_empty():
+		return Control.CURSOR_HELP
+	if node_glyph_at(at_position) != &"":
 		return Control.CURSOR_HELP
 	if not interaction_enabled:
 		return Control.CURSOR_ARROW
@@ -1140,6 +1149,8 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 			var source_glyph := source_glyph_for_node(node_id)
 			if source_glyph != null:
 				_draw_mini_glyph(source_glyph, center + Vector2(0, 3), 1.55)
+		if node_id == hovered_node_glyph_id:
+			draw_arc(center + Vector2(0, 3), 18.0, 0.0, TAU, 28, Color(GLYPH_COLOR, 0.72), 2.0, true)
 		_draw_node_input_glyphs(node, center)
 		_draw_ports(node, center)
 
@@ -1553,6 +1564,46 @@ func visible_glyph_for_node(node_id: StringName) -> GlyphModel:
 	return _visible_node_glyph(display_simulation.nodes[node_id])
 
 
+func display_glyph_for_node(node_id: StringName) -> GlyphModel:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return null
+	var active := _visible_node_active_glyph(display_simulation.nodes[node_id])
+	if active != null:
+		return active
+	var predicted: GlyphModel = cached_node_output_glyphs.get(node_id)
+	if GlyphPainterModel.can_draw(predicted):
+		return predicted
+	return source_glyph_for_node(node_id)
+
+
+func node_glyph_display_state(node_id: StringName) -> StringName:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return &"empty"
+	if _visible_node_active_glyph(display_simulation.nodes[node_id]) != null:
+		return &"actual"
+	if GlyphPainterModel.can_draw(cached_node_output_glyphs.get(node_id)):
+		return &"predicted"
+	if source_glyph_for_node(node_id) != null:
+		return &"source"
+	return &"empty"
+
+
+func node_glyph_at(at_position: Vector2) -> StringName:
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return &""
+	var node_ids := display_simulation.nodes.keys()
+	node_ids.sort()
+	for node_id in node_ids:
+		if display_glyph_for_node(node_id) == null:
+			continue
+		if at_position.distance_to(node_local_position(node_id) + Vector2(0, 3)) <= 18.0:
+			return node_id
+	return &""
+
+
 func predicted_output_glyph_for_node(node_id: StringName) -> GlyphModel:
 	return cached_node_output_glyphs.get(node_id)
 
@@ -1655,15 +1706,15 @@ func _get_tooltip(at_position: Vector2) -> String:
 	var node_id := _node_at(at_position)
 	if node_id != &"":
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
-		var visible_glyph := _visible_node_glyph(node)
-		if visible_glyph != null:
-			_set_comparison_tooltip(visible_glyph, _node_label(node), "設備内の現在Glyph")
-		elif cached_node_output_glyphs.has(node_id):
-			_set_comparison_tooltip(cached_node_output_glyphs[node_id], _node_label(node), "32秒予測の出力Glyph")
-		else:
-			var source_glyph := source_glyph_for_node(node_id)
-			if source_glyph != null:
-				_set_comparison_tooltip(source_glyph, _node_label(node), "素材Primitive")
+		var node_glyph := display_glyph_for_node(node_id)
+		var node_state := node_glyph_display_state(node_id)
+		var node_context: String = {
+			&"actual": "設備内の現在出力Glyph",
+			&"predicted": "32秒予測の出力Glyph",
+			&"source": "素材Primitive",
+		}.get(node_state, "")
+		if node_glyph != null:
+			_set_comparison_tooltip(node_glyph, _node_label(node), node_context)
 		if tooltip_glyph == null:
 			return ""
 		return "glyph_comparison" if tooltip_target_glyph != null else "glyph_preview"

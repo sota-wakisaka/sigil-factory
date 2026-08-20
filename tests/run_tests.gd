@@ -1798,7 +1798,7 @@ func _test_factory_nodes_can_be_repositioned() -> void:
 	_expect(not board.move_node(&"ring_source", summoner_center), "overlapping drag should leave the equipment at its last valid position")
 	_expect(board.node_local_position(&"ring_source").is_equal_approx(node_center), "rejected overlap should preserve the original equipment position")
 	var hover := InputEventMouseMotion.new()
-	hover.position = node_center
+	hover.position = node_center + Vector2(0, 22)
 	board._gui_input(hover)
 	_expect(board.hovered_node_id == &"ring_source", "hover should visibly identify draggable equipment before selection")
 	hover.position = Vector2(8, 8)
@@ -2213,6 +2213,22 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	var combiner: FactoryNodeModel = combine_board.simulation.nodes[&"combiner"]
 	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	var combiner_output_preview := combine_board.display_glyph_for_node(&"combiner")
+	_expect(
+		combiner_output_preview != null and not combiner_output_preview.combine_children.is_empty(),
+		"combiner center should expose its predicted combined output before battle"
+	)
+	var combiner_center := combine_board.node_local_position(&"combiner") + Vector2(0, 3)
+	_expect(
+		combine_board.cursor_shape_at(combiner_center) == Control.CURSOR_HELP,
+		"displayed node Glyph should advertise its large visual tooltip instead of node dragging"
+	)
+	combine_board.set_interaction_enabled(true)
+	combine_board._update_pointer_hover(combiner_center)
+	_expect(
+		combine_board.hovered_node_glyph_id == &"combiner" and combine_board.hovered_node_id == &"",
+		"node Glyph hover should highlight the symbol without highlighting the draggable equipment frame"
+	)
 	_expect(
 		combine_board.predicted_input_glyph_for_node(&"combiner", 0).canonical_serialization() == ring.canonical_serialization(),
 		"combiner should preview the ring expected at its first empty input"
@@ -2230,7 +2246,6 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		combine_board.cursor_shape_at(predicted_input_center) == Control.CURSOR_HELP,
 		"input Glyph should advertise its detailed hover instead of node dragging"
 	)
-	combine_board.set_interaction_enabled(true)
 	combine_board._update_pointer_hover(predicted_input_center)
 	_expect(
 		combine_board.hovered_input_glyph_node_id == &"combiner"
@@ -2274,6 +2289,12 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		combine_board._get_tooltip(predicted_input_center) == "glyph_comparison"
 		and "到着済み入力Glyph" in combine_board.tooltip_context,
 		"arrived combiner input should identify itself separately from a plan prediction"
+	)
+	_expect(
+		combine_board._get_tooltip(combiner_center) == "glyph_comparison"
+		and "32秒予測の出力Glyph" in combine_board.tooltip_context
+		and not combine_board.tooltip_glyph.combine_children.is_empty(),
+		"combiner center tooltip should keep matching the displayed combined output after one input arrives"
 	)
 	_expect(
 		combine_board.visible_input_glyph_for_node(&"combiner", 1) == spike,
@@ -2380,7 +2401,7 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	board._gui_input(output_click)
 	_expect(board.input_port_connectable(&"summoner", 0), "wiring mode should identify the valid target input before click")
 	_expect(not board.input_port_connectable(&"ring_source", 0), "wiring mode should not highlight a node without a valid input")
-	_expect(board.get_cursor_shape(board.node_local_position(&"ring_source")) == Control.CURSOR_DRAG, "node hover should advertise drag without permanent text")
+	_expect(board.get_cursor_shape(board.node_local_position(&"ring_source") + Vector2(0, 22)) == Control.CURSOR_DRAG, "equipment frame hover should advertise drag without permanent text")
 	_expect(board.get_cursor_shape(board._output_port_position(&"ring_source")) == Control.CURSOR_POINTING_HAND, "output hover should advertise connection")
 	_expect(board.get_cursor_shape(board._input_port_position(&"summoner", 0)) == Control.CURSOR_POINTING_HAND, "input hover should advertise connection")
 	port_hover.position = board._input_port_position(&"summoner", 0)
