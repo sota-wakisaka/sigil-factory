@@ -28,6 +28,7 @@ const REFERENCE_SIZE := Vector2(820, 395)
 const PORT_RADIUS := 7.0
 const FACTORY_LINE_WIDTH := 2.0
 const TRANSPORT_GLYPH_HALO_RADIUS := 13.0
+const MIN_PREDICTED_LINE_GLYPH_LENGTH := 112.0
 const PRODUCTION_PREVIEW_TICKS := 160
 const FLOW_WARNING_HOLD_TICKS := 5
 
@@ -1027,6 +1028,10 @@ func _draw_lines(display_simulation: FactorySimulation, display_positions: Dicti
 			var glyph_center := start.lerp(finish, progress)
 			_draw_transport_glyph(line.payload, glyph_center)
 			_draw_recipe_match_marker(glyph_center, line_recipe_match_state(line_id), 11.0)
+		else:
+			var predicted_glyph := predicted_glyph_for_line(line_id)
+			if predicted_glyph != null and line_has_preview_space(start, finish):
+				_draw_predicted_line_glyph(predicted_glyph, start.lerp(finish, 0.28))
 
 
 func _draw_flow_arrow(start: Vector2, finish: Vector2, color: Color) -> void:
@@ -1056,6 +1061,30 @@ func _draw_transport_glyph(glyph: GlyphModel, center: Vector2) -> void:
 	draw_circle(center, TRANSPORT_GLYPH_HALO_RADIUS, Color(0.012, 0.024, 0.038, 0.94))
 	draw_arc(center, TRANSPORT_GLYPH_HALO_RADIUS, 0.0, TAU, 24, Color(0.22, 0.42, 0.56, 0.42), 1.0, true)
 	_draw_mini_glyph(glyph, center, transport_glyph_draw_scale(glyph))
+
+
+func _draw_predicted_line_glyph(glyph: GlyphModel, center: Vector2) -> void:
+	if not GlyphPainterModel.can_draw(glyph):
+		return
+	draw_circle(center, 10.0, Color(0.012, 0.024, 0.038, 0.86))
+	for segment in 8:
+		var start_angle := float(segment) * TAU / 8.0
+		draw_arc(
+			center,
+			10.0,
+			start_angle,
+			start_angle + TAU / 16.0,
+			3,
+			Color(0.22, 0.54, 0.68, 0.38),
+			1.0,
+			true
+		)
+	var scale := 0.68 if not glyph.combine_children.is_empty() else 1.2
+	_draw_mini_glyph(glyph, center, scale, 0.64)
+
+
+func line_has_preview_space(start: Vector2, finish: Vector2) -> bool:
+	return start.distance_to(finish) >= MIN_PREDICTED_LINE_GLYPH_LENGTH
 
 
 func transport_glyph_draw_scale(glyph: GlyphModel) -> float:
@@ -1706,6 +1735,19 @@ func display_glyph_for_line(line_id: StringName) -> GlyphModel:
 	var actual := visible_glyph_for_line(line_id)
 	if actual != null:
 		return actual
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.lines.has(line_id):
+		return null
+	var line: FactoryLineModel = display_simulation.lines[line_id]
+	var predicted: GlyphModel = cached_node_output_glyphs.get(line.from_node_id)
+	if not GlyphPainterModel.can_draw(predicted):
+		return null
+	return predicted
+
+
+func predicted_glyph_for_line(line_id: StringName) -> GlyphModel:
+	if visible_glyph_for_line(line_id) != null:
+		return null
 	var display_simulation := _display_simulation()
 	if display_simulation == null or not display_simulation.lines.has(line_id):
 		return null

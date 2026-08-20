@@ -2139,10 +2139,26 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		"node glyph display should prioritize processed output"
 	)
 	var line: FactoryLineModel = board.simulation.lines[&"line_1"]
+	_expect(
+		board.predicted_glyph_for_line(&"line_1") != null,
+		"empty pre-battle line should expose a persistent predicted Glyph marker"
+	)
+	_expect(
+		board.line_has_preview_space(Vector2.ZERO, Vector2(FactoryBoard.MIN_PREDICTED_LINE_GLYPH_LENGTH, 0)),
+		"line prediction should appear when its conduit has enough visual space"
+	)
+	_expect(
+		not board.line_has_preview_space(Vector2.ZERO, Vector2(FactoryBoard.MIN_PREDICTED_LINE_GLYPH_LENGTH - 1.0, 0)),
+		"short conduit should leave prediction display to its equipment nodes"
+	)
 	line.payload = output_glyph
 	_expect(
 		board.visible_glyph_for_line(&"line_1") == output_glyph,
 		"line glyph display should expose the transported structure"
+	)
+	_expect(
+		board.predicted_glyph_for_line(&"line_1") == null,
+		"actual transported Glyph should replace the persistent line prediction"
 	)
 	_expect(FactoryBoard.FACTORY_LINE_WIDTH <= 2.0, "factory conduit should stay visually weaker than transported Glyph strokes")
 	_expect(board.transport_glyph_draw_scale(output_glyph) >= 1.5, "single-Primitive transport Glyph should be readable on the full-width board")
