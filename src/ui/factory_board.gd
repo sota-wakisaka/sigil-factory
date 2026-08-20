@@ -1040,6 +1040,7 @@ func _draw() -> void:
 		_draw_blocked_placement()
 	if editing:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.18, 0.62, 0.9, 0.055), true)
+		_draw_line_edit_differences()
 		_draw_node_edit_differences()
 		_draw_edit_summary()
 	if interaction_enabled:
@@ -1554,6 +1555,81 @@ func removed_edit_node_ids() -> Array:
 			result.append(node_id)
 	result.sort()
 	return result
+
+
+func line_edit_state(line_id: StringName) -> StringName:
+	if not editing or preview_simulation == null or not preview_simulation.lines.has(line_id):
+		return &"unchanged"
+	if not simulation.lines.has(line_id):
+		return &"added"
+	var preview_line: FactoryLineModel = preview_simulation.lines[line_id]
+	var committed_line: FactoryLineModel = simulation.lines[line_id]
+	if (
+		preview_line.from_node_id != committed_line.from_node_id
+		or preview_line.to_node_id != committed_line.to_node_id
+		or preview_line.to_port != committed_line.to_port
+		or preview_line.travel_ticks != committed_line.travel_ticks
+	):
+		return &"changed"
+	return &"unchanged"
+
+
+func removed_edit_line_ids() -> Array:
+	var result: Array = []
+	if not editing or preview_simulation == null:
+		return result
+	for line_id in simulation.lines:
+		if not preview_simulation.lines.has(line_id):
+			result.append(line_id)
+	result.sort()
+	return result
+
+
+func _draw_line_edit_differences() -> void:
+	for line_id in preview_simulation.lines:
+		var state := line_edit_state(line_id)
+		if state == &"unchanged":
+			continue
+		var line: FactoryLineModel = preview_simulation.lines[line_id]
+		var start := _output_port_position(line.from_node_id)
+		var finish := _input_port_position(line.to_node_id, line.to_port)
+		var color := EDIT_ADDED_COLOR if state == &"added" else EDIT_CHANGED_COLOR
+		_draw_edit_line(start, finish, color, state == &"changed")
+		_draw_edit_state_badge(start.lerp(finish, 0.5) + Vector2(0, -10), state, color)
+	for line_id in removed_edit_line_ids():
+		var endpoints := _committed_line_endpoints(simulation.lines[line_id])
+		if endpoints.is_empty():
+			continue
+		var removed_start: Vector2 = endpoints["start"]
+		var removed_finish: Vector2 = endpoints["finish"]
+		_draw_edit_line(removed_start, removed_finish, EDIT_REMOVED_COLOR, true)
+		_draw_edit_state_badge(removed_start.lerp(removed_finish, 0.5) + Vector2(0, -10), &"removed", EDIT_REMOVED_COLOR)
+
+
+func _draw_edit_line(start: Vector2, finish: Vector2, color: Color, dashed: bool) -> void:
+	if dashed:
+		draw_dashed_line(start, finish, color, 3.0, 9.0, true)
+	else:
+		draw_line(start, finish, color, 3.0, true)
+
+
+func _committed_line_endpoints(line: FactoryLineModel) -> Dictionary:
+	if not simulation.nodes.has(line.from_node_id) or not simulation.nodes.has(line.to_node_id):
+		return {}
+	if not node_positions.has(line.from_node_id) or not node_positions.has(line.to_node_id):
+		return {}
+	var from_node: FactoryNodeModel = simulation.nodes[line.from_node_id]
+	var to_node: FactoryNodeModel = simulation.nodes[line.to_node_id]
+	var from_center := _scaled_position(node_positions[line.from_node_id])
+	var to_center := _scaled_position(node_positions[line.to_node_id])
+	var direction := from_center.direction_to(to_center)
+	var start := from_center + _port_boundary_offset(from_node, direction)
+	var radial_direction := -direction
+	var finish := to_center + _port_boundary_offset(to_node, radial_direction)
+	if to_node.required_input_count() > 1:
+		var tangent := Vector2(-radial_direction.y, radial_direction.x).normalized()
+		finish += tangent * (-8.0 if line.to_port == 0 else 8.0)
+	return {"start": start, "finish": finish}
 
 
 func _draw_node_edit_differences() -> void:
