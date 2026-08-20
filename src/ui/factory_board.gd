@@ -95,9 +95,12 @@ func configure(next_plan_id: StringName) -> void:
 	preview_simulation = null
 	selected_node_id = &""
 	hovered_node_id = &""
+	hovered_node_glyph_id = &""
 	hovered_output_node_id = &""
 	hovered_input_node_id = &""
 	hovered_input_port = -1
+	hovered_input_glyph_node_id = &""
+	hovered_input_glyph_port = -1
 	hovered_line_id = &""
 	dragging_node = false
 	drag_snapshot_pending = false

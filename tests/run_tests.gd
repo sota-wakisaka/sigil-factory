@@ -2315,6 +2315,13 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		combine_board.visible_input_glyph_for_node(&"combiner", 2) == null,
 		"input Glyph lookup should reject an out-of-range port"
 	)
+	combine_board.configure(MvpContent.PLAN_SCOUT)
+	_expect(
+		combine_board.hovered_node_glyph_id == &""
+		and combine_board.hovered_input_glyph_node_id == &""
+		and combine_board.hovered_input_glyph_port == -1,
+		"reconfiguring the factory should clear Glyph hover state"
+	)
 	combine_board.free()
 
 
