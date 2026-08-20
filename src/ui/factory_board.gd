@@ -48,6 +48,8 @@ var hovered_line_id: StringName = &""
 var dragging_node := false
 var drag_snapshot_pending := false
 var drag_offset := Vector2.ZERO
+var placement_blocked := false
+var blocked_placement_position := Vector2.ZERO
 var connecting_from_node_id: StringName = &""
 var connection_cursor := Vector2.ZERO
 var connection_serial := 1
@@ -90,6 +92,7 @@ func configure(next_plan_id: StringName) -> void:
 	hovered_line_id = &""
 	dragging_node = false
 	drag_snapshot_pending = false
+	placement_blocked = false
 	connecting_from_node_id = &""
 	connection_message = ""
 	flow_warning_message = ""
@@ -105,6 +108,7 @@ func set_interaction_enabled(enabled: bool) -> void:
 	if not enabled:
 		dragging_node = false
 		drag_snapshot_pending = false
+		placement_blocked = false
 		selected_node_id = &""
 		hovered_node_id = &""
 		hovered_output_node_id = &""
@@ -120,14 +124,31 @@ func move_node(node_id: StringName, local_position: Vector2) -> bool:
 	var positions := _display_positions()
 	if not interaction_enabled or not positions.has(node_id):
 		return false
-	var margin := NODE_HALF_SIZE + Vector2(8, 8)
-	var clamped_local := Vector2(
-		clampf(local_position.x, margin.x, size.x - margin.x),
-		clampf(local_position.y, margin.y, size.y - margin.y)
-	)
+	var clamped_local := _clamped_node_position(local_position)
+	if not placement_is_valid(node_id, clamped_local):
+		placement_blocked = true
+		blocked_placement_position = clamped_local
+		queue_redraw()
+		return false
+	placement_blocked = false
 	positions[node_id] = _reference_position(clamped_local)
 	queue_redraw()
 	return true
+
+
+func placement_is_valid(node_id: StringName, local_position: Vector2) -> bool:
+	var positions := _display_positions()
+	if not positions.has(node_id):
+		return false
+	return _reference_position_is_available(_reference_position(_clamped_node_position(local_position)), positions, node_id)
+
+
+func _clamped_node_position(local_position: Vector2) -> Vector2:
+	var margin := NODE_HALF_SIZE + Vector2(8, 8)
+	return Vector2(
+		clampf(local_position.x, margin.x, size.x - margin.x),
+		clampf(local_position.y, margin.y, size.y - margin.y)
+	)
 
 
 func node_local_position(node_id: StringName) -> Vector2:
@@ -213,9 +234,11 @@ func _next_palette_reference_position(positions: Dictionary) -> Vector2:
 	return Vector2(735, 320)
 
 
-func _reference_position_is_available(candidate: Vector2, positions: Dictionary) -> bool:
-	for existing in positions.values():
-		var existing_position: Vector2 = existing
+func _reference_position_is_available(candidate: Vector2, positions: Dictionary, ignored_id: StringName = &"") -> bool:
+	for existing_id in positions:
+		if existing_id == ignored_id:
+			continue
+		var existing_position: Vector2 = positions[existing_id]
 		if absf(candidate.x - existing_position.x) < 85.0 and absf(candidate.y - existing_position.y) < 75.0:
 			return false
 	return true
@@ -578,17 +601,26 @@ func _gui_input(event: InputEvent) -> void:
 			dragging_node = selected_node_id != &""
 			if dragging_node:
 				drag_snapshot_pending = true
+				placement_blocked = false
 				drag_offset = node_local_position(selected_node_id) - event.position
 				accept_event()
 		else:
 			dragging_node = false
 			drag_snapshot_pending = false
+			placement_blocked = false
 		queue_redraw()
 	elif event is InputEventMouseMotion and dragging_node:
+		var target_position: Vector2 = event.position + drag_offset
+		if not placement_is_valid(selected_node_id, target_position):
+			placement_blocked = true
+			blocked_placement_position = _clamped_node_position(target_position)
+			queue_redraw()
+			accept_event()
+			return
 		if drag_snapshot_pending:
 			_push_undo_snapshot()
 			drag_snapshot_pending = false
-		move_node(selected_node_id, event.position + drag_offset)
+		move_node(selected_node_id, target_position)
 		accept_event()
 	elif event is InputEventMouseMotion and connecting_from_node_id != &"":
 		connection_cursor = event.position
@@ -910,6 +942,8 @@ func _draw() -> void:
 	if connecting_from_node_id != &"":
 		draw_line(_output_port_position(connecting_from_node_id), connection_cursor, SELECTED_COLOR, 3.0, true)
 	_draw_nodes(display_simulation, display_positions)
+	if dragging_node and placement_blocked:
+		_draw_blocked_placement()
 	if editing:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.18, 0.62, 0.9, 0.055), true)
 		_draw_edit_summary()
@@ -1017,6 +1051,15 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 
 func persistent_node_label_count() -> int:
 	return 0
+
+
+func _draw_blocked_placement() -> void:
+	var half_size := NODE_HALF_SIZE + Vector2(7, 7)
+	var rect := Rect2(blocked_placement_position - half_size, half_size * 2.0)
+	draw_rect(rect, Color(WARNING_COLOR, 0.08), true)
+	draw_dashed_line(rect.position, rect.end, Color(WARNING_COLOR, 0.75), 2.0, 7.0)
+	draw_dashed_line(Vector2(rect.end.x, rect.position.y), Vector2(rect.position.x, rect.end.y), Color(WARNING_COLOR, 0.75), 2.0, 7.0)
+	draw_rect(rect, Color(WARNING_COLOR, 0.72), false, 2.0)
 
 
 func warning_marker_symbol(flow_state: StringName) -> StringName:
