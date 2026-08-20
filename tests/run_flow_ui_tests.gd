@@ -62,6 +62,7 @@ func _initialize() -> void:
 	main.factory_board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	_expect(main.get_node("Toolbar/ScoutButton").button_pressed, "selected sigil plan should be highlighted")
+	_expect(main.factory_state.state == &"ready", "complete factory template should show the same ready state as manually completed wiring")
 	_expect(not main.get_node("Toolbar/EmptyButton").button_pressed, "previous sigil plan should clear its highlight")
 	_expect(
 		main.get_node("Toolbar/ScoutButton").glyph.canonical_serialization() == main.sigil_ghost.glyph.canonical_serialization(),

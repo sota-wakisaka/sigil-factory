@@ -85,7 +85,7 @@ func _ready() -> void:
 	phase_button.pressed.connect(_advance_overlay)
 	factory_board.summon_produced.connect(_on_summon_produced)
 	factory_board.selection_changed.connect(_refresh_factory_inspector)
-	factory_board.factory_changed.connect(_refresh_empty_factory_guidance)
+	factory_board.factory_changed.connect(_refresh_factory_validation_state)
 	factory_board.factory_changed.connect(_refresh_factory_goal_candidate)
 	factory_board.factory_changed.connect(_refresh_factory_palette_state)
 	factory_board.selection_changed.connect(_refresh_factory_palette_state)
@@ -216,9 +216,10 @@ func _select_plan(plan_id: StringName) -> void:
 		_set_factory_feedback(feedback)
 	else:
 		factory_board.configure(plan_id)
-		_set_factory_feedback("◇ %s" % MvpContent.plan_name(plan_id))
-	if plan_id == MvpContent.PLAN_EMPTY:
-		_set_factory_feedback("◇ 配線待ち")
+		if flow.phase == RunFlow.Phase.FACTORY_BUILD:
+			_refresh_factory_validation_state()
+		else:
+			_set_factory_feedback("◇ %s" % MvpContent.plan_name(plan_id))
 
 
 func _set_factory_feedback(message: String) -> void:
@@ -226,28 +227,34 @@ func _set_factory_feedback(message: String) -> void:
 	factory_state.configure(message)
 
 
-func _refresh_empty_factory_guidance() -> void:
-	if flow.phase != RunFlow.Phase.FACTORY_BUILD or factory_board.plan_id != MvpContent.PLAN_EMPTY:
-		return
-	if factory_board.is_guided_connection_pending():
-		_set_factory_feedback("◇ 配線待ち")
-	elif factory_board.validation_result()["ok"]:
-		_set_factory_feedback("✓ 構築可能")
+func _refresh_factory_validation_state() -> void:
+	if flow.phase == RunFlow.Phase.FACTORY_BUILD:
+		if factory_board.plan_id == MvpContent.PLAN_EMPTY and factory_board.is_guided_connection_pending():
+			_set_factory_feedback("◇ 配線待ち")
+			return
+		var result := factory_board.validation_result()
+		if result["ok"]:
+			_set_factory_feedback("✓ 構築可能")
+		else:
+			_set_factory_feedback("◇ 未接続 // %s" % result["message"])
+	elif flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
+		var feedback := "◇ 未確定"
+		var discard_notice := factory_board.pending_discard_notice()
+		if discard_notice != "":
+			feedback += " // " + discard_notice
+		_set_factory_feedback(feedback)
 
 
 func _add_factory_node(template_id: StringName) -> void:
-	if factory_board.add_node_from_palette(template_id) != &"":
-		_set_factory_feedback("◇ 未接続")
+	factory_board.add_node_from_palette(template_id)
 
 
 func _delete_factory_node() -> void:
-	if factory_board.remove_selected_node():
-		_set_factory_feedback("− 設備削除")
+	factory_board.remove_selected_node()
 
 
 func _undo_factory_edit() -> void:
-	if factory_board.undo():
-		_set_factory_feedback("↶ Undo")
+	factory_board.undo()
 
 
 func _refresh_factory_inspector() -> void:
@@ -295,12 +302,7 @@ func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
 
 
 func _on_inspector_option_selected(index: int) -> void:
-	if factory_board.configure_selected_node(index):
-		var feedback := "◇ 設定変更"
-		var discard_notice := factory_board.pending_discard_notice()
-		if discard_notice != "":
-			feedback += " // " + discard_notice
-		_set_factory_feedback(feedback)
+	factory_board.configure_selected_node(index)
 
 
 func _cancel_edit() -> void:
