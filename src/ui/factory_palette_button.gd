@@ -11,6 +11,7 @@ const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 
 var preview_glyph: GlyphModel
 var goal_relevant := false
+var goal_state: StringName = &"irrelevant"
 var availability_reason: StringName = &""
 var base_tooltip := ""
 
@@ -44,7 +45,7 @@ func _draw() -> void:
 		_draw_mana_cost()
 	if disabled:
 		_draw_unavailable_overlay()
-	if goal_relevant:
+	if goal_state != &"irrelevant":
 		_draw_goal_marker()
 
 
@@ -55,6 +56,9 @@ func _make_custom_tooltip(_for_text: String):
 	var unavailable_reason := _availability_reason_text(availability_reason)
 	if unavailable_reason != "":
 		context = "%s\n%s" % [unavailable_reason, context]
+	var goal_reason := _goal_state_text()
+	if goal_reason != "":
+		context = "%s\n%s" % [goal_reason, context]
 	var preview := GlyphTooltipModel.new()
 	preview.configure(
 		preview_glyph,
@@ -65,16 +69,50 @@ func _make_custom_tooltip(_for_text: String):
 
 
 func set_goal_relevant(relevant: bool) -> void:
-	goal_relevant = relevant
+	set_goal_state(&"missing" if relevant else &"irrelevant")
+
+
+func set_goal_state(next_state: StringName) -> void:
+	goal_state = (
+		next_state
+		if next_state in [&"irrelevant", &"present", &"missing", &"blocked"]
+		else &"irrelevant"
+	)
+	goal_relevant = goal_state != &"irrelevant"
+	_refresh_tooltip_text()
 	queue_redraw()
+
+
+func goal_marker_style() -> StringName:
+	return goal_state
 
 
 func set_availability(available: bool, reason: StringName = &"") -> void:
 	disabled = not available
 	availability_reason = &"" if available else reason
-	var reason_text := _availability_reason_text(availability_reason)
-	tooltip_text = base_tooltip if reason_text == "" else "%s\n%s" % [reason_text, base_tooltip]
+	_refresh_tooltip_text()
 	queue_redraw()
+
+
+func _refresh_tooltip_text() -> void:
+	var lines := PackedStringArray()
+	var reason_text := _availability_reason_text(availability_reason)
+	if reason_text != "":
+		lines.append(reason_text)
+	var goal_text := _goal_state_text()
+	if goal_text != "":
+		lines.append(goal_text)
+	if base_tooltip != "":
+		lines.append(base_tooltip)
+	tooltip_text = "\n".join(lines)
+
+
+func _goal_state_text() -> String:
+	return {
+		&"present": "目標に関係 // 盤上に存在",
+		&"missing": "目標に関係 // 盤上に不在",
+		&"blocked": "目標に関係 // 現在は追加不可",
+	}.get(goal_state, "")
 
 
 func _availability_reason_text(reason: StringName) -> String:
@@ -89,9 +127,34 @@ func _availability_reason_text(reason: StringName) -> String:
 
 
 func _draw_goal_marker() -> void:
-	var color := Color(0.28, 0.78, 1.0, 0.96)
-	draw_line(Vector2(8, size.y - 2), Vector2(size.x - 8, size.y - 2), color, 2.0, true)
-	draw_circle(Vector2(size.x * 0.5, size.y - 2), 2.6, color)
+	var start := Vector2(8, size.y - 2)
+	var finish := Vector2(size.x - 8, size.y - 2)
+	var center := start.lerp(finish, 0.5)
+	match goal_state:
+		&"present":
+			var present_color := Color(0.3, 0.64, 0.8, 0.72)
+			draw_line(start, finish, present_color, 1.4, true)
+			draw_circle(center, 2.6, present_color)
+		&"missing":
+			var missing_color := Color(0.32, 0.82, 1.0, 0.98)
+			draw_dashed_line(start, finish, missing_color, 1.8, 4.0)
+			_draw_goal_diamond(center, missing_color)
+		&"blocked":
+			var blocked_color := Color(0.95, 0.66, 0.3, 0.9)
+			draw_dashed_line(start, finish, blocked_color, 1.5, 4.0)
+			_draw_goal_diamond(center, blocked_color)
+			draw_line(center + Vector2(-3.5, 3.5), center + Vector2(3.5, -3.5), blocked_color, 1.3, true)
+
+
+func _draw_goal_diamond(center: Vector2, color: Color) -> void:
+	var diamond := PackedVector2Array([
+		center + Vector2(0, -4),
+		center + Vector2(4, 0),
+		center + Vector2(0, 4),
+		center + Vector2(-4, 0),
+		center + Vector2(0, -4),
+	])
+	draw_polyline(diamond, color, 1.4, true)
 
 
 func _draw_mana_cost() -> void:

@@ -88,6 +88,7 @@ func _initialize() -> void:
 	_test_factory_nodes_can_be_repositioned()
 	_test_factory_editor_undo_restores_graph()
 	_test_factory_mana_budget_limits_and_refunds_nodes()
+	_test_factory_goal_equipment_presence_tracks_inventory()
 	_test_factory_enforces_single_summoner()
 	_test_factory_node_configuration_is_undoable()
 	_test_factory_configuration_discards_work_transactionally()
@@ -1921,6 +1922,32 @@ func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
 	golem_board.configure(MvpContent.PLAN_GOLEM)
 	_expect(golem_board.mana_used() == 95, "complete golem template should fit with five mana remaining")
 	golem_board.free()
+
+
+func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SCOUT)
+	_expect(board.goal_equipment_present(&"ring_source"), "scout inventory should report its exact ring source as present")
+	_expect(board.goal_equipment_present(&"summoner"), "scout inventory should report its summoner as present")
+	_expect(not board.goal_equipment_present(&"spike_source"), "ring source should not satisfy the separate spike inventory marker")
+	_expect(not board.goal_equipment_present(&"rotator"), "absent processing equipment should remain missing")
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	_expect(board.configure_selected_node(1), "inventory fixture should switch its source Primitive")
+	_expect(not board.goal_equipment_present(&"ring_source") and board.goal_equipment_present(&"spike_source"), "source inventory should follow its current Primitive instead of node kind alone")
+	_expect(board.undo(), "inventory fixture should undo the source change")
+	_expect(board.goal_equipment_present(&"ring_source") and not board.goal_equipment_present(&"spike_source"), "Undo should restore the exact source inventory state")
+	board.free()
+
+	var sentinel_board := FactoryBoard.new()
+	sentinel_board.configure(MvpContent.PLAN_SENTINEL)
+	_expect(sentinel_board.goal_equipment_present(&"rotator") and sentinel_board.goal_equipment_present(&"colorizer"), "sentinel inventory should expose both processing categories")
+	sentinel_board.set_interaction_enabled(true)
+	sentinel_board.selected_node_id = &"rotator"
+	_expect(sentinel_board.remove_selected_node(), "inventory fixture should remove a processing category")
+	_expect(not sentinel_board.goal_equipment_present(&"rotator"), "removed processing equipment should become missing immediately")
+	_expect(sentinel_board.undo() and sentinel_board.goal_equipment_present(&"rotator"), "Undo should restore a removed equipment category")
+	sentinel_board.free()
 
 
 func _test_factory_enforces_single_summoner() -> void:

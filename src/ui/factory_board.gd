@@ -398,6 +398,33 @@ func palette_availability(template_id: StringName) -> Dictionary:
 	return {"available": true, "reason": &""}
 
 
+func goal_equipment_present(template_id: StringName) -> bool:
+	var display_simulation := _display_simulation()
+	if display_simulation == null:
+		return false
+	for node: FactoryNodeModel in display_simulation.nodes.values():
+		match template_id:
+			&"ring_source":
+				if node.kind == FactoryNodeModel.NodeKind.SOURCE and StringName(node.config.get("primitive_id", "")) == &"ring":
+					return true
+			&"spike_source":
+				if node.kind == FactoryNodeModel.NodeKind.SOURCE and StringName(node.config.get("primitive_id", "")) == &"spike":
+					return true
+			&"rotator":
+				if node.kind == FactoryNodeModel.NodeKind.ROTATOR:
+					return true
+			&"colorizer":
+				if node.kind == FactoryNodeModel.NodeKind.COLORIZER:
+					return true
+			&"combiner":
+				if node.kind == FactoryNodeModel.NodeKind.COMBINER:
+					return true
+			&"summoner":
+				if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
+					return true
+	return false
+
+
 func can_undo() -> bool:
 	return interaction_enabled and not undo_history.is_empty()
 

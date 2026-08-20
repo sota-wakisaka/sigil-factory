@@ -316,9 +316,17 @@ func _refresh_factory_goal_tools() -> void:
 	relevant[&"summoner"] = true
 	for button in $FactoryPalette.get_children():
 		if button.equipment_kind in [&"delete", &"undo"]:
-			button.set_goal_relevant(false)
+			button.set_goal_state(&"irrelevant")
 		else:
-			button.set_goal_relevant(relevant.has(button.equipment_kind))
+			var goal_state: StringName = &"irrelevant"
+			if relevant.has(button.equipment_kind):
+				if factory_board.goal_equipment_present(button.equipment_kind):
+					goal_state = &"present"
+				elif button.availability_reason in [&"mana", &"summoner_limit"]:
+					goal_state = &"blocked"
+				else:
+					goal_state = &"missing"
+			button.set_goal_state(goal_state)
 
 
 func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
@@ -737,6 +745,7 @@ func _set_factory_palette_enabled(enabled: bool) -> void:
 	if not enabled:
 		for button in $FactoryPalette.get_children():
 			button.set_availability(false, &"locked")
+		_refresh_factory_goal_tools()
 		return
 	_refresh_factory_palette_state()
 
@@ -752,6 +761,7 @@ func _refresh_factory_palette_state() -> void:
 			_:
 				var availability := factory_board.palette_availability(button.equipment_kind)
 				button.set_availability(availability["available"], availability["reason"])
+	_refresh_factory_goal_tools()
 
 
 func _refresh_status() -> void:
