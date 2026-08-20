@@ -575,6 +575,11 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 	var display_simulation := _display_simulation()
 	if display_simulation == null or from_node_id == to_node_id:
 		return {"ok": false, "error": "self_connection"}
+	for line in display_simulation.lines.values():
+		if line.from_node_id == from_node_id and line.to_node_id == to_node_id and line.to_port == to_port:
+			connection_message = "接続済み"
+			queue_redraw()
+			return {"ok": true, "error": "already_connected", "changed": false}
 	_push_undo_snapshot()
 	var removed_line: FactoryLineModel
 	for line in display_simulation.lines.values():
@@ -789,7 +794,17 @@ func hovered_port_kind() -> StringName:
 func connection_preview_state() -> StringName:
 	if connecting_from_node_id == &"" or hovered_input_node_id == &"":
 		return &"free"
-	return &"valid" if input_port_connectable(hovered_input_node_id, hovered_input_port) else &"invalid"
+	return connection_target_state(hovered_input_node_id, hovered_input_port)
+
+
+func connection_target_state(to_node_id: StringName, to_port: int) -> StringName:
+	var display_simulation := _display_simulation()
+	if connecting_from_node_id == &"" or display_simulation == null:
+		return &"free"
+	for line in display_simulation.lines.values():
+		if line.from_node_id == connecting_from_node_id and line.to_node_id == to_node_id and line.to_port == to_port:
+			return &"already_connected"
+	return &"valid" if input_port_connectable(to_node_id, to_port) else &"invalid"
 
 
 func connection_preview_endpoint() -> Vector2:
@@ -1089,6 +1104,7 @@ func _draw() -> void:
 		var connection_color: Color = {
 			&"valid": MATCH_COLOR,
 			&"invalid": WARNING_COLOR,
+			&"already_connected": GLYPH_COLOR,
 		}.get(connection_state, SELECTED_COLOR)
 		draw_line(_output_port_position(connecting_from_node_id), connection_endpoint, connection_color, 3.0, true)
 		if connection_state == &"invalid":
@@ -2404,15 +2420,20 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 		if is_guided_connection_pending() and node.id == &"summoner":
 			input_color = SELECTED_COLOR
 		if connecting_from_node_id != &"":
-			if input_port_connectable(node.id, port):
-				input_color = MATCH_COLOR
-				draw_arc(position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(MATCH_COLOR, 0.32), 2.0, true)
+			var target_state := connection_target_state(node.id, port)
+			if target_state in [&"valid", &"already_connected"]:
+				input_color = MATCH_COLOR if target_state == &"valid" else GLYPH_COLOR
+				draw_arc(position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(input_color, 0.32), 2.0, true)
 			else:
 				input_color = Color(LINE_COLOR, 0.2)
 		if node.id == hovered_input_node_id and port == hovered_input_port:
 			var hover_color := GLYPH_COLOR
 			if connecting_from_node_id != &"":
-				hover_color = MATCH_COLOR if input_port_connectable(node.id, port) else WARNING_COLOR
+				var target_state := connection_target_state(node.id, port)
+				hover_color = {
+					&"valid": MATCH_COLOR,
+					&"already_connected": GLYPH_COLOR,
+				}.get(target_state, WARNING_COLOR)
 			draw_arc(position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(hover_color, 0.52), 2.2, true)
 		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
 		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, input_color, 2.0)

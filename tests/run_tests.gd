@@ -2070,6 +2070,18 @@ func _test_factory_rewiring_discards_work_transactionally() -> void:
 	_expect(committed_work_in_progress > 0, "rewiring test should begin with work in progress")
 	board.begin_edit()
 	board.set_interaction_enabled(true)
+	var original_line_id: StringName = board.preview_simulation.lines.keys()[0]
+	var undo_count_before := board.undo_history.size()
+	board.connecting_from_node_id = &"ring_source"
+	board.hovered_input_node_id = &"summoner"
+	board.hovered_input_port = 0
+	_expect(board.connection_preview_state() == &"already_connected", "same connection preview should differ from a new valid route")
+	var no_op_result := board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
+	board.connecting_from_node_id = &""
+	_expect(no_op_result["ok"] and not no_op_result["changed"], "reselecting the same connection should be an explicit no-op")
+	_expect(board.preview_simulation.lines.has(original_line_id), "same-connection no-op should preserve the existing line ID")
+	_expect(board.work_in_progress_count() == committed_work_in_progress and board.pending_discard_count() == 0, "same-connection no-op should preserve every work item")
+	_expect(board.undo_history.size() == undo_count_before, "same-connection no-op should not consume an undo step")
 	_expect(board.disconnect_input(&"summoner", 0), "time stop should allow disconnecting the active route")
 	_expect(board.pending_discard_count() == committed_work_in_progress, "rewiring should disclose pending discards")
 	_expect(board.preview_simulation.lines.is_empty(), "preview should contain the disconnected route")
