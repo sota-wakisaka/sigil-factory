@@ -432,13 +432,14 @@ func selected_node_details() -> Dictionary:
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
 			options = PackedStringArray(["環", "棘"])
-			selected_index = 1 if String(node.config.get("primitive_id", "ring")) == "spike" else 0
+			selected_index = ["ring", "spike"].find(String(node.config.get("primitive_id", "")))
 		FactoryNodeModel.NodeKind.ROTATOR:
 			options = PackedStringArray(["90°", "180°", "270°"])
-			selected_index = clampi(int(node.config.get("steps", 1)) - 1, 0, 2)
+			var steps := int(node.config.get("steps", 0))
+			selected_index = steps - 1 if steps in [1, 2, 3] else -1
 		FactoryNodeModel.NodeKind.COLORIZER:
 			options = PackedStringArray(["青", "赤", "白"])
-			var color_id := String(node.config.get("color_id", "blue"))
+			var color_id := String(node.config.get("color_id", ""))
 			selected_index = ["blue", "red", "white"].find(color_id)
 	return {
 		"selected": true,
@@ -2399,15 +2400,22 @@ func _path_reaches_node(current_id: StringName, sought_id: StringName, visited: 
 func _node_label(node: FactoryNodeModel) -> String:
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
-			var primitive := String(node.config.get("primitive_id", "ring"))
+			var primitive := String(node.config.get("primitive_id", ""))
+			if primitive not in ["ring", "spike"]:
+				return "素材未設定"
 			return "棘素材" if primitive == "spike" else "環素材"
 		FactoryNodeModel.NodeKind.ROTATOR:
-			var steps := clampi(int(node.config.get("steps", 1)), 1, 3)
+			var steps := int(node.config.get("steps", 0))
+			if steps not in [1, 2, 3]:
+				return "回転未設定"
 			return "回転 +%d°" % (steps * 90)
 		FactoryNodeModel.NodeKind.TRANSLATOR:
 			return "位置移動"
 		FactoryNodeModel.NodeKind.COLORIZER:
-			return "%s着色" % _color_name(StringName(node.config.get("color_id", "blue")))
+			var color_id := StringName(node.config.get("color_id", ""))
+			if color_id not in [&"blue", &"red", &"white"]:
+				return "色未設定"
+			return "%s着色" % _color_name(color_id)
 		FactoryNodeModel.NodeKind.COMBINER:
 			return "グリフ合成"
 		FactoryNodeModel.NodeKind.SUMMONER:

@@ -2664,6 +2664,9 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 	board.size = Vector2(568, 339)
 	board.configure(MvpContent.PLAN_SCOUT)
 	board.simulation.nodes[&"ring_source"].config["primitive_id"] = ""
+	board.selected_node_id = &"ring_source"
+	_expect(board.selected_node_details()["selected_index"] == -1, "invalid restored source setting should not masquerade as a valid ring selection")
+	_expect(board.selected_node_details()["title"] == "素材未設定", "invalid restored source setting should ask for a fresh choice")
 	var validation := board.validation_result()
 	_expect(not validation["ok"], "invalid restored source configuration should block factory start")
 	_expect(
@@ -2683,6 +2686,9 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 		"出力が分岐" in board._validation_message(["occupied_output:source"]),
 		"restored implicit fan-out should explain the wiring violation"
 	)
+	board.set_interaction_enabled(true)
+	_expect(board.configure_selected_node(0), "one valid inspector choice should repair an invalid restored source setting")
+	_expect(board.selected_node_details()["selected_index"] == 0, "repaired source setting should select its valid ring option")
 	board.free()
 
 

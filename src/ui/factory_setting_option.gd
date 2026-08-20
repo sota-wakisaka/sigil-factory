@@ -16,7 +16,7 @@ func _ready() -> void:
 func configure_visual(kind: int, selected_index: int, detail: String) -> void:
 	visual_kind = kind
 	visual_index = selected_index
-	tooltip_text = detail if selected_index >= 0 else "設定可能な設備を選択"
+	tooltip_text = detail if selected_index >= 0 else "%s // 候補を再選択" % detail
 	_refresh_item_icons()
 
 

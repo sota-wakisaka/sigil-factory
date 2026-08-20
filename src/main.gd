@@ -289,8 +289,7 @@ func _refresh_factory_inspector() -> void:
 		inspector_option.add_item(option)
 	inspector_option.visible = details["selected"] and not details["options"].is_empty()
 	inspector_option.disabled = details["options"].is_empty() or not factory_board.interaction_enabled
-	if details["selected_index"] >= 0:
-		inspector_option.select(details["selected_index"])
+	inspector_option.select(details["selected_index"])
 	inspector_option.configure_visual(details["kind"], details["selected_index"], details["title"])
 
 
