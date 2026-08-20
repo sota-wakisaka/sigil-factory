@@ -1179,6 +1179,7 @@ func _draw_nodes(display_simulation: FactorySimulation, display_positions: Dicti
 			border_color = Color(0.56, 0.86, 1.0)
 		_draw_node_frame(node, center, border_color, node_id == selected_node_id or node_id == hovered_node_id)
 		_draw_node_warning_marker(node_state, center)
+		_draw_node_validation_marker(node_id, center)
 		_draw_node_activity_progress(node, center, display_simulation.tick_index > 0)
 		var visible_glyph := _visible_node_active_glyph(node)
 		if visible_glyph != null:
@@ -2317,6 +2318,8 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 			output_color = SELECTED_COLOR
 		var output_position := _output_port_position(node.id)
 		draw_circle(output_position, PORT_RADIUS, output_color)
+		if output_validation_state(node.id) == &"missing":
+			_draw_validation_port_marker(output_position)
 		if node.id == hovered_output_node_id:
 			draw_arc(output_position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(GLYPH_COLOR, 0.5), 2.2, true)
 	for port in node.required_input_count():
@@ -2338,7 +2341,7 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
 		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, input_color, 2.0)
 		if input_validation_state(node.id, port) == &"missing":
-			_draw_missing_input_marker(position)
+			_draw_validation_port_marker(position)
 
 
 func input_validation_state(node_id: StringName, port: int) -> StringName:
@@ -2346,7 +2349,28 @@ func input_validation_state(node_id: StringName, port: int) -> StringName:
 	return &"missing" if cached_validation_errors.has(expected_error) else &"valid"
 
 
-func _draw_missing_input_marker(position: Vector2) -> void:
+func output_validation_state(node_id: StringName) -> StringName:
+	return &"missing" if cached_validation_errors.has("missing_output:%s" % node_id) else &"valid"
+
+
+func node_validation_state(node_id: StringName) -> StringName:
+	for error in cached_validation_errors:
+		var parts := error.split(":")
+		if parts.size() < 2 or parts[1] != String(node_id):
+			continue
+		if parts[0] in [
+			"missing_source_primitive",
+			"invalid_source_interval",
+			"invalid_processing_ticks",
+			"invalid_rotation_steps",
+			"invalid_translation_offset",
+			"missing_color_id",
+		]:
+			return &"configuration"
+	return &"valid"
+
+
+func _draw_validation_port_marker(position: Vector2) -> void:
 	for segment in 4:
 		var start_angle := float(segment) * TAU / 4.0
 		draw_arc(
@@ -2361,6 +2385,16 @@ func _draw_missing_input_marker(position: Vector2) -> void:
 		)
 	draw_line(position + Vector2(-3.0, -3.0), position + Vector2(3.0, 3.0), WARNING_COLOR, 1.8, true)
 	draw_line(position + Vector2(-3.0, 3.0), position + Vector2(3.0, -3.0), WARNING_COLOR, 1.8, true)
+
+
+func _draw_node_validation_marker(node_id: StringName, center: Vector2) -> void:
+	if node_validation_state(node_id) != &"configuration":
+		return
+	var marker_center := center + Vector2(34.0, -20.0)
+	draw_circle(marker_center, 8.0, Color(0.025, 0.045, 0.068, 0.96))
+	draw_arc(marker_center, 8.0, 0.0, TAU, 20, WARNING_COLOR, 1.8, true)
+	draw_line(marker_center + Vector2(0, -4), marker_center + Vector2(0, 2), WARNING_COLOR, 1.8, true)
+	draw_circle(marker_center + Vector2(0, 5), 1.3, WARNING_COLOR)
 
 
 func input_port_connectable(to_node_id: StringName, to_port: int) -> bool:

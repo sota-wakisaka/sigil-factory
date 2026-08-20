@@ -2407,9 +2407,11 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	board.configure(MvpContent.PLAN_EMPTY)
 	_expect(board.final_summoner_candidate_glyph() == null, "unwired factory should not invent a final candidate Glyph")
 	_expect(board.final_summoner_candidate()["state"] == &"missing", "unwired factory should identify its missing final candidate")
+	_expect(board.output_validation_state(&"ring_source") == &"missing", "unwired factory should mark the exact missing output port")
 	_expect(board.input_validation_state(&"summoner", 0) == &"missing", "unwired factory should mark the exact missing input port")
 	board.set_interaction_enabled(true)
 	board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
+	_expect(board.output_validation_state(&"ring_source") == &"valid", "connecting the source should clear its output fault marker")
 	_expect(board.input_validation_state(&"summoner", 0) == &"valid", "connecting the missing input should clear its port fault marker")
 	board.disconnect_input(&"summoner", 0)
 	var source_center := board.node_local_position(&"ring_source")
@@ -2674,6 +2676,7 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 		"factory start rejection should name the invalid source setting"
 	)
 	board._refresh_production_preview()
+	_expect(board.node_validation_state(&"ring_source") == &"configuration", "invalid restored source setting should mark its equipment directly")
 	_expect(
 		"素材源「ring_source」の素材設定がありません" in board.cached_production_preview,
 		"production preview should show the same actionable validation reason"
