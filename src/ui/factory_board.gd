@@ -38,6 +38,11 @@ const PRODUCTION_PREVIEW_TICKS := 160
 const PRODUCTION_TICK_SECONDS := 0.2
 const PRODUCTION_TIMELINE_WIDTH := 48.0
 const FLOW_WARNING_HOLD_TICKS := 5
+const INTERACTION_LEGEND_TOOLTIPS := [
+	"ドラッグ // 設備を移動",
+	"出力 → 入力 // 順にクリック",
+	"右クリック // 配線を切断",
+]
 
 var plan_id: StringName = MvpContent.PLAN_SCOUT
 var simulation: FactorySimulation
@@ -58,6 +63,7 @@ var hovered_input_port := -1
 var hovered_input_glyph_node_id: StringName = &""
 var hovered_input_glyph_port := -1
 var hovered_line_id: StringName = &""
+var hovered_interaction_legend_index := -1
 var dragging_node := false
 var drag_snapshot_pending := false
 var drag_offset := Vector2.ZERO
@@ -116,6 +122,7 @@ func configure(next_plan_id: StringName) -> void:
 	hovered_input_glyph_node_id = &""
 	hovered_input_glyph_port = -1
 	hovered_line_id = &""
+	hovered_interaction_legend_index = -1
 	dragging_node = false
 	drag_snapshot_pending = false
 	placement_blocked = false
@@ -144,6 +151,7 @@ func set_interaction_enabled(enabled: bool) -> void:
 		hovered_input_glyph_node_id = &""
 		hovered_input_glyph_port = -1
 		hovered_line_id = &""
+		hovered_interaction_legend_index = -1
 		connecting_from_node_id = &""
 	selection_changed.emit()
 	queue_redraw()
@@ -958,6 +966,9 @@ func disconnect_input(to_node_id: StringName, to_port: int) -> bool:
 func _gui_input(event: InputEvent) -> void:
 	if not interaction_enabled:
 		return
+	if event is InputEventMouseButton and interaction_legend_index_at(event.position) >= 0:
+		accept_event()
+		return
 	if event is InputEventMouseMotion:
 		_update_pointer_hover(event.position)
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -1059,7 +1070,7 @@ func apply_plan(next_plan_id: StringName) -> bool:
 
 
 func _clear_node_hover() -> void:
-	if hovered_node_id == &"" and hovered_node_glyph_id == &"" and hovered_output_node_id == &"" and hovered_input_node_id == &"" and hovered_input_glyph_node_id == &"" and hovered_line_id == &"":
+	if hovered_node_id == &"" and hovered_node_glyph_id == &"" and hovered_output_node_id == &"" and hovered_input_node_id == &"" and hovered_input_glyph_node_id == &"" and hovered_line_id == &"" and hovered_interaction_legend_index < 0:
 		return
 	hovered_node_id = &""
 	hovered_node_glyph_id = &""
@@ -1069,10 +1080,12 @@ func _clear_node_hover() -> void:
 	hovered_input_glyph_node_id = &""
 	hovered_input_glyph_port = -1
 	hovered_line_id = &""
+	hovered_interaction_legend_index = -1
 	queue_redraw()
 
 
 func _update_pointer_hover(at_position: Vector2) -> void:
+	var next_legend_index := interaction_legend_index_at(at_position)
 	var next_node := _node_at(at_position)
 	var next_output := _output_port_at(at_position)
 	var input := _input_port_at(at_position)
@@ -1087,6 +1100,15 @@ func _update_pointer_hover(at_position: Vector2) -> void:
 	if next_input_glyph_node != &"" or next_node_glyph != &"":
 		next_node = &""
 	var next_line := _line_at(at_position)
+	if next_legend_index >= 0:
+		next_node = &""
+		next_node_glyph = &""
+		next_output = &""
+		next_input_node = &""
+		next_input_port = -1
+		next_input_glyph_node = &""
+		next_input_glyph_port = -1
+		next_line = &""
 	if (
 		next_node == hovered_node_id
 		and next_node_glyph == hovered_node_glyph_id
@@ -1096,6 +1118,7 @@ func _update_pointer_hover(at_position: Vector2) -> void:
 		and next_input_glyph_node == hovered_input_glyph_node_id
 		and next_input_glyph_port == hovered_input_glyph_port
 		and next_line == hovered_line_id
+		and next_legend_index == hovered_interaction_legend_index
 	):
 		return
 	hovered_node_id = next_node
@@ -1106,6 +1129,7 @@ func _update_pointer_hover(at_position: Vector2) -> void:
 	hovered_input_glyph_node_id = next_input_glyph_node
 	hovered_input_glyph_port = next_input_glyph_port
 	hovered_line_id = next_line
+	hovered_interaction_legend_index = next_legend_index
 	queue_redraw()
 
 
@@ -1210,6 +1234,7 @@ func informational_visual_at(at_position: Vector2) -> bool:
 		or production_error_at(at_position)
 		or production_discard_badge_at(at_position)
 		or production_summary_unit_at(at_position) != &""
+		or interaction_legend_index_at(at_position) >= 0
 	)
 
 
@@ -1980,7 +2005,28 @@ func _draw_production_timeline(
 
 
 func interaction_legend_count() -> int:
-	return 3
+	return INTERACTION_LEGEND_TOOLTIPS.size()
+
+
+func interaction_legend_rect(index: int) -> Rect2:
+	if index < 0 or index >= interaction_legend_count():
+		return Rect2()
+	return Rect2(Vector2(18.0 + index * 78.0, size.y - 33.0), Vector2(66.0, 28.0))
+
+
+func interaction_legend_index_at(at_position: Vector2) -> int:
+	if not interaction_enabled or dragging_node or connecting_from_node_id != &"":
+		return -1
+	for index in interaction_legend_count():
+		if interaction_legend_rect(index).has_point(at_position):
+			return index
+	return -1
+
+
+func interaction_legend_tooltip(index: int) -> String:
+	if index < 0 or index >= interaction_legend_count():
+		return ""
+	return INTERACTION_LEGEND_TOOLTIPS[index]
 
 
 func _draw_production_error_badge() -> void:
@@ -2094,9 +2140,12 @@ func _draw_interaction_legend() -> void:
 	var icon_color := Color(0.4, 0.68, 0.86, 0.82)
 	var muted := Color(0.16, 0.28, 0.38, 0.7)
 	for index in interaction_legend_count():
-		var rect := Rect2(Vector2(18.0 + index * 78.0, y - 15.0), Vector2(66.0, 28.0))
+		var rect := interaction_legend_rect(index)
 		draw_rect(rect, Color(0.025, 0.045, 0.068, 0.84), true)
-		draw_rect(rect, muted, false, 1.0)
+		var is_hovered := index == hovered_interaction_legend_index
+		draw_rect(rect, icon_color if is_hovered else muted, false, 2.2 if is_hovered else 1.0)
+		if is_hovered:
+			_draw_interaction_legend_hover_corners(rect, icon_color)
 	var move_center := Vector2(51.0, y - 1.0)
 	draw_rect(Rect2(move_center - Vector2(8, 5), Vector2(16, 10)), Color(0.08, 0.13, 0.19), true)
 	draw_rect(Rect2(move_center - Vector2(8, 5), Vector2(16, 10)), icon_color, false, 1.2)
@@ -2122,6 +2171,19 @@ func _draw_interaction_legend() -> void:
 	var cut_center := cut_left.lerp(cut_right, 0.5)
 	draw_line(cut_center + Vector2(-4, -4), cut_center + Vector2(4, 4), Color(0.96, 0.42, 0.36), 1.5, true)
 	draw_line(cut_center + Vector2(-4, 4), cut_center + Vector2(4, -4), Color(0.96, 0.42, 0.36), 1.5, true)
+
+
+func _draw_interaction_legend_hover_corners(rect: Rect2, color: Color) -> void:
+	var corners := [
+		{"position": rect.position, "x": 1.0, "y": 1.0},
+		{"position": Vector2(rect.end.x, rect.position.y), "x": -1.0, "y": 1.0},
+		{"position": Vector2(rect.position.x, rect.end.y), "x": 1.0, "y": -1.0},
+		{"position": rect.end, "x": -1.0, "y": -1.0},
+	]
+	for corner in corners:
+		var position: Vector2 = corner["position"]
+		draw_line(position, position + Vector2(float(corner["x"]) * 4.0, 0), color, 2.2, true)
+		draw_line(position, position + Vector2(0, float(corner["y"]) * 4.0), color, 2.2, true)
 
 
 func _draw_mana_meter() -> void:
@@ -2810,6 +2872,9 @@ func _get_tooltip(at_position: Vector2) -> String:
 				context
 			)
 			return "glyph_preview"
+	var legend_index := interaction_legend_index_at(at_position)
+	if legend_index >= 0:
+		return interaction_legend_tooltip(legend_index)
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return ""

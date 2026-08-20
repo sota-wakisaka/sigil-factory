@@ -106,6 +106,7 @@ func _initialize() -> void:
 	_test_factory_board_offers_visual_glyph_tooltips()
 	_test_factory_board_exposes_node_activity_progress()
 	_test_factory_processor_role_marks_follow_settings()
+	_test_factory_interaction_legend_is_explanatory_and_non_destructive()
 	_test_factory_downstream_route_focus_is_non_destructive()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_overlapping_hits_follow_draw_order()
@@ -2808,6 +2809,51 @@ func _test_factory_processor_role_marks_follow_settings() -> void:
 	_expect(board.undo(), "colorizer role mark configuration should remain undoable")
 	_expect(board.node_role_mark_state(&"colorizer")["pattern"] == &"striped", "colorizer role mark should follow the color restored by undo")
 	_expect(board.colorizer_role_pattern(&"unknown") == &"invalid", "unknown colors should retain the invalid marker instead of a valid pattern")
+	board.free()
+
+
+func _test_factory_interaction_legend_is_explanatory_and_non_destructive() -> void:
+	var board := FactoryBoard.new()
+	root.add_child(board)
+	board.size = Vector2(568, 339)
+	board.configure(MvpContent.PLAN_SCOUT)
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	var expected_tooltips := [
+		"ドラッグ // 設備を移動",
+		"出力 → 入力 // 順にクリック",
+		"右クリック // 配線を切断",
+	]
+	var runtime_before := _factory_runtime_signature(board.simulation)
+	var production_before := board.production_snapshot()
+	var undo_count_before := board.undo_history.size()
+	for index in board.interaction_legend_count():
+		var rect := board.interaction_legend_rect(index)
+		var center := rect.get_center()
+		_expect(board.interaction_legend_index_at(center) == index, "each factory gesture tile should expose its own stable hover target")
+		_expect(board._get_tooltip(center) == expected_tooltips[index], "gesture tooltip should describe the actual compact interaction")
+		_expect(board.cursor_shape_at(center) == Control.CURSOR_HELP, "gesture tiles should advertise on-demand help rather than a click action")
+		board._update_pointer_hover(center)
+		_expect(board.hovered_interaction_legend_index == index, "gesture hover should drive only its local outline feedback")
+	var first_rect := board.interaction_legend_rect(0)
+	var gap_position := Vector2(first_rect.end.x + 6.0, first_rect.get_center().y)
+	_expect(board.interaction_legend_index_at(gap_position) == -1, "the gap between gesture tiles should not steal board input")
+	_expect(board.interaction_legend_index_at(Vector2(first_rect.end.x, first_rect.get_center().y)) == -1, "gesture hit testing should exclude the right edge like Rect2.has_point")
+	var second_center := board.interaction_legend_rect(1).get_center()
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = second_center
+	board._gui_input(click)
+	_expect(board.selected_node_id == &"ring_source", "clicking an explanatory gesture tile should not clear the selected equipment")
+	_expect(_factory_runtime_signature(board.simulation) == runtime_before and board.production_snapshot() == production_before, "gesture inspection should not mutate simulation or production prediction")
+	_expect(board.undo_history.size() == undo_count_before and board.connecting_from_node_id == &"", "gesture inspection should not add Undo state or begin wiring")
+	board.connecting_from_node_id = &"ring_source"
+	_expect(board.interaction_legend_index_at(second_center) == -1, "active wiring should keep its operation cursor instead of opening generic gesture help")
+	board.connecting_from_node_id = &""
+	board.set_interaction_enabled(false)
+	_expect(board.interaction_legend_index_at(second_center) == -1 and board._get_tooltip(second_center) == "", "locked factory gestures should be neither hoverable nor explained")
+	_expect(board.cursor_shape_at(second_center) == Control.CURSOR_ARROW, "locked gesture tiles should fall back to the normal cursor")
 	board.free()
 
 
