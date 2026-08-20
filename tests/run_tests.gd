@@ -105,6 +105,7 @@ func _initialize() -> void:
 	_test_factory_board_exposes_visible_work_in_progress_glyphs()
 	_test_factory_board_offers_visual_glyph_tooltips()
 	_test_factory_board_exposes_node_activity_progress()
+	_test_factory_processor_role_marks_follow_settings()
 	_test_factory_downstream_route_focus_is_non_destructive()
 	_test_factory_ports_connect_through_mouse_input()
 	_test_factory_overlapping_hits_follow_draw_order()
@@ -2780,6 +2781,33 @@ func _test_factory_overlapping_hits_follow_draw_order() -> void:
 	_expect(input_hit.get("node_id", &"") == front_rotator.id, "overlapping input ports should resolve to the last drawn equipment")
 	var input_glyph_hit := board.input_glyph_at(board.input_glyph_center(front_rotator.id, 0))
 	_expect(input_glyph_hit.get("node_id", &"") == front_rotator.id, "overlapping input Glyphs should inspect the front equipment")
+	board.free()
+
+
+func _test_factory_processor_role_marks_follow_settings() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SENTINEL)
+	board.set_interaction_enabled(true)
+	var rotator_state := board.node_role_mark_state(&"rotator")
+	_expect(rotator_state["valid"] and rotator_state["direction"] == Vector2i.RIGHT, "90-degree rotator role mark should point right like the setting option")
+	board.selected_node_id = &"rotator"
+	_expect(board.configure_selected_node(1), "rotator role mark fixture should accept 180 degrees")
+	_expect(board.node_role_mark_state(&"rotator")["direction"] == Vector2i.DOWN, "180-degree rotator role mark should point down immediately after configuration")
+	_expect(board.configure_selected_node(2), "rotator role mark fixture should accept 270 degrees")
+	_expect(board.node_role_mark_state(&"rotator")["direction"] == Vector2i.LEFT, "270-degree rotator role mark should point left")
+	_expect(board.undo(), "rotator role mark configuration should remain undoable")
+	_expect(board.node_role_mark_state(&"rotator")["direction"] == Vector2i.DOWN, "rotator role mark should follow the angle restored by undo")
+	_expect(board.rotator_role_direction(0) == Vector2i.ZERO and board.rotator_role_direction(4) == Vector2i.ZERO, "invalid rotations should not masquerade as a valid direction")
+	var colorizer_state := board.node_role_mark_state(&"colorizer")
+	_expect(colorizer_state["valid"] and colorizer_state["pattern"] == &"filled", "blue colorizer should use the filled color-independent mark")
+	board.selected_node_id = &"colorizer"
+	_expect(board.configure_selected_node(1), "colorizer role mark fixture should accept red")
+	_expect(board.node_role_mark_state(&"colorizer")["pattern"] == &"striped", "red colorizer should add stripes instead of relying on hue")
+	_expect(board.configure_selected_node(2), "colorizer role mark fixture should accept white")
+	_expect(board.node_role_mark_state(&"colorizer")["pattern"] == &"hollow", "white colorizer should use a hollow double ring")
+	_expect(board.undo(), "colorizer role mark configuration should remain undoable")
+	_expect(board.node_role_mark_state(&"colorizer")["pattern"] == &"striped", "colorizer role mark should follow the color restored by undo")
+	_expect(board.colorizer_role_pattern(&"unknown") == &"invalid", "unknown colors should retain the invalid marker instead of a valid pattern")
 	board.free()
 
 

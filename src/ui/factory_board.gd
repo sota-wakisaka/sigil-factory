@@ -2491,16 +2491,108 @@ func _draw_node_focus_marker(
 
 func _draw_node_role_mark(node: FactoryNodeModel, center: Vector2) -> void:
 	var mark_center := center + Vector2(-34, -16)
-	match node.kind:
-		FactoryNodeModel.NodeKind.ROTATOR:
-			draw_arc(mark_center, 6.0, -0.7, 4.4, 16, Color(0.5, 0.76, 0.94, 0.78), 1.5, true)
-			draw_line(mark_center + Vector2(-6, -2), mark_center + Vector2(-2, -6), Color(0.5, 0.76, 0.94, 0.78), 1.5, true)
-		FactoryNodeModel.NodeKind.COLORIZER:
-			var color_id := StringName(node.config.get("color_id", "white"))
-			draw_circle(mark_center, 4.5, GlyphPainterModel.component_color(color_id))
+	var role_state := _node_role_mark_state(node)
+	match role_state.get("kind", &"none"):
+		&"rotator":
+			_draw_rotator_role_mark(mark_center, role_state)
+		&"colorizer":
+			_draw_colorizer_role_mark(mark_center, role_state)
 		FactoryNodeModel.NodeKind.COMBINER:
 			draw_arc(mark_center + Vector2(-3, 0), 5.0, 0.0, TAU, 16, Color(0.5, 0.76, 0.94, 0.7), 1.3, true)
 			draw_arc(mark_center + Vector2(4, 0), 5.0, 0.0, TAU, 16, Color(0.5, 0.76, 0.94, 0.7), 1.3, true)
+
+
+func node_role_mark_state(node_id: StringName) -> Dictionary:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return {"kind": &"none", "valid": false}
+	return _node_role_mark_state(display_simulation.nodes[node_id])
+
+
+func _node_role_mark_state(node: FactoryNodeModel) -> Dictionary:
+	match node.kind:
+		FactoryNodeModel.NodeKind.ROTATOR:
+			var steps := int(node.config.get("steps", 0))
+			var direction := rotator_role_direction(steps)
+			return {
+				"kind": &"rotator",
+				"valid": direction != Vector2i.ZERO,
+				"steps": steps,
+				"direction": direction,
+			}
+		FactoryNodeModel.NodeKind.COLORIZER:
+			var color_id := StringName(node.config.get("color_id", ""))
+			var pattern := colorizer_role_pattern(color_id)
+			return {
+				"kind": &"colorizer",
+				"valid": pattern != &"invalid",
+				"color_id": color_id,
+				"pattern": pattern,
+			}
+		FactoryNodeModel.NodeKind.COMBINER:
+			return {"kind": FactoryNodeModel.NodeKind.COMBINER, "valid": true}
+	return {"kind": &"none", "valid": true}
+
+
+func rotator_role_direction(steps: int) -> Vector2i:
+	match steps:
+		1:
+			return Vector2i.RIGHT
+		2:
+			return Vector2i.DOWN
+		3:
+			return Vector2i.LEFT
+	return Vector2i.ZERO
+
+
+func colorizer_role_pattern(color_id: StringName) -> StringName:
+	match color_id:
+		&"blue":
+			return &"filled"
+		&"red":
+			return &"striped"
+		&"white":
+			return &"hollow"
+	return &"invalid"
+
+
+func _draw_rotator_role_mark(center: Vector2, role_state: Dictionary) -> void:
+	var color := Color(0.5, 0.76, 0.94, 0.84)
+	if not role_state.get("valid", false):
+		for segment in 4:
+			var start_angle := float(segment) * TAU / 4.0
+			draw_arc(center, 6.0, start_angle, start_angle + TAU / 8.0, 4, color, 1.4, true)
+		return
+	var direction := Vector2(role_state["direction"])
+	var endpoint := center + direction * 7.0
+	var normal := Vector2(-direction.y, direction.x)
+	draw_circle(center, 1.8, color)
+	draw_line(center, endpoint, color, 1.8, true)
+	draw_line(endpoint, endpoint - direction * 3.2 + normal * 2.2, color, 1.6, true)
+	draw_line(endpoint, endpoint - direction * 3.2 - normal * 2.2, color, 1.6, true)
+
+
+func _draw_colorizer_role_mark(center: Vector2, role_state: Dictionary) -> void:
+	var outline := Color(0.58, 0.8, 0.96, 0.82)
+	var pattern: StringName = role_state.get("pattern", &"invalid")
+	if pattern == &"invalid":
+		for segment in 4:
+			var start_angle := float(segment) * TAU / 4.0
+			draw_arc(center, 5.5, start_angle, start_angle + TAU / 8.0, 4, outline, 1.3, true)
+		return
+	var color_id: StringName = role_state["color_id"]
+	var fill := GlyphPainterModel.component_color(color_id)
+	if pattern == &"hollow":
+		draw_circle(center, 5.5, Color(0.055, 0.09, 0.13, 0.96))
+		draw_arc(center, 5.5, 0.0, TAU, 18, fill, 1.4, true)
+		draw_arc(center, 2.7, 0.0, TAU, 14, fill, 1.1, true)
+		return
+	draw_circle(center, 5.0, fill)
+	draw_arc(center, 5.5, 0.0, TAU, 18, outline, 1.1, true)
+	if pattern == &"striped":
+		var stripe_color := Color(0.04, 0.07, 0.1, 0.9)
+		draw_line(center + Vector2(-4, 1), center + Vector2(1, -4), stripe_color, 1.2, true)
+		draw_line(center + Vector2(-1, 4), center + Vector2(4, -1), stripe_color, 1.2, true)
 
 
 func node_activity_progress(node_id: StringName) -> float:
