@@ -468,6 +468,7 @@ func configure_selected_node(option_index: int) -> bool:
 		FactoryNodeModel.NodeKind.SOURCE:
 			node.config["primitive_id"] = "spike" if option_index == 1 else "ring"
 			node.config["interval_ticks"] = 54 if option_index == 1 else 18
+			node.source_timer = 0
 			_apply_node_upgrades(node)
 		FactoryNodeModel.NodeKind.ROTATOR:
 			node.config["steps"] = option_index + 1

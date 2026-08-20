@@ -91,6 +91,7 @@ func _initialize() -> void:
 	_test_factory_enforces_single_summoner()
 	_test_factory_node_configuration_is_undoable()
 	_test_factory_configuration_discards_work_transactionally()
+	_test_source_configuration_resets_generation_progress()
 	_test_factory_rewiring_discards_work_transactionally()
 	_test_factory_board_connections_change_output()
 	_test_factory_board_shows_summon_failure_reason()
@@ -1980,6 +1981,35 @@ func _test_factory_configuration_discards_work_transactionally() -> void:
 	board.cancel_edit()
 	_expect(board.work_in_progress_count() == committed_work_in_progress, "cancel should restore configured work in progress")
 	_expect(board.simulation.discarded_glyphs == 0, "cancel should not commit configuration discards")
+	board.free()
+
+
+func _test_source_configuration_resets_generation_progress() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SCOUT)
+	var committed_source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
+	committed_source.config["primitive_id"] = "spike"
+	committed_source.config["interval_ticks"] = 54
+	committed_source.source_timer = 53
+	board.begin_edit()
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	_expect(board.configure_selected_node(0), "source should accept a different Primitive during time stop")
+	var preview_source: FactoryNodeModel = board.preview_simulation.nodes[&"ring_source"]
+	_expect(preview_source.source_timer == 0, "changing source Primitive should reset incompatible generation progress")
+	board.cancel_edit()
+	_expect(
+		committed_source.source_timer == 53 and committed_source.config["primitive_id"] == "spike",
+		"canceling source reconfiguration should preserve the committed Primitive and progress"
+	)
+	board.begin_edit()
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	board.configure_selected_node(0)
+	board.commit_edit()
+	var changed_source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
+	board.advance_tick()
+	_expect(changed_source.source_timer == 1 and changed_source.output_buffer == null, "new source should restart generation instead of producing immediately")
 	board.free()
 
 
