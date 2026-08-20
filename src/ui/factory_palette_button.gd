@@ -25,14 +25,14 @@ func _ready() -> void:
 
 
 func _draw() -> void:
-	var icon_center := Vector2(size.x * 0.5, 16)
+	var icon_center := Vector2(size.x * 0.5, 27)
 	if preview_glyph != null:
-		GlyphPainterModel.draw_glyph(self, preview_glyph, icon_center, 1.28)
+		GlyphPainterModel.draw_glyph(self, preview_glyph, icon_center, 1.7)
 	else:
 		_draw_equipment_icon(icon_center)
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(0, size.y - 6),
+		Vector2(0, size.y - 10),
 		caption,
 		HORIZONTAL_ALIGNMENT_CENTER,
 		size.x,

@@ -22,7 +22,7 @@ var tooltip_context := ""
 
 
 func _init() -> void:
-	custom_minimum_size = Vector2(280, 50)
+	custom_minimum_size = Vector2(320, 80)
 
 
 func _ready() -> void:
@@ -76,22 +76,22 @@ func _draw() -> void:
 	)
 	if glyph == null:
 		return
-	var target_center := Vector2(122, size.y * 0.5)
-	var candidate_center := Vector2(224, size.y * 0.5)
+	var target_center := Vector2(132, size.y * 0.5)
+	var candidate_center := Vector2(266, size.y * 0.5)
 	GlyphPainterModel.draw_glyph(self, glyph, target_center, glyph_draw_scale())
-	draw_line(Vector2(154, size.y * 0.5), Vector2(190, size.y * 0.5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
-	draw_line(Vector2(190, size.y * 0.5), Vector2(183, size.y * 0.5 - 4), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
-	draw_line(Vector2(190, size.y * 0.5), Vector2(183, size.y * 0.5 + 4), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
+	draw_line(Vector2(174, size.y * 0.5), Vector2(224, size.y * 0.5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
+	draw_line(Vector2(224, size.y * 0.5), Vector2(216, size.y * 0.5 - 5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
+	draw_line(Vector2(224, size.y * 0.5), Vector2(216, size.y * 0.5 + 5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
 	if candidate_glyph != null:
 		GlyphPainterModel.draw_glyph(self, candidate_glyph, candidate_center, candidate_draw_scale())
 	else:
 		draw_arc(candidate_center, 13.0, 0.0, TAU, 24, Color(0.32, 0.44, 0.54, 0.6), 1.0, true)
-	_draw_candidate_marker(candidate_center + Vector2(24, -13))
+	_draw_candidate_marker(candidate_center + Vector2(30, -22))
 	if candidate_state == &"match":
-		draw_arc(candidate_center, 20.0, 0.0, TAU, 24, Color(MATCH_COLOR, 0.72), 1.5, true)
+		draw_arc(candidate_center, 29.0, 0.0, TAU, 28, Color(MATCH_COLOR, 0.72), 1.5, true)
 	elif candidate_state == &"mismatch":
-		draw_arc(target_center, 20.0, 0.0, TAU, 24, Color(1.0, 0.74, 0.28, 0.72), 1.5, true)
-		draw_arc(candidate_center, 20.0, 0.0, TAU, 24, Color(MISMATCH_COLOR, 0.72), 1.5, true)
+		draw_arc(target_center, 29.0, 0.0, TAU, 28, Color(1.0, 0.74, 0.28, 0.72), 1.5, true)
+		draw_arc(candidate_center, 29.0, 0.0, TAU, 28, Color(MISMATCH_COLOR, 0.72), 1.5, true)
 
 
 func persistent_label() -> String:
@@ -100,14 +100,14 @@ func persistent_label() -> String:
 
 func glyph_draw_scale() -> float:
 	if glyph != null and glyph.combine_children.is_empty():
-		return 1.75
-	return 0.95
+		return 2.45
+	return 1.35
 
 
 func candidate_draw_scale() -> float:
 	if candidate_glyph != null and candidate_glyph.combine_children.is_empty():
-		return 1.75
-	return 0.95
+		return 2.45
+	return 1.35
 
 
 func _draw_candidate_marker(center: Vector2) -> void:

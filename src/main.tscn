@@ -165,14 +165,14 @@ vertical_alignment = 1
 [node name="FactoryPalette" type="HBoxContainer" parent="."]
 layout_mode = 0
 offset_left = 42.0
-offset_top = 578.0
+offset_top = 548.0
 offset_right = 610.0
 offset_bottom = 628.0
 theme_override_constants/separation = 4
 alignment = 1
 
 [node name="RingButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 50)
+custom_minimum_size = Vector2(64, 80)
 layout_mode = 2
 tooltip_text = "環グリフを一定周期で生成する素材源を追加（魔力20）"
 script = ExtResource("6_palette_button")
@@ -181,7 +181,7 @@ caption = "環"
 mana_cost = 20
 
 [node name="SpikeButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 50)
+custom_minimum_size = Vector2(64, 80)
 layout_mode = 2
 tooltip_text = "棘グリフを一定周期で生成する素材源を追加（魔力20）"
 script = ExtResource("6_palette_button")
@@ -190,7 +190,7 @@ caption = "棘"
 mana_cost = 20
 
 [node name="RotateButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 50)
+custom_minimum_size = Vector2(64, 80)
 layout_mode = 2
 tooltip_text = "回転器を追加（魔力15）。選択後に90°・180°・270°を設定できます"
 script = ExtResource("6_palette_button")
@@ -199,7 +199,7 @@ caption = "回転"
 mana_cost = 15
 
 [node name="ColorButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 50)
+custom_minimum_size = Vector2(64, 80)
 layout_mode = 2
 tooltip_text = "着色器を追加（魔力15）。選択後に青・赤・白を設定できます"
 script = ExtResource("6_palette_button")
@@ -208,7 +208,7 @@ caption = "着色"
 mana_cost = 15
 
 [node name="CombineButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 50)
+custom_minimum_size = Vector2(64, 80)
 layout_mode = 2
 tooltip_text = "2つの入力グリフを1つにまとめる合成器を追加（魔力20）"
 script = ExtResource("6_palette_button")
@@ -217,7 +217,7 @@ caption = "合成"
 mana_cost = 20
 
 [node name="SummonButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 50)
+custom_minimum_size = Vector2(64, 80)
 layout_mode = 2
 tooltip_text = "召喚器がない場合、完成グリフを照合する汎用召喚器を1基追加（魔力20）"
 script = ExtResource("6_palette_button")
@@ -226,7 +226,7 @@ caption = "召喚"
 mana_cost = 20
 
 [node name="DeleteButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 50)
+custom_minimum_size = Vector2(64, 80)
 layout_mode = 2
 tooltip_text = "現在選択している設備と接続線を削除"
 script = ExtResource("6_palette_button")
@@ -234,7 +234,7 @@ equipment_kind = &"delete"
 caption = "削除"
 
 [node name="UndoButton" type="Button" parent="FactoryPalette"]
-custom_minimum_size = Vector2(64, 50)
+custom_minimum_size = Vector2(64, 80)
 layout_mode = 2
 tooltip_text = "現在の編集セッションで行った直前の操作を元に戻す"
 script = ExtResource("6_palette_button")
@@ -244,26 +244,26 @@ caption = "Undo"
 [node name="FactoryInspector" type="HBoxContainer" parent="."]
 layout_mode = 0
 offset_left = 630.0
-offset_top = 578.0
+offset_top = 548.0
 offset_right = 1238.0
 offset_bottom = 628.0
 theme_override_constants/separation = 12
 alignment = 1
 
 [node name="SigilGhost" type="Control" parent="FactoryInspector"]
-custom_minimum_size = Vector2(280, 50)
+custom_minimum_size = Vector2(320, 80)
 layout_mode = 2
 mouse_filter = 1
 mouse_default_cursor_shape = 4
 script = ExtResource("4_ghost")
 
 [node name="SelectionLabel" type="Control" parent="FactoryInspector"]
-custom_minimum_size = Vector2(140, 50)
+custom_minimum_size = Vector2(128, 80)
 layout_mode = 2
 script = ExtResource("7_selection_indicator")
 
 [node name="SettingOption" type="OptionButton" parent="FactoryInspector"]
-custom_minimum_size = Vector2(140, 50)
+custom_minimum_size = Vector2(140, 80)
 layout_mode = 2
 disabled = true
 alignment = 2
