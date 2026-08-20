@@ -15,6 +15,7 @@ var recipe_id: StringName = &""
 var glyph: GlyphModel
 var candidate_glyph: GlyphModel
 var candidate_state: StringName = &"missing"
+var candidate_origin: StringName = &"missing"
 var display_name := ""
 var tooltip_glyph: GlyphModel
 var tooltip_title := ""
@@ -72,8 +73,9 @@ func show_recipe(next_recipe_id: StringName) -> bool:
 	return false
 
 
-func show_candidate(next_candidate: GlyphModel) -> void:
+func show_candidate(next_candidate: GlyphModel, next_origin: StringName = &"actual") -> void:
 	candidate_glyph = next_candidate.copy() if GlyphPainterModel.can_draw(next_candidate) else null
+	candidate_origin = next_origin if candidate_glyph != null and next_origin in [&"actual", &"predicted"] else &"missing"
 	_refresh_candidate_state()
 	queue_redraw()
 
@@ -108,19 +110,38 @@ func _draw() -> void:
 	draw_line(Vector2(224, size.y * 0.5), Vector2(216, size.y * 0.5 - 5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
 	draw_line(Vector2(224, size.y * 0.5), Vector2(216, size.y * 0.5 + 5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
 	if candidate_glyph != null:
-		GlyphPainterModel.draw_glyph(self, candidate_glyph, candidate_center, candidate_draw_scale())
+		GlyphPainterModel.draw_glyph(
+			self,
+			candidate_glyph,
+			candidate_center,
+			candidate_draw_scale(),
+			0.7 if candidate_origin == &"predicted" else 1.0
+		)
 	else:
 		draw_arc(candidate_center, 13.0, 0.0, TAU, 24, Color(0.32, 0.44, 0.54, 0.6), 1.0, true)
 	_draw_candidate_marker(candidate_center + Vector2(30, -22))
 	if candidate_state == &"match":
-		draw_arc(candidate_center, 29.0, 0.0, TAU, 28, Color(MATCH_COLOR, 0.72), 1.5, true)
+		_draw_candidate_state_ring(candidate_center, Color(MATCH_COLOR, 0.72))
 	elif candidate_state == &"mismatch":
 		draw_arc(target_center, 29.0, 0.0, TAU, 28, Color(1.0, 0.74, 0.28, 0.72), 1.5, true)
-		draw_arc(candidate_center, 29.0, 0.0, TAU, 28, Color(MISMATCH_COLOR, 0.72), 1.5, true)
+		_draw_candidate_state_ring(candidate_center, Color(MISMATCH_COLOR, 0.72))
 	if hovered_slot == &"target":
 		draw_arc(target_center, 34.0, 0.0, TAU, 32, Color(1.0, 0.78, 0.3, 0.9), 1.5, true)
 	elif hovered_slot == &"candidate":
 		draw_arc(candidate_center, 34.0, 0.0, TAU, 32, Color(0.42, 0.82, 1.0, 0.9), 1.5, true)
+
+
+func _draw_candidate_state_ring(center: Vector2, color: Color) -> void:
+	if candidate_origin != &"predicted":
+		draw_arc(center, 29.0, 0.0, TAU, 28, color, 1.5, true)
+		return
+	for segment in 12:
+		var start_angle := float(segment) * TAU / 12.0
+		draw_arc(center, 29.0, start_angle, start_angle + TAU / 24.0, 3, color, 1.5, true)
+
+
+func candidate_ring_style() -> StringName:
+	return &"dashed" if candidate_origin == &"predicted" else &"solid"
 
 
 func persistent_label() -> String:
@@ -156,7 +177,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 	if hover_slot_at(at_position) == &"candidate":
 		tooltip_glyph = candidate_glyph
 		tooltip_title = "工場出力候補"
-		tooltip_context = "実仕掛品または32秒予測"
+		tooltip_context = "32秒予測" if candidate_origin == &"predicted" else "実仕掛品"
 		return "candidate"
 	tooltip_glyph = glyph
 	tooltip_title = "目標シジル // %s" % display_name
@@ -167,7 +188,12 @@ func _get_tooltip(at_position: Vector2) -> String:
 func _make_custom_tooltip(for_text: String):
 	if for_text == "candidate" and candidate_glyph != null:
 		var comparison := GlyphComparisonTooltipModel.new()
-		comparison.configure(glyph, candidate_glyph, display_name)
+		comparison.configure(
+			glyph,
+			candidate_glyph,
+			display_name,
+			"予測出力" if candidate_origin == &"predicted" else "実仕掛品"
+		)
 		return comparison
 	var preview := GlyphTooltipModel.new()
 	preview.configure(

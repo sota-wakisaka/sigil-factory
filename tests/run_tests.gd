@@ -2376,6 +2376,7 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	board.size = Vector2(1196, 401)
 	board.configure(MvpContent.PLAN_EMPTY)
 	_expect(board.final_summoner_candidate_glyph() == null, "unwired factory should not invent a final candidate Glyph")
+	_expect(board.final_summoner_candidate()["state"] == &"missing", "unwired factory should identify its missing final candidate")
 	var source_center := board.node_local_position(&"ring_source")
 	_expect(board._get_tooltip(source_center) == "glyph_comparison", "source equipment should compare its Primitive with the selected target")
 	_expect(board.tooltip_context == "素材Primitive", "unconnected source tooltip should identify its material Primitive")
@@ -2389,6 +2390,7 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	source_tooltip.free()
 	board.configure(MvpContent.PLAN_SCOUT)
 	var predicted_candidate := board.final_summoner_candidate_glyph()
+	_expect(board.final_summoner_candidate()["state"] == &"predicted", "non-destructive final output should retain its predicted origin")
 	_expect(predicted_candidate != null, "valid factory should expose its predicted final summoner candidate")
 	_expect(
 		predicted_candidate.canonical_serialization() == MvpContent.recipes()[0].glyph.canonical_serialization(),
@@ -2396,6 +2398,7 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	)
 	var transported := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	board.simulation.lines[&"line_1"].payload = transported
+	_expect(board.final_summoner_candidate()["state"] == &"actual", "transported final output should replace the predicted candidate with an actual one")
 	var line_start := board._output_port_position(&"ring_source")
 	var line_finish := board._input_port_position(&"summoner", 0)
 	_expect(board._get_tooltip(line_start.lerp(line_finish, 0.5)) == "glyph_comparison", "transport line should compare its Glyph with the selected target")
@@ -2664,8 +2667,9 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	target_tooltip.free()
 	_expect(ghost.recipe_id == &"azure_guard", "sigil ghost should retain the displayed recipe ID")
 	_expect(ghost.glyph_draw_scale() == 2.45, "single-Primitive completion target should stay readable beside the factory candidate")
-	ghost.show_candidate(ghost.glyph)
+	ghost.show_candidate(ghost.glyph, &"predicted")
 	_expect(ghost.candidate_state == &"match", "identical factory candidate should show a positive comparison state")
+	_expect(ghost.candidate_origin == &"predicted" and ghost.candidate_ring_style() == &"dashed", "predicted factory candidate should keep a dashed visual grammar")
 	var mismatching_candidate := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	ghost.show_candidate(mismatching_candidate)
 	_expect(ghost.candidate_state == &"mismatch", "different factory candidate should show a negative comparison state")

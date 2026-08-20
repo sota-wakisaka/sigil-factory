@@ -67,6 +67,7 @@ func _initialize() -> void:
 	_expect(guided_result["ok"], "guided factory connection should succeed")
 	_expect(main.factory_state.state == &"ready", "first connection should replace the guide with a visual ready badge")
 	_expect(main.sigil_ghost.candidate_state == &"match", "completed starter wiring should visually match factory output against the target")
+	_expect(main.sigil_ghost.candidate_origin == &"predicted", "pre-battle factory output should remain visibly identified as a prediction")
 	_expect(main.factory_board.disconnect_input(&"summoner", 0), "guided connection should be removable")
 	_expect(main.factory_state.state == &"pending", "removing the first connection should restore the pending connection badge")
 	_expect(main.sigil_ghost.candidate_state == &"missing", "broken wiring should clear the final candidate comparison")

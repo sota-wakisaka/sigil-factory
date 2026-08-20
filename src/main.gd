@@ -293,7 +293,8 @@ func _refresh_factory_inspector() -> void:
 
 
 func _refresh_factory_goal_candidate() -> void:
-	sigil_ghost.show_candidate(factory_board.final_summoner_candidate_glyph())
+	var candidate := factory_board.final_summoner_candidate()
+	sigil_ghost.show_candidate(candidate["glyph"], candidate["state"])
 
 
 func _refresh_factory_goal_tools() -> void:

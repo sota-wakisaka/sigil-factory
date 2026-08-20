@@ -1654,9 +1654,13 @@ func predicted_output_glyph_for_node(node_id: StringName) -> GlyphModel:
 
 
 func final_summoner_candidate_glyph() -> GlyphModel:
+	return final_summoner_candidate()["glyph"]
+
+
+func final_summoner_candidate() -> Dictionary:
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
-		return null
+		return {"glyph": null, "state": &"missing"}
 	var summoner_ids: Array = []
 	for node_id in display_simulation.nodes:
 		if display_simulation.nodes[node_id].kind == FactoryNodeModel.NodeKind.SUMMONER:
@@ -1666,7 +1670,7 @@ func final_summoner_candidate_glyph() -> GlyphModel:
 		var summoner: FactoryNodeModel = display_simulation.nodes[summoner_id]
 		for input_glyph in summoner.input_buffers:
 			if GlyphPainterModel.can_draw(input_glyph):
-				return input_glyph.copy()
+				return {"glyph": input_glyph.copy(), "state": &"actual"}
 		var line_ids := display_simulation.lines.keys()
 		line_ids.sort()
 		for line_id in line_ids:
@@ -1674,12 +1678,12 @@ func final_summoner_candidate_glyph() -> GlyphModel:
 			if line.to_node_id != summoner_id:
 				continue
 			if GlyphPainterModel.can_draw(line.payload):
-				return line.payload.copy()
+				return {"glyph": line.payload.copy(), "state": &"actual"}
 			if cached_node_output_glyphs.has(line.from_node_id):
 				var predicted = cached_node_output_glyphs[line.from_node_id]
 				if GlyphPainterModel.can_draw(predicted):
-					return predicted.copy()
-	return null
+					return {"glyph": predicted.copy(), "state": &"predicted"}
+	return {"glyph": null, "state": &"missing"}
 
 
 func source_glyph_for_node(node_id: StringName) -> GlyphModel:
