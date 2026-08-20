@@ -2563,11 +2563,18 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	invalid_board.size = Vector2(1196, 401)
 	invalid_board.configure(MvpContent.PLAN_SENTINEL)
 	invalid_board.set_interaction_enabled(true)
+	_expect(invalid_board.disconnect_input(&"colorizer", 0), "invalid connection test should expose a missing target input")
+	var rejected_input := invalid_board._input_port_position(&"colorizer", 0)
+	_expect(invalid_board.validation_fault_at(rejected_input) == "入力を接続", "idle missing input should retain its local repair tooltip")
 	invalid_board.connecting_from_node_id = &"ring_source"
 	invalid_board.hovered_input_node_id = &"colorizer"
 	invalid_board.hovered_input_port = 0
 	invalid_board.connection_cursor = Vector2(12, 12)
 	_expect(invalid_board.connection_preview_state() == &"invalid", "occupied output should produce an invalid red connection preview")
+	_expect(invalid_board.connection_target_result(&"colorizer", 0)["reason"] == &"occupied_output", "connection preview should retain the specific rejection reason")
+	_expect(invalid_board.validation_fault_at(rejected_input) == "", "active wiring should suppress the stale missing-input instruction")
+	_expect(invalid_board._get_tooltip(rejected_input) == "出力は使用中", "rejected target should explain the actual connection failure")
+	_expect(invalid_board.cursor_shape_at(rejected_input) == Control.CURSOR_FORBIDDEN, "rejected target should use an action cursor instead of a help cursor")
 	_expect(invalid_board.connection_preview_endpoint() == invalid_board._input_port_position(&"colorizer", 0), "invalid preview should still snap to the rejected port")
 	invalid_board.free()
 

@@ -866,13 +866,43 @@ func connection_preview_state() -> StringName:
 
 
 func connection_target_state(to_node_id: StringName, to_port: int) -> StringName:
+	return connection_target_result(to_node_id, to_port)["state"]
+
+
+func connection_target_result(to_node_id: StringName, to_port: int) -> Dictionary:
 	var display_simulation := _display_simulation()
 	if connecting_from_node_id == &"" or display_simulation == null:
-		return &"free"
+		return {"state": &"free", "reason": &"inactive"}
+	if (
+		not display_simulation.nodes.has(connecting_from_node_id)
+		or not display_simulation.nodes.has(to_node_id)
+	):
+		return {"state": &"invalid", "reason": &"missing_node"}
+	if connecting_from_node_id == to_node_id:
+		return {"state": &"invalid", "reason": &"self_connection"}
+	var target: FactoryNodeModel = display_simulation.nodes[to_node_id]
+	if to_port < 0 or to_port >= target.required_input_count():
+		return {"state": &"invalid", "reason": &"invalid_port"}
 	for line in display_simulation.lines.values():
 		if line.from_node_id == connecting_from_node_id and line.to_node_id == to_node_id and line.to_port == to_port:
-			return &"already_connected"
-	return &"valid" if input_port_connectable(to_node_id, to_port) else &"invalid"
+			return {"state": &"already_connected", "reason": &"already_connected"}
+	for line in display_simulation.lines.values():
+		if line.from_node_id == connecting_from_node_id:
+			return {"state": &"invalid", "reason": &"occupied_output"}
+	if _path_reaches_node(to_node_id, connecting_from_node_id, {}):
+		return {"state": &"invalid", "reason": &"cycle"}
+	return {"state": &"valid", "reason": &"valid"}
+
+
+func connection_target_tooltip(to_node_id: StringName, to_port: int) -> String:
+	var result := connection_target_result(to_node_id, to_port)
+	match result["reason"]:
+		&"valid": return "接続できます"
+		&"already_connected": return "接続済み"
+		&"occupied_output": return "出力は使用中"
+		&"cycle": return "循環するため接続できません"
+		&"self_connection": return "同じ設備には接続できません"
+		_: return "ここには接続できません"
 
 
 func connection_preview_endpoint() -> Vector2:
@@ -886,6 +916,14 @@ func _get_cursor_shape(at_position: Vector2) -> CursorShape:
 
 
 func cursor_shape_at(at_position: Vector2) -> CursorShape:
+	if connecting_from_node_id != &"":
+		var connection_input := _input_port_at(at_position)
+		if not connection_input.is_empty():
+			var target_state := connection_target_state(
+				connection_input.get("node_id", &""),
+				int(connection_input.get("port", -1))
+			)
+			return Control.CURSOR_FORBIDDEN if target_state == &"invalid" else Control.CURSOR_POINTING_HAND
 	if informational_visual_at(at_position):
 		return Control.CURSOR_HELP
 	if not input_glyph_at(at_position).is_empty():
@@ -2097,6 +2135,13 @@ func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_context = ""
 	tooltip_comparison_name = ""
 	tooltip_candidate_label = "工場出力"
+	if connecting_from_node_id != &"":
+		var connection_input := _input_port_at(at_position)
+		if not connection_input.is_empty():
+			return connection_target_tooltip(
+				connection_input.get("node_id", &""),
+				int(connection_input.get("port", -1))
+			)
 	var validation_fault := validation_fault_at(at_position)
 	if not validation_fault.is_empty():
 		return validation_fault
@@ -2591,10 +2636,7 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 			draw_arc(position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(hover_color, 0.52), 2.2, true)
 		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
 		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, input_color, 2.0)
-		if (
-			input_validation_state(node.id, port) == &"missing"
-			and not (connecting_from_node_id != &"" and input_port_connectable(node.id, port))
-		):
+		if input_validation_state(node.id, port) == &"missing" and connecting_from_node_id == &"":
 			_draw_validation_port_marker(position)
 
 
@@ -2640,7 +2682,7 @@ func validation_fault_at(at_position: Vector2) -> String:
 		for port in node.required_input_count():
 			if (
 				input_validation_state(node_id, port) == &"missing"
-				and not (connecting_from_node_id != &"" and input_port_connectable(node_id, port))
+				and connecting_from_node_id == &""
 				and at_position.distance_to(_input_port_position(node_id, port)) <= PORT_RADIUS + 7.0
 			):
 				return "入力を接続"
@@ -2696,24 +2738,7 @@ func _draw_node_validation_marker(node_id: StringName, center: Vector2) -> void:
 
 
 func input_port_connectable(to_node_id: StringName, to_port: int) -> bool:
-	var display_simulation := _display_simulation()
-	if (
-		connecting_from_node_id == &""
-		or display_simulation == null
-		or not display_simulation.nodes.has(connecting_from_node_id)
-		or not display_simulation.nodes.has(to_node_id)
-		or connecting_from_node_id == to_node_id
-	):
-		return false
-	var target: FactoryNodeModel = display_simulation.nodes[to_node_id]
-	if to_port < 0 or to_port >= target.required_input_count():
-		return false
-	for line in display_simulation.lines.values():
-		if line.from_node_id != connecting_from_node_id:
-			continue
-		if line.to_node_id != to_node_id or line.to_port != to_port:
-			return false
-	return not _path_reaches_node(to_node_id, connecting_from_node_id, {})
+	return connection_target_state(to_node_id, to_port) in [&"valid", &"already_connected"]
 
 
 func _path_reaches_node(current_id: StringName, sought_id: StringName, visited: Dictionary) -> bool:
