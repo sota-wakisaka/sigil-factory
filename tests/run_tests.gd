@@ -3069,10 +3069,36 @@ func _test_factory_downstream_route_focus_is_non_destructive() -> void:
 	golem_board.hovered_node_id = &""
 	_expect(golem_board.focused_route_start_node_id() == &"spike_source", "selection should restore route focus after hover exits")
 	_expect(golem_board.node_focus_marker_kind(&"spike_source", &"spike_source") == &"selected" and golem_board.node_focus_marker_kind(&"ring_source", &"spike_source") == &"none", "hover marker should disappear when the selected route regains focus")
+	var line_hover_runtime_before := _factory_runtime_signature(golem_board.simulation)
+	var line_hover_production_before := golem_board.production_snapshot()
+	var line_hover_undo_before := golem_board.undo_history.size()
+	golem_board.selected_node_id = &"ring_source"
+	golem_board.hovered_line_id = &"line_spike"
+	_expect(golem_board.focused_route_start_node_id() == &"spike_source", "hovered line should temporarily focus the route from its sending equipment")
+	var spike_line_route := golem_board.focused_downstream_route(golem_board.focused_route_start_node_id())
+	_expect(
+		spike_line_route["node_ids"] == [&"colorizer", &"combiner", &"spike_source", &"summoner"]
+		and spike_line_route["line_ids"] == [&"line_color", &"line_spike", &"line_summon"]
+		and not spike_line_route["node_ids"].has(&"ring_source")
+		and not spike_line_route["line_ids"].has(&"line_ring"),
+		"line hover should replace the selected sibling route with only its own branch and shared downstream"
+	)
+	_expect(golem_board.node_focus_marker_kind(&"ring_source", &"spike_source") == &"selected" and golem_board.node_focus_marker_kind(&"spike_source", &"spike_source") == &"hover", "line route should keep the selected origin filled and mark its temporary source as hollow")
+	golem_board.hovered_line_id = &"line_color"
+	_expect(golem_board.focused_route_start_node_id() == &"combiner", "shared downstream line should focus from its own sender without claiming either source branch")
+	var shared_line_route := golem_board.focused_downstream_route(golem_board.focused_route_start_node_id())
+	_expect(shared_line_route["node_ids"] == [&"colorizer", &"combiner", &"summoner"] and shared_line_route["line_ids"] == [&"line_color", &"line_summon"], "shared line focus should omit both upstream material branches")
+	golem_board.hovered_line_id = &"missing_line"
+	_expect(golem_board.focused_route_start_node_id() == &"ring_source", "stale hovered line should safely fall back to the selected route")
+	golem_board.hovered_line_id = &""
+	_expect(golem_board.focused_route_start_node_id() == &"ring_source", "line hover exit should restore the selected route immediately")
+	_expect(_factory_runtime_signature(golem_board.simulation) == line_hover_runtime_before and golem_board.production_snapshot() == line_hover_production_before and golem_board.undo_history.size() == line_hover_undo_before, "line route inspection should not mutate simulation, production, or Undo history")
 	golem_board.connecting_from_node_id = &"ring_source"
 	_expect(golem_board.focused_route_start_node_id() == &"", "active rewiring should suppress route focus behind the connection preview")
 	golem_board.connecting_from_node_id = &""
+	golem_board.hovered_line_id = &"line_color"
 	_expect(golem_board.disconnect_input(&"colorizer", 0), "route focus fixture should disconnect the shared downstream route")
+	_expect(golem_board.hovered_line_id == &"" and golem_board.focused_route_start_node_id() == &"ring_source", "successful topology change should clear line hover and retain only the selected route")
 	var interrupted_route := golem_board.focused_downstream_route(&"ring_source")
 	_expect(
 		interrupted_route["node_ids"] == [&"combiner", &"ring_source"]
@@ -3080,6 +3106,8 @@ func _test_factory_downstream_route_focus_is_non_destructive() -> void:
 		and not interrupted_route["reaches_summoner"],
 		"a broken route should focus only the reachable segment up to its dead end"
 	)
+	_expect(golem_board.undo(), "route focus fixture should restore its disconnected line")
+	_expect(golem_board.hovered_line_id == &"", "Undo should not restore transient line hover from the graph snapshot")
 	golem_board.free()
 
 

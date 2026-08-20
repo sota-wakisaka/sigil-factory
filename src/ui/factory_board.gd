@@ -313,6 +313,7 @@ func remove_factory_node(node_id: StringName) -> bool:
 		var snapshot: Dictionary = undo_history.pop_back()
 		_restore_undo_snapshot(snapshot)
 		return false
+	_clear_node_hover()
 	_display_positions().erase(node_id)
 	if selected_node_id == node_id:
 		selected_node_id = &""
@@ -347,6 +348,7 @@ func undo() -> bool:
 		plan_id = snapshot.get("plan_id", plan_id)
 		observed_event_count = simulation.summon_events.size()
 		observed_failure_count = simulation.summon_failure_events.size()
+	_clear_node_hover()
 	selected_node_id = &""
 	connecting_from_node_id = &""
 	connection_message = "元に戻しました"
@@ -925,6 +927,7 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 	if result["ok"]:
 		connection_serial += 1
 		_apply_line_upgrades(display_simulation.lines[line_id])
+		_clear_node_hover()
 	if not result["ok"]:
 		var snapshot: Dictionary = undo_history.pop_back()
 		_restore_undo_snapshot(snapshot)
@@ -952,6 +955,7 @@ func disconnect_input(to_node_id: StringName, to_port: int) -> bool:
 				return false
 			var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
 			display_simulation.disconnect_line(line.id)
+			_clear_node_hover()
 			connection_message = (
 				"接続を解除しました（%s）" % pending_discard_notice()
 				if discarded_now > 0
@@ -1056,6 +1060,7 @@ func apply_plan(next_plan_id: StringName) -> bool:
 		return false
 	plan_id = next_plan_id
 	simulation = MvpContent.build_factory(plan_id)
+	_clear_node_hover()
 	_apply_run_upgrades(simulation)
 	node_positions = MvpContent.layout_for_plan(plan_id)
 	observed_event_count = 0
@@ -1276,6 +1281,7 @@ func preview_plan(next_plan_id: StringName) -> bool:
 	var committed_tick := simulation.tick_index
 	pending_plan_id = next_plan_id
 	preview_simulation = MvpContent.build_factory(pending_plan_id)
+	_clear_node_hover()
 	_apply_run_upgrades(preview_simulation)
 	preview_simulation.discarded_glyphs = discarded_before_edit + discarded_work_in_progress
 	preview_simulation.tick_index = committed_tick
@@ -1295,6 +1301,7 @@ func commit_edit() -> void:
 	node_positions = preview_node_positions
 	observed_event_count = simulation.summon_events.size()
 	observed_failure_count = simulation.summon_failure_events.size()
+	_clear_node_hover()
 	editing = false
 	preview_simulation = null
 	undo_history.clear()
@@ -1307,6 +1314,7 @@ func commit_edit() -> void:
 func cancel_edit() -> void:
 	if not editing:
 		return
+	_clear_node_hover()
 	editing = false
 	preview_simulation = null
 	preview_node_positions.clear()
@@ -2463,10 +2471,18 @@ func focused_route_start_node_id() -> StringName:
 		hovered_output_node_id,
 		hovered_input_node_id,
 		hovered_node_id,
-		selected_node_id,
 	]:
 		if candidate != &"" and display_simulation.nodes.has(candidate):
 			return candidate
+	if hovered_line_id != &"" and display_simulation.lines.has(hovered_line_id):
+		var hovered_line: FactoryLineModel = display_simulation.lines[hovered_line_id]
+		if (
+			display_simulation.nodes.has(hovered_line.from_node_id)
+			and display_simulation.nodes.has(hovered_line.to_node_id)
+		):
+			return hovered_line.from_node_id
+	if selected_node_id != &"" and display_simulation.nodes.has(selected_node_id):
+		return selected_node_id
 	return &""
 
 
