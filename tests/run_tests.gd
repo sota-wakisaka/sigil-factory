@@ -2742,6 +2742,9 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	attribute_comparison.free()
 	ghost.show_candidate(null)
 	_expect(ghost.candidate_state == &"missing", "missing factory candidate should leave an empty comparison slot")
+	ghost.hovered_slot = &"candidate"
+	ghost.show_candidate(null)
+	_expect(ghost.hovered_slot == &"", "clearing the factory candidate should also clear its stale hover emphasis")
 	var expected: SigilRecipeModel
 	for recipe in MvpContent.recipes():
 		if recipe.id == &"azure_guard":

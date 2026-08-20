@@ -76,6 +76,8 @@ func show_recipe(next_recipe_id: StringName) -> bool:
 func show_candidate(next_candidate: GlyphModel, next_origin: StringName = &"actual") -> void:
 	candidate_glyph = next_candidate.copy() if GlyphPainterModel.can_draw(next_candidate) else null
 	candidate_origin = next_origin if candidate_glyph != null and next_origin in [&"actual", &"predicted"] else &"missing"
+	if candidate_glyph == null and hovered_slot == &"candidate":
+		hovered_slot = &""
 	_refresh_candidate_state()
 	queue_redraw()
 
