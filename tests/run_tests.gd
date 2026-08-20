@@ -2261,6 +2261,10 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	board.size = Vector2(568, 339)
 	board.configure(MvpContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
+	var port_hover := InputEventMouseMotion.new()
+	port_hover.position = board._output_port_position(&"ring_source")
+	board._gui_input(port_hover)
+	_expect(board.hovered_port_kind() == &"output", "output port should gain a visual hover ring before wiring")
 	var output_click := InputEventMouseButton.new()
 	output_click.button_index = MOUSE_BUTTON_LEFT
 	output_click.pressed = true
@@ -2272,6 +2276,9 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	_expect(board.get_cursor_shape(board.node_local_position(&"ring_source")) == Control.CURSOR_DRAG, "node hover should advertise drag without permanent text")
 	_expect(board.get_cursor_shape(board._output_port_position(&"ring_source")) == Control.CURSOR_POINTING_HAND, "output hover should advertise connection")
 	_expect(board.get_cursor_shape(board._input_port_position(&"summoner", 0)) == Control.CURSOR_POINTING_HAND, "input hover should advertise connection")
+	port_hover.position = board._input_port_position(&"summoner", 0)
+	board._gui_input(port_hover)
+	_expect(board.hovered_port_kind() == &"input" and board.input_port_connectable(&"summoner", 0), "input hover should combine target feedback with connection validity")
 	var input_click := InputEventMouseButton.new()
 	input_click.button_index = MOUSE_BUTTON_LEFT
 	input_click.pressed = true

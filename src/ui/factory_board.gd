@@ -41,6 +41,9 @@ var preview_node_positions: Dictionary = {}
 var interaction_enabled := false
 var selected_node_id: StringName = &""
 var hovered_node_id: StringName = &""
+var hovered_output_node_id: StringName = &""
+var hovered_input_node_id: StringName = &""
+var hovered_input_port := -1
 var dragging_node := false
 var drag_snapshot_pending := false
 var drag_offset := Vector2.ZERO
@@ -80,6 +83,9 @@ func configure(next_plan_id: StringName) -> void:
 	preview_simulation = null
 	selected_node_id = &""
 	hovered_node_id = &""
+	hovered_output_node_id = &""
+	hovered_input_node_id = &""
+	hovered_input_port = -1
 	dragging_node = false
 	drag_snapshot_pending = false
 	connecting_from_node_id = &""
@@ -99,6 +105,9 @@ func set_interaction_enabled(enabled: bool) -> void:
 		drag_snapshot_pending = false
 		selected_node_id = &""
 		hovered_node_id = &""
+		hovered_output_node_id = &""
+		hovered_input_node_id = &""
+		hovered_input_port = -1
 		connecting_from_node_id = &""
 	selection_changed.emit()
 	queue_redraw()
@@ -526,10 +535,7 @@ func _gui_input(event: InputEvent) -> void:
 	if not interaction_enabled:
 		return
 	if event is InputEventMouseMotion:
-		var next_hovered := _node_at(event.position)
-		if next_hovered != hovered_node_id:
-			hovered_node_id = next_hovered
-			queue_redraw()
+		_update_pointer_hover(event.position)
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			var input_port := _input_port_at(event.position)
@@ -575,10 +581,41 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _clear_node_hover() -> void:
-	if hovered_node_id == &"":
+	if hovered_node_id == &"" and hovered_output_node_id == &"" and hovered_input_node_id == &"":
 		return
 	hovered_node_id = &""
+	hovered_output_node_id = &""
+	hovered_input_node_id = &""
+	hovered_input_port = -1
 	queue_redraw()
+
+
+func _update_pointer_hover(at_position: Vector2) -> void:
+	var next_node := _node_at(at_position)
+	var next_output := _output_port_at(at_position)
+	var input := _input_port_at(at_position)
+	var next_input_node: StringName = input.get("node_id", &"")
+	var next_input_port := int(input.get("port", -1))
+	if (
+		next_node == hovered_node_id
+		and next_output == hovered_output_node_id
+		and next_input_node == hovered_input_node_id
+		and next_input_port == hovered_input_port
+	):
+		return
+	hovered_node_id = next_node
+	hovered_output_node_id = next_output
+	hovered_input_node_id = next_input_node
+	hovered_input_port = next_input_port
+	queue_redraw()
+
+
+func hovered_port_kind() -> StringName:
+	if hovered_output_node_id != &"":
+		return &"output"
+	if hovered_input_node_id != &"":
+		return &"input"
+	return &"none"
 
 
 func _get_cursor_shape(at_position: Vector2) -> CursorShape:
@@ -1678,7 +1715,10 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 		var output_color := LINE_COLOR
 		if is_guided_connection_pending() and node.id == &"ring_source":
 			output_color = SELECTED_COLOR
-		draw_circle(center + Vector2(NODE_HALF_SIZE.x, 0), PORT_RADIUS, output_color)
+		var output_position := center + Vector2(NODE_HALF_SIZE.x, 0)
+		draw_circle(output_position, PORT_RADIUS, output_color)
+		if node.id == hovered_output_node_id:
+			draw_arc(output_position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(GLYPH_COLOR, 0.5), 2.2, true)
 	for port in node.required_input_count():
 		var position := _input_port_position(node.id, port)
 		var input_color := LINE_COLOR
@@ -1690,6 +1730,11 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 				draw_arc(position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(MATCH_COLOR, 0.32), 2.0, true)
 			else:
 				input_color = Color(LINE_COLOR, 0.2)
+		if node.id == hovered_input_node_id and port == hovered_input_port:
+			var hover_color := GLYPH_COLOR
+			if connecting_from_node_id != &"":
+				hover_color = MATCH_COLOR if input_port_connectable(node.id, port) else WARNING_COLOR
+			draw_arc(position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(hover_color, 0.52), 2.2, true)
 		draw_circle(position, PORT_RADIUS, PANEL_COLOR)
 		draw_arc(position, PORT_RADIUS, 0.0, TAU, 20, input_color, 2.0)
 
