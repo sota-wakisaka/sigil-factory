@@ -406,7 +406,7 @@ func set_run_upgrades(upgrades: Array[StringName]) -> void:
 func is_guided_connection_pending() -> bool:
 	var display_simulation := _display_simulation()
 	return (
-		plan_id == MvpContent.PLAN_EMPTY
+		display_plan_id() == MvpContent.PLAN_EMPTY
 		and display_simulation != null
 		and display_simulation.lines.is_empty()
 		and connecting_from_node_id == &""
@@ -1799,7 +1799,7 @@ func production_summary_center(index: int) -> Vector2:
 
 
 func production_summary_is_goal(unit_id: StringName) -> bool:
-	var target_recipe_id := MvpContent.recipe_id_for_plan(plan_id)
+	var target_recipe_id := MvpContent.recipe_id_for_plan(display_plan_id())
 	for recipe in MvpContent.recipes():
 		if recipe.id == target_recipe_id:
 			return recipe.unit_id == unit_id
@@ -1920,7 +1920,7 @@ func line_goal_match_state(line_id: StringName) -> StringName:
 		glyph = cached_node_output_glyphs.get(line.from_node_id)
 	if not GlyphPainterModel.can_draw(glyph):
 		return &"empty"
-	var target_recipe_id := MvpContent.recipe_id_for_plan(plan_id)
+	var target_recipe_id := MvpContent.recipe_id_for_plan(display_plan_id())
 	for recipe in MvpContent.recipes():
 		if recipe.id != target_recipe_id:
 			continue
@@ -1949,11 +1949,15 @@ func line_goal_progress_level(line_id: StringName) -> int:
 
 
 func _goal_glyph() -> GlyphModel:
-	var target_recipe_id := MvpContent.recipe_id_for_plan(plan_id)
+	var target_recipe_id := MvpContent.recipe_id_for_plan(display_plan_id())
 	for recipe in MvpContent.recipes():
 		if recipe.id == target_recipe_id:
 			return recipe.glyph
 	return null
+
+
+func display_plan_id() -> StringName:
+	return pending_plan_id if editing else plan_id
 
 
 func input_recipe_match_state(node_id: StringName, port: int) -> StringName:
