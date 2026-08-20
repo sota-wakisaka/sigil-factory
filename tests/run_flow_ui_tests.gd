@@ -76,6 +76,10 @@ func _initialize() -> void:
 	_expect(main.get_node("Toolbar/ScoutButton").button_pressed, "selected sigil plan should be highlighted")
 	_expect(main.factory_state.state == &"ready", "complete factory template should show the same ready state as manually completed wiring")
 	_expect(not main.get_node("Toolbar/EmptyButton").button_pressed, "previous sigil plan should clear its highlight")
+	main.get_node("FactoryPalette/UndoButton").pressed.emit()
+	_expect(main.factory_board.plan_id == MvpContent.PLAN_EMPTY and main.factory_board.simulation.lines.size() == 1, "build-phase preset undo should restore the preceding hand-wired factory")
+	_expect(main.get_node("Toolbar/EmptyButton").button_pressed and not main.get_node("Toolbar/ScoutButton").button_pressed, "build-phase preset undo should restore its plan highlight")
+	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	_expect(
 		main.get_node("Toolbar/ScoutButton").glyph.canonical_serialization() == main.sigil_ghost.glyph.canonical_serialization(),
 		"selected plan button and persistent goal should draw the same CanonicalGlyph"
@@ -89,8 +93,8 @@ func _initialize() -> void:
 	_expect(main.get_node("FactoryPalette/DeleteButton").disabled, "delete should stay unavailable until a node is selected")
 	_expect(main.get_node("FactoryPalette/DeleteButton").availability_reason == &"selection", "delete palette badge should identify a missing selection")
 	_expect("設備を選択" in main.get_node("FactoryPalette/DeleteButton").tooltip_text, "disabled delete should explain how to enable it on hover")
-	_expect(main.get_node("FactoryPalette/UndoButton").disabled, "undo should stay unavailable without edit history")
-	_expect(main.get_node("FactoryPalette/UndoButton").availability_reason == &"undo_empty", "undo palette badge should identify an empty history")
+	_expect(not main.get_node("FactoryPalette/UndoButton").disabled, "undo should retain the latest template application")
+	_expect(main.get_node("FactoryPalette/UndoButton").availability_reason == &"", "available undo should clear its empty-history badge")
 	_expect(not main.inspector_label.visible, "empty inspector should remove its idle target instead of reserving a blank control")
 	_expect(not main.inspector_option.visible, "empty inspector should hide its unusable setting dropdown")
 	_expect(main.get_node("FactoryPalette/RingButton").preview_glyph != null, "source palette choice should use its Primitive as the main icon")

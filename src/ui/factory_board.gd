@@ -323,6 +323,9 @@ func undo() -> bool:
 	else:
 		simulation = snapshot["simulation"]
 		node_positions = snapshot["positions"]
+		plan_id = snapshot.get("plan_id", plan_id)
+		observed_event_count = simulation.summon_events.size()
+		observed_failure_count = simulation.summon_failure_events.size()
 	selected_node_id = &""
 	connecting_from_node_id = &""
 	connection_message = "元に戻しました"
@@ -687,6 +690,28 @@ func cancel_pending_connection() -> bool:
 	connecting_from_node_id = &""
 	connection_cursor = Vector2.ZERO
 	connection_message = "配線をキャンセルしました"
+	queue_redraw()
+	return true
+
+
+func apply_plan(next_plan_id: StringName) -> bool:
+	if not interaction_enabled or editing or next_plan_id == plan_id:
+		return false
+	var history_size := undo_history.size()
+	_push_undo_snapshot()
+	if undo_history.size() == history_size:
+		return false
+	plan_id = next_plan_id
+	simulation = MvpContent.build_factory(plan_id)
+	_apply_run_upgrades(simulation)
+	node_positions = MvpContent.layout_for_plan(plan_id)
+	observed_event_count = 0
+	observed_failure_count = 0
+	selected_node_id = &""
+	connecting_from_node_id = &""
+	connection_message = "テンプレートを適用しました"
+	_refresh_production_preview()
+	selection_changed.emit()
 	queue_redraw()
 	return true
 

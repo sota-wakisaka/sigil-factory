@@ -228,10 +228,11 @@ func _select_plan(plan_id: StringName) -> void:
 			feedback += " // " + discard_notice
 		_set_factory_feedback(feedback)
 	else:
-		factory_board.configure(plan_id)
 		if flow.phase == RunFlow.Phase.FACTORY_BUILD:
+			factory_board.apply_plan(plan_id)
 			_refresh_factory_validation_state()
 		else:
+			factory_board.configure(plan_id)
 			_set_factory_feedback("◇ %s" % MvpContent.plan_name(plan_id))
 
 
