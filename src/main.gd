@@ -44,7 +44,7 @@ enum WorkspaceView {
 @onready var reward_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RewardOption
 @onready var route_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RouteOption
 @onready var inspector_label: FactorySelectionIndicatorControl = $FactoryInspector/SelectionLabel
-@onready var inspector_option: OptionButton = $FactoryInspector/SettingOption
+@onready var inspector_option: FactorySettingOption = $FactoryInspector/SettingOption
 @onready var sigil_ghost: SigilGhostControl = $FactoryInspector/SigilGhost
 @onready var factory_tab: Button = $WorkspaceTabs/FactoryTab
 @onready var battle_tab: Button = $WorkspaceTabs/BattleTab
@@ -91,8 +91,12 @@ func _ready() -> void:
 	factory_board.factory_changed.connect(_refresh_factory_validation_state)
 	factory_board.factory_changed.connect(_refresh_factory_goal_candidate)
 	factory_board.factory_changed.connect(_refresh_factory_palette_state)
+	factory_board.factory_changed.connect(inspector_option._clear_option_preview)
 	factory_board.selection_changed.connect(_refresh_factory_palette_state)
+	factory_board.selection_changed.connect(inspector_option._clear_option_preview)
 	inspector_option.item_selected.connect(_on_inspector_option_selected)
+	inspector_option.option_preview_requested.connect(_on_inspector_option_preview_requested)
+	inspector_option.option_preview_cleared.connect(_on_inspector_option_preview_cleared)
 	battle_board.battle_finished.connect(_on_battle_finished)
 	_select_plan(MvpContent.PLAN_SCOUT)
 	_apply_phase()
@@ -336,6 +340,23 @@ func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
 
 func _on_inspector_option_selected(index: int) -> void:
 	factory_board.configure_selected_node(index)
+
+
+func _on_inspector_option_preview_requested(index: int) -> void:
+	var candidate := factory_board.setting_option_candidate(index)
+	if not bool(candidate.get("active", false)):
+		_refresh_factory_goal_candidate()
+		return
+	var forecast_state: StringName = (
+		&"invalid"
+		if candidate.get("validity", &"invalid") == &"invalid"
+		else candidate.get("output_state", &"no_output")
+	)
+	sigil_ghost.show_candidate(candidate.get("glyph"), &"hypothetical", forecast_state)
+
+
+func _on_inspector_option_preview_cleared() -> void:
+	_refresh_factory_goal_candidate()
 
 
 func _cancel_edit() -> void:

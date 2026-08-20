@@ -78,6 +78,8 @@ var cached_production_discarded := 0
 var cached_production_valid := false
 var cached_validation_errors: Array[String] = []
 var cached_node_output_glyphs: Dictionary = {}
+var factory_revision := 0
+var setting_option_preview_cache: Dictionary = {}
 var production_comparison_active := false
 var production_comparison_baseline: Dictionary = {}
 var tooltip_glyph: GlyphModel
@@ -464,49 +466,13 @@ func configure_selected_node(option_index: int) -> bool:
 	if not interaction_enabled or selected_node_id == &"" or not display_simulation.nodes.has(selected_node_id):
 		return false
 	var node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
-	var config_changed := false
-	match node.kind:
-		FactoryNodeModel.NodeKind.SOURCE:
-			if option_index < 0 or option_index > 1:
-				return false
-			config_changed = (
-				String(node.config.get("primitive_id", "ring")) != ("spike" if option_index == 1 else "ring")
-				or int(node.config.get("interval_ticks", 0)) < 1
-			)
-		FactoryNodeModel.NodeKind.ROTATOR:
-			if option_index < 0 or option_index > 2:
-				return false
-			config_changed = (
-				int(node.config.get("steps", 0)) != option_index + 1
-				or int(node.config.get("processing_ticks", 0)) < 1
-			)
-		FactoryNodeModel.NodeKind.COLORIZER:
-			if option_index < 0 or option_index > 2:
-				return false
-			config_changed = (
-				String(node.config.get("color_id", "")) != ["blue", "red", "white"][option_index]
-				or int(node.config.get("processing_ticks", 0)) < 1
-			)
-		_:
-			return false
-	if not config_changed:
+	if not _setting_option_changes_node(node, option_index):
 		return false
 	_push_undo_snapshot()
 	var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
-	match node.kind:
-		FactoryNodeModel.NodeKind.SOURCE:
-			node.config["primitive_id"] = "spike" if option_index == 1 else "ring"
-			node.config["interval_ticks"] = 54 if option_index == 1 else 18
-			node.source_timer = 0
-			_apply_node_upgrades(node)
-		FactoryNodeModel.NodeKind.ROTATOR:
-			node.config["steps"] = option_index + 1
-			node.config["processing_ticks"] = 2
-			_apply_node_upgrades(node)
-		FactoryNodeModel.NodeKind.COLORIZER:
-			node.config["color_id"] = ["blue", "red", "white"][option_index]
-			node.config["processing_ticks"] = 2
-			_apply_node_upgrades(node)
+	if not _apply_setting_option(node, option_index):
+		undo_history.pop_back()
+		return false
 	connection_message = (
 		"設備設定を変更しました（%s）" % pending_discard_notice()
 		if discarded_now > 0
@@ -518,10 +484,125 @@ func configure_selected_node(option_index: int) -> bool:
 	return true
 
 
+func _setting_option_changes_node(node: FactoryNodeModel, option_index: int) -> bool:
+	match node.kind:
+		FactoryNodeModel.NodeKind.SOURCE:
+			if option_index < 0 or option_index > 1:
+				return false
+			return (
+				String(node.config.get("primitive_id", "ring")) != ("spike" if option_index == 1 else "ring")
+				or int(node.config.get("interval_ticks", 0)) < 1
+			)
+		FactoryNodeModel.NodeKind.ROTATOR:
+			if option_index < 0 or option_index > 2:
+				return false
+			return (
+				int(node.config.get("steps", 0)) != option_index + 1
+				or int(node.config.get("processing_ticks", 0)) < 1
+			)
+		FactoryNodeModel.NodeKind.COLORIZER:
+			if option_index < 0 or option_index > 2:
+				return false
+			return (
+				String(node.config.get("color_id", "")) != ["blue", "red", "white"][option_index]
+				or int(node.config.get("processing_ticks", 0)) < 1
+			)
+	return false
+
+
+func _apply_setting_option(node: FactoryNodeModel, option_index: int) -> bool:
+	match node.kind:
+		FactoryNodeModel.NodeKind.SOURCE:
+			if option_index < 0 or option_index > 1:
+				return false
+			node.config["primitive_id"] = "spike" if option_index == 1 else "ring"
+			node.config["interval_ticks"] = 54 if option_index == 1 else 18
+			node.source_timer = 0
+			_apply_node_upgrades(node)
+		FactoryNodeModel.NodeKind.ROTATOR:
+			if option_index < 0 or option_index > 2:
+				return false
+			node.config["steps"] = option_index + 1
+			node.config["processing_ticks"] = 2
+			_apply_node_upgrades(node)
+		FactoryNodeModel.NodeKind.COLORIZER:
+			if option_index < 0 or option_index > 2:
+				return false
+			node.config["color_id"] = ["blue", "red", "white"][option_index]
+			node.config["processing_ticks"] = 2
+			_apply_node_upgrades(node)
+		_:
+			return false
+	return true
+
+
+func setting_option_candidate(option_index: int) -> Dictionary:
+	var display_simulation := _display_simulation()
+	if (
+		not interaction_enabled
+		or selected_node_id == &""
+		or display_simulation == null
+		or not display_simulation.nodes.has(selected_node_id)
+	):
+		return {"active": false, "glyph": null, "validity": &"inactive", "output_state": &"no_output", "errors": []}
+	var selected_node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
+	if not _setting_option_changes_node(selected_node, option_index):
+		return {"active": false, "glyph": null, "validity": &"inactive", "output_state": &"no_output", "errors": []}
+	var cache_key := "%d:%s:%d" % [factory_revision, selected_node_id, option_index]
+	if setting_option_preview_cache.has(cache_key):
+		return _copy_setting_option_candidate(setting_option_preview_cache[cache_key])
+	var duplication := display_simulation.duplicate_state_result()
+	if not duplication["ok"]:
+		var failed := {
+			"active": true,
+			"glyph": null,
+			"validity": &"invalid",
+			"output_state": &"no_output",
+			"errors": duplication.get("errors", []).duplicate(),
+		}
+		setting_option_preview_cache[cache_key] = failed
+		return failed.duplicate(true)
+	var hypothetical: FactorySimulation = duplication["state"]
+	if editing:
+		hypothetical.discard_all_work_in_progress()
+	var hypothetical_node: FactoryNodeModel = hypothetical.nodes[selected_node_id]
+	if not _apply_setting_option(hypothetical_node, option_index):
+		return {"active": false, "glyph": null, "validity": &"inactive", "output_state": &"no_output", "errors": []}
+	var preview := _production_preview_for_simulation(hypothetical, PRODUCTION_PREVIEW_TICKS)
+	var candidate := (
+		_final_summoner_candidate_for(hypothetical, preview.get("node_outputs", {}))
+		if preview.get("ok", false)
+		else {"glyph": null, "state": &"missing"}
+	)
+	var result := {
+		"active": true,
+		"glyph": candidate["glyph"].copy() if GlyphPainterModel.can_draw(candidate.get("glyph")) else null,
+		"validity": &"valid" if preview.get("ok", false) else &"invalid",
+		"output_state": &"glyph" if GlyphPainterModel.can_draw(candidate.get("glyph")) else &"no_output",
+		"errors": preview.get("errors", []).duplicate(),
+	}
+	setting_option_preview_cache[cache_key] = result
+	return _copy_setting_option_candidate(result)
+
+
+func _copy_setting_option_candidate(candidate: Dictionary) -> Dictionary:
+	var glyph: GlyphModel = candidate.get("glyph")
+	return {
+		"active": bool(candidate.get("active", false)),
+		"glyph": glyph.copy() if GlyphPainterModel.can_draw(glyph) else null,
+		"validity": candidate.get("validity", &"invalid"),
+		"output_state": candidate.get("output_state", &"no_output"),
+		"errors": candidate.get("errors", []).duplicate(),
+	}
+
+
 func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
+	return _production_preview_for_simulation(_display_simulation(), ticks)
+
+
+func _production_preview_for_simulation(display_simulation: FactorySimulation, ticks: int) -> Dictionary:
 	var counts := {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	var event_offsets := _empty_production_event_offsets()
-	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return {"ok": false, "counts": counts, "event_offsets": event_offsets, "discarded": 0, "first_failure": {}, "node_outputs": {}, "errors": []}
 	var validation := display_simulation.validate_graph()
@@ -2348,29 +2429,32 @@ func final_summoner_candidate_glyph() -> GlyphModel:
 
 
 func final_summoner_candidate() -> Dictionary:
-	var display_simulation := _display_simulation()
-	if display_simulation == null:
+	return _final_summoner_candidate_for(_display_simulation(), cached_node_output_glyphs)
+
+
+func _final_summoner_candidate_for(source_simulation: FactorySimulation, predicted_outputs: Dictionary) -> Dictionary:
+	if source_simulation == null:
 		return {"glyph": null, "state": &"missing"}
 	var summoner_ids: Array = []
-	for node_id in display_simulation.nodes:
-		if display_simulation.nodes[node_id].kind == FactoryNodeModel.NodeKind.SUMMONER:
+	for node_id in source_simulation.nodes:
+		if source_simulation.nodes[node_id].kind == FactoryNodeModel.NodeKind.SUMMONER:
 			summoner_ids.append(node_id)
 	summoner_ids.sort()
 	for summoner_id in summoner_ids:
-		var summoner: FactoryNodeModel = display_simulation.nodes[summoner_id]
+		var summoner: FactoryNodeModel = source_simulation.nodes[summoner_id]
 		for input_glyph in summoner.input_buffers:
 			if GlyphPainterModel.can_draw(input_glyph):
 				return {"glyph": input_glyph.copy(), "state": &"actual"}
-		var line_ids := display_simulation.lines.keys()
+		var line_ids := source_simulation.lines.keys()
 		line_ids.sort()
 		for line_id in line_ids:
-			var line: FactoryLineModel = display_simulation.lines[line_id]
+			var line: FactoryLineModel = source_simulation.lines[line_id]
 			if line.to_node_id != summoner_id:
 				continue
 			if GlyphPainterModel.can_draw(line.payload):
 				return {"glyph": line.payload.copy(), "state": &"actual"}
-			if cached_node_output_glyphs.has(line.from_node_id):
-				var predicted = cached_node_output_glyphs[line.from_node_id]
+			if predicted_outputs.has(line.from_node_id):
+				var predicted = predicted_outputs[line.from_node_id]
 				if GlyphPainterModel.can_draw(predicted):
 					return {"glyph": predicted.copy(), "state": &"predicted"}
 	return {"glyph": null, "state": &"missing"}
@@ -3318,6 +3402,8 @@ func _push_undo_snapshot() -> void:
 
 
 func _refresh_production_preview() -> void:
+	factory_revision += 1
+	setting_option_preview_cache.clear()
 	var result := production_preview()
 	if not result["ok"]:
 		cached_production_valid = false

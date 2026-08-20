@@ -108,6 +108,40 @@ func _initialize() -> void:
 	_expect(main.get_node("FactoryPalette/RotateButton").mana_cost == 15, "palette should expose processor mana cost with the same visual convention")
 	_expect(main.get_node("FactoryPalette/RingButton").goal_relevant, "scout target should visually link to its ring source tool")
 	_expect(not main.get_node("FactoryPalette/RotateButton").goal_relevant, "scout target should not mark an unused rotation tool")
+	main.factory_board.selected_node_id = &"ring_source"
+	main.factory_board.selection_changed.emit()
+	var factory_snapshot_before_hover: Dictionary = main.factory_board.production_snapshot()
+	var undo_count_before_hover: int = main.factory_board.undo_history.size()
+	var setting_popup: PopupMenu = main.inspector_option.get_popup()
+	main.inspector_option.show_popup()
+	await process_frame
+	var popup_panel := setting_popup.get_theme_stylebox("panel")
+	var popup_top := maxf(popup_panel.get_content_margin(SIDE_TOP), 0.0)
+	var popup_bottom := maxf(popup_panel.get_content_margin(SIDE_BOTTOM), 0.0)
+	var popup_content_height := float(setting_popup.size.y) - popup_top - popup_bottom
+	var second_item_position := Vector2(
+		float(setting_popup.size.x) * 0.5,
+		popup_top + popup_content_height * 0.75
+	)
+	_expect(main.inspector_option.popup_item_index_at(second_item_position) == 1, "mouse row hit testing should identify the second source setting")
+	var option_mouse_motion := InputEventMouseMotion.new()
+	option_mouse_motion.position = second_item_position
+	setting_popup.window_input.emit(option_mouse_motion)
+	_expect(main.inspector_option.preview_index == 1, "moving the mouse over a popup row should select one temporary setting preview")
+	_expect(main.sigil_ghost.candidate_origin == &"hypothetical" and main.sigil_ghost.candidate_glyph != null, "focused source alternative should replace only the final candidate with a hypothetical Glyph")
+	_expect(main.sigil_ghost.candidate_ring_style() == &"dotted", "hypothetical setting should use a neutral dotted marker instead of the predicted result ring")
+	_expect(main.factory_board.production_snapshot() == factory_snapshot_before_hover and main.factory_board.undo_history.size() == undo_count_before_hover, "popup focus should not mutate production forecast or undo history")
+	var preview_cache_size: int = main.factory_board.setting_option_preview_cache.size()
+	option_mouse_motion.position += Vector2(3, 0)
+	setting_popup.window_input.emit(option_mouse_motion)
+	_expect(main.factory_board.setting_option_preview_cache.size() == preview_cache_size, "moving inside the same popup row should reuse the isolated setting forecast")
+	setting_popup.hide()
+	await process_frame
+	_expect(main.sigil_ghost.candidate_origin == &"predicted" and main.inspector_option.preview_index == -1, "closing setting preview should restore the current factory candidate")
+	setting_popup.id_focused.emit(1)
+	_expect(main.inspector_option.preview_index == 1 and main.sigil_ghost.candidate_origin == &"hypothetical", "keyboard-focused popup rows should share the same temporary setting preview")
+	main.factory_board.selection_changed.emit()
+	_expect(main.inspector_option.preview_index == -1 and main.sigil_ghost.candidate_origin == &"predicted", "equipment selection changes should clear a stale temporary setting preview")
 	main.sigil_ghost.show_recipe(&"azure_guard")
 	main._refresh_factory_goal_tools()
 	_expect(main.get_node("FactoryPalette/RotateButton").goal_relevant, "rotated target should visually mark the rotation tool")

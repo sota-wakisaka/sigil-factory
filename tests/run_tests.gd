@@ -93,6 +93,7 @@ func _initialize() -> void:
 	_test_factory_configuration_discards_work_transactionally()
 	_test_factory_preset_preview_is_undoable()
 	_test_source_configuration_resets_generation_progress()
+	_test_factory_setting_preview_is_non_destructive()
 	_test_factory_rewiring_discards_work_transactionally()
 	_test_factory_board_connections_change_output()
 	_test_factory_board_shows_summon_failure_reason()
@@ -2070,6 +2071,66 @@ func _test_source_configuration_resets_generation_progress() -> void:
 	board.advance_tick()
 	_expect(changed_source.source_timer == 1 and changed_source.output_buffer == null, "new source should restart generation instead of producing immediately")
 	board.free()
+
+
+func _test_factory_setting_preview_is_non_destructive() -> void:
+	var cases := [
+		{"plan": MvpContent.PLAN_SCOUT, "node_id": &"ring_source", "option": 1},
+		{"plan": MvpContent.PLAN_SENTINEL, "node_id": &"rotator", "option": 1},
+		{"plan": MvpContent.PLAN_SENTINEL, "node_id": &"colorizer", "option": 1},
+	]
+	for case in cases:
+		var board := FactoryBoard.new()
+		board.configure(case["plan"])
+		if case["node_id"] == &"rotator":
+			for _tick in 25:
+				board.advance_tick()
+		_expect(board.begin_edit(), "setting preview fixture should enter a transaction")
+		board.set_interaction_enabled(true)
+		board.selected_node_id = case["node_id"]
+		var runtime_before := _factory_runtime_signature(board.preview_simulation)
+		var config_before: Dictionary = board.preview_simulation.nodes[case["node_id"]].config.duplicate(true)
+		var production_before := board.production_snapshot()
+		var undo_before := board.undo_history.size()
+		var discard_before := board.pending_discard_count()
+		var committed_candidate := board.final_summoner_candidate_glyph()
+		var hypothetical := board.setting_option_candidate(case["option"])
+		_expect(hypothetical["active"] and GlyphPainterModel.can_draw(hypothetical["glyph"]), "hovered setting should expose a predicted final Glyph")
+		_expect(
+			committed_candidate == null
+			or committed_candidate.canonical_serialization() != hypothetical["glyph"].canonical_serialization(),
+			"alternative setting should visibly change the final candidate"
+		)
+		_expect(_factory_runtime_signature(board.preview_simulation) == runtime_before, "setting hover should not mutate work in progress, timers, lines, or events")
+		_expect(board.preview_simulation.nodes[case["node_id"]].config == config_before, "setting hover should not mutate the selected equipment config")
+		_expect(board.production_snapshot() == production_before, "setting hover should not replace the live 32-second forecast cache")
+		_expect(board.undo_history.size() == undo_before and board.pending_discard_count() == discard_before, "setting hover should not create undo or discard costs")
+		_expect(board.setting_option_preview_cache.size() == 1, "first setting hover should cache its isolated prediction")
+		var cached_hypothetical := board.setting_option_candidate(case["option"])
+		_expect(board.setting_option_preview_cache.size() == 1 and cached_hypothetical["glyph"].canonical_serialization() == hypothetical["glyph"].canonical_serialization(), "repeated hover should reuse the same graph-revision prediction")
+		_expect(board.configure_selected_node(case["option"]), "clicking the hovered alternative should commit one real edit")
+		var confirmed_candidate := board.final_summoner_candidate_glyph()
+		_expect(confirmed_candidate != null and confirmed_candidate.canonical_serialization() == hypothetical["glyph"].canonical_serialization(), "confirmed setting should match the Glyph shown during hover")
+		_expect(board.undo_history.size() == undo_before + 1, "only the confirmed setting should add one undo step")
+		_expect(board.setting_option_preview_cache.is_empty(), "committed graph revision should clear hypothetical setting cache")
+		board.cancel_edit()
+		board.free()
+	var invalid_board := FactoryBoard.new()
+	invalid_board.configure(MvpContent.PLAN_SCOUT)
+	_expect(invalid_board.begin_edit(), "invalid setting preview fixture should enter a transaction")
+	invalid_board.set_interaction_enabled(true)
+	_expect(invalid_board.disconnect_input(&"summoner", 0), "invalid setting preview fixture should break the final route")
+	invalid_board.selected_node_id = &"ring_source"
+	var invalid_candidate := invalid_board.setting_option_candidate(1)
+	_expect(
+		invalid_candidate["active"]
+		and invalid_candidate["validity"] == &"invalid"
+		and invalid_candidate["output_state"] == &"no_output"
+		and invalid_candidate["glyph"] == null,
+		"invalid hypothetical graph should remain distinct from a valid forecast with no output"
+	)
+	invalid_board.cancel_edit()
+	invalid_board.free()
 
 
 func _test_factory_rewiring_discards_work_transactionally() -> void:

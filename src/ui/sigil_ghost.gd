@@ -16,6 +16,7 @@ var glyph: GlyphModel
 var candidate_glyph: GlyphModel
 var candidate_state: StringName = &"missing"
 var candidate_origin: StringName = &"missing"
+var candidate_forecast_state: StringName = &"valid"
 var display_name := ""
 var tooltip_glyph: GlyphModel
 var tooltip_title := ""
@@ -51,7 +52,7 @@ func _clear_hover_slot() -> void:
 
 
 func hover_slot_at(at_position: Vector2) -> StringName:
-	if candidate_glyph != null and at_position.x >= 200.0:
+	if (candidate_glyph != null or candidate_origin == &"hypothetical") and at_position.x >= 200.0:
 		return &"candidate"
 	return &"target" if glyph != null else &""
 
@@ -73,9 +74,22 @@ func show_recipe(next_recipe_id: StringName) -> bool:
 	return false
 
 
-func show_candidate(next_candidate: GlyphModel, next_origin: StringName = &"actual") -> void:
+func show_candidate(
+	next_candidate: GlyphModel,
+	next_origin: StringName = &"actual",
+	next_forecast_state: StringName = &"valid"
+) -> void:
 	candidate_glyph = next_candidate.copy() if GlyphPainterModel.can_draw(next_candidate) else null
-	candidate_origin = next_origin if candidate_glyph != null and next_origin in [&"actual", &"predicted"] else &"missing"
+	candidate_origin = (
+		next_origin
+		if next_origin == &"hypothetical" or (candidate_glyph != null and next_origin in [&"actual", &"predicted"])
+		else &"missing"
+	)
+	candidate_forecast_state = (
+		next_forecast_state
+		if candidate_origin == &"hypothetical" and next_forecast_state in [&"glyph", &"no_output", &"invalid"]
+		else &"valid"
+	)
 	if candidate_glyph == null and hovered_slot == &"candidate":
 		hovered_slot = &""
 	_refresh_candidate_state()
@@ -112,19 +126,31 @@ func _draw() -> void:
 	draw_line(Vector2(224, size.y * 0.5), Vector2(216, size.y * 0.5 - 5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
 	draw_line(Vector2(224, size.y * 0.5), Vector2(216, size.y * 0.5 + 5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
 	if candidate_glyph != null:
+		var candidate_opacity: float = {
+			&"actual": 1.0,
+			&"predicted": 0.7,
+			&"hypothetical": 0.52,
+		}.get(candidate_origin, 1.0)
 		GlyphPainterModel.draw_glyph(
 			self,
 			candidate_glyph,
 			candidate_center,
 			candidate_draw_scale(),
-			0.7 if candidate_origin == &"predicted" else 1.0
+			candidate_opacity
 		)
 	else:
-		draw_arc(candidate_center, 13.0, 0.0, TAU, 24, Color(0.32, 0.44, 0.54, 0.6), 1.0, true)
-	_draw_candidate_marker(candidate_center + Vector2(30, -22))
-	if candidate_state == &"match":
+		var empty_color := MISMATCH_COLOR if candidate_forecast_state == &"invalid" else Color(0.32, 0.62, 0.78, 0.76)
+		draw_arc(candidate_center, 13.0, 0.0, TAU, 24, empty_color, 1.0, true)
+		if candidate_origin == &"hypothetical" and candidate_forecast_state == &"invalid":
+			draw_line(candidate_center + Vector2(-4, -4), candidate_center + Vector2(4, 4), empty_color, 1.5, true)
+			draw_line(candidate_center + Vector2(-4, 4), candidate_center + Vector2(4, -4), empty_color, 1.5, true)
+	if candidate_origin == &"hypothetical":
+		_draw_hypothetical_ring(candidate_center)
+	elif candidate_state == &"match":
+		_draw_candidate_marker(candidate_center + Vector2(30, -22))
 		_draw_candidate_state_ring(candidate_center, Color(MATCH_COLOR, 0.72))
 	elif candidate_state == &"mismatch":
+		_draw_candidate_marker(candidate_center + Vector2(30, -22))
 		draw_arc(target_center, 29.0, 0.0, TAU, 28, Color(1.0, 0.74, 0.28, 0.72), 1.5, true)
 		_draw_candidate_state_ring(candidate_center, Color(MISMATCH_COLOR, 0.72))
 	if hovered_slot == &"target":
@@ -134,7 +160,7 @@ func _draw() -> void:
 
 
 func _draw_candidate_state_ring(center: Vector2, color: Color) -> void:
-	if candidate_origin != &"predicted":
+	if candidate_origin == &"actual":
 		draw_arc(center, 29.0, 0.0, TAU, 28, color, 1.5, true)
 		return
 	for segment in 12:
@@ -142,7 +168,25 @@ func _draw_candidate_state_ring(center: Vector2, color: Color) -> void:
 		draw_arc(center, 29.0, start_angle, start_angle + TAU / 24.0, 3, color, 1.5, true)
 
 
+func _draw_hypothetical_ring(center: Vector2) -> void:
+	var color := Color(0.42, 0.82, 1.0, 0.8)
+	for segment in 16:
+		var start_angle := float(segment) * TAU / 16.0
+		draw_arc(center, 29.0, start_angle, start_angle + TAU / 64.0, 3, color, 1.5, true)
+	var marker_center := center + Vector2(30, -22)
+	var diamond := PackedVector2Array([
+		marker_center + Vector2(0, -4),
+		marker_center + Vector2(4, 0),
+		marker_center + Vector2(0, 4),
+		marker_center + Vector2(-4, 0),
+		marker_center + Vector2(0, -4),
+	])
+	draw_polyline(diamond, color, 1.4, true)
+
+
 func candidate_ring_style() -> StringName:
+	if candidate_origin == &"hypothetical":
+		return &"dotted"
 	return &"dashed" if candidate_origin == &"predicted" else &"solid"
 
 
@@ -177,9 +221,19 @@ func _draw_candidate_marker(center: Vector2) -> void:
 
 func _get_tooltip(at_position: Vector2) -> String:
 	if hover_slot_at(at_position) == &"candidate":
+		if candidate_origin == &"hypothetical" and candidate_glyph == null:
+			return (
+				"設定候補 // 予測できません"
+				if candidate_forecast_state == &"invalid"
+				else "設定候補 // 32秒内に出力なし"
+			)
 		tooltip_glyph = candidate_glyph
 		tooltip_title = "工場出力候補"
-		tooltip_context = "32秒予測" if candidate_origin == &"predicted" else "実仕掛品"
+		tooltip_context = {
+			&"actual": "実仕掛品",
+			&"predicted": "32秒予測",
+			&"hypothetical": "設定候補 // 未確定",
+		}.get(candidate_origin, "候補なし")
 		return "candidate"
 	tooltip_glyph = glyph
 	tooltip_title = "目標シジル // %s" % display_name
@@ -188,13 +242,19 @@ func _get_tooltip(at_position: Vector2) -> String:
 
 
 func _make_custom_tooltip(for_text: String):
+	if for_text.begins_with("設定候補 //"):
+		return null
 	if for_text == "candidate" and candidate_glyph != null:
 		var comparison := GlyphComparisonTooltipModel.new()
 		comparison.configure(
 			glyph,
 			candidate_glyph,
 			display_name,
-			"予測出力" if candidate_origin == &"predicted" else "実仕掛品"
+			{
+				&"actual": "実仕掛品",
+				&"predicted": "予測出力",
+				&"hypothetical": "設定候補",
+			}.get(candidate_origin, "工場出力")
 		)
 		return comparison
 	var preview := GlyphTooltipModel.new()

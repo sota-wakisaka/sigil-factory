@@ -1,19 +1,29 @@
 class_name FactorySettingOption
 extends OptionButton
 
+signal option_preview_requested(index: int)
+signal option_preview_cleared
+
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
 
 var visual_kind := -1
 var visual_index := -1
 var icon_cache: Dictionary = {}
+var preview_index := -1
 
 
 func _ready() -> void:
 	item_selected.connect(_on_visual_item_selected)
-	get_popup().add_theme_constant_override("icon_max_width", 24)
+	var popup := get_popup()
+	popup.add_theme_constant_override("icon_max_width", 24)
+	popup.id_focused.connect(_on_popup_id_focused)
+	popup.window_input.connect(_on_popup_window_input)
+	popup.popup_hide.connect(_clear_option_preview)
 
 
 func configure_visual(kind: int, selected_index: int, detail: String) -> void:
+	if kind != visual_kind or selected_index != visual_index:
+		_clear_option_preview()
 	visual_kind = kind
 	visual_index = selected_index
 	tooltip_text = detail if selected_index >= 0 else "%s // 候補を再選択" % detail
@@ -21,7 +31,55 @@ func configure_visual(kind: int, selected_index: int, detail: String) -> void:
 
 
 func _on_visual_item_selected(index: int) -> void:
+	_clear_option_preview()
 	visual_index = index
+
+
+func _on_popup_id_focused(item_id: int) -> void:
+	var popup := get_popup()
+	var index := popup.get_item_index(item_id)
+	if index < 0 and item_id >= 0 and item_id < item_count:
+		index = item_id
+	_request_option_preview(index)
+
+
+func _on_popup_window_input(event: InputEvent) -> void:
+	if not event is InputEventMouseMotion:
+		return
+	var motion := event as InputEventMouseMotion
+	var index := popup_item_index_at(motion.position)
+	if index < 0:
+		_clear_option_preview()
+		return
+	_request_option_preview(index)
+
+
+func popup_item_index_at(at_position: Vector2) -> int:
+	var popup := get_popup()
+	if item_count <= 0:
+		return -1
+	var panel := popup.get_theme_stylebox("panel")
+	var top_margin := maxf(panel.get_content_margin(SIDE_TOP), 0.0)
+	var bottom_margin := maxf(panel.get_content_margin(SIDE_BOTTOM), 0.0)
+	var content_height := float(popup.size.y) - top_margin - bottom_margin
+	if content_height <= 0.0 or at_position.y < top_margin or at_position.y >= top_margin + content_height:
+		return -1
+	var index := int(floor((at_position.y - top_margin) / (content_height / float(item_count))))
+	return index if index >= 0 and index < item_count else -1
+
+
+func _request_option_preview(index: int) -> void:
+	if index < 0 or index >= item_count or index == preview_index:
+		return
+	preview_index = index
+	option_preview_requested.emit(index)
+
+
+func _clear_option_preview() -> void:
+	if preview_index < 0:
+		return
+	preview_index = -1
+	option_preview_cleared.emit()
 
 
 func _refresh_item_icons() -> void:
