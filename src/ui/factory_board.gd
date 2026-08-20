@@ -565,6 +565,20 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 
 
+func _get_cursor_shape(at_position: Vector2) -> CursorShape:
+	return cursor_shape_at(at_position)
+
+
+func cursor_shape_at(at_position: Vector2) -> CursorShape:
+	if not interaction_enabled:
+		return Control.CURSOR_ARROW
+	if _output_port_at(at_position) != &"" or not _input_port_at(at_position).is_empty():
+		return Control.CURSOR_POINTING_HAND
+	if _node_at(at_position) != &"":
+		return Control.CURSOR_DRAG
+	return Control.CURSOR_ARROW
+
+
 func begin_edit() -> void:
 	last_corrupt_discard_count = 0
 	var runtime_errors := simulation.work_in_progress_validation_errors()

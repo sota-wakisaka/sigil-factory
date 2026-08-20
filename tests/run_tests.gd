@@ -2259,6 +2259,9 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	_expect(board.connecting_from_node_id == &"ring_source", "clicking an output port should begin wiring")
 	_expect(board.input_port_connectable(&"summoner", 0), "wiring mode should identify the valid target input before click")
 	_expect(not board.input_port_connectable(&"ring_source", 0), "wiring mode should not highlight a node without a valid input")
+	_expect(board.get_cursor_shape(board.node_local_position(&"ring_source")) == Control.CURSOR_DRAG, "node hover should advertise drag without permanent text")
+	_expect(board.get_cursor_shape(board._output_port_position(&"ring_source")) == Control.CURSOR_POINTING_HAND, "output hover should advertise connection")
+	_expect(board.get_cursor_shape(board._input_port_position(&"summoner", 0)) == Control.CURSOR_POINTING_HAND, "input hover should advertise connection")
 	var input_click := InputEventMouseButton.new()
 	input_click.button_index = MOUSE_BUTTON_LEFT
 	input_click.pressed = true
