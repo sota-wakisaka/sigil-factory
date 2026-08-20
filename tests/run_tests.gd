@@ -2777,6 +2777,17 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 	_expect(processor_board.configure_selected_node(0), "reselecting a rotator option should repair its corrupt processing time")
 	_expect(processor_board.simulation.nodes[&"rotator"].config["processing_ticks"] >= 1, "rotator repair should restore a valid processing time")
 	processor_board.free()
+	var interval_board := FactoryBoard.new()
+	interval_board.configure(MvpContent.PLAN_SCOUT)
+	interval_board.set_interaction_enabled(true)
+	interval_board.simulation.nodes[&"ring_source"].config["interval_ticks"] = 0
+	interval_board.selected_node_id = &"ring_source"
+	interval_board._refresh_production_preview()
+	_expect(not interval_board.cached_production_valid, "corrupt restored source interval should invalidate the forecast")
+	_expect(interval_board.configure_selected_node(0), "reselecting the same source material should repair its corrupt interval")
+	_expect(interval_board.simulation.nodes[&"ring_source"].config["interval_ticks"] >= 1, "source repair should restore a positive interval")
+	_expect(interval_board.cached_production_valid, "source interval repair should immediately restore the production forecast")
+	interval_board.free()
 
 
 func _test_sigil_ghost_tracks_plan_recipe() -> void:

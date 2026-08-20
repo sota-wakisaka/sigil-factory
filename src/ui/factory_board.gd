@@ -466,7 +466,10 @@ func configure_selected_node(option_index: int) -> bool:
 		FactoryNodeModel.NodeKind.SOURCE:
 			if option_index < 0 or option_index > 1:
 				return false
-			config_changed = String(node.config.get("primitive_id", "ring")) != ("spike" if option_index == 1 else "ring")
+			config_changed = (
+				String(node.config.get("primitive_id", "ring")) != ("spike" if option_index == 1 else "ring")
+				or int(node.config.get("interval_ticks", 0)) < 1
+			)
 		FactoryNodeModel.NodeKind.ROTATOR:
 			if option_index < 0 or option_index > 2:
 				return false
