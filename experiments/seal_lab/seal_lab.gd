@@ -7,6 +7,7 @@ const SealLabContentModel := preload("res://experiments/seal_lab/seal_lab_conten
 const SealLabViewModel := preload("res://experiments/seal_lab/seal_view.gd")
 
 const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
+const LEGACY_LAB_SCENE := "res://experiments/seal_lab/legacy_glyph_lab.tscn"
 
 var fixtures: Array[Dictionary] = []
 var compiled_fixtures: Array[Dictionary] = []
@@ -21,6 +22,7 @@ var animation_progress := 1.0
 
 var mode_buttons: Dictionary = {}
 var menu_button: Button
+var legacy_button: Button
 var grayscale_button: Button
 var progress_slider: HSlider
 var status_label: Label
@@ -138,6 +140,15 @@ func _build_toolbar() -> Control:
 	title.add_theme_font_size_override("font_size", 20)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(title)
+
+	legacy_button = Button.new()
+	legacy_button.text = "MVP方式"
+	legacy_button.tooltip_text = "従来Glyph方式を複雑化した作例へ"
+	legacy_button.custom_minimum_size = Vector2(92, 36)
+	legacy_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(LEGACY_LAB_SCENE)
+	)
+	toolbar.add_child(legacy_button)
 
 	menu_button = Button.new()
 	menu_button.text = "← MENU"

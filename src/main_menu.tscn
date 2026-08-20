@@ -70,11 +70,11 @@ text = "◇  MVP\n\n工場構築  →  戦闘"
 custom_minimum_size = Vector2(360, 172)
 layout_mode = 2
 focus_neighbor_left = NodePath("../MvpButton")
-tooltip_text = "魔法陣V2を大・中・小表示と白黒表示で比較します"
+tooltip_text = "魔法陣V2と、MVP方式を複雑化した作例を比較します"
 theme_override_colors/font_color = Color(0.82, 0.86, 1, 1)
 theme_override_colors/font_hover_color = Color(0.96, 0.94, 1, 1)
 theme_override_font_sizes/font_size = 24
-text = "◎  SEAL LAB\n\n魔法陣V2を確認"
+text = "◎  SEAL LAB\n\nV2 / MVP複雑作例を確認"
 
 [node name="Hint" type="Label" parent="Center/Content"]
 layout_mode = 2

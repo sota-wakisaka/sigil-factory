@@ -78,8 +78,9 @@ that adaptive production wins while scout-only and golem-only production do not.
 3. Press **F6** or **F5** to run the main scene.
 
 The project opens on a mode menu. Choose **MVP** for the factory/battle loop or
-**SEAL LAB** to inspect the experimental magic-circle grammar at 32, 80, and
-256 pixels. Both modes include a **MENU** button that returns to mode selection.
+**SEAL LAB** to compare the experimental V2 grammar with increasingly complex
+examples rendered by the current MVP Glyph system. Both labs include multiple
+display sizes, and every mode includes a **MENU** button.
 
 Follow the highlighted progression bar from **Route Selection**. At the factory
 step, choose a production plan as a starting template or customize it with the
