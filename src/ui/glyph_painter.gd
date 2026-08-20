@@ -74,12 +74,34 @@ static func _collect_combine_visuals(
 	var radius := _glyph_content_radius(glyph, glyph_center, scale)
 	radius += float(_combine_depth(glyph) - 1) * 6.0 * scale
 	circles.append({"center": glyph_center, "radius": radius})
-	for child_value in glyph.combine_children:
+	var children := glyph.combine_children.duplicate()
+	children.sort_custom(_canonical_child_less)
+	for child_index in children.size():
+		var child_value = children[child_index]
 		var child: GlyphModel = child_value
 		var child_center := _glyph_center_offset(child, scale)
 		if glyph_center.distance_to(child_center) >= 2.0 * scale:
 			connections.append({"from": glyph_center, "to": child_center})
+		else:
+			var angle := -PI * 0.5 + TAU * float(child_index) / float(children.size())
+			var direction := Vector2.RIGHT.rotated(angle)
+			connections.append({
+				"from": glyph_center + direction * 3.0 * scale,
+				"to": glyph_center + direction * minf(radius * 0.62, 14.0 * scale),
+			})
 		_collect_combine_visuals(child, scale, circles, connections)
+
+
+static func _canonical_child_less(first, second) -> bool:
+	if not first is GlyphModel or not second is GlyphModel:
+		return first is GlyphModel
+	var first_glyph: GlyphModel = first
+	var second_glyph: GlyphModel = second
+	var first_hash := first_glyph.canonical_hash()
+	var second_hash := second_glyph.canonical_hash()
+	if first_hash != second_hash:
+		return first_hash < second_hash
+	return first_glyph.canonical_serialization() < second_glyph.canonical_serialization()
 
 
 static func _glyph_center_offset(glyph: GlyphModel, scale: float) -> Vector2:

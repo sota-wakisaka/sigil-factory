@@ -988,6 +988,7 @@ func _test_shared_glyph_painter_rejects_invalid_structures() -> void:
 	var nested := GlyphModel.combine(GlyphModel.combine(valid, spike), branch)
 	var nested_visuals := GlyphPainterModel.combine_visuals(nested, 2.0)
 	_expect(nested_visuals["circles"].size() == 2, "each nested Combine should produce its own structural circle")
+	_expect(nested_visuals["connections"].size() == 4, "coincident nested Combine children should retain visible structural connections")
 	_expect(
 		float(nested_visuals["circles"][0]["radius"]) > float(nested_visuals["circles"][1]["radius"]),
 		"outer Combine circle should remain larger than its nested child circle"
@@ -996,6 +997,14 @@ func _test_shared_glyph_painter_rejects_invalid_structures() -> void:
 	var right := GlyphModel.new([GlyphComponentModel.new(&"spike", Vector2i(1, 0))])
 	var separated_visuals := GlyphPainterModel.combine_visuals(GlyphModel.combine(left, right), 2.0)
 	_expect(separated_visuals["connections"].size() == 2, "positioned Combine children should draw low-priority structural connections")
+	var coincident := GlyphModel.combine(valid, spike)
+	var coincident_visuals := GlyphPainterModel.combine_visuals(coincident, 2.0)
+	_expect(coincident_visuals["connections"].size() == 2, "coincident Combine children should use deterministic radial connections")
+	var reversed := GlyphModel.new([], null, [spike, valid])
+	_expect(
+		GlyphPainterModel.combine_visuals(reversed, 2.0)["connections"] == coincident_visuals["connections"],
+		"Combine connection layout should follow canonical child order rather than restored array order"
+	)
 
 
 func _test_factory_owns_registered_recipe_data() -> void:
