@@ -1495,7 +1495,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 		return "glyph_preview" if tooltip_glyph != null else ""
 	for line_id in display_simulation.lines:
 		var line: FactoryLineModel = display_simulation.lines[line_id]
-		if line.payload == null or not GlyphPainterModel.can_draw(line.payload):
+		var line_glyph := display_glyph_for_line(line_id)
+		if line_glyph == null:
 			continue
 		var start := _scaled_position(_display_positions().get(line.from_node_id, Vector2.ZERO)) + Vector2(NODE_HALF_SIZE.x, 0)
 		var finish := _input_port_position(line.to_node_id, line.to_port)
@@ -1504,7 +1505,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 			continue
 		var from_label := _node_label(display_simulation.nodes[line.from_node_id])
 		var to_label := _node_label(display_simulation.nodes[line.to_node_id])
-		_set_glyph_tooltip(line.payload, "%s → %s" % [from_label, to_label], "輸送中Glyph")
+		var context := "輸送中Glyph" if GlyphPainterModel.can_draw(line.payload) else "32秒予測の輸送Glyph"
+		_set_glyph_tooltip(line_glyph, "%s → %s" % [from_label, to_label], context)
 		return "glyph_preview"
 	return ""
 
@@ -1568,6 +1570,20 @@ func visible_glyph_for_line(line_id: StringName) -> GlyphModel:
 	if glyph == null or not glyph.structure_validation_errors().is_empty():
 		return null
 	return glyph
+
+
+func display_glyph_for_line(line_id: StringName) -> GlyphModel:
+	var actual := visible_glyph_for_line(line_id)
+	if actual != null:
+		return actual
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.lines.has(line_id):
+		return null
+	var line: FactoryLineModel = display_simulation.lines[line_id]
+	var predicted: GlyphModel = cached_node_output_glyphs.get(line.from_node_id)
+	if not GlyphPainterModel.can_draw(predicted):
+		return null
+	return predicted
 
 
 func line_recipe_match_state(line_id: StringName) -> StringName:

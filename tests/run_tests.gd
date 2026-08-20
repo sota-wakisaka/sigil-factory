@@ -2321,6 +2321,9 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(board.production_summary_is_goal(&"scout") and not board.production_summary_is_goal(&"golem"), "production summary should visually outline the selected sigil goal")
 	_expect(board._get_tooltip(summary_center) == "glyph_preview", "production Glyph should open the same large visual tooltip as factory Glyphs")
 	_expect(board.tooltip_glyph != null and "生産見込み" in board.tooltip_context, "production tooltip should pair its CanonicalGlyph with the forecast count")
+	var preview_line_center := board._output_port_position(&"ring_source").lerp(board._input_port_position(&"summoner", 0), 0.5)
+	_expect(board.display_glyph_for_line(&"line_1") != null, "empty pre-battle line should expose its predicted CanonicalGlyph")
+	_expect(board._get_tooltip(preview_line_center) == "glyph_preview" and "32秒予測" in board.tooltip_context, "empty line hover should explain its predicted transport Glyph visually")
 	_expect(board.line_goal_match_state(&"line_1") == &"match", "summoner path should compare its predicted Glyph with the selected goal before battle")
 	board.selected_node_id = &"ring_source"
 	board.configure_selected_node(1)
