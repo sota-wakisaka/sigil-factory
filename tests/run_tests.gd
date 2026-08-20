@@ -102,6 +102,7 @@ func _initialize() -> void:
 	_test_factory_board_offers_visual_glyph_tooltips()
 	_test_factory_board_exposes_node_activity_progress()
 	_test_factory_ports_connect_through_mouse_input()
+	_test_factory_overlapping_hits_follow_draw_order()
 	_test_factory_production_preview_is_non_destructive()
 	_test_factory_production_preview_explains_first_mismatch()
 	_test_factory_board_explains_restored_validation_errors()
@@ -2475,6 +2476,37 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	line_disconnect.position = line_center
 	board._gui_input(line_disconnect)
 	_expect(board.simulation.lines.is_empty(), "right-clicking a highlighted line should disconnect it directly")
+	board.free()
+
+
+func _test_factory_overlapping_hits_follow_draw_order() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(1196, 401)
+	board.configure(MvpContent.PLAN_EMPTY)
+	var back_source := FactoryNodeModel.new(&"back_source", FactoryNodeModel.NodeKind.SOURCE, {"primitive_id": "ring", "interval_ticks": 18})
+	var front_source := FactoryNodeModel.new(&"front_source", FactoryNodeModel.NodeKind.SOURCE, {"primitive_id": "spike", "interval_ticks": 54})
+	board.simulation.nodes[back_source.id] = back_source
+	board.simulation.nodes[front_source.id] = front_source
+	board.node_positions[back_source.id] = Vector2(280, 110)
+	board.node_positions[front_source.id] = Vector2(280, 110)
+	var source_center := board.node_local_position(front_source.id)
+	var output_center := board._output_port_position(front_source.id)
+	_expect(board._node_at(source_center) == front_source.id, "overlapping node body should resolve to the last drawn equipment")
+	_expect(board._output_port_at(output_center) == front_source.id, "overlapping output ports should resolve to the same front equipment as its body")
+	_expect(board.node_glyph_at(source_center + Vector2(0, 3)) == front_source.id, "overlapping node Glyphs should inspect the front equipment")
+	var back_rotator := FactoryNodeModel.new(&"back_rotator", FactoryNodeModel.NodeKind.ROTATOR, {"steps": 1, "processing_ticks": 2})
+	var front_rotator := FactoryNodeModel.new(&"front_rotator", FactoryNodeModel.NodeKind.ROTATOR, {"steps": 1, "processing_ticks": 2})
+	back_rotator.input_buffers[0] = GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	front_rotator.input_buffers[0] = GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	board.simulation.nodes[back_rotator.id] = back_rotator
+	board.simulation.nodes[front_rotator.id] = front_rotator
+	board.node_positions[back_rotator.id] = Vector2(280, 260)
+	board.node_positions[front_rotator.id] = Vector2(280, 260)
+	var input_center := board._input_port_position(front_rotator.id, 0)
+	var input_hit := board._input_port_at(input_center)
+	_expect(input_hit.get("node_id", &"") == front_rotator.id, "overlapping input ports should resolve to the last drawn equipment")
+	var input_glyph_hit := board.input_glyph_at(board.input_glyph_center(front_rotator.id, 0))
+	_expect(input_glyph_hit.get("node_id", &"") == front_rotator.id, "overlapping input Glyphs should inspect the front equipment")
 	board.free()
 
 

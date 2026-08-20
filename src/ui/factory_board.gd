@@ -1638,9 +1638,7 @@ func node_glyph_at(at_position: Vector2) -> StringName:
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return &""
-	var node_ids := display_simulation.nodes.keys()
-	node_ids.sort()
-	for node_id in node_ids:
+	for node_id in _front_to_back_node_ids(display_simulation):
 		if display_glyph_for_node(node_id) == null:
 			continue
 		if at_position.distance_to(node_local_position(node_id) + Vector2(0, 3)) <= 18.0:
@@ -2050,9 +2048,7 @@ func input_glyph_at(at_position: Vector2) -> Dictionary:
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return {}
-	var node_ids := display_simulation.nodes.keys()
-	node_ids.sort()
-	for node_id in node_ids:
+	for node_id in _front_to_back_node_ids(display_simulation):
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
 		for port in node.input_buffers.size():
 			var state := input_glyph_display_state(node_id, port)
@@ -2261,9 +2257,7 @@ func _node_at(local_position: Vector2) -> StringName:
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return &""
-	var ids := display_simulation.nodes.keys()
-	ids.reverse()
-	for node_id in ids:
+	for node_id in _front_to_back_node_ids(display_simulation):
 		var center := node_local_position(node_id)
 		if Rect2(center - NODE_HALF_SIZE, NODE_HALF_SIZE * 2.0).has_point(local_position):
 			return node_id
@@ -2341,7 +2335,7 @@ func _output_port_at(local_position: Vector2) -> StringName:
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return &""
-	for node_id in display_simulation.nodes:
+	for node_id in _front_to_back_node_ids(display_simulation):
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
 		if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
 			continue
@@ -2354,12 +2348,18 @@ func _input_port_at(local_position: Vector2) -> Dictionary:
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
 		return {}
-	for node_id in display_simulation.nodes:
+	for node_id in _front_to_back_node_ids(display_simulation):
 		var node: FactoryNodeModel = display_simulation.nodes[node_id]
 		for port in node.required_input_count():
 			if local_position.distance_to(_input_port_position(node_id, port)) <= PORT_RADIUS + 4.0:
 				return {"node_id": node_id, "port": port}
 	return {}
+
+
+func _front_to_back_node_ids(display_simulation: FactorySimulation) -> Array:
+	var node_ids := display_simulation.nodes.keys()
+	node_ids.reverse()
+	return node_ids
 
 
 func _line_at(local_position: Vector2) -> StringName:
