@@ -349,7 +349,7 @@ func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
 		match component.primitive_id:
 			&"ring": relevant[&"ring_source"] = true
 			&"spike": relevant[&"spike_source"] = true
-		if component.rotation_step != 0:
+		if component.rotation_degrees != 0:
 			relevant[&"rotator"] = true
 		if component.color_id != &"white":
 			relevant[&"colorizer"] = true

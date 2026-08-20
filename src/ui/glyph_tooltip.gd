@@ -103,7 +103,7 @@ func _detail_lines() -> PackedStringArray:
 		var parts := PackedStringArray([
 			_primitive_name(component.primitive_id),
 			_color_name(component.color_id),
-			"%d°" % (component.rotation_step * 90),
+			"%d°" % component.rotation_degrees,
 		])
 		lines.append("・".join(parts))
 	return lines

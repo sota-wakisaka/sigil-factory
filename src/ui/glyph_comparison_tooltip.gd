@@ -111,9 +111,14 @@ func _component_signature(value: GlyphModel, category: StringName) -> PackedStri
 	for component in value.components:
 		match category:
 			&"primitive": signature.append(String(component.primitive_id))
-			&"rotation": signature.append("%s:%d" % [component.primitive_id, component.rotation_step])
+			&"rotation": signature.append("%s:%d" % [component.primitive_id, component.rotation_degrees])
 			&"color": signature.append("%s:%s" % [component.primitive_id, component.color_id])
-			&"geometry": signature.append("%s:%d,%d:%d" % [component.primitive_id, component.position.x, component.position.y, component.scale_step])
+			&"geometry": signature.append("%s:%s,%s:%d" % [
+				component.primitive_id,
+				GlyphComponentModel.coordinate_key(component.position.x),
+				GlyphComponentModel.coordinate_key(component.position.y),
+				component.scale_step,
+			])
 	signature.sort()
 	return signature
 

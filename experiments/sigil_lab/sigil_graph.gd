@@ -255,7 +255,7 @@ func _apply_node(kind: StringName, config: Dictionary, inputs: Array) -> Diction
 	match kind:
 		ROTATE:
 			glyph = inputs[0].copy()
-			glyph.rotate(int(config["steps"]))
+			glyph.rotate_degrees(int(config["degrees"]))
 		MOVE:
 			glyph = inputs[0].copy()
 			glyph.translate(config["offset"])
@@ -310,13 +310,23 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 				return {"ok": false, "error": &"invalid_primitive", "config": {}}
 			return {"ok": true, "error": &"", "config": {"primitive_id": primitive_id}}
 		ROTATE:
-			var steps := int(config.get("steps", 1))
-			if steps < 0 or steps > 3:
+			var degrees := (
+				int(config["degrees"])
+				if config.has("degrees")
+				else int(config.get("steps", 1)) * 90
+			)
+			if degrees < -359 or degrees > 359:
 				return {"ok": false, "error": &"invalid_rotation", "config": {}}
-			return {"ok": true, "error": &"", "config": {"steps": steps}}
+			return {"ok": true, "error": &"", "config": {"degrees": posmod(degrees, 360)}}
 		MOVE:
 			var offset = config.get("offset", Vector2i(0, -3))
-			if not offset is Vector2i or absi(offset.x) > 6 or absi(offset.y) > 6:
+			if (
+				not offset is Vector2i
+				or offset == Vector2i.ZERO
+				or (offset.x != 0 and offset.y != 0)
+				or absi(offset.x) > 6
+				or absi(offset.y) > 6
+			):
 				return {"ok": false, "error": &"invalid_offset", "config": {}}
 			return {"ok": true, "error": &"", "config": {"offset": offset}}
 		COLOR:

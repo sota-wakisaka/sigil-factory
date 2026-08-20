@@ -138,7 +138,7 @@ static func _difference_score(
 ) -> int:
 	var score := 0
 	score += int(actual.position != target.position)
-	score += int(actual.rotation_step != target.rotation_step)
+	score += int(actual.rotation_degrees != target.rotation_degrees)
 	score += int(actual.scale_step != target.scale_step)
 	score += int(actual.color_id != target.color_id)
 	return score
@@ -151,7 +151,7 @@ static func _append_component_differences(
 ) -> void:
 	if actual.color_id != target.color_id:
 		_add_unique(diagnostics, "色が違います")
-	if actual.rotation_step != target.rotation_step:
+	if actual.rotation_degrees != target.rotation_degrees:
 		_add_unique(diagnostics, "回転が違います")
 	if actual.scale_step != target.scale_step:
 		_add_unique(diagnostics, "倍率が違います")

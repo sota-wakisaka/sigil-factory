@@ -35,6 +35,7 @@ func _initialize() -> void:
 	_test_combine_hierarchy_affects_matching()
 	_test_production_context_does_not_affect_matching()
 	_test_rotation_is_normalized_to_quarter_turns()
+	_test_free_angle_rotation_is_canonical()
 	_test_combined_rotation_transforms_positions_and_orientation()
 	_test_combined_move_transforms_structure_center()
 	_test_transform_history_folds_into_final_state()
@@ -379,6 +380,29 @@ func _test_rotation_is_normalized_to_quarter_turns() -> void:
 	_expect(SigilMatcher.compare(first, negative)["is_match"], "negative rotation should normalize into the same cycle")
 
 
+func _test_free_angle_rotation_is_canonical() -> void:
+	var glyph := GlyphModel.new([
+		GlyphComponentModel.new(&"spike", Vector2i(0, -4)),
+	])
+	var original := glyph.canonical_serialization()
+	glyph.rotate_degrees(120)
+	_expect(glyph.components[0].rotation_degrees == 120, "free-angle rotation should preserve the visible angle")
+	_expect(
+		GlyphComponentModel.coordinate_key(glyph.components[0].position.x) == "3.464"
+		and GlyphComponentModel.coordinate_key(glyph.components[0].position.y) == "2",
+		"free-angle rotation should rotate position around the shared origin"
+	)
+	glyph.rotate_degrees(120)
+	glyph.rotate_degrees(120)
+	_expect(glyph.canonical_serialization() == original, "three 120° rotations should restore the exact canonical Glyph")
+	var forty_five := GlyphModel.new([GlyphComponentModel.new(&"spike")])
+	forty_five.rotate_degrees(45)
+	_expect(
+		not SigilMatcher.compare(forty_five, GlyphModel.new([GlyphComponentModel.new(&"spike")]))["is_match"],
+		"45° and 0° Glyphs should remain distinct"
+	)
+
+
 func _test_combined_rotation_transforms_positions_and_orientation() -> void:
 	var ring := GlyphModel.new([
 		GlyphComponentModel.new(&"ring", Vector2i(1, 0), 0),
@@ -420,7 +444,7 @@ func _test_combined_move_transforms_structure_center() -> void:
 	])
 	var combined := GlyphModel.combine(ring, spike)
 	combined.translate(Vector2i(0, -4))
-	_expect(combined.combine_origin == Vector2i(0, -4), "moving a completed Combine should move its structural center")
+	_expect(combined.combine_origin == Vector2(0, -4), "moving a completed Combine should move its structural center")
 	var visuals := GlyphPainterModel.combine_visuals(combined)
 	_expect(visuals["circles"][0]["center"] == Vector2(0, -24), "the Combine circle should follow the moved center")
 	for connection in visuals["connections"]:
@@ -428,7 +452,7 @@ func _test_combined_move_transforms_structure_center() -> void:
 	var owned_copy := combined.copy()
 	_expect(owned_copy.combine_origin == combined.combine_origin, "Glyph copies should preserve every Combine center")
 	combined.rotate(1)
-	_expect(combined.combine_origin == Vector2i(4, 0), "rotating a moved Combine should rotate its center around the root origin")
+	_expect(combined.combine_origin == Vector2(4, 0), "rotating a moved Combine should rotate its center around the root origin")
 
 	var moved_ring := ring.copy()
 	var moved_spike := spike.copy()
@@ -931,7 +955,7 @@ func _test_factory_rejects_invalid_recipe_structures() -> void:
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	var branch := GlyphModel.new([GlyphComponentModel.new(&"branch")])
 	var too_many_children: Array = []
-	for child_index in 7:
+	for child_index in 9:
 		too_many_children.append(GlyphModel.new([
 			GlyphComponentModel.new(StringName("arity_%d" % child_index)),
 		]))

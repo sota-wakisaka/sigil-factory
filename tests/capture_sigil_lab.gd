@@ -21,6 +21,8 @@ func _initialize() -> void:
 		_build_post_combine_move_fixture(lab)
 	elif fixture == "coincident_child":
 		_build_coincident_child_fixture(lab)
+	elif fixture == "triangle":
+		_build_triangle_fixture(lab)
 	await process_frame
 	await process_frame
 	await RenderingServer.frame_post_draw
@@ -60,6 +62,33 @@ func _build_coincident_child_fixture(lab) -> void:
 	lab.connect_lab_nodes(ring, ring_move)
 	lab.connect_lab_nodes(ring_move, combine, 0)
 	lab.connect_lab_nodes(spike, combine, 1)
+	lab.connect_lab_nodes(combine, output_id)
+
+
+func _build_triangle_fixture(lab) -> void:
+	lab.clear_workspace()
+	var combine: StringName = lab.add_lab_node(SigilGraphModel.COMBINE, {}, Vector2(610, 245))
+	var output_id: StringName = lab.graph.output_node_id()
+	for input_index in 3:
+		var y := 85.0 + float(input_index) * 205.0
+		var source: StringName = lab.add_lab_node(
+			SigilGraphModel.SOURCE,
+			{"primitive_id": &"spike"},
+			Vector2(20, y)
+		)
+		var move: StringName = lab.add_lab_node(
+			SigilGraphModel.MOVE,
+			{"offset": Vector2i(0, -4)},
+			Vector2(190, y)
+		)
+		var rotate: StringName = lab.add_lab_node(
+			SigilGraphModel.ROTATE,
+			{"degrees": input_index * 120},
+			Vector2(380, y)
+		)
+		lab.connect_lab_nodes(source, move)
+		lab.connect_lab_nodes(move, rotate)
+		lab.connect_lab_nodes(rotate, combine, input_index)
 	lab.connect_lab_nodes(combine, output_id)
 
 

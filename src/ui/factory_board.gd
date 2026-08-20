@@ -1412,11 +1412,11 @@ func _glyph_type_label(glyph: GlyphModel) -> String:
 		var attributes := PackedStringArray([_primitive_name(component.primitive_id)])
 		if component.color_id != &"white":
 			attributes.append(_color_name(component.color_id))
-		if component.rotation_step != 0:
-			attributes.append("%d°" % (component.rotation_step * 90))
+		if component.rotation_degrees != 0:
+			attributes.append("%d°" % component.rotation_degrees)
 		if component.scale_step != 1:
 			attributes.append("倍率%d" % component.scale_step)
-		if component.position != Vector2i.ZERO:
+		if component.position != Vector2.ZERO:
 			attributes.append("位置%d,%d" % [component.position.x, component.position.y])
 		component_labels.append("・".join(attributes))
 	component_labels.sort()

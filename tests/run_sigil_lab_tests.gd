@@ -1,13 +1,15 @@
 extends SceneTree
 
 const SigilGraphModel := preload("res://experiments/sigil_lab/sigil_graph.gd")
+const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 
 var failures := 0
 
 
 func _initialize() -> void:
 	_test_graph_evaluation()
-	_test_six_way_combine()
+	_test_eight_way_combine()
+	_test_free_angle_triangle()
 	_test_post_combine_move()
 	_test_connection_guards()
 	_test_owned_results()
@@ -33,35 +35,59 @@ func _test_graph_evaluation() -> void:
 	var result := graph.evaluate_output()
 	_expect(result["ok"], "complete graph should produce a valid sigil")
 	_expect(result["glyph"].components.size() == 2, "output should contain both source materials")
-	_expect(result["glyph"].components[0].position == Vector2i(0, -4) or result["glyph"].components[1].position == Vector2i(0, -4), "move should be folded into the output Glyph")
+	_expect(result["glyph"].components[0].position == Vector2(0, -4) or result["glyph"].components[1].position == Vector2(0, -4), "move should be folded into the output Glyph")
 	_expect(result["glyph"].components[0].rotation_step == 1 or result["glyph"].components[1].rotation_step == 1, "rotation should be folded into the output Glyph")
 
 
-func _test_six_way_combine() -> void:
+func _test_eight_way_combine() -> void:
 	var graph = SigilGraphModel.new()
 	graph.add_node(&"combine", SigilGraphModel.COMBINE)
 	graph.add_node(&"output", SigilGraphModel.OUTPUT)
-	var offsets := [
-		Vector2i(-4, 0),
-		Vector2i(-2, -3),
-		Vector2i(2, -3),
-		Vector2i(4, 0),
-		Vector2i(2, 3),
-		Vector2i(-2, 3),
-	]
 	for input_index in SigilGraphModel.MAX_COMBINE_INPUTS:
 		var source_id := StringName("source_%d" % input_index)
 		var move_id := StringName("move_%d" % input_index)
+		var rotate_id := StringName("rotate_%d" % input_index)
 		graph.add_node(source_id, SigilGraphModel.SOURCE, {
 			"primitive_id": [&"ring", &"spike", &"branch"][input_index % 3],
 		})
-		graph.add_node(move_id, SigilGraphModel.MOVE, {"offset": offsets[input_index]})
-		_expect(graph.connect_nodes(source_id, 0, move_id, 0), "six-way source should connect to its move node")
-		_expect(graph.connect_nodes(move_id, 0, &"combine", input_index), "each of the six Combine ports should accept one input")
-	_expect(graph.connect_nodes(&"combine", 0, &"output", 0), "six-way Combine should connect to output")
+		graph.add_node(move_id, SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)})
+		graph.add_node(rotate_id, SigilGraphModel.ROTATE, {"degrees": input_index * 45})
+		_expect(graph.connect_nodes(source_id, 0, move_id, 0), "eight-way source should connect to its cardinal move node")
+		_expect(graph.connect_nodes(move_id, 0, rotate_id, 0), "each branch should rotate around the shared center")
+		_expect(graph.connect_nodes(rotate_id, 0, &"combine", input_index), "each of the eight Combine ports should accept one input")
+	_expect(graph.connect_nodes(&"combine", 0, &"output", 0), "eight-way Combine should connect to output")
 	var result := graph.evaluate_output()
-	_expect(result["ok"], "six connected inputs should produce a valid sigil")
-	_expect(result["glyph"].combine_children.size() == 6, "six-way Combine should preserve all children in one level")
+	_expect(result["ok"], "eight connected inputs should produce a valid sigil")
+	_expect(result["glyph"].combine_children.size() == 8, "eight-way Combine should preserve all children in one level")
+
+
+func _test_free_angle_triangle() -> void:
+	var graph = SigilGraphModel.new()
+	graph.add_node(&"combine", SigilGraphModel.COMBINE)
+	graph.add_node(&"output", SigilGraphModel.OUTPUT)
+	for input_index in 3:
+		var source_id := StringName("triangle_source_%d" % input_index)
+		var move_id := StringName("triangle_move_%d" % input_index)
+		var rotate_id := StringName("triangle_rotate_%d" % input_index)
+		graph.add_node(source_id, SigilGraphModel.SOURCE, {"primitive_id": &"spike"})
+		graph.add_node(move_id, SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)})
+		graph.add_node(rotate_id, SigilGraphModel.ROTATE, {"degrees": input_index * 120})
+		graph.connect_nodes(source_id, 0, move_id, 0)
+		graph.connect_nodes(move_id, 0, rotate_id, 0)
+		graph.connect_nodes(rotate_id, 0, &"combine", input_index)
+	graph.connect_nodes(&"combine", 0, &"output", 0)
+	var result := graph.evaluate_output()
+	_expect(result["ok"], "cardinal movement plus free-angle rotation should form a triangle")
+	if result["ok"]:
+		var positions: Array[String] = []
+		for component in result["glyph"].components:
+			positions.append("%s,%s" % [
+				GlyphComponentModel.coordinate_key(component.position.x),
+				GlyphComponentModel.coordinate_key(component.position.y),
+			])
+		positions.sort()
+		_expect(positions == ["-3.464,2", "0,-4", "3.464,2"], "120° rotations should place the three points symmetrically")
+		_expect(not graph.add_node(&"diagonal", SigilGraphModel.MOVE, {"offset": Vector2i(3, 3)}), "a single Move node should reject diagonal movement")
 
 
 func _test_post_combine_move() -> void:
@@ -81,7 +107,7 @@ func _test_post_combine_move() -> void:
 	graph.connect_nodes(&"group_move", 0, &"output", 0)
 	var result := graph.evaluate_output()
 	_expect(result["ok"], "a moved completed group should remain a valid Lab output")
-	_expect(result["glyph"].combine_origin == Vector2i(0, -4), "Lab Move should carry the completed Combine center with it")
+	_expect(result["glyph"].combine_origin == Vector2(0, -4), "Lab Move should carry the completed Combine center with it")
 
 
 func _test_connection_guards() -> void:
@@ -123,6 +149,17 @@ func _test_lab_scene() -> void:
 	_expect(lab.name == "SigilLab", "Sigil Lab scene should use the consistent product term")
 	_expect(lab.graph_edit != null and lab.graph_edit.visible, "Sigil Lab should expose a connectable GraphEdit")
 	_expect(lab.node_controls.size() >= 10, "default four-direction template should expose editable nodes")
+	var combine_id: StringName = &""
+	for node_id in lab.graph.nodes:
+		if lab.graph.node_kind(node_id) == SigilGraphModel.COMBINE:
+			combine_id = node_id
+			break
+	_expect(combine_id != &"" and lab.graph.input_count(combine_id) == 8, "Lab Combine nodes should expose eight inputs")
+	var free_rotate: StringName = lab.add_lab_node(SigilGraphModel.ROTATE, {"degrees": 120}, Vector2(40, 40))
+	_expect(lab.option_controls[free_rotate] is SpinBox, "Lab rotation should use a free-angle numeric control")
+	if lab.option_controls[free_rotate] is SpinBox:
+		var angle_control: SpinBox = lab.option_controls[free_rotate]
+		_expect(angle_control.min_value == 0.0 and angle_control.max_value == 359.0 and angle_control.step == 1.0, "free-angle control should cover 0–359° in one-degree steps")
 	var output: Dictionary = lab.graph.evaluate_output()
 	_expect(output["ok"] and output["glyph"].components.size() == 4, "default template should produce a four-material sigil")
 	_expect(output["glyph"].combine_children.size() == 4, "default template should use one four-way Combine instead of a binary tree")

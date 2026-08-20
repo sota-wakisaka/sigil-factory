@@ -5,20 +5,20 @@ const GlyphProductionContextModel := preload("res://src/domain/glyph_production_
 
 var components: Array[GlyphComponentModel] = []
 var combine_children: Array = []
-var combine_origin := Vector2i.ZERO
+var combine_origin := Vector2.ZERO
 var production_context: GlyphProductionContextModel
 
 const MIN_COMBINE_CHILDREN := 2
-const MAX_COMBINE_CHILDREN := 6
+const MAX_COMBINE_CHILDREN := 8
 
 
 func _init(
 	initial_components: Array[GlyphComponentModel] = [],
 	initial_production_context: GlyphProductionContextModel = null,
 	initial_combine_children: Array = [],
-	initial_combine_origin: Vector2i = Vector2i.ZERO
+	initial_combine_origin = Vector2.ZERO
 ) -> void:
-	combine_origin = initial_combine_origin
+	combine_origin = GlyphComponentModel.normalized_position(Vector2(initial_combine_origin))
 	production_context = (
 		initial_production_context.copy()
 		if initial_production_context != null
@@ -82,7 +82,10 @@ func canonical_serialization() -> String:
 		func(a: String, b: String) -> bool:
 			return _canonical_serialization_less(a, b)
 	)
-	var origin_serialization := "%d,%d" % [combine_origin.x, combine_origin.y]
+	var origin_serialization := "%s,%s" % [
+		GlyphComponentModel.coordinate_key(combine_origin.x),
+		GlyphComponentModel.coordinate_key(combine_origin.y),
+	]
 	return "C(%s;%s)" % [_frame(origin_serialization), _frame_sequence(child_serializations)]
 
 
@@ -196,27 +199,47 @@ func rotate(steps: int) -> void:
 		combine_origin = _rotate_position(combine_origin, normalized_steps)
 	for component in components:
 		component.position = _rotate_position(component.position, normalized_steps)
-		component.rotation_step = posmod(component.rotation_step + normalized_steps, 4)
+		component.rotate_degrees_by(normalized_steps * 90)
 	for child in combine_children:
 		child.rotate(normalized_steps)
 
 
-func _rotate_position(position: Vector2i, steps: int) -> Vector2i:
+func rotate_degrees(degrees: int) -> void:
+	var normalized_degrees := posmod(degrees, 360)
+	if normalized_degrees % 90 == 0:
+		rotate(int(normalized_degrees / 90))
+		return
+	if not combine_children.is_empty():
+		combine_origin = _rotate_position_degrees(combine_origin, normalized_degrees)
+	for component in components:
+		component.position = _rotate_position_degrees(component.position, normalized_degrees)
+		component.rotate_degrees_by(normalized_degrees)
+	for child in combine_children:
+		child.rotate_degrees(normalized_degrees)
+
+
+func _rotate_position(position: Vector2, steps: int) -> Vector2:
 	match posmod(steps, 4):
 		1:
-			return Vector2i(-position.y, position.x)
+			return Vector2(-position.y, position.x)
 		2:
-			return Vector2i(-position.x, -position.y)
+			return Vector2(-position.x, -position.y)
 		3:
-			return Vector2i(position.y, -position.x)
-	return position
+			return Vector2(position.y, -position.x)
+	return Vector2(position)
+
+
+func _rotate_position_degrees(position: Vector2, degrees: int) -> Vector2:
+	return GlyphComponentModel.normalized_position(
+		position.rotated(deg_to_rad(float(degrees)))
+	)
 
 
 func translate(offset: Vector2i) -> void:
 	if not combine_children.is_empty():
-		combine_origin += offset
+		combine_origin = GlyphComponentModel.normalized_position(combine_origin + Vector2(offset))
 	for component in components:
-		component.position += offset
+		component.position = GlyphComponentModel.normalized_position(component.position + Vector2(offset))
 	for child in combine_children:
 		child.translate(offset)
 

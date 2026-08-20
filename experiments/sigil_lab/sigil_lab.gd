@@ -20,10 +20,6 @@ const MOVE_OPTIONS := [
 	Vector2i(4, 0),
 	Vector2i(0, 4),
 	Vector2i(-4, 0),
-	Vector2i(-3, -3),
-	Vector2i(3, -3),
-	Vector2i(3, 3),
-	Vector2i(-3, 3),
 ]
 
 var graph = SigilGraphModel.new()
@@ -154,10 +150,10 @@ func _build_palette() -> Control:
 		["環", SigilGraphModel.SOURCE, {"primitive_id": &"ring"}, "環素材"],
 		["棘", SigilGraphModel.SOURCE, {"primitive_id": &"spike"}, "棘素材"],
 		["枝", SigilGraphModel.SOURCE, {"primitive_id": &"branch"}, "枝素材"],
-		["↻", SigilGraphModel.ROTATE, {"steps": 1}, "90°単位で回転"],
-		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "整数グリッドで移動"],
+		["↻", SigilGraphModel.ROTATE, {"degrees": 45}, "中心を基準に1°単位で回転"],
+		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "上下左右へ移動"],
 		["●", SigilGraphModel.COLOR, {"color_id": &"blue"}, "白・青・赤へ着色"],
-		["⊕", SigilGraphModel.COMBINE, {}, "2〜6個のGlyphを中央で合成"],
+		["⊕", SigilGraphModel.COMBINE, {}, "2〜8個のGlyphを中央で合成"],
 	]:
 		var button := Button.new()
 		button.text = definition[0]
@@ -304,19 +300,27 @@ func _source_option(node_id: StringName) -> OptionButton:
 	return option
 
 
-func _setting_option(node_id: StringName, kind: StringName) -> OptionButton:
+func _setting_option(node_id: StringName, kind: StringName) -> Control:
+	if kind == SigilGraphModel.ROTATE:
+		var angle := SpinBox.new()
+		angle.min_value = 0.0
+		angle.max_value = 359.0
+		angle.step = 1.0
+		angle.suffix = "°"
+		angle.allow_greater = false
+		angle.allow_lesser = false
+		angle.custom_minimum_size = Vector2(108, 34)
+		angle.tooltip_text = "中心を基準に回転 // 0〜359°"
+		angle.value = float(graph.node_config(node_id).get("degrees", 0))
+		angle.value_changed.connect(func(value: float) -> void:
+			graph.set_node_config(node_id, {"degrees": roundi(value)})
+			_refresh_all()
+		)
+		return angle
 	var option := OptionButton.new()
 	match kind:
-		SigilGraphModel.ROTATE:
-			for label in ["0°", "90°", "180°", "270°"]:
-				option.add_item(label)
-			option.select(int(graph.node_config(node_id).get("steps", 1)))
-			option.item_selected.connect(func(index: int) -> void:
-				graph.set_node_config(node_id, {"steps": index})
-				_refresh_all()
-			)
 		SigilGraphModel.MOVE:
-			for label in ["↑4", "→4", "↓4", "←4", "↖3", "↗3", "↘3", "↙3"]:
+			for label in ["↑4", "→4", "↓4", "←4"]:
 				option.add_item(label)
 			var current_offset: Vector2i = graph.node_config(node_id).get("offset", MOVE_OPTIONS[0])
 			option.select(maxi(MOVE_OPTIONS.find(current_offset), 0))
@@ -396,7 +400,7 @@ func _load_cardinal_template() -> void:
 	var move_top := _add_node(SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, Vector2(190, 80))
 	var move_right := _add_node(SigilGraphModel.MOVE, {"offset": Vector2i(4, 0)}, Vector2(190, 240))
 	var move_bottom := _add_node(SigilGraphModel.MOVE, {"offset": Vector2i(0, 4)}, Vector2(190, 400))
-	var rotate_left := _add_node(SigilGraphModel.ROTATE, {"steps": 2}, Vector2(190, 560))
+	var rotate_left := _add_node(SigilGraphModel.ROTATE, {"degrees": 180}, Vector2(190, 560))
 	var move_left := _add_node(SigilGraphModel.MOVE, {"offset": Vector2i(-4, 0)}, Vector2(360, 560))
 
 	var combine_root := _add_node(SigilGraphModel.COMBINE, {}, Vector2(540, 215))

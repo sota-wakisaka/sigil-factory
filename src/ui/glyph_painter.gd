@@ -156,7 +156,7 @@ static func _draw_component(
 	opacity: float
 ) -> void:
 	var color := _with_opacity(component_color(component.color_id), opacity)
-	var angle := float(component.rotation_step) * PI * 0.5
+	var angle := deg_to_rad(float(component.rotation_degrees))
 	var radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
 	var stroke := primitive_stroke_width(scale)
 	match component.primitive_id:
