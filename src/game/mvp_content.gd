@@ -131,28 +131,28 @@ static func layout_for_plan(plan_id: StringName) -> Dictionary:
 	match plan_id:
 		PLAN_EMPTY:
 			return {
-				&"ring_source": Vector2(180, 190),
-				&"summoner": Vector2(640, 190),
+				&"ring_source": Vector2(105, 195),
+				&"summoner": Vector2(410, 195),
 			}
 		PLAN_SENTINEL:
 			return {
-				&"ring_source": Vector2(90, 190),
-				&"rotator": Vector2(280, 190),
-				&"colorizer": Vector2(470, 190),
-				&"summoner": Vector2(680, 190),
+				&"ring_source": Vector2(85, 70),
+				&"rotator": Vector2(220, 95),
+				&"colorizer": Vector2(325, 145),
+				&"summoner": Vector2(410, 195),
 			}
 		PLAN_GOLEM:
 			return {
-				&"ring_source": Vector2(80, 110),
-				&"spike_source": Vector2(80, 280),
-				&"combiner": Vector2(300, 195),
-				&"colorizer": Vector2(500, 195),
-				&"summoner": Vector2(700, 195),
+				&"ring_source": Vector2(70, 70),
+				&"spike_source": Vector2(70, 320),
+				&"combiner": Vector2(220, 195),
+				&"colorizer": Vector2(325, 195),
+				&"summoner": Vector2(410, 195),
 			}
 		_:
 			return {
-				&"ring_source": Vector2(150, 190),
-				&"summoner": Vector2(650, 190),
+				&"ring_source": Vector2(105, 195),
+				&"summoner": Vector2(410, 195),
 			}
 
 

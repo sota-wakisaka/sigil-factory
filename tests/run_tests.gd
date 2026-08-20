@@ -2088,7 +2088,13 @@ func _test_factory_board_holds_transient_flow_warning() -> void:
 
 func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	var board := FactoryBoard.new()
+	board.size = Vector2(1196, 401)
 	board.configure(MvpContent.PLAN_SENTINEL)
+	_expect(MvpContent.layout_for_plan(MvpContent.PLAN_SENTINEL)[&"summoner"] == Vector2(410, 195), "factory templates should place the summoner at the radial workspace center")
+	var source_center := board.node_local_position(&"ring_source")
+	var rotator_center := board.node_local_position(&"rotator")
+	var output_direction := source_center.direction_to(board._output_port_position(&"ring_source"))
+	_expect(output_direction.dot(source_center.direction_to(rotator_center)) > 0.99, "factory output port should face its downstream equipment in a radial layout")
 	var rotator: FactoryNodeModel = board.simulation.nodes[&"rotator"]
 	var input_glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	var output_glyph := GlyphModel.new([GlyphComponentModel.new(&"spike", Vector2i.ZERO, 1, 1, &"blue")])
@@ -2211,8 +2217,8 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	)
 	var transported := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	board.simulation.lines[&"line_1"].payload = transported
-	var line_start := board.node_local_position(&"ring_source") + Vector2(FactoryBoard.NODE_HALF_SIZE.x, 0)
-	var line_finish := board.node_local_position(&"summoner") - Vector2(FactoryBoard.NODE_HALF_SIZE.x, 0)
+	var line_start := board._output_port_position(&"ring_source")
+	var line_finish := board._input_port_position(&"summoner", 0)
 	_expect(board._get_tooltip(line_start.lerp(line_finish, 0.5)) == "glyph_preview", "transport line should offer a visual Glyph tooltip")
 	_expect(board.tooltip_context == "輸送中Glyph", "line tooltip should identify the Glyph as transported work")
 	_expect(
@@ -2268,7 +2274,7 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	var output_click := InputEventMouseButton.new()
 	output_click.button_index = MOUSE_BUTTON_LEFT
 	output_click.pressed = true
-	output_click.position = board.node_local_position(&"ring_source") + Vector2(48, 0)
+	output_click.position = board._output_port_position(&"ring_source")
 	board._gui_input(output_click)
 	_expect(board.connecting_from_node_id == &"ring_source", "clicking an output port should begin wiring")
 	_expect(board.input_port_connectable(&"summoner", 0), "wiring mode should identify the valid target input before click")

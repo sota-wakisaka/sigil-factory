@@ -911,7 +911,7 @@ func _draw() -> void:
 func _draw_lines(display_simulation: FactorySimulation, display_positions: Dictionary) -> void:
 	for line_id in display_simulation.lines:
 		var line: FactoryLineModel = display_simulation.lines[line_id]
-		var start := _scaled_position(display_positions.get(line.from_node_id, Vector2.ZERO)) + Vector2(NODE_HALF_SIZE.x, 0)
+		var start := _output_port_position(line.from_node_id)
 		var finish := _input_port_position(line.to_node_id, line.to_port)
 		var line_color := WARNING_COLOR if display_simulation.line_flow_state(line_id) == &"buffer_full" else LINE_COLOR
 		var goal_state := line_goal_match_state(line_id)
@@ -1498,7 +1498,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 		var line_glyph := display_glyph_for_line(line_id)
 		if line_glyph == null:
 			continue
-		var start := _scaled_position(_display_positions().get(line.from_node_id, Vector2.ZERO)) + Vector2(NODE_HALF_SIZE.x, 0)
+		var start := _output_port_position(line.from_node_id)
 		var finish := _input_port_position(line.to_node_id, line.to_port)
 		var closest := Geometry2D.get_closest_point_to_segment(at_position, start, finish)
 		if at_position.distance_to(closest) > 14.0:
@@ -1706,10 +1706,9 @@ func _draw_node_input_glyphs(node: FactoryNodeModel, center: Vector2) -> void:
 		var glyph: GlyphModel = glyph_value
 		if not glyph.structure_validation_errors().is_empty():
 			continue
-		var y_offset := 0.0
-		if node.required_input_count() == 2:
-			y_offset = -13.0 if port == 0 else 13.0
-		var glyph_center := center + Vector2(-NODE_HALF_SIZE.x + 14.0, y_offset)
+		var port_position := _input_port_position(node.id, port)
+		var inward := port_position.direction_to(center)
+		var glyph_center := port_position + inward * 14.0
 		_draw_mini_glyph(glyph, glyph_center, 0.85)
 		if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
 			_draw_recipe_match_marker(glyph_center, input_recipe_match_state(node.id, port), 9.0)
@@ -1749,7 +1748,7 @@ func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:
 		var output_color := LINE_COLOR
 		if is_guided_connection_pending() and node.id == &"ring_source":
 			output_color = SELECTED_COLOR
-		var output_position := center + Vector2(NODE_HALF_SIZE.x, 0)
+		var output_position := _output_port_position(node.id)
 		draw_circle(output_position, PORT_RADIUS, output_color)
 		if node.id == hovered_output_node_id:
 			draw_arc(output_position, PORT_RADIUS + 5.0, 0.0, TAU, 24, Color(GLYPH_COLOR, 0.5), 2.2, true)
@@ -1860,16 +1859,42 @@ func _node_at(local_position: Vector2) -> StringName:
 
 
 func _output_port_position(node_id: StringName) -> Vector2:
-	return node_local_position(node_id) + Vector2(NODE_HALF_SIZE.x, 0)
+	var display_simulation := _display_simulation()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return node_local_position(node_id) + Vector2(NODE_HALF_SIZE.x, 0)
+	var center := node_local_position(node_id)
+	var direction := Vector2.RIGHT
+	for line in display_simulation.lines.values():
+		if line.from_node_id == node_id and display_simulation.nodes.has(line.to_node_id):
+			direction = center.direction_to(node_local_position(line.to_node_id))
+			break
+	return center + _port_boundary_offset(display_simulation.nodes[node_id], direction)
 
 
 func _input_port_position(node_id: StringName, port: int) -> Vector2:
-	var node: FactoryNodeModel = _display_simulation().nodes[node_id]
+	var display_simulation := _display_simulation()
+	var node: FactoryNodeModel = display_simulation.nodes[node_id]
+	var center := node_local_position(node_id)
+	for line in display_simulation.lines.values():
+		if line.to_node_id == node_id and line.to_port == port and display_simulation.nodes.has(line.from_node_id):
+			var direction := center.direction_to(node_local_position(line.from_node_id))
+			return center + _port_boundary_offset(node, direction)
 	var y_offset := 0.0
 	if node.required_input_count() == 2:
 		y_offset = -13.0 if port == 0 else 13.0
 	var x_offset := -40.0 if node.kind == FactoryNodeModel.NodeKind.SUMMONER else -NODE_HALF_SIZE.x
-	return node_local_position(node_id) + Vector2(x_offset, y_offset)
+	return center + Vector2(x_offset, y_offset)
+
+
+func _port_boundary_offset(node: FactoryNodeModel, direction: Vector2) -> Vector2:
+	var normalized := direction.normalized()
+	if normalized == Vector2.ZERO:
+		normalized = Vector2.RIGHT
+	if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
+		return normalized * 40.0
+	var x_scale := INF if absf(normalized.x) < 0.001 else NODE_HALF_SIZE.x / absf(normalized.x)
+	var y_scale := INF if absf(normalized.y) < 0.001 else NODE_HALF_SIZE.y / absf(normalized.y)
+	return normalized * minf(x_scale, y_scale)
 
 
 func _output_port_at(local_position: Vector2) -> StringName:
