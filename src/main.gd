@@ -138,6 +138,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if event.ctrl_pressed and event.keycode == KEY_Z:
 		_undo_factory_edit()
+	elif event.keycode == KEY_ESCAPE and factory_board.interaction_enabled:
+		factory_board.cancel_pending_connection()
 	elif event.keycode == KEY_DELETE:
 		_delete_factory_node()
 	elif event.keycode == KEY_SPACE and flow.phase in [RunFlow.Phase.FACTORY_BUILD, RunFlow.Phase.BATTLE, RunFlow.Phase.FACTORY_RECONFIGURE]:

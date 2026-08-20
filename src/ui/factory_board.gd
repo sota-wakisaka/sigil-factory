@@ -381,6 +381,7 @@ func is_guided_connection_pending() -> bool:
 		plan_id == MvpContent.PLAN_EMPTY
 		and display_simulation != null
 		and display_simulation.lines.is_empty()
+		and connecting_from_node_id == &""
 		and display_simulation.nodes.has(&"ring_source")
 		and display_simulation.nodes.has(&"summoner")
 	)
@@ -631,6 +632,9 @@ func _gui_input(event: InputEvent) -> void:
 		queue_redraw()
 		accept_event()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if cancel_pending_connection():
+			accept_event()
+			return
 		var input_port := _input_port_at(event.position)
 		if not input_port.is_empty():
 			disconnect_input(input_port["node_id"], input_port["port"])
@@ -642,6 +646,16 @@ func _gui_input(event: InputEvent) -> void:
 			var line: FactoryLineModel = display_simulation.lines[line_id]
 			disconnect_input(line.to_node_id, line.to_port)
 			accept_event()
+
+
+func cancel_pending_connection() -> bool:
+	if connecting_from_node_id == &"":
+		return false
+	connecting_from_node_id = &""
+	connection_cursor = Vector2.ZERO
+	connection_message = "配線をキャンセルしました"
+	queue_redraw()
+	return true
 
 
 func _clear_node_hover() -> void:
