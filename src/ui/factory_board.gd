@@ -1104,7 +1104,7 @@ func _draw_edit_summary() -> void:
 		)
 	var discard_count := pending_discard_count()
 	if discard_count > 0:
-		var center := Vector2(78.0 + mini(groups.size(), 6) * 58.0, 28.0)
+		var center := pending_discard_badge_center()
 		draw_circle(center, 10.0, WARNING_COLOR)
 		draw_line(center + Vector2(-4, -4), center + Vector2(4, 4), Color.WHITE, 1.8, true)
 		draw_line(center + Vector2(-4, 4), center + Vector2(4, -4), Color.WHITE, 1.8, true)
@@ -1132,6 +1132,14 @@ func work_in_progress_summary_index_at(at_position: Vector2) -> int:
 		if at_position.distance_to(Vector2(72.0 + index * 58.0, 28.0)) <= 22.0:
 			return index
 	return -1
+
+
+func pending_discard_badge_center() -> Vector2:
+	return Vector2(78.0 + mini(work_in_progress_visual_summary().size(), 6) * 58.0, 28.0)
+
+
+func pending_discard_badge_at(at_position: Vector2) -> bool:
+	return editing and pending_discard_count() > 0 and at_position.distance_to(pending_discard_badge_center()) <= 20.0
 
 
 func _draw_interaction_legend() -> void:
@@ -1355,6 +1363,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 		return connection_message
 	if flow_warning_badge_at(at_position):
 		return flow_warning_message
+	if pending_discard_badge_at(at_position):
+		return pending_discard_notice()
 	var work_index := work_in_progress_summary_index_at(at_position)
 	if work_index >= 0:
 		var work_entry: Dictionary = work_in_progress_visual_summary()[work_index]
