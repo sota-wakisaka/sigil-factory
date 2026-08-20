@@ -1,0 +1,84 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/main_menu.gd" id="1_menu"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 44.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="Center"]
+custom_minimum_size = Vector2(780, 430)
+layout_mode = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Kicker" type="Label" parent="Center/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.36, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 13
+text = "ARCANE PRODUCTION // PROTOTYPE"
+horizontal_alignment = 1
+
+[node name="Title" type="Label" parent="Center/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 42
+text = "SIGIL FACTORY"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Center/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.68, 0.8, 1)
+theme_override_font_sizes/font_size = 15
+text = "起動するモードを選択"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="Center/Content"]
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+
+[node name="Choices" type="HBoxContainer" parent="Center/Content"]
+layout_mode = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="MvpButton" type="Button" parent="Center/Content/Choices"]
+custom_minimum_size = Vector2(360, 172)
+layout_mode = 2
+focus_neighbor_right = NodePath("../SealLabButton")
+tooltip_text = "工場を構築し、3分間のリアルタイム戦闘を進めます"
+theme_override_colors/font_color = Color(0.78, 0.91, 1, 1)
+theme_override_colors/font_hover_color = Color(0.92, 0.98, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "◇  MVP\n\n工場構築  →  戦闘"
+
+[node name="SealLabButton" type="Button" parent="Center/Content/Choices"]
+custom_minimum_size = Vector2(360, 172)
+layout_mode = 2
+focus_neighbor_left = NodePath("../MvpButton")
+tooltip_text = "魔法陣V2を大・中・小表示と白黒表示で比較します"
+theme_override_colors/font_color = Color(0.82, 0.86, 1, 1)
+theme_override_colors/font_hover_color = Color(0.96, 0.94, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "◎  SEAL LAB\n\n魔法陣V2を確認"
+
+[node name="Hint" type="Label" parent="Center/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.5, 0.62, 1)
+theme_override_font_sizes/font_size = 12
+text = "← → で選択  //  Enterで決定"
+horizontal_alignment = 1

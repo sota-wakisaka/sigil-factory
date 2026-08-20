@@ -6,6 +6,8 @@ const SealLimitsModel := preload("res://src/sigil_v2/seal_limits.gd")
 const SealLabContentModel := preload("res://experiments/seal_lab/seal_lab_content.gd")
 const SealLabViewModel := preload("res://experiments/seal_lab/seal_view.gd")
 
+const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
+
 var fixtures: Array[Dictionary] = []
 var compiled_fixtures: Array[Dictionary] = []
 var catalog_buttons: Array[Button] = []
@@ -18,6 +20,7 @@ var grayscale := false
 var animation_progress := 1.0
 
 var mode_buttons: Dictionary = {}
+var menu_button: Button
 var grayscale_button: Button
 var progress_slider: HSlider
 var status_label: Label
@@ -135,6 +138,15 @@ func _build_toolbar() -> Control:
 	title.add_theme_font_size_override("font_size", 20)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(title)
+
+	menu_button = Button.new()
+	menu_button.text = "← MENU"
+	menu_button.tooltip_text = "メインメニューへ戻る"
+	menu_button.custom_minimum_size = Vector2(96, 36)
+	menu_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+	)
+	toolbar.add_child(menu_button)
 
 	for definition in [
 		[&"operational", "⚙", "意味線を即時表示"],

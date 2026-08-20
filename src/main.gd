@@ -6,6 +6,8 @@ const RunFlow := preload("res://src/game/run_flow.gd")
 const SigilGhostControl := preload("res://src/ui/sigil_ghost.gd")
 const FactorySelectionIndicatorControl := preload("res://src/ui/factory_selection_indicator.gd")
 
+const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
+
 const BACKGROUND_COLOR := Color("070a10")
 const GRID_COLOR := Color(0.18, 0.26, 0.36, 0.2)
 const GRID_SPACING := 32
@@ -67,6 +69,7 @@ var action_error_hold_ticks := 0
 
 
 func _ready() -> void:
+	$MenuButton.pressed.connect(_return_to_main_menu)
 	factory_tab.pressed.connect(func() -> void: _show_workspace(WorkspaceView.FACTORY))
 	battle_tab.pressed.connect(func() -> void: _show_workspace(WorkspaceView.BATTLE))
 	$Toolbar/ScoutButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SCOUT))
@@ -101,6 +104,10 @@ func _ready() -> void:
 	_select_plan(MvpContent.PLAN_SCOUT)
 	_apply_phase()
 	queue_redraw()
+
+
+func _return_to_main_menu() -> void:
+	get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 
 
 func _show_workspace(next_view: WorkspaceView) -> void:

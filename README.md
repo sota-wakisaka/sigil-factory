@@ -77,6 +77,10 @@ that adaptive production wins while scout-only and golem-only production do not.
 2. Import `project.godot` when prompted.
 3. Press **F6** or **F5** to run the main scene.
 
+The project opens on a mode menu. Choose **MVP** for the factory/battle loop or
+**SEAL LAB** to inspect the experimental magic-circle grammar at 32, 80, and
+256 pixels. Both modes include a **MENU** button that returns to mode selection.
+
 Follow the highlighted progression bar from **Route Selection**. At the factory
 step, choose a production plan as a starting template or customize it with the
 equipment palette. Drag equipment to reposition it, click a filled output port
