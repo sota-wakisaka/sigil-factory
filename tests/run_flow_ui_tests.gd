@@ -115,6 +115,9 @@ func _initialize() -> void:
 	_expect(not main.inspector_option.disabled, "selected configurable equipment should enable its inspector")
 	_expect(main.inspector_option.visual_kind == FactoryNodeModel.NodeKind.SOURCE, "source inspector should use its Primitive visual language")
 	_expect(main.inspector_option.visual_index == 0 and main.inspector_option.get_item_text(0) == "環", "source setting should keep text subordinate to the ring icon")
+	_expect(main.inspector_option.get_item_icon(0) != null and main.inspector_option.get_item_icon(1) != null, "source dropdown should keep Primitive icons visible in every choice")
+	_expect(main.inspector_option._setting_icon(FactoryNodeModel.NodeKind.ROTATOR, 0) != null, "rotation dropdown should expose its visual operation icon")
+	_expect(main.inspector_option._setting_icon(FactoryNodeModel.NodeKind.COLORIZER, 0) != null and main.inspector_option._setting_icon(FactoryNodeModel.NodeKind.COLORIZER, 1) != null, "color dropdown should expose distinct blue and red swatches")
 	main.inspector_option.item_selected.emit(1)
 	_expect(main.inspector_option.visual_index == 1, "setting icon should follow the selected source Primitive")
 	var selected_source: FactoryNodeModel = main.factory_board.simulation.nodes[main.factory_board.selected_node_id]

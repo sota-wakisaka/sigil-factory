@@ -5,47 +5,53 @@ const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
 
 var visual_kind := -1
 var visual_index := -1
+var icon_cache: Dictionary = {}
 
 
 func _ready() -> void:
 	item_selected.connect(_on_visual_item_selected)
-	queue_redraw()
+	get_popup().add_theme_constant_override("icon_max_width", 24)
 
 
 func configure_visual(kind: int, selected_index: int, detail: String) -> void:
 	visual_kind = kind
 	visual_index = selected_index
 	tooltip_text = detail if selected_index >= 0 else "設定可能な設備を選択"
-	queue_redraw()
+	_refresh_item_icons()
 
 
 func _on_visual_item_selected(index: int) -> void:
 	visual_index = index
-	queue_redraw()
 
 
-func _draw() -> void:
-	if disabled or visual_index < 0:
-		return
-	var center := Vector2(22.0, size.y * 0.5)
-	var color := Color(0.4, 0.84, 1.0)
-	match visual_kind:
+func _refresh_item_icons() -> void:
+	for index in item_count:
+		set_item_icon(index, _setting_icon(visual_kind, index))
+
+
+func _setting_icon(kind: int, index: int) -> Texture2D:
+	var key := "%d:%d" % [kind, index]
+	if icon_cache.has(key):
+		return icon_cache[key]
+	var body := ""
+	match kind:
 		FactoryNodeModel.NodeKind.SOURCE:
-			if visual_index == 0:
-				draw_arc(center, 8.0, 0.0, TAU, 24, color, 2.0, true)
-			else:
-				var points := PackedVector2Array([
-					center + Vector2(0, -9), center + Vector2(7, 7), center,
-					center + Vector2(-7, 7), center + Vector2(0, -9),
-				])
-				draw_polyline(points, color, 2.0, true)
+			body = (
+				"<path d='M17.5 17.5 A8 8 0 1 1 17.5 6.5' fill='none' stroke='#66d6ff' stroke-width='2.4' stroke-linecap='round'/>"
+				if index == 0
+				else "<path d='M12 3 L20 20 L12 15 L4 20 Z' fill='none' stroke='#66d6ff' stroke-width='2' stroke-linejoin='round'/>"
+			)
 		FactoryNodeModel.NodeKind.ROTATOR:
-			draw_arc(center, 8.0, -0.4, TAU - 0.8, 20, color, 2.0, true)
-			draw_colored_polygon(PackedVector2Array([
-				center + Vector2(7, -5), center + Vector2(11, -4), center + Vector2(8, 0),
-			]), color)
+			body = "<path d='M18 8 A7 7 0 1 0 19 15 M18 8 L18 3 L22 7' fill='none' stroke='#66d6ff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/>"
 		FactoryNodeModel.NodeKind.COLORIZER:
-			var swatches := [Color(0.25, 0.68, 1.0), Color(1.0, 0.3, 0.28), Color(0.92, 0.95, 1.0)]
-			color = swatches[clampi(visual_index, 0, swatches.size() - 1)]
-			draw_circle(center, 8.0, color)
-			draw_arc(center, 9.5, 0.0, TAU, 24, Color(0.7, 0.86, 1.0), 1.2, true)
+			var colors := ["#40adff", "#ff4d48", "#edf4ff"]
+			body = "<circle cx='12' cy='12' r='8' fill='%s' stroke='#9edcff' stroke-width='1.5'/>" % colors[clampi(index, 0, colors.size() - 1)]
+		_:
+			return null
+	var svg := "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>%s</svg>" % body
+	var image := Image.new()
+	if image.load_svg_from_string(svg, 1.0) != OK:
+		return null
+	var texture := ImageTexture.create_from_image(image)
+	icon_cache[key] = texture
+	return texture
