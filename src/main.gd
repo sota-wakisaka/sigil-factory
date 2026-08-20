@@ -219,15 +219,18 @@ func _factory_is_valid(prefix: String) -> bool:
 
 
 func _select_plan(plan_id: StringName) -> void:
-	_sync_plan_ui(plan_id)
 	if flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
-		factory_board.preview_plan(plan_id)
+		if not factory_board.preview_plan(plan_id):
+			_sync_plan_ui(factory_board.display_plan_id())
+			return
+		_sync_plan_ui(plan_id)
 		var feedback := "◇ %s  • 未確定" % MvpContent.plan_name(plan_id)
 		var discard_notice := factory_board.pending_discard_notice()
 		if discard_notice != "":
 			feedback += " // " + discard_notice
 		_set_factory_feedback(feedback)
 	else:
+		_sync_plan_ui(plan_id)
 		if flow.phase == RunFlow.Phase.FACTORY_BUILD:
 			factory_board.apply_plan(plan_id)
 			_refresh_factory_validation_state()

@@ -220,6 +220,17 @@ func _initialize() -> void:
 	_expect(main.pause_button.action_kind == "resume" and main.pause_button.text == "確定・再開", "reconfiguration should pair confirmation with a visual resume action")
 	_expect(main.cancel_button.action_kind == "cancel" and main.cancel_button.text == "破棄", "reconfiguration should keep discard visually distinct and terse")
 	_expect(main.speed_button.disabled, "time stop should disable speed controls")
+	var same_plan_preview: FactorySimulation = main.factory_board.preview_simulation
+	var same_plan_undo_count: int = main.factory_board.undo_history.size()
+	main.get_node("Toolbar/ScoutButton").pressed.emit()
+	_expect(main.factory_board.preview_simulation == same_plan_preview and main.factory_board.undo_history.size() == same_plan_undo_count, "reselecting the highlighted plan should not reset the time-stop factory")
+	_expect(main.sigil_ghost.recipe_id == &"open_ring" and main.get_node("Toolbar/ScoutButton").button_pressed, "same-plan no-op should preserve its goal UI")
+	var preserved_preview_recipe: SigilRecipeModel = main.factory_board.preview_simulation.recipes[0]
+	main.factory_board.preview_simulation.recipes[0] = null
+	main.get_node("Toolbar/SentinelButton").pressed.emit()
+	_expect(main.factory_board.pending_plan_id == MvpContent.PLAN_SCOUT, "failed preset snapshot should preserve the pending factory plan")
+	_expect(main.sigil_ghost.recipe_id == &"open_ring" and main.get_node("Toolbar/ScoutButton").button_pressed, "failed preset snapshot should not switch the goal UI ahead of factory state")
+	main.factory_board.preview_simulation.recipes[0] = preserved_preview_recipe
 	main.get_node("Toolbar/SentinelButton").pressed.emit()
 	_expect(main.sigil_ghost.recipe_id == &"azure_guard", "sentinel selection should update the completed sigil ghost")
 	_expect(main.factory_board.production_difference_state(&"scout")["state"] == &"decrease", "sentinel preview should show scout loss before confirmation")

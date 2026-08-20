@@ -1006,13 +1006,13 @@ func begin_edit() -> bool:
 	return true
 
 
-func preview_plan(next_plan_id: StringName) -> void:
-	if not editing:
-		return
+func preview_plan(next_plan_id: StringName) -> bool:
+	if not editing or next_plan_id == pending_plan_id:
+		return false
 	var history_size := undo_history.size()
 	_push_undo_snapshot()
 	if undo_history.size() == history_size:
-		return
+		return false
 	var discarded_before_edit := simulation.discarded_glyphs
 	var discarded_work_in_progress := work_in_progress_count()
 	var committed_tick := simulation.tick_index
@@ -1026,6 +1026,7 @@ func preview_plan(next_plan_id: StringName) -> void:
 	_refresh_production_preview()
 	selection_changed.emit()
 	queue_redraw()
+	return true
 
 
 func commit_edit() -> void:
