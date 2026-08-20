@@ -2235,12 +2235,15 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	board.simulation.lines[&"line_1"].payload = transported
 	var line_start := board._output_port_position(&"ring_source")
 	var line_finish := board._input_port_position(&"summoner", 0)
-	_expect(board._get_tooltip(line_start.lerp(line_finish, 0.5)) == "glyph_preview", "transport line should offer a visual Glyph tooltip")
+	_expect(board._get_tooltip(line_start.lerp(line_finish, 0.5)) == "glyph_comparison", "transport line should compare its Glyph with the selected target")
 	_expect(board.tooltip_context == "輸送中Glyph", "line tooltip should identify the Glyph as transported work")
 	_expect(
 		board.tooltip_glyph.canonical_serialization() == transported.canonical_serialization(),
 		"line tooltip should copy the actual transported CanonicalGlyph"
 	)
+	var line_tooltip = board._make_custom_tooltip("glyph_comparison")
+	_expect(line_tooltip.get_script() == GlyphComparisonTooltipModel, "line hover should reuse the side-by-side target comparison")
+	line_tooltip.free()
 	_expect(board._get_tooltip(Vector2(8, 8)) == "", "empty board space should not show a Glyph tooltip")
 	_expect(board.node_frame_kind(&"ring_source") == &"source_hex", "source should use a dedicated non-rectangular frame")
 	_expect(board.node_frame_kind(&"summoner") == &"summon_circle", "summoner should use a dedicated circular frame")
@@ -2345,7 +2348,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(board.tooltip_glyph != null and "生産見込み" in board.tooltip_context, "production tooltip should pair its CanonicalGlyph with the forecast count")
 	var preview_line_center := board._output_port_position(&"ring_source").lerp(board._input_port_position(&"summoner", 0), 0.5)
 	_expect(board.display_glyph_for_line(&"line_1") != null, "empty pre-battle line should expose its predicted CanonicalGlyph")
-	_expect(board._get_tooltip(preview_line_center) == "glyph_preview" and "32秒予測" in board.tooltip_context, "empty line hover should explain its predicted transport Glyph visually")
+	_expect(board._get_tooltip(preview_line_center) == "glyph_comparison" and "32秒予測" in board.tooltip_context, "empty line hover should compare its predicted transport Glyph with the target")
 	_expect(board.line_goal_match_state(&"line_1") == &"match", "summoner path should compare its predicted Glyph with the selected goal before battle")
 	board.selected_node_id = &"ring_source"
 	board.configure_selected_node(1)
