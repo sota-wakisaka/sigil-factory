@@ -7,6 +7,9 @@ var components: Array[GlyphComponentModel] = []
 var combine_children: Array = []
 var production_context: GlyphProductionContextModel
 
+const MIN_COMBINE_CHILDREN := 2
+const MAX_COMBINE_CHILDREN := 6
+
 
 func _init(
 	initial_components: Array[GlyphComponentModel] = [],
@@ -27,17 +30,28 @@ func _init(
 
 
 static func combine(first: GlyphModel, second: GlyphModel) -> GlyphModel:
-	var children: Array = [first.copy(), second.copy()]
+	return combine_many([first, second])
+
+
+static func combine_many(glyphs: Array) -> GlyphModel:
+	var children: Array = []
+	var contexts: Array = []
+	for glyph_value in glyphs:
+		if glyph_value is GlyphModel:
+			var glyph: GlyphModel = glyph_value
+			children.append(glyph.copy())
+			contexts.append(glyph.production_context)
+		else:
+			children.append(glyph_value)
 	children.sort_custom(
-		func(a: GlyphModel, b: GlyphModel) -> bool:
+		func(a, b) -> bool:
+			if not a is GlyphModel or not b is GlyphModel:
+				return a is GlyphModel
 			return _canonical_child_less(a, b)
 	)
 	return GlyphModel.new(
 		[],
-		GlyphProductionContextModel.merge([
-			first.production_context,
-			second.production_context,
-		]),
+		GlyphProductionContextModel.merge(contexts),
 		children
 	)
 
@@ -100,7 +114,10 @@ func _structure_validation_errors(path: String, active_ancestors: Dictionary) ->
 			if component.scale_step < 1:
 				errors.append("invalid_scale:%s:%d" % [path, component.scale_step])
 	else:
-		if combine_children.size() != 2:
+		if (
+			combine_children.size() < MIN_COMBINE_CHILDREN
+			or combine_children.size() > MAX_COMBINE_CHILDREN
+		):
 			errors.append("combine_arity:%s:%d" % [path, combine_children.size()])
 		for child_index in combine_children.size():
 			var child_value = combine_children[child_index]

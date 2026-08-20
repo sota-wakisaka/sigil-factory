@@ -7,6 +7,7 @@ var failures := 0
 
 func _initialize() -> void:
 	_test_graph_evaluation()
+	_test_six_way_combine()
 	_test_connection_guards()
 	_test_owned_results()
 	await _test_lab_scene()
@@ -33,6 +34,33 @@ func _test_graph_evaluation() -> void:
 	_expect(result["glyph"].components.size() == 2, "output should contain both source materials")
 	_expect(result["glyph"].components[0].position == Vector2i(0, -4) or result["glyph"].components[1].position == Vector2i(0, -4), "move should be folded into the output Glyph")
 	_expect(result["glyph"].components[0].rotation_step == 1 or result["glyph"].components[1].rotation_step == 1, "rotation should be folded into the output Glyph")
+
+
+func _test_six_way_combine() -> void:
+	var graph = SigilGraphModel.new()
+	graph.add_node(&"combine", SigilGraphModel.COMBINE)
+	graph.add_node(&"output", SigilGraphModel.OUTPUT)
+	var offsets := [
+		Vector2i(-4, 0),
+		Vector2i(-2, -3),
+		Vector2i(2, -3),
+		Vector2i(4, 0),
+		Vector2i(2, 3),
+		Vector2i(-2, 3),
+	]
+	for input_index in SigilGraphModel.MAX_COMBINE_INPUTS:
+		var source_id := StringName("source_%d" % input_index)
+		var move_id := StringName("move_%d" % input_index)
+		graph.add_node(source_id, SigilGraphModel.SOURCE, {
+			"primitive_id": [&"ring", &"spike", &"branch"][input_index % 3],
+		})
+		graph.add_node(move_id, SigilGraphModel.MOVE, {"offset": offsets[input_index]})
+		_expect(graph.connect_nodes(source_id, 0, move_id, 0), "six-way source should connect to its move node")
+		_expect(graph.connect_nodes(move_id, 0, &"combine", input_index), "each of the six Combine ports should accept one input")
+	_expect(graph.connect_nodes(&"combine", 0, &"output", 0), "six-way Combine should connect to output")
+	var result := graph.evaluate_output()
+	_expect(result["ok"], "six connected inputs should produce a valid sigil")
+	_expect(result["glyph"].combine_children.size() == 6, "six-way Combine should preserve all children in one level")
 
 
 func _test_connection_guards() -> void:
@@ -76,6 +104,7 @@ func _test_lab_scene() -> void:
 	_expect(lab.node_controls.size() >= 10, "default four-direction template should expose editable nodes")
 	var output: Dictionary = lab.graph.evaluate_output()
 	_expect(output["ok"] and output["glyph"].components.size() == 4, "default template should produce a four-material sigil")
+	_expect(output["glyph"].combine_children.size() == 4, "default template should use one four-way Combine instead of a binary tree")
 	_expect(lab.output_preview.glyph.canonical_serialization() == output["glyph"].canonical_serialization(), "large preview should show the actual graph output")
 	lab.clear_workspace()
 	await process_frame

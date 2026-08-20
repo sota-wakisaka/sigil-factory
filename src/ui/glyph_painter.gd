@@ -70,13 +70,14 @@ static func _collect_combine_visuals(
 ) -> void:
 	if glyph.combine_children.is_empty():
 		return
-	var glyph_center := _glyph_center_offset(glyph, scale)
+	# Combine is anchored to the canonical Glyph origin. This keeps its structure
+	# aligned with Rotate, which also transforms every child around (0, 0).
+	var glyph_center := Vector2.ZERO
 	var radius := _glyph_content_radius(glyph, glyph_center, scale)
 	radius += float(_combine_depth(glyph) - 1) * 6.0 * scale
 	circles.append({"center": glyph_center, "radius": radius})
 	var children := glyph.combine_children.duplicate()
 	children.sort_custom(_canonical_child_less)
-	var coincident_directions: Array[Vector2] = []
 	for child_index in children.size():
 		var child_value = children[child_index]
 		var child: GlyphModel = child_value
@@ -84,11 +85,16 @@ static func _collect_combine_visuals(
 		if glyph_center.distance_to(child_center) >= 2.0 * scale:
 			connections.append({"from": glyph_center, "to": child_center})
 		else:
-			var direction := _coincident_child_direction(child, coincident_directions)
-			coincident_directions.append(direction)
+			var direction := Vector2.UP.rotated(
+				float(child_index) * TAU / float(children.size())
+			)
+			var target_length := minf(
+				radius * (0.76 if not child.combine_children.is_empty() else 0.62),
+				(17.0 if not child.combine_children.is_empty() else 14.0) * scale
+			)
 			connections.append({
-				"from": glyph_center + direction * 3.0 * scale,
-				"to": glyph_center + direction * minf(radius * 0.62, 14.0 * scale),
+				"from": glyph_center,
+				"to": glyph_center + direction * target_length,
 			})
 		_collect_combine_visuals(child, scale, circles, connections)
 
@@ -103,32 +109,6 @@ static func _canonical_child_less(first, second) -> bool:
 	if first_hash != second_hash:
 		return first_hash < second_hash
 	return first_glyph.canonical_serialization() < second_glyph.canonical_serialization()
-
-
-static func _coincident_child_direction(child: GlyphModel, occupied: Array[Vector2]) -> Vector2:
-	var angle := 0.0
-	if child.combine_children.is_empty() and not child.components.is_empty():
-		var component: GlyphComponentModel = child.components[0]
-		angle = {
-			&"ring": -PI * 0.5,
-			&"spike": 0.0,
-			&"branch": PI * 0.75,
-		}.get(component.primitive_id, 0.0)
-		angle += float(component.rotation_step) * PI * 0.5
-	else:
-		angle = deg_to_rad(float(posmod(child.canonical_serialization().hash(), 360)))
-	var direction := Vector2.RIGHT.rotated(angle)
-	while _direction_is_occupied(direction, occupied):
-		angle += PI * 0.5
-		direction = Vector2.RIGHT.rotated(angle)
-	return direction
-
-
-static func _direction_is_occupied(candidate: Vector2, occupied: Array[Vector2]) -> bool:
-	for direction in occupied:
-		if candidate.dot(direction) > 0.86:
-			return true
-	return false
 
 
 static func _glyph_center_offset(glyph: GlyphModel, scale: float) -> Vector2:

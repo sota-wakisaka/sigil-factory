@@ -14,6 +14,7 @@ const OUTPUT := &"output"
 const NODE_KINDS := [SOURCE, ROTATE, MOVE, COLOR, COMBINE, OUTPUT]
 const PRIMITIVES := [&"ring", &"spike", &"branch"]
 const COLORS := [&"white", &"blue", &"red"]
+const MAX_COMBINE_INPUTS := GlyphModel.MAX_COMBINE_CHILDREN
 
 var nodes: Dictionary = {}
 var connections: Array[Dictionary] = []
@@ -162,7 +163,7 @@ func input_count(node_id: StringName) -> int:
 		SOURCE:
 			return 0
 		COMBINE:
-			return 2
+			return GlyphModel.MAX_COMBINE_CHILDREN
 		ROTATE, MOVE, COLOR, OUTPUT:
 			return 1
 	return 0
@@ -210,6 +211,23 @@ func _evaluate(node_id: StringName, cache: Dictionary, active: Dictionary) -> Di
 			]),
 			"error": &"",
 		}
+	elif kind == COMBINE:
+		var inputs: Array = []
+		for input_port in input_count(node_id):
+			var source_id := _incoming_node(node_id, input_port)
+			if source_id == &"":
+				continue
+			var input_result := _evaluate(source_id, cache, active)
+			if not bool(input_result["ok"]):
+				result = input_result
+				active.erase(node_id)
+				cache[node_id] = result
+				return _result_copy(result)
+			inputs.append(input_result["glyph"])
+		if inputs.size() < GlyphModel.MIN_COMBINE_CHILDREN:
+			result = {"ok": false, "glyph": null, "error": &"missing_input"}
+		else:
+			result = _apply_node(kind, node_config(node_id), inputs)
 	else:
 		var inputs: Array = []
 		for input_port in input_count(node_id):
@@ -245,7 +263,7 @@ func _apply_node(kind: StringName, config: Dictionary, inputs: Array) -> Diction
 			glyph = inputs[0].copy()
 			glyph.recolor(StringName(config["color_id"]))
 		COMBINE:
-			glyph = GlyphModel.combine(inputs[0], inputs[1])
+			glyph = GlyphModel.combine_many(inputs)
 		OUTPUT:
 			glyph = inputs[0].copy()
 		_:

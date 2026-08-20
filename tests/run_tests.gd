@@ -899,6 +899,11 @@ func _test_factory_rejects_invalid_recipe_structures() -> void:
 	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	var branch := GlyphModel.new([GlyphComponentModel.new(&"branch")])
+	var too_many_children: Array = []
+	for child_index in 7:
+		too_many_children.append(GlyphModel.new([
+			GlyphComponentModel.new(StringName("arity_%d" % child_index)),
+		]))
 	var invalid_recipes: Array[SigilRecipeModel] = [
 		SigilRecipeModel.new(&"", ring, &"scout"),
 		SigilRecipeModel.new(&"missing_unit", ring, &""),
@@ -909,7 +914,7 @@ func _test_factory_rejects_invalid_recipe_structures() -> void:
 			&"golem"
 		),
 		SigilRecipeModel.new(&"unary_combine", GlyphModel.new([], null, [ring]), &"scout"),
-		SigilRecipeModel.new(&"ternary_combine", GlyphModel.new([], null, [ring, spike, branch]), &"golem"),
+		SigilRecipeModel.new(&"oversized_combine", GlyphModel.new([], null, too_many_children), &"golem"),
 		SigilRecipeModel.new(
 			&"missing_primitive",
 			GlyphModel.new([GlyphComponentModel.new(&"")]),
@@ -948,7 +953,7 @@ func _test_factory_rejects_invalid_recipe_structures() -> void:
 	_expect(simulation.recipes.is_empty(), "invalid recipe definitions should never enter the registry")
 	_expect(
 		simulation.add_recipe(SigilRecipeModel.new(&"valid_nested", GlyphModel.combine(ring, GlyphModel.combine(spike, branch)), &"golem")),
-		"valid nested binary Combine recipe should remain accepted"
+		"valid nested Combine recipe should remain accepted"
 	)
 
 
@@ -1006,11 +1011,32 @@ func _test_shared_glyph_painter_rejects_invalid_structures() -> void:
 	var coincident := GlyphModel.combine(valid, spike)
 	var coincident_visuals := GlyphPainterModel.combine_visuals(coincident, 2.0)
 	_expect(coincident_visuals["connections"].size() == 2, "coincident Combine children should use deterministic radial connections")
+	_expect(
+		coincident_visuals["circles"][0]["center"] == Vector2.ZERO,
+		"Combine circles should stay at the canonical origin instead of the children centroid"
+	)
+	for connection in coincident_visuals["connections"]:
+		_expect(connection["from"] == Vector2.ZERO, "coincident children should also connect from the exact center")
 	var reversed := GlyphModel.new([], null, [spike, valid])
 	_expect(
 		GlyphPainterModel.combine_visuals(reversed, 2.0)["connections"] == coincident_visuals["connections"],
 		"Combine connection layout should follow canonical child order rather than restored array order"
 	)
+	var radial_children: Array = []
+	for child_index in 6:
+		radial_children.append(GlyphModel.new([
+			GlyphComponentModel.new(
+				StringName("radial_%d" % child_index),
+				Vector2i(Vector2.RIGHT.rotated(float(child_index) * TAU / 6.0).round())
+			),
+		]))
+	var radial := GlyphModel.combine_many(radial_children)
+	var radial_visuals := GlyphPainterModel.combine_visuals(radial, 2.0)
+	_expect(radial.is_structure_valid(), "Combine should accept up to six children in one hierarchy level")
+	_expect(radial_visuals["circles"].size() == 1, "six-way Combine should need only one structural circle")
+	_expect(radial_visuals["connections"].size() == 6, "six-way Combine should connect every child from the center")
+	for connection in radial_visuals["connections"]:
+		_expect(connection["from"] == Vector2.ZERO, "positioned six-way children should all connect from the canonical center")
 
 
 func _test_factory_owns_registered_recipe_data() -> void:

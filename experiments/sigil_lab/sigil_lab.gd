@@ -157,7 +157,7 @@ func _build_palette() -> Control:
 		["↻", SigilGraphModel.ROTATE, {"steps": 1}, "90°単位で回転"],
 		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "整数グリッドで移動"],
 		["●", SigilGraphModel.COLOR, {"color_id": &"blue"}, "白・青・赤へ着色"],
-		["⊕", SigilGraphModel.COMBINE, {}, "2つのGlyphを合成"],
+		["⊕", SigilGraphModel.COMBINE, {}, "2〜6個のGlyphを中央で合成"],
 	]:
 		var button := Button.new()
 		button.text = definition[0]
@@ -257,16 +257,23 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 			node.add_child(option)
 			option_controls[node_id] = option
 		SigilGraphModel.COMBINE:
-			for label_text in ["A", "B"]:
+			for input_index in SigilGraphModel.MAX_COMBINE_INPUTS:
 				var input_label := Label.new()
-				input_label.text = label_text
+				input_label.text = str(input_index + 1)
 				input_label.custom_minimum_size = Vector2(108, 28)
 				input_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				node.add_child(input_label)
+				node.set_slot(input_index, true, 0, PORT_COLOR, false, 0, PORT_COLOR)
 			node.add_child(preview)
-			node.set_slot(0, true, 0, PORT_COLOR, false, 0, PORT_COLOR)
-			node.set_slot(1, true, 0, PORT_COLOR, false, 0, PORT_COLOR)
-			node.set_slot(2, false, 0, PORT_COLOR, true, 0, PORT_COLOR)
+			node.set_slot(
+				SigilGraphModel.MAX_COMBINE_INPUTS,
+				false,
+				0,
+				PORT_COLOR,
+				true,
+				0,
+				PORT_COLOR
+			)
 		SigilGraphModel.OUTPUT:
 			node.add_child(preview)
 			node.set_slot(0, true, 0, PORT_COLOR, false, 0, PORT_COLOR)
@@ -392,9 +399,7 @@ func _load_cardinal_template() -> void:
 	var rotate_left := _add_node(SigilGraphModel.ROTATE, {"steps": 2}, Vector2(190, 560))
 	var move_left := _add_node(SigilGraphModel.MOVE, {"offset": Vector2i(-4, 0)}, Vector2(360, 560))
 
-	var combine_top := _add_node(SigilGraphModel.COMBINE, {}, Vector2(390, 130))
-	var combine_bottom := _add_node(SigilGraphModel.COMBINE, {}, Vector2(390, 420))
-	var combine_root := _add_node(SigilGraphModel.COMBINE, {}, Vector2(610, 270))
+	var combine_root := _add_node(SigilGraphModel.COMBINE, {}, Vector2(540, 215))
 	var output_id := graph.output_node_id()
 
 	_connect_nodes(ring_top, 0, move_top, 0)
@@ -402,12 +407,10 @@ func _load_cardinal_template() -> void:
 	_connect_nodes(ring_bottom, 0, move_bottom, 0)
 	_connect_nodes(spike_left, 0, rotate_left, 0)
 	_connect_nodes(rotate_left, 0, move_left, 0)
-	_connect_nodes(move_top, 0, combine_top, 0)
-	_connect_nodes(move_right, 0, combine_top, 1)
-	_connect_nodes(move_bottom, 0, combine_bottom, 0)
-	_connect_nodes(move_left, 0, combine_bottom, 1)
-	_connect_nodes(combine_top, 0, combine_root, 0)
-	_connect_nodes(combine_bottom, 0, combine_root, 1)
+	_connect_nodes(move_top, 0, combine_root, 0)
+	_connect_nodes(move_right, 0, combine_root, 1)
+	_connect_nodes(move_bottom, 0, combine_root, 2)
+	_connect_nodes(move_left, 0, combine_root, 3)
 	_connect_nodes(combine_root, 0, output_id, 0)
 	_refresh_all()
 
