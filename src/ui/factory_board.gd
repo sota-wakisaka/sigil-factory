@@ -316,6 +316,7 @@ func undo() -> bool:
 	if editing:
 		preview_simulation = snapshot["simulation"]
 		preview_node_positions = snapshot["positions"]
+		pending_plan_id = snapshot.get("plan_id", pending_plan_id)
 	else:
 		simulation = snapshot["simulation"]
 		node_positions = snapshot["positions"]
@@ -810,6 +811,10 @@ func begin_edit() -> bool:
 func preview_plan(next_plan_id: StringName) -> void:
 	if not editing:
 		return
+	var history_size := undo_history.size()
+	_push_undo_snapshot()
+	if undo_history.size() == history_size:
+		return
 	var discarded_before_edit := simulation.discarded_glyphs
 	var discarded_work_in_progress := work_in_progress_count()
 	var committed_tick := simulation.tick_index
@@ -820,7 +825,6 @@ func preview_plan(next_plan_id: StringName) -> void:
 	preview_simulation.tick_index = committed_tick
 	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
 	selected_node_id = &""
-	undo_history.clear()
 	_refresh_production_preview()
 	selection_changed.emit()
 	queue_redraw()
@@ -2472,6 +2476,7 @@ func _push_undo_snapshot() -> void:
 	undo_history.append({
 		"simulation": duplication["state"],
 		"positions": _display_positions().duplicate(true),
+		"plan_id": display_plan_id(),
 	})
 
 

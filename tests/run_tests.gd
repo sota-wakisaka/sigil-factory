@@ -91,6 +91,7 @@ func _initialize() -> void:
 	_test_factory_enforces_single_summoner()
 	_test_factory_node_configuration_is_undoable()
 	_test_factory_configuration_discards_work_transactionally()
+	_test_factory_preset_preview_is_undoable()
 	_test_source_configuration_resets_generation_progress()
 	_test_factory_rewiring_discards_work_transactionally()
 	_test_factory_board_connections_change_output()
@@ -1985,6 +1986,24 @@ func _test_factory_configuration_discards_work_transactionally() -> void:
 	board.cancel_edit()
 	_expect(board.work_in_progress_count() == committed_work_in_progress, "cancel should restore configured work in progress")
 	_expect(board.simulation.discarded_glyphs == 0, "cancel should not commit configuration discards")
+	board.free()
+
+
+func _test_factory_preset_preview_is_undoable() -> void:
+	var board := FactoryBoard.new()
+	board.configure(MvpContent.PLAN_SCOUT)
+	board.begin_edit()
+	board.set_interaction_enabled(true)
+	var added_node_id := board.add_node_from_palette(&"rotator")
+	_expect(added_node_id != &"", "preset undo test should create a custom edit")
+	var edited_node_count := board.preview_simulation.nodes.size()
+	board.preview_plan(MvpContent.PLAN_GOLEM)
+	_expect(board.pending_plan_id == MvpContent.PLAN_GOLEM and board.undo_history.size() == 2, "preset preview should become one undoable edit")
+	_expect(board.undo(), "preset preview should undo to the preceding custom graph")
+	_expect(board.pending_plan_id == MvpContent.PLAN_SCOUT, "undoing a preset should restore its preceding goal")
+	_expect(board.preview_simulation.nodes.size() == edited_node_count and board.preview_simulation.nodes.has(added_node_id), "undoing a preset should restore all custom equipment")
+	_expect(board.undo(), "custom edit before a preset should remain separately undoable")
+	_expect(not board.preview_simulation.nodes.has(added_node_id), "second undo should restore the original transaction graph")
 	board.free()
 
 

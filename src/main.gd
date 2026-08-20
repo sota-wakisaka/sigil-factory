@@ -275,7 +275,8 @@ func _delete_factory_node() -> void:
 
 
 func _undo_factory_edit() -> void:
-	factory_board.undo()
+	if factory_board.undo():
+		_sync_plan_ui(factory_board.display_plan_id())
 
 
 func _refresh_factory_inspector() -> void:
