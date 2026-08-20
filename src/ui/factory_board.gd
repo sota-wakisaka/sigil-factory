@@ -22,6 +22,9 @@ const SELECTED_COLOR := Color(1.0, 0.78, 0.3, 1.0)
 const WARNING_COLOR := Color(1.0, 0.38, 0.28, 1.0)
 const WAITING_COLOR := Color(1.0, 0.72, 0.24, 1.0)
 const MATCH_COLOR := Color(0.36, 1.0, 0.58, 1.0)
+const PRODUCTION_INCREASE_COLOR := Color(0.3, 0.86, 0.94, 1.0)
+const PRODUCTION_DECREASE_COLOR := Color(1.0, 0.7, 0.28, 1.0)
+const PRODUCTION_COMPARISON_COLOR := Color(0.42, 0.58, 0.7, 0.88)
 const EDIT_ADDED_COLOR := Color(0.24, 0.9, 0.92, 0.96)
 const EDIT_CHANGED_COLOR := Color(1.0, 0.72, 0.24, 0.96)
 const EDIT_REMOVED_COLOR := Color(1.0, 0.34, 0.3, 0.92)
@@ -72,6 +75,8 @@ var cached_production_discarded := 0
 var cached_production_valid := false
 var cached_validation_errors: Array[String] = []
 var cached_node_output_glyphs: Dictionary = {}
+var production_comparison_active := false
+var production_comparison_baseline: Dictionary = {}
 var tooltip_glyph: GlyphModel
 var tooltip_target_glyph: GlyphModel
 var tooltip_title := ""
@@ -88,6 +93,7 @@ func _ready() -> void:
 
 
 func configure(next_plan_id: StringName) -> void:
+	clear_production_comparison_baseline()
 	plan_id = next_plan_id
 	simulation = MvpContent.build_factory(plan_id)
 	_apply_run_upgrades(simulation)
@@ -555,6 +561,65 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 	}
 
 
+func production_snapshot() -> Dictionary:
+	return {
+		"ok": cached_production_valid,
+		"horizon_ticks": PRODUCTION_PREVIEW_TICKS,
+		"counts": cached_production_counts.duplicate(true),
+		"discarded": cached_production_discarded,
+		"errors": cached_validation_errors.duplicate(),
+	}
+
+
+func set_production_comparison_baseline(snapshot: Dictionary) -> bool:
+	clear_production_comparison_baseline()
+	if (
+		not editing
+		or not bool(snapshot.get("ok", false))
+		or int(snapshot.get("horizon_ticks", -1)) != PRODUCTION_PREVIEW_TICKS
+	):
+		return false
+	var counts = snapshot.get("counts")
+	if not counts is Dictionary:
+		return false
+	production_comparison_baseline = snapshot.duplicate(true)
+	production_comparison_active = true
+	queue_redraw()
+	return true
+
+
+func clear_production_comparison_baseline() -> void:
+	production_comparison_active = false
+	production_comparison_baseline.clear()
+	queue_redraw()
+
+
+func production_difference_state(unit_id: StringName) -> Dictionary:
+	if not production_comparison_active:
+		return {"state": &"inactive"}
+	var baseline_counts = production_comparison_baseline.get("counts", {})
+	var before := int(baseline_counts.get(unit_id, 0)) if baseline_counts is Dictionary else 0
+	if not cached_production_valid:
+		return {
+			"state": &"invalid",
+			"before": before,
+			"after": null,
+			"delta": null,
+		}
+	var after := int(cached_production_counts.get(unit_id, 0))
+	var state: StringName = &"unchanged"
+	if after > before:
+		state = &"increase"
+	elif after < before:
+		state = &"decrease"
+	return {
+		"state": state,
+		"before": before,
+		"after": after,
+		"delta": after - before,
+	}
+
+
 func _capture_preview_node_outputs(preview: FactorySimulation, outputs: Dictionary) -> void:
 	for node_id in preview.nodes:
 		if outputs.has(node_id):
@@ -850,6 +915,7 @@ func informational_visual_at(at_position: Vector2) -> bool:
 
 
 func begin_edit() -> bool:
+	clear_production_comparison_baseline()
 	last_corrupt_discard_count = 0
 	var runtime_errors := simulation.work_in_progress_validation_errors()
 	if not runtime_errors.is_empty():
@@ -909,6 +975,7 @@ func commit_edit() -> void:
 	editing = false
 	preview_simulation = null
 	undo_history.clear()
+	clear_production_comparison_baseline()
 	_refresh_production_preview()
 	selection_changed.emit()
 	queue_redraw()
@@ -921,6 +988,7 @@ func cancel_edit() -> void:
 	preview_simulation = null
 	preview_node_positions.clear()
 	undo_history.clear()
+	clear_production_comparison_baseline()
 	_refresh_production_preview()
 	selection_changed.emit()
 	queue_redraw()
@@ -1120,9 +1188,9 @@ func _draw() -> void:
 		_draw_edit_summary()
 	if interaction_enabled:
 		_draw_interaction_legend()
-		if cached_production_valid:
+		if cached_production_valid or production_comparison_active:
 			_draw_production_summary()
-		else:
+		if not cached_production_valid:
 			_draw_production_error_badge()
 		_draw_mana_meter()
 	if connection_message != "":
@@ -1374,18 +1442,15 @@ func _draw_production_summary() -> void:
 		if GlyphPainterModel.can_draw(glyph):
 			var scale := 1.3 if glyph.combine_children.is_empty() else 1.15
 			GlyphPainterModel.draw_glyph(self, glyph, center, scale)
-		var count_center := center + Vector2(14, 12)
-		draw_circle(count_center, 8.5, Color(0.02, 0.12, 0.09, 0.96))
-		draw_arc(count_center, 8.5, 0.0, TAU, 20, Color(0.38, 0.9, 0.68), 1.0, true)
-		draw_string(
-			ThemeDB.fallback_font,
-			count_center + Vector2(-8, 4),
-			str(cached_production_counts.get(unit_id, 0)),
-			HORIZONTAL_ALIGNMENT_CENTER,
-			16.0,
-			12,
-			Color(0.54, 0.86, 0.7)
-		)
+		if production_comparison_active:
+			_draw_production_comparison(unit_id, center)
+		else:
+			_draw_production_count_badge(
+				center + Vector2(14, 12),
+				int(cached_production_counts.get(unit_id, 0)),
+				Color(0.38, 0.9, 0.68),
+				false
+			)
 	if cached_production_discarded > 0:
 		var warning_center := Vector2(size.x - 18.0, 28.0)
 		draw_circle(warning_center, 9.0, WARNING_COLOR)
@@ -1400,6 +1465,78 @@ func _draw_production_summary() -> void:
 			10,
 			WARNING_COLOR
 		)
+
+
+func _draw_production_comparison(unit_id: StringName, center: Vector2) -> void:
+	var difference := production_difference_state(unit_id)
+	var before_center := center + Vector2(-14, 12)
+	var after_center := center + Vector2(14, 12)
+	var change_center := center + Vector2(0, 12)
+	_draw_production_count_badge(
+		before_center,
+		int(difference.get("before", 0)),
+		PRODUCTION_COMPARISON_COLOR,
+		true
+	)
+	var state: StringName = difference.get("state", &"invalid")
+	if state == &"invalid":
+		_draw_production_unknown_badge(after_center)
+		_draw_production_change_symbol(change_center, state)
+		return
+	var change_color := PRODUCTION_COMPARISON_COLOR
+	if state == &"increase":
+		change_color = PRODUCTION_INCREASE_COLOR
+	elif state == &"decrease":
+		change_color = PRODUCTION_DECREASE_COLOR
+	_draw_production_count_badge(
+		after_center,
+		int(difference.get("after", 0)),
+		change_color,
+		false
+	)
+	_draw_production_change_symbol(change_center, state)
+
+
+func _draw_production_count_badge(center: Vector2, count: int, color: Color, is_baseline: bool) -> void:
+	var radius := 7.5 if is_baseline else 8.5
+	draw_circle(center, radius, Color(0.02, 0.055, 0.075, 0.76 if is_baseline else 0.96))
+	draw_arc(center, radius, 0.0, TAU, 20, Color(color, 0.62 if is_baseline else 1.0), 1.0, true)
+	var font_size := 9 if abs(count) >= 10 else 10
+	draw_string(
+		ThemeDB.fallback_font,
+		center + Vector2(-radius, 3.5),
+		str(count),
+		HORIZONTAL_ALIGNMENT_CENTER,
+		radius * 2.0,
+		font_size,
+		Color(color, 0.72 if is_baseline else 1.0)
+	)
+
+
+func _draw_production_unknown_badge(center: Vector2) -> void:
+	draw_circle(center, 8.5, Color(0.06, 0.035, 0.04, 0.96))
+	for segment in 8:
+		var start_angle := float(segment) * TAU / 8.0
+		draw_arc(center, 8.5, start_angle, start_angle + TAU / 16.0, 3, WARNING_COLOR, 1.0, true)
+	draw_line(center + Vector2(-3, -3), center + Vector2(3, 3), WARNING_COLOR, 1.5, true)
+	draw_line(center + Vector2(-3, 3), center + Vector2(3, -3), WARNING_COLOR, 1.5, true)
+
+
+func _draw_production_change_symbol(center: Vector2, state: StringName) -> void:
+	if state == &"increase":
+		draw_colored_polygon(PackedVector2Array([
+			center + Vector2(0, -4), center + Vector2(-3, 2), center + Vector2(3, 2),
+		]), PRODUCTION_INCREASE_COLOR)
+	elif state == &"decrease":
+		draw_colored_polygon(PackedVector2Array([
+			center + Vector2(0, 4), center + Vector2(-3, -2), center + Vector2(3, -2),
+		]), PRODUCTION_DECREASE_COLOR)
+	elif state == &"unchanged":
+		draw_line(center + Vector2(-3, 0), center + Vector2(3, 0), PRODUCTION_COMPARISON_COLOR, 1.5, true)
+	else:
+		draw_line(center + Vector2(-3, 0), center + Vector2(3, 0), PRODUCTION_COMPARISON_COLOR, 1.3, true)
+		draw_line(center + Vector2(3, 0), center + Vector2(0, -2.5), PRODUCTION_COMPARISON_COLOR, 1.3, true)
+		draw_line(center + Vector2(3, 0), center + Vector2(0, 2.5), PRODUCTION_COMPARISON_COLOR, 1.3, true)
 
 
 func interaction_legend_count() -> int:
@@ -1987,10 +2124,21 @@ func _get_tooltip(at_position: Vector2) -> String:
 		for recipe in MvpContent.recipes():
 			if recipe.unit_id != summary_unit:
 				continue
+			var context := "生産見込み %d体" % cached_production_counts.get(summary_unit, 0)
+			if production_comparison_active:
+				var difference := production_difference_state(summary_unit)
+				context = (
+					"%d → ?" % int(difference.get("before", 0))
+					if difference.get("state", &"invalid") == &"invalid"
+					else "%d → %d" % [
+						int(difference.get("before", 0)),
+						int(difference.get("after", 0)),
+					]
+				)
 			_set_glyph_tooltip(
 				recipe.glyph,
 				"32秒予測 // %s" % String(MvpContent.sigil_name(recipe.id)).trim_suffix("シジル"),
-				"生産見込み %d体" % cached_production_counts.get(summary_unit, 0)
+				context
 			)
 			return "glyph_preview"
 	var display_simulation := _display_simulation()
@@ -2045,7 +2193,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 
 
 func production_summary_unit_at(at_position: Vector2) -> StringName:
-	if not interaction_enabled or not cached_production_valid:
+	if not interaction_enabled or (not cached_production_valid and not production_comparison_active):
 		return &""
 	var unit_order: Array[StringName] = [&"scout", &"sentinel", &"golem"]
 	for index in unit_order.size():

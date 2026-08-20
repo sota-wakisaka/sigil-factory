@@ -342,16 +342,17 @@ func _cancel_edit() -> void:
 
 
 func _capture_pre_edit_production() -> void:
-	var preview := factory_board.production_preview()
+	var preview := factory_board.production_snapshot()
 	pre_edit_production_counts = (
 		preview["counts"].duplicate()
 		if preview["ok"]
 		else {}
 	)
+	factory_board.set_production_comparison_baseline(preview)
 
 
 func _update_factory_change_summary() -> void:
-	var preview := factory_board.production_preview()
+	var preview := factory_board.production_snapshot()
 	if pre_edit_production_counts.is_empty() or not preview["ok"]:
 		last_factory_change_summary = ""
 		pre_edit_production_counts.clear()
