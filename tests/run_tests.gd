@@ -87,6 +87,7 @@ func _initialize() -> void:
 	_test_factory_edit_preserves_custom_graph()
 	_test_factory_nodes_can_be_repositioned()
 	_test_factory_editor_undo_restores_graph()
+	_test_factory_mutations_fail_closed_without_undo_snapshot()
 	_test_factory_mana_budget_limits_and_refunds_nodes()
 	_test_factory_goal_equipment_presence_tracks_inventory()
 	_test_factory_enforces_single_summoner()
@@ -1948,6 +1949,78 @@ func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 	_expect(not sentinel_board.goal_equipment_present(&"rotator"), "removed processing equipment should become missing immediately")
 	_expect(sentinel_board.undo() and sentinel_board.goal_equipment_present(&"rotator"), "Undo should restore a removed equipment category")
 	sentinel_board.free()
+
+
+func _test_factory_mutations_fail_closed_without_undo_snapshot() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(1196, 401)
+	board.configure(MvpContent.PLAN_SCOUT)
+	board.set_interaction_enabled(true)
+	var extra_rotator_id := board.add_node_from_palette(&"rotator")
+	_expect(extra_rotator_id != &"", "snapshot failure fixture should first create one valid undo entry")
+	board.selected_node_id = &"ring_source"
+	var invalid_glyph := GlyphModel.new([
+		GlyphComponentModel.new(&"ring"),
+		GlyphComponentModel.new(&"spike"),
+	])
+	board.simulation.nodes[&"ring_source"].output_buffer = invalid_glyph
+	var nodes_before := board.simulation.nodes.size()
+	var lines_before := board.simulation.lines.size()
+	var positions_before: Dictionary = board.node_positions.duplicate(true)
+	var undo_before := board.undo_history.size()
+	var undo_signature_before := _factory_runtime_signature(board.undo_history[0]["simulation"])
+	var node_serial_before := board.node_serial
+	var connection_serial_before := board.connection_serial
+	var plan_before := board.plan_id
+
+	_expect(board.add_node_from_palette(&"colorizer") == &"", "failed undo capture should reject equipment addition")
+	_expect(not board.remove_factory_node(extra_rotator_id), "failed undo capture should reject equipment deletion")
+	_expect(not board.configure_selected_node(1), "failed undo capture should reject equipment configuration")
+	var connect_result := board.connect_nodes_interactive(&"ring_source", extra_rotator_id, 0)
+	_expect(not connect_result["ok"] and connect_result["error"] == "undo_snapshot", "failed undo capture should reject rewiring before replacing an input")
+	_expect(not board.disconnect_input(&"summoner", 0), "failed undo capture should reject disconnection")
+	_expect(not board.apply_plan(MvpContent.PLAN_SENTINEL), "failed undo capture should reject template replacement")
+
+	var drag_start := board.node_local_position(&"ring_source")
+	var drag_target := drag_start
+	for offset in [Vector2(0, 80), Vector2(0, -80), Vector2(90, 0), Vector2(-90, 0)]:
+		if board.placement_is_valid(&"ring_source", drag_start + offset):
+			drag_target = drag_start + offset
+			break
+	_expect(drag_target != drag_start, "snapshot failure fixture should find one valid drag destination")
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = drag_start
+	board._gui_input(press)
+	var motion := InputEventMouseMotion.new()
+	motion.position = drag_target
+	board._gui_input(motion)
+
+	_expect(board.simulation.nodes.size() == nodes_before and board.simulation.lines.size() == lines_before, "failed undo capture should preserve graph membership")
+	_expect(board.node_positions == positions_before, "failed undo capture should preserve every equipment position")
+	_expect(board.simulation.nodes[&"ring_source"].config["primitive_id"] == "ring", "failed undo capture should preserve equipment settings")
+	_expect(board.simulation.nodes[&"ring_source"].output_buffer == invalid_glyph, "failed undo capture should not discard or replace corrupt work in progress")
+	_expect(board.undo_history.size() == undo_before and _factory_runtime_signature(board.undo_history[0]["simulation"]) == undo_signature_before, "failed undo capture should preserve earlier valid undo history")
+	_expect(board.node_serial == node_serial_before and board.connection_serial == connection_serial_before, "failed undo capture should preserve future equipment and line IDs")
+	_expect(board.plan_id == plan_before and board.selected_node_id == &"ring_source", "failed undo capture should preserve the plan and current selection")
+	_expect(not board.dragging_node and not board.drag_snapshot_pending, "failed drag snapshot should stop cleanly without moving the equipment")
+	_expect("工場状態を保存できません" in board.connection_message, "rejected mutation should expose the shared snapshot diagnostic")
+	board.free()
+
+	var edit_board := FactoryBoard.new()
+	edit_board.configure(MvpContent.PLAN_SENTINEL)
+	_expect(edit_board.begin_edit(), "preview snapshot failure fixture should enter editing while valid")
+	edit_board.set_interaction_enabled(true)
+	var preview_before: FactorySimulation = edit_board.preview_simulation
+	var pending_plan_before := edit_board.pending_plan_id
+	var edit_undo_before := edit_board.undo_history.size()
+	edit_board.preview_simulation.nodes[&"ring_source"].output_buffer = invalid_glyph
+	_expect(not edit_board.preview_plan(MvpContent.PLAN_GOLEM), "failed undo capture should reject a transactional template preview")
+	_expect(edit_board.preview_simulation == preview_before and edit_board.pending_plan_id == pending_plan_before, "failed template preview should preserve the current edit simulation and plan")
+	_expect(edit_board.undo_history.size() == edit_undo_before and edit_board.preview_simulation.nodes[&"ring_source"].output_buffer == invalid_glyph, "failed template preview should preserve edit history and work in progress")
+	edit_board.cancel_edit()
+	edit_board.free()
 
 
 func _test_factory_enforces_single_summoner() -> void:

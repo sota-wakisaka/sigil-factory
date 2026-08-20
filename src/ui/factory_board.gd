@@ -244,12 +244,13 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 		]
 		queue_redraw()
 		return &""
-	_push_undo_snapshot()
-	var node_id := StringName("%s_user_%d" % [prefix, node_serial])
+	if not _push_undo_snapshot():
+		return &""
+	var next_serial := node_serial
+	var node_id := StringName("%s_user_%d" % [prefix, next_serial])
 	while display_simulation.nodes.has(node_id):
-		node_serial += 1
-		node_id = StringName("%s_user_%d" % [prefix, node_serial])
-	node_serial += 1
+		next_serial += 1
+		node_id = StringName("%s_user_%d" % [prefix, next_serial])
 	var new_node := FactoryNodeModel.new(node_id, kind, config)
 	_apply_node_upgrades(new_node)
 	var registration := display_simulation.node_registration_result(new_node)
@@ -258,6 +259,7 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 		connection_message = "設備を追加できません: 設備データが不正です（%s）" % ", ".join(registration["errors"])
 		queue_redraw()
 		return &""
+	node_serial = next_serial + 1
 	display_simulation.add_node(new_node)
 	_display_positions()[node_id] = _next_palette_reference_position(_display_positions())
 	selected_node_id = node_id
@@ -294,14 +296,14 @@ func remove_factory_node(node_id: StringName) -> bool:
 	if not interaction_enabled or node_id == &"":
 		return false
 	var display_simulation := _display_simulation()
-	_push_undo_snapshot()
+	if display_simulation == null or not display_simulation.nodes.has(node_id):
+		return false
+	if not _push_undo_snapshot():
+		return false
 	var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
 	if not display_simulation.remove_node(node_id):
 		var snapshot: Dictionary = undo_history.pop_back()
-		if editing:
-			preview_simulation = snapshot["simulation"]
-		else:
-			simulation = snapshot["simulation"]
+		_restore_undo_snapshot(snapshot)
 		return false
 	_display_positions().erase(node_id)
 	if selected_node_id == node_id:
@@ -495,11 +497,12 @@ func configure_selected_node(option_index: int) -> bool:
 	var node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
 	if not _setting_option_changes_node(node, option_index):
 		return false
-	_push_undo_snapshot()
-	var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
+	if not _push_undo_snapshot():
+		return false
 	if not _apply_setting_option(node, option_index):
 		undo_history.pop_back()
 		return false
+	var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
 	connection_message = (
 		"設備設定を変更しました（%s）" % pending_discard_notice()
 		if discarded_now > 0
@@ -899,7 +902,8 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 			connection_message = "接続済み"
 			queue_redraw()
 			return {"ok": true, "error": "already_connected", "changed": false}
-	_push_undo_snapshot()
+	if not _push_undo_snapshot():
+		return {"ok": false, "error": "undo_snapshot", "changed": false}
 	var removed_line: FactoryLineModel
 	for line in display_simulation.lines.values():
 		if line.to_node_id == to_node_id and line.to_port == to_port:
@@ -907,16 +911,15 @@ func connect_nodes_interactive(from_node_id: StringName, to_node_id: StringName,
 			display_simulation.disconnect_line(line.id)
 			break
 	var line_id := StringName("user_line_%d" % connection_serial)
-	connection_serial += 1
 	var result := display_simulation.connect_nodes(
 		FactoryLineModel.new(line_id, from_node_id, to_node_id, to_port, 2)
 	)
 	if result["ok"]:
+		connection_serial += 1
 		_apply_line_upgrades(display_simulation.lines[line_id])
-	if not result["ok"] and removed_line != null:
-		display_simulation.connect_nodes(removed_line)
 	if not result["ok"]:
-		undo_history.pop_back()
+		var snapshot: Dictionary = undo_history.pop_back()
+		_restore_undo_snapshot(snapshot)
 	var discarded_now := 0
 	if result["ok"] and editing:
 		discarded_now = display_simulation.discard_all_work_in_progress()
@@ -937,7 +940,8 @@ func disconnect_input(to_node_id: StringName, to_port: int) -> bool:
 	var display_simulation := _display_simulation()
 	for line in display_simulation.lines.values():
 		if line.to_node_id == to_node_id and line.to_port == to_port:
-			_push_undo_snapshot()
+			if not _push_undo_snapshot():
+				return false
 			var discarded_now := display_simulation.discard_all_work_in_progress() if editing else 0
 			display_simulation.disconnect_line(line.id)
 			connection_message = (
@@ -994,7 +998,12 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 			return
 		if drag_snapshot_pending:
-			_push_undo_snapshot()
+			if not _push_undo_snapshot():
+				dragging_node = false
+				drag_snapshot_pending = false
+				placement_blocked = false
+				accept_event()
+				return
 			drag_snapshot_pending = false
 		move_node(selected_node_id, target_position)
 		accept_event()
@@ -1032,9 +1041,7 @@ func cancel_pending_connection() -> bool:
 func apply_plan(next_plan_id: StringName) -> bool:
 	if not interaction_enabled or editing or next_plan_id == plan_id:
 		return false
-	var history_size := undo_history.size()
-	_push_undo_snapshot()
-	if undo_history.size() == history_size:
+	if not _push_undo_snapshot():
 		return false
 	plan_id = next_plan_id
 	simulation = MvpContent.build_factory(plan_id)
@@ -1237,9 +1244,7 @@ func begin_edit() -> bool:
 func preview_plan(next_plan_id: StringName) -> bool:
 	if not editing or next_plan_id == pending_plan_id:
 		return false
-	var history_size := undo_history.size()
-	_push_undo_snapshot()
-	if undo_history.size() == history_size:
+	if not _push_undo_snapshot():
 		return false
 	var discarded_before_edit := simulation.discarded_glyphs
 	var discarded_work_in_progress := work_in_progress_count()
@@ -3413,19 +3418,34 @@ func _validation_message(errors: Array) -> String:
 	return "工場の配線を確認してください"
 
 
-func _push_undo_snapshot() -> void:
+func _push_undo_snapshot() -> bool:
 	var display_simulation := _display_simulation()
 	if display_simulation == null:
-		return
+		connection_message = "工場状態を保存できません // 工場データがありません"
+		queue_redraw()
+		return false
 	var duplication := display_simulation.duplicate_state_result()
 	if not duplication["ok"]:
 		connection_message = "工場状態を保存できません // %s" % _validation_message(duplication["errors"])
-		return
+		queue_redraw()
+		return false
 	undo_history.append({
 		"simulation": duplication["state"],
 		"positions": _display_positions().duplicate(true),
 		"plan_id": display_plan_id(),
 	})
+	return true
+
+
+func _restore_undo_snapshot(snapshot: Dictionary) -> void:
+	if editing:
+		preview_simulation = snapshot["simulation"]
+		preview_node_positions = snapshot["positions"]
+		pending_plan_id = snapshot.get("plan_id", pending_plan_id)
+	else:
+		simulation = snapshot["simulation"]
+		node_positions = snapshot["positions"]
+		plan_id = snapshot.get("plan_id", plan_id)
 
 
 func _refresh_production_preview() -> void:

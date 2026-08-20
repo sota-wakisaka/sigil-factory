@@ -2,6 +2,8 @@ extends SceneTree
 
 const RunFlow := preload("res://src/game/run_flow.gd")
 const MvpContent := preload("res://src/game/mvp_content.gd")
+const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
+const GlyphModel := preload("res://src/domain/glyph.gd")
 
 var failures := 0
 
@@ -85,6 +87,17 @@ func _initialize() -> void:
 		"selected plan button and persistent goal should draw the same CanonicalGlyph"
 	)
 	_expect(main.sigil_ghost.candidate_state == &"match", "template output should immediately compare against its selected target")
+	var invalid_snapshot_glyph := GlyphModel.new([
+		GlyphComponentModel.new(&"ring"),
+		GlyphComponentModel.new(&"spike"),
+	])
+	main.factory_board.simulation.nodes[&"ring_source"].output_buffer = invalid_snapshot_glyph
+	main.get_node("Toolbar/SentinelButton").pressed.emit()
+	_expect(main.factory_board.plan_id == MvpContent.PLAN_SCOUT, "failed build snapshot should keep the committed factory plan")
+	_expect(main.sigil_ghost.recipe_id == &"open_ring" and main.get_node("Toolbar/ScoutButton").button_pressed and not main.get_node("Toolbar/SentinelButton").button_pressed, "failed build snapshot should restore goal and template selection to the actual plan")
+	_expect("工場状態を保存できません" in main.factory_board.connection_message, "failed build snapshot should retain its actionable diagnostic")
+	main.factory_board.simulation.nodes[&"ring_source"].output_buffer = null
+	main.factory_board.connection_message = ""
 	_expect(main.factory_board.interaction_enabled, "factory build should enable node placement")
 	_expect(not main.get_node("FactoryPalette/RingButton").disabled, "factory build should enable the equipment palette")
 	_expect(main.get_node("FactoryPalette/SummonButton").disabled, "palette should visually block the one-summoner limit before click")
@@ -112,6 +125,14 @@ func _initialize() -> void:
 	_expect(main.get_node("FactoryPalette/SummonButton").goal_state == &"present", "existing summoner should remain present even when its one-node limit disables another")
 	main.factory_board.selected_node_id = &"ring_source"
 	main.factory_board.selection_changed.emit()
+	main.factory_board.simulation.nodes[&"ring_source"].output_buffer = invalid_snapshot_glyph
+	main.inspector_option.select(1)
+	main.inspector_option.item_selected.emit(1)
+	_expect(main.factory_board.simulation.nodes[&"ring_source"].config["primitive_id"] == "ring", "failed setting snapshot should preserve the actual equipment config")
+	_expect(main.inspector_option.selected == 0 and main.inspector_option.visual_index == 0, "failed setting snapshot should restore the dropdown to the actual config")
+	_expect("工場状態を保存できません" in main.factory_board.connection_message, "failed setting snapshot should retain its actionable diagnostic")
+	main.factory_board.simulation.nodes[&"ring_source"].output_buffer = null
+	main.factory_board.connection_message = ""
 	var factory_snapshot_before_hover: Dictionary = main.factory_board.production_snapshot()
 	var undo_count_before_hover: int = main.factory_board.undo_history.size()
 	var setting_popup: PopupMenu = main.inspector_option.get_popup()

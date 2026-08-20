@@ -239,12 +239,16 @@ func _select_plan(plan_id: StringName) -> void:
 			feedback += " // " + discard_notice
 		_set_factory_feedback(feedback)
 	else:
-		_sync_plan_ui(plan_id)
 		if flow.phase == RunFlow.Phase.FACTORY_BUILD:
-			factory_board.apply_plan(plan_id)
+			if not factory_board.apply_plan(plan_id):
+				_sync_plan_ui(factory_board.display_plan_id())
+				_refresh_factory_validation_state()
+				return
+			_sync_plan_ui(plan_id)
 			_refresh_factory_validation_state()
 		else:
 			factory_board.configure(plan_id)
+			_sync_plan_ui(plan_id)
 			_set_factory_feedback("◇ %s" % MvpContent.plan_name(plan_id))
 
 
@@ -347,7 +351,8 @@ func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
 
 
 func _on_inspector_option_selected(index: int) -> void:
-	factory_board.configure_selected_node(index)
+	if not factory_board.configure_selected_node(index):
+		_refresh_factory_inspector()
 
 
 func _on_inspector_option_preview_requested(index: int) -> void:
