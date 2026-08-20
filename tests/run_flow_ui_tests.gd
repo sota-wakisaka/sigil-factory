@@ -143,6 +143,12 @@ func _initialize() -> void:
 	_expect(main.inspector_option.visual_index == 0 and main.inspector_option.get_item_text(0) == "環", "source setting should keep text subordinate to the ring icon")
 	_expect(main.inspector_option.get_item_icon(0) != null and main.inspector_option.get_item_icon(1) != null, "source dropdown should keep Primitive icons visible in every choice")
 	_expect(main.inspector_option._setting_icon(FactoryNodeModel.NodeKind.ROTATOR, 0) != null, "rotation dropdown should expose its visual operation icon")
+	_expect(
+		main.inspector_option.rotation_direction_for_index(0) == Vector2i.RIGHT
+		and main.inspector_option.rotation_direction_for_index(1) == Vector2i.DOWN
+		and main.inspector_option.rotation_direction_for_index(2) == Vector2i.LEFT,
+		"rotation dropdown should distinguish 90, 180, and 270 degrees by direction instead of text alone"
+	)
 	_expect(main.inspector_option._setting_icon(FactoryNodeModel.NodeKind.COLORIZER, 0) != null and main.inspector_option._setting_icon(FactoryNodeModel.NodeKind.COLORIZER, 1) != null, "color dropdown should expose distinct blue and red swatches")
 	main.inspector_option.item_selected.emit(1)
 	_expect(main.inspector_option.visual_index == 1, "setting icon should follow the selected source Primitive")

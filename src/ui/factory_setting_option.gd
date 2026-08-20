@@ -42,7 +42,21 @@ func _setting_icon(kind: int, index: int) -> Texture2D:
 				else "<path d='M12 3 L20 20 L12 15 L4 20 Z' fill='none' stroke='#66d6ff' stroke-width='2' stroke-linejoin='round'/>"
 			)
 		FactoryNodeModel.NodeKind.ROTATOR:
-			body = "<path d='M18 8 A7 7 0 1 0 19 15 M18 8 L18 3 L22 7' fill='none' stroke='#66d6ff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/>"
+			var direction := rotation_direction_for_index(index)
+			var endpoint := Vector2(12, 12) + Vector2(direction) * 8.0
+			var normal := Vector2(-direction.y, direction.x)
+			var arrow_left := endpoint - Vector2(direction) * 3.5 + normal * 2.5
+			var arrow_right := endpoint - Vector2(direction) * 3.5 - normal * 2.5
+			body = (
+				"<circle cx='12' cy='12' r='9' fill='none' stroke='#294d66' stroke-width='1.2'/>"
+				+ "<circle cx='12' cy='12' r='2' fill='#66d6ff'/>"
+				+ "<path d='M12 12 L%.1f %.1f M%.1f %.1f L%.1f %.1f L%.1f %.1f' fill='none' stroke='#66d6ff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/>" % [
+					endpoint.x, endpoint.y,
+					arrow_left.x, arrow_left.y,
+					endpoint.x, endpoint.y,
+					arrow_right.x, arrow_right.y,
+				]
+			)
 		FactoryNodeModel.NodeKind.COLORIZER:
 			var colors := ["#40adff", "#ff4d48", "#edf4ff"]
 			body = "<circle cx='12' cy='12' r='8' fill='%s' stroke='#9edcff' stroke-width='1.5'/>" % colors[clampi(index, 0, colors.size() - 1)]
@@ -55,3 +69,7 @@ func _setting_icon(kind: int, index: int) -> Texture2D:
 	var texture := ImageTexture.create_from_image(image)
 	icon_cache[key] = texture
 	return texture
+
+
+func rotation_direction_for_index(index: int) -> Vector2i:
+	return [Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT][clampi(index, 0, 2)]
