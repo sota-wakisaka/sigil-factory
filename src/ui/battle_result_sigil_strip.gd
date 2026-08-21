@@ -115,8 +115,8 @@ func _draw_metric_icon(key: StringName, center: Vector2, color: Color) -> void:
 			draw_line(center, center + Vector2(0, -4), color, 1.4, true)
 			draw_line(center, center + Vector2(3, 2), color, 1.4, true)
 		&"kills":
-			draw_line(center + Vector2(-5, -5), center + Vector2(5, 5), color, 1.6, true)
-			draw_line(center + Vector2(-5, 5), center + Vector2(5, -5), color, 1.6, true)
+			draw_arc(center, 6.0, 0.0, TAU, 18, color, 1.3, true)
+			draw_line(center + Vector2(-4, 4), center + Vector2(4, -4), color, 1.7, true)
 		&"pauses":
 			draw_arc(center, 7.0, 0.0, TAU, 18, color, 1.2, true)
 			draw_line(center + Vector2(-2.5, -4), center + Vector2(-2.5, 4), color, 1.8, true)

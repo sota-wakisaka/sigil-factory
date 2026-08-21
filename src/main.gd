@@ -1031,23 +1031,6 @@ func _reward_summary() -> String:
 	return " / ".join(names)
 
 
-func _battle_result_summary() -> String:
-	var battle := battle_board.simulation
-	var elapsed_seconds := float(battle.tick_index) * TICK_SECONDS
-	var summary := "戦闘時間 %02d:%02d  //  撃破 %d体\n生産: 斥候 %d  衛兵 %d  巨像 %d  //  時間停止 %d回  再構成 %d回  廃棄・不一致 %d" % [
-		int(elapsed_seconds) / 60,
-		int(elapsed_seconds) % 60,
-		battle.player_kills,
-		produced_units[&"scout"],
-		produced_units[&"sentinel"],
-		produced_units[&"golem"],
-		time_stop_count,
-		factory_change_count,
-		factory_board.simulation.discarded_glyphs,
-	]
-	return summary
-
-
 func _battle_result_metrics() -> Dictionary:
 	var elapsed_seconds := int(float(battle_board.simulation.tick_index) * TICK_SECONDS)
 	return {
