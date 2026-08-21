@@ -50,10 +50,12 @@ Design documents:
 - Per-side 48-unit and eight-spawns-per-tick safety limits with visible rejection counts
 - 24-second enemy threat forecast across a three-minute standard encounter
 - 60-second advance warnings for major swarm, armor, and final wave changes
+- Full pre-stage spawn schedules shown as circle, triangle, and square enemy lanes
 - Victory, reward, next-route, defeat, and instant retry flow
 - Persistent run rewards for source, processor, or transport speed
-- Route and wave labels, hit feedback, and post-battle analysis without prescribed factory answers
-- Defeat advice classified from summon output, mismatches, reconfiguration, and missing counters
+- Producing meaning sigils retained as visible marks on friendly battlefield units
+- Visual post-battle sigil, damage, time, defeat, pause, rebuild, and discard metrics
+- Route and wave labels, hit feedback, and factual defeat analysis without prescribed factory answers
 - Before/after production impact shown when battle resumes
 - Fifteen-second post-change observation of enemy kills, allied losses, and objective damage
 
@@ -89,14 +91,14 @@ meaning Glyphs. The Lab supports free-angle rotation, fine four-direction moveme
 independent X/Y scaling, radial repetition, two-to-eight-input Combine, a completion
 node, and full-graph JSON export. Every mode includes a **MENU** button.
 
-Follow the highlighted progression bar from **Route Selection**. At the factory
+Follow the phase overlays from **Route Selection** through stage information and factory
 step, choose a production plan as a starting template or customize it with the
 equipment palette. Drag equipment to reposition it, click a filled output port
 and then an outlined input port to connect them, and right-click an input port to
 disconnect it. Select equipment before pressing **Delete**. Incomplete factories
 cannot start and display the first missing connection. **Undo** restores placement,
 wiring, additions, and deletions made during the current edit session.
-Select a source, rotator, colorizer, or combiner to change its setting in the inspector.
+Select a source, rotator, or combiner to change its setting in the inspector.
 Meaning sources can switch among every registered meaning Glyph. Hovering an
 uncommitted setting shows its resulting sigil, 32-second output, and first arrival
 without adding an Undo step or discarding work.
@@ -118,7 +120,7 @@ The first factory step opens an unwired workshop containing an Eye source and a
 summoner. Connecting its two highlighted ports produces the first scout. The
 four completed production plans remain available as reference templates.
 
-Press **Build Complete / Start Battle** when the graph is ready.
+Press **戦闘開始** when the graph is ready; the action stays disabled while the graph is incomplete.
 During battle, press **Time Stop**, select a production plan, then confirm the
 change. Preview changes do not affect the running factory until committed. The
 **Fast Forward** button cycles between 1x, 2x, and 4x battle speed and is disabled
