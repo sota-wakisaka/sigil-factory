@@ -139,6 +139,7 @@ func _show_workspace(next_view: WorkspaceView) -> void:
 	$Toolbar/EmptyButton.visible = show_factory
 	$Toolbar/ScoutButton.visible = show_factory
 	$Toolbar/SentinelButton.visible = show_factory
+	$Toolbar/StarButton.visible = show_factory
 	$Toolbar/GolemButton.visible = show_factory
 	speed_button.visible = not show_factory
 	threat_label.visible = not show_factory

@@ -126,7 +126,7 @@ to finish; it is not part of the intended battle controls.
 
 Keyboard shortcuts: **Space** starts, stops, or resumes battle; **F** changes
 battle speed; **Ctrl+Z** undoes an edit; **Delete** removes selected equipment;
-and **0–3** select factory templates.
+and **0–4** select factory templates.
 
 ## Tests
 
