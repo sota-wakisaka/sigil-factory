@@ -31,6 +31,12 @@ const SOURCE_OPTION_IDS := [
 	MeaningGlyphsModel.STAR, MeaningGlyphsModel.COMPASS,
 ]
 const SOURCE_OPTION_INTERVALS := [18, 54, 18, 30, 32, 36, 48]
+const COMBINE_OPTION_LABELS := ["中心", "相互", "単純"]
+const COMBINE_OPTION_IDS := [
+	GlyphModel.CONNECTION_RADIAL,
+	GlyphModel.CONNECTION_PAIRWISE,
+	GlyphModel.CONNECTION_SIMPLE,
+]
 const PRODUCTION_DECREASE_COLOR := Color(1.0, 0.7, 0.28, 1.0)
 const PRODUCTION_COMPARISON_COLOR := Color(0.42, 0.58, 0.7, 0.88)
 const EDIT_ADDED_COLOR := Color(0.24, 0.9, 0.92, 0.96)
@@ -244,7 +250,10 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 		&"combiner":
 			prefix = "combiner"
 			kind = FactoryNodeModel.NodeKind.COMBINER
-			config = {"processing_ticks": 3}
+			config = {
+				"processing_ticks": 3,
+				"connection_mode": GlyphModel.CONNECTION_RADIAL,
+			}
 		&"summoner":
 			prefix = "summoner"
 			kind = FactoryNodeModel.NodeKind.SUMMONER
@@ -513,6 +522,12 @@ func selected_node_details() -> Dictionary:
 			options = PackedStringArray(["青", "赤", "白"])
 			var color_id := String(node.config.get("color_id", ""))
 			selected_index = ["blue", "red", "white"].find(color_id)
+		FactoryNodeModel.NodeKind.COMBINER:
+			options = PackedStringArray(COMBINE_OPTION_LABELS)
+			var connection_mode := StringName(
+				node.config.get("connection_mode", GlyphModel.CONNECTION_RADIAL)
+			)
+			selected_index = COMBINE_OPTION_IDS.find(connection_mode)
 	return {
 		"selected": true,
 		"kind": node.kind,
@@ -566,6 +581,14 @@ func _setting_option_changes_node(node: FactoryNodeModel, option_index: int) -> 
 				String(node.config.get("color_id", "")) != ["blue", "red", "white"][option_index]
 				or int(node.config.get("processing_ticks", 0)) < 1
 			)
+		FactoryNodeModel.NodeKind.COMBINER:
+			if option_index < 0 or option_index >= COMBINE_OPTION_IDS.size():
+				return false
+			return (
+				StringName(node.config.get("connection_mode", GlyphModel.CONNECTION_RADIAL))
+				!= COMBINE_OPTION_IDS[option_index]
+				or int(node.config.get("processing_ticks", 0)) < 1
+			)
 	return false
 
 
@@ -594,6 +617,12 @@ func _apply_setting_option(node: FactoryNodeModel, option_index: int) -> bool:
 				return false
 			node.config["color_id"] = ["blue", "red", "white"][option_index]
 			node.config["processing_ticks"] = 2
+			_apply_node_upgrades(node)
+		FactoryNodeModel.NodeKind.COMBINER:
+			if option_index < 0 or option_index >= COMBINE_OPTION_IDS.size():
+				return false
+			node.config["connection_mode"] = COMBINE_OPTION_IDS[option_index]
+			node.config["processing_ticks"] = 3
 			_apply_node_upgrades(node)
 		_:
 			return false
@@ -3541,7 +3570,17 @@ func _node_label(node: FactoryNodeModel) -> String:
 				return "色未設定"
 			return "%s着色" % _color_name(color_id)
 		FactoryNodeModel.NodeKind.COMBINER:
-			return "グリフ合成"
+			var connection_mode := StringName(
+				node.config.get("connection_mode", GlyphModel.CONNECTION_RADIAL)
+			)
+			match connection_mode:
+				GlyphModel.CONNECTION_RADIAL:
+					return "中心結合"
+				GlyphModel.CONNECTION_PAIRWISE:
+					return "相互結合"
+				GlyphModel.CONNECTION_SIMPLE:
+					return "単純結合"
+			return "結合未設定"
 		FactoryNodeModel.NodeKind.SUMMONER:
 			return "召喚器"
 	return MvpContent.node_name(node.kind)

@@ -1368,7 +1368,10 @@ func _test_combiner_waits_for_both_inputs() -> void:
 	var combiner := FactoryNodeModel.new(
 		&"combiner",
 		FactoryNodeModel.NodeKind.COMBINER,
-		{"processing_ticks": 1}
+		{
+			"processing_ticks": 1,
+			"connection_mode": GlyphModel.CONNECTION_SIMPLE,
+		}
 	)
 	var summoner := FactoryNodeModel.new(
 		&"summoner",
@@ -1382,7 +1385,8 @@ func _test_combiner_waits_for_both_inputs() -> void:
 	simulation.connect_nodes(FactoryLineModel.new(&"out", &"combiner", &"summoner"))
 	var target := GlyphModel.combine(
 		GlyphModel.new([GlyphComponentModel.new(&"ring")]),
-		GlyphModel.new([GlyphComponentModel.new(&"spike")])
+		GlyphModel.new([GlyphComponentModel.new(&"spike")]),
+		GlyphModel.CONNECTION_SIMPLE
 	)
 	simulation.add_recipe(SigilRecipeModel.new(&"bound_pair", target, &"golem"))
 
@@ -1577,9 +1581,14 @@ func _test_factory_validation_rejects_invalid_restored_configuration() -> void:
 		FactoryNodeModel.NodeKind.COLORIZER,
 		{"color_id": "", "processing_ticks": 1}
 	)
+	var combiner := FactoryNodeModel.new(
+		&"combiner",
+		FactoryNodeModel.NodeKind.COMBINER,
+		{"connection_mode": "unknown", "processing_ticks": 1}
+	)
 	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
 	simulation.nodes[&"wrong_source_key"] = source
-	for node in [rotator, translator, colorizer, summoner]:
+	for node in [rotator, translator, colorizer, combiner, summoner]:
 		simulation.nodes[node.id] = node
 	var mismatched_line := FactoryLineModel.new(&"actual_line_id", &"source_id", &"summoner")
 	simulation.lines[&"wrong_line_key"] = mismatched_line
@@ -1593,6 +1602,7 @@ func _test_factory_validation_rejects_invalid_restored_configuration() -> void:
 		"invalid_rotation_steps:rotator",
 		"invalid_translation_offset:translator",
 		"missing_color_id:colorizer",
+		"invalid_combine_connection_mode:combiner",
 		"line_key_mismatch:wrong_line_key:actual_line_id",
 	]:
 		_expect(result["errors"].has(expected_error), "restored validation should report %s" % expected_error)
@@ -2304,6 +2314,20 @@ func _test_factory_node_configuration_is_undoable() -> void:
 		board.selected_node_details()["title"] == "青着色",
 		"colorizer label should follow the color restored by undo"
 	)
+	var combiner_id := board.add_node_from_palette(&"combiner")
+	_expect(board.configure_selected_node(2), "selected combiner should accept a line-free simple setting")
+	_expect(
+		board.simulation.nodes[combiner_id].config["connection_mode"] == GlyphModel.CONNECTION_SIMPLE,
+		"combiner inspector should store the selected connection mode"
+	)
+	_expect(board.selected_node_details()["title"] == "単純結合", "combiner label should expose its visible connection rule")
+	_expect(board.undo(), "combiner configuration should be undoable")
+	board.selected_node_id = combiner_id
+	_expect(
+		board.simulation.nodes[combiner_id].config["connection_mode"] == GlyphModel.CONNECTION_RADIAL,
+		"undo should restore the radial combiner default"
+	)
+	_expect(board.selected_node_details()["title"] == "中心結合", "combiner label should follow the mode restored by undo")
 	board.configure(MvpContent.PLAN_SCOUT)
 	_expect(board.selected_node_id == &"", "switching factory templates should clear stale inspector selection")
 	board.free()

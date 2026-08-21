@@ -130,6 +130,16 @@ func _setting_icon(kind: int, index: int) -> Texture2D:
 		FactoryNodeModel.NodeKind.COLORIZER:
 			var colors := ["#40adff", "#ff4d48", "#edf4ff"]
 			body = "<circle cx='12' cy='12' r='8' fill='%s' stroke='#9edcff' stroke-width='1.5'/>" % colors[clampi(index, 0, colors.size() - 1)]
+		FactoryNodeModel.NodeKind.COMBINER:
+			match index:
+				0:
+					body = "<circle cx='12' cy='12' r='2' fill='#66d6ff'/><path d='M12 12 L5 6 M12 12 L19 6 M12 12 L12 21' fill='none' stroke='#66d6ff' stroke-width='1.7' stroke-linecap='round'/><circle cx='5' cy='6' r='2' fill='none' stroke='#66d6ff' stroke-width='1.4'/><circle cx='19' cy='6' r='2' fill='none' stroke='#66d6ff' stroke-width='1.4'/>"
+				1:
+					body = "<circle cx='6' cy='12' r='3' fill='none' stroke='#66d6ff' stroke-width='1.5'/><circle cx='18' cy='12' r='3' fill='none' stroke='#66d6ff' stroke-width='1.5'/><path d='M9 12 H15' fill='none' stroke='#66d6ff' stroke-width='1.8' stroke-linecap='round'/>"
+				2:
+					body = "<circle cx='8' cy='12' r='5' fill='none' stroke='#66d6ff' stroke-width='1.5'/><circle cx='16' cy='12' r='5' fill='none' stroke='#66d6ff' stroke-width='1.5'/>"
+				_:
+					return null
 		_:
 			return null
 	var svg := "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>%s</svg>" % body

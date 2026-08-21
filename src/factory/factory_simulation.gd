@@ -295,6 +295,16 @@ func _node_configuration_errors(node_key: StringName, node: FactoryNodeModel) ->
 		FactoryNodeModel.NodeKind.COLORIZER:
 			if StringName(node.config.get("color_id", "")) == &"":
 				errors.append("missing_color_id:%s" % node_key)
+		FactoryNodeModel.NodeKind.COMBINER:
+			var connection_mode := StringName(
+				node.config.get("connection_mode", GlyphModel.CONNECTION_RADIAL)
+			)
+			if connection_mode not in [
+				GlyphModel.CONNECTION_RADIAL,
+				GlyphModel.CONNECTION_PAIRWISE,
+				GlyphModel.CONNECTION_SIMPLE,
+			]:
+				errors.append("invalid_combine_connection_mode:%s" % node_key)
 	return errors
 
 
@@ -682,7 +692,14 @@ func _summon_failure_rank(diagnostics: PackedStringArray) -> int:
 
 func _consume_inputs(node: FactoryNodeModel) -> GlyphModel:
 	if node.kind == FactoryNodeModel.NodeKind.COMBINER:
-		var combined := GlyphModel.combine(node.input_buffers[0], node.input_buffers[1])
+		var connection_mode := StringName(
+			node.config.get("connection_mode", GlyphModel.CONNECTION_RADIAL)
+		)
+		var combined := GlyphModel.combine(
+			node.input_buffers[0],
+			node.input_buffers[1],
+			connection_mode
+		)
 		for index in node.input_buffers.size():
 			node.input_buffers[index] = null
 		return combined
