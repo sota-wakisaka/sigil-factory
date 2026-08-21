@@ -372,6 +372,8 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.VICTORY, "placeholder completion should defeat the leader")
 	_expect("生産: 斥候" in main.phase_body.text, "victory screen should summarize factory production")
 	_expect("時間停止 2回" in main.phase_body.text, "victory screen should summarize committed and discarded time stops")
+	main.produced_recipes = {&"watchful_eye": 3, &"stellar_sentinel": 2}
+	_expect(main._produced_sigil_summary() == "目 3 / 星衛兵 2", "battle results should retain which acquired sigil recipes produced the units")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.REWARD, "victory OK should open rewards")
 	_expect(main.reward_choices.visible and main.reward_choices.get_child_count() == 3, "reward phase should offer three meaning-Glyph upgrades")

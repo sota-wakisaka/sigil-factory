@@ -1,7 +1,7 @@
 class_name FactoryBoard
 extends Control
 
-signal summon_produced(unit_id: StringName)
+signal summon_produced(unit_id: StringName, recipe_id: StringName)
 signal selection_changed
 signal factory_changed
 
@@ -1574,7 +1574,7 @@ func advance_tick() -> void:
 		var event := simulation.summon_events[observed_event_count]
 		observed_event_count += 1
 		connection_message = "召喚成功 // %s" % MvpContent.sigil_name(event["recipe_id"])
-		summon_produced.emit(event["unit_id"])
+		summon_produced.emit(event["unit_id"], event["recipe_id"])
 	while observed_failure_count < simulation.summon_failure_events.size():
 		var event := simulation.summon_failure_events[observed_failure_count]
 		observed_failure_count += 1

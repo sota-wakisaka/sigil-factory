@@ -62,6 +62,7 @@ var acquired_rewards: Array[StringName] = []
 var selected_route_id: StringName = MvpContent.ROUTE_MIXED
 var selected_route_name := MvpContent.route_name(MvpContent.ROUTE_MIXED)
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
+var produced_recipes: Dictionary = {}
 var pre_edit_production_snapshot: Dictionary = {}
 var last_factory_change_summary := ""
 var factory_change_battle_baseline: Dictionary = {}
@@ -590,8 +591,9 @@ func _complete_battle_placeholder() -> void:
 	_enter_victory()
 
 
-func _on_summon_produced(unit_id: StringName) -> void:
+func _on_summon_produced(unit_id: StringName, recipe_id: StringName) -> void:
 	produced_units[unit_id] = int(produced_units.get(unit_id, 0)) + 1
+	produced_recipes[recipe_id] = int(produced_recipes.get(recipe_id, 0)) + 1
 	battle_board.spawn_player(unit_id)
 
 
@@ -617,6 +619,7 @@ func _reset_stage() -> void:
 	factory_board.set_run_upgrades(acquired_rewards)
 	factory_board.configure(MvpContent.PLAN_EMPTY)
 	produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
+	produced_recipes.clear()
 	elapsed_since_tick = 0.0
 	battle_speed_index = 0
 	time_stop_count = 0
@@ -754,7 +757,7 @@ func _reward_summary() -> String:
 func _battle_result_summary() -> String:
 	var battle := battle_board.simulation
 	var elapsed_seconds := float(battle.tick_index) * TICK_SECONDS
-	return "戦闘時間 %02d:%02d  //  撃破 %d体\n生産: 斥候 %d  衛兵 %d  巨像 %d  //  時間停止 %d回  再構成 %d回  廃棄・不一致 %d" % [
+	var summary := "戦闘時間 %02d:%02d  //  撃破 %d体\n生産: 斥候 %d  衛兵 %d  巨像 %d  //  時間停止 %d回  再構成 %d回  廃棄・不一致 %d" % [
 		int(elapsed_seconds) / 60,
 		int(elapsed_seconds) % 60,
 		battle.player_kills,
@@ -765,6 +768,23 @@ func _battle_result_summary() -> String:
 		factory_change_count,
 		factory_board.simulation.discarded_glyphs,
 	]
+	var sigil_summary := _produced_sigil_summary()
+	if sigil_summary != "":
+		summary += "\n使用シジル: " + sigil_summary
+	return summary
+
+
+func _produced_sigil_summary() -> String:
+	var labels := PackedStringArray()
+	for recipe in MvpContent.recipes():
+		var count := int(produced_recipes.get(recipe.id, 0))
+		if count <= 0:
+			continue
+		labels.append("%s %d" % [
+			String(MvpContent.sigil_name(recipe.id)).trim_suffix("シジル"),
+			count,
+		])
+	return " / ".join(labels)
 
 
 func _defeat_reason() -> String:
