@@ -1723,6 +1723,7 @@ func _draw_lines(
 			draw_line(hover_center - hover_normal * 6.0, hover_center + hover_normal * 6.0, Color(line_color, 0.86), 1.5, true)
 		draw_line(start, finish, line_color, FACTORY_LINE_WIDTH, true)
 		_draw_flow_arrow(start, finish, line_color)
+		_draw_line_upgrade_marker(start, finish, run_upgrade_level(&"line_speed"))
 		if display_simulation.line_flow_state(line_id) == &"buffer_full":
 			_draw_line_blocked_marker(start.lerp(finish, 0.58))
 		if line.payload != null:
@@ -1748,6 +1749,18 @@ func _draw_flow_arrow(start: Vector2, finish: Vector2, color: Color) -> void:
 	var normal := Vector2(-direction.y, direction.x) * 6.0
 	draw_line(tip, wing_origin + normal, color, 1.5, true)
 	draw_line(tip, wing_origin - normal, color, 1.5, true)
+
+
+func _draw_line_upgrade_marker(start: Vector2, finish: Vector2, level: int) -> void:
+	if level <= 0 or start.is_equal_approx(finish):
+		return
+	var direction := start.direction_to(finish)
+	var normal := direction.orthogonal()
+	var origin := start.lerp(finish, 0.72) + normal * 7.0
+	for index in mini(level, 3):
+		var center := origin + direction * (float(index) - float(level - 1) * 0.5) * 6.0
+		draw_circle(center, 2.4, Color(0.42, 0.86, 1.0, 0.94))
+		draw_circle(center, 0.8, PANEL_COLOR)
 
 
 func _draw_transport_glyph(glyph: GlyphModel, center: Vector2) -> void:
@@ -1813,6 +1826,7 @@ func _draw_nodes(
 			node_id == selected_node_id or node_id == hovered_node_id,
 			focused_node_ids.has(node_id)
 		)
+		_draw_node_upgrade_marker(node, center)
 		_draw_node_warning_marker(node_state, center)
 		_draw_node_validation_marker(node_id, center)
 		_draw_node_activity_progress(node, center, display_simulation.tick_index > 0)
@@ -1840,6 +1854,27 @@ func _draw_nodes(
 
 func persistent_node_label_count() -> int:
 	return 0
+
+
+func _draw_node_upgrade_marker(node: FactoryNodeModel, center: Vector2) -> void:
+	var state := node_upgrade_state_for(node)
+	var level := int(state.get("level", 0))
+	if level <= 0:
+		return
+	var origin := center + Vector2(-31.0, -23.0)
+	for index in mini(level, 3):
+		var pip := origin + Vector2(float(index) * 7.0, 0)
+		if state.get("upgrade_id", &"") == &"ring_speed":
+			var diamond := PackedVector2Array([
+				pip + Vector2(0, -3.2),
+				pip + Vector2(3.2, 0),
+				pip + Vector2(0, 3.2),
+				pip + Vector2(-3.2, 0),
+			])
+			draw_colored_polygon(diamond, Color(0.42, 0.86, 1.0, 0.94))
+		else:
+			draw_line(pip + Vector2(-3.0, 0), pip + Vector2(3.0, 0), Color(0.42, 0.86, 1.0, 0.94), 1.5, true)
+			draw_line(pip + Vector2(0, -3.0), pip + Vector2(0, 3.0), Color(0.42, 0.86, 1.0, 0.94), 1.5, true)
 
 
 func _draw_blocked_placement() -> void:
@@ -3174,6 +3209,9 @@ func _get_tooltip(at_position: Vector2) -> String:
 				else "素材Primitive"
 			),
 		}.get(node_state, "")
+		var upgrade_context := node_upgrade_tooltip(node)
+		if upgrade_context != "":
+			node_context += ("\n" if node_context != "" else "") + upgrade_context
 		if node_glyph != null:
 			_set_comparison_tooltip(node_glyph, _node_label(node), node_context, "設備出力")
 		if tooltip_glyph == null:
@@ -3192,6 +3230,9 @@ func _get_tooltip(at_position: Vector2) -> String:
 		var from_label := _node_label(display_simulation.nodes[line.from_node_id])
 		var to_label := _node_label(display_simulation.nodes[line.to_node_id])
 		var context := "輸送中Glyph" if GlyphPainterModel.can_draw(line.payload) else "32秒予測の輸送Glyph"
+		var line_level := run_upgrade_level(&"line_speed")
+		if line_level > 0:
+			context += "\n先見 %d/3 // 輸送 %d tick" % [line_level, line.travel_ticks]
 		_set_comparison_tooltip(line_glyph, "%s → %s" % [from_label, to_label], context, "輸送Glyph")
 		return "glyph_comparison"
 	return ""
@@ -4088,6 +4129,30 @@ func _apply_run_upgrades(target_simulation: FactorySimulation) -> void:
 		_apply_node_upgrades(node)
 	for line in target_simulation.lines.values():
 		_apply_line_upgrades(line)
+
+
+func run_upgrade_level(upgrade_id: StringName) -> int:
+	return mini(run_upgrades.count(upgrade_id), 3)
+
+
+func node_upgrade_state_for(node: FactoryNodeModel) -> Dictionary:
+	if node == null:
+		return {"upgrade_id": &"", "level": 0}
+	if node.kind == FactoryNodeModel.NodeKind.SOURCE:
+		return {"upgrade_id": &"ring_speed", "level": run_upgrade_level(&"ring_speed")}
+	if node.kind not in [FactoryNodeModel.NodeKind.SOURCE, FactoryNodeModel.NodeKind.SUMMONER]:
+		return {"upgrade_id": &"processing_speed", "level": run_upgrade_level(&"processing_speed")}
+	return {"upgrade_id": &"", "level": 0}
+
+
+func node_upgrade_tooltip(node: FactoryNodeModel) -> String:
+	var state := node_upgrade_state_for(node)
+	var level := int(state.get("level", 0))
+	if level <= 0:
+		return ""
+	if state.get("upgrade_id", &"") == &"ring_speed":
+		return "集束 %d/3 // 生成間隔 %d tick" % [level, int(node.config.get("interval_ticks", 0))]
+	return "交差 %d/3 // 加工 %d tick" % [level, int(node.config.get("processing_ticks", 0))]
 
 
 func _apply_node_upgrades(node: FactoryNodeModel) -> void:

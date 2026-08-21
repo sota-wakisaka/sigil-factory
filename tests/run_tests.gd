@@ -3765,6 +3765,8 @@ func _test_run_upgrade_accelerates_ring_source() -> void:
 	board.configure(MvpContent.PLAN_SCOUT)
 	var source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
 	_expect(source.config["interval_ticks"] < 18, "ring speed reward should accelerate future factories")
+	_expect(board.node_upgrade_state_for(source) == {"upgrade_id": &"ring_speed", "level": 1}, "source equipment should expose its visible reward level")
+	_expect("集束 1/3" in board.node_upgrade_tooltip(source), "source hover should disclose the applied reward only on demand")
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
 	board.configure_selected_node(1)
@@ -3778,6 +3780,9 @@ func _test_run_upgrade_accelerates_ring_source() -> void:
 	var first_line: FactoryLineModel = processing_board.simulation.lines[&"line_1"]
 	_expect(rotator.config["processing_ticks"] == 1, "processing reward should accelerate processors")
 	_expect(first_line.travel_ticks == 1, "line reward should accelerate transport")
+	_expect(processing_board.node_upgrade_state_for(rotator) == {"upgrade_id": &"processing_speed", "level": 1}, "processor equipment should expose its applied reward level")
+	_expect(processing_board.run_upgrade_level(&"line_speed") == 1, "factory lines should expose their applied transport reward level")
+	_expect(processing_board.node_upgrade_state_for(processing_board.simulation.nodes[&"summoner"])["level"] == 0, "summoners should not claim an unrelated processing reward")
 	processing_board.free()
 
 

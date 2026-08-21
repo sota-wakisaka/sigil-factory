@@ -432,6 +432,9 @@ func _initialize() -> void:
 	_expect(main.battle_board.route_number == 2 and is_equal_approx(main.battle_board.simulation.enemy_durability_multiplier, 1.04), "the selected route number should reach the battle simulation")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "next route should reach factory build again")
+	var upgraded_source_center: Vector2 = main.factory_board._scaled_position(main.factory_board.node_positions[&"ring_source"])
+	main.factory_board._get_tooltip(upgraded_source_center)
+	_expect("集束 1/3" in main.factory_board.tooltip_context, "applied run rewards should be inspectable on their affected factory equipment")
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	main.pause_button.pressed.emit()
 	main.produced_units = {&"scout": 30, &"sentinel": 0, &"golem": 0}
