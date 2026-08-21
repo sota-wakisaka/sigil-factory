@@ -7,6 +7,7 @@ const FactorySimulation := preload("res://src/factory/factory_simulation.gd")
 const SigilRecipeModel := preload("res://src/domain/sigil_recipe.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
+const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 const UnitSpecModel := preload("res://src/battle/unit_spec.gd")
 const ThreatEventModel := preload("res://src/battle/threat_event.gd")
 const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
@@ -154,10 +155,8 @@ static func validate_recipe_set(candidate_recipes: Array[SigilRecipeModel]) -> D
 static func recipes() -> Array[SigilRecipeModel]:
 	return [
 		SigilRecipeModel.new(
-			&"open_ring",
-			GlyphModel.new([
-				GlyphComponentModel.new(&"ring"),
-			]),
+			&"watchful_eye",
+			MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE),
 			&"scout"
 		),
 		SigilRecipeModel.new(
@@ -220,7 +219,7 @@ static func plan_name(plan_id: StringName) -> String:
 		PLAN_GOLEM:
 			return "BOUND GOLEM"
 		_:
-			return "OPEN-RING SCOUT"
+			return "WATCHFUL-EYE SCOUT"
 
 
 static func plan_description(plan_id: StringName) -> String:
@@ -232,12 +231,12 @@ static func plan_description(plan_id: StringName) -> String:
 		PLAN_GOLEM:
 			return "対装甲 // 高耐久・低速・長工程"
 		_:
-			return "初動 // 高速生産・短寿命"
+			return "目印 // 高速生産・短寿命"
 
 
 static func sigil_name(recipe_id: StringName) -> String:
 	match recipe_id:
-		&"open_ring":
+		&"watchful_eye":
 			return "斥候シジル"
 		&"azure_guard":
 			return "衛兵シジル"
@@ -254,7 +253,7 @@ static func recipe_id_for_plan(plan_id: StringName) -> StringName:
 		PLAN_GOLEM:
 			return &"bound_colossus"
 		_:
-			return &"open_ring"
+			return &"watchful_eye"
 
 
 static func node_name(kind: FactoryNodeModel.NodeKind) -> String:
@@ -287,13 +286,13 @@ static func node_mana_cost(kind: FactoryNodeModel.NodeKind) -> int:
 
 
 static func _build_scout_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_source(&"ring_source", &"ring", 18))
+	simulation.add_node(_meaning_source(&"ring_source", MeaningGlyphsModel.EYE, 18))
 	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_1", &"ring_source", &"summoner", 0, 3))
 
 
 static func _build_empty_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_source(&"ring_source", &"ring", 18))
+	simulation.add_node(_meaning_source(&"ring_source", MeaningGlyphsModel.EYE, 18))
 	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
 
 
@@ -340,4 +339,12 @@ static func _source(id: StringName, primitive_id: StringName, interval: int) -> 
 		id,
 		FactoryNodeModel.NodeKind.SOURCE,
 		{"primitive_id": primitive_id, "interval_ticks": interval}
+	)
+
+
+static func _meaning_source(id: StringName, glyph_id: StringName, interval: int) -> FactoryNodeModel:
+	return FactoryNodeModel.new(
+		id,
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"meaning_glyph_id": glyph_id, "interval_ticks": interval}
 	)

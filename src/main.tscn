@@ -307,20 +307,20 @@ alignment = 1
 [node name="EmptyButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(128, 50)
 layout_mode = 2
-tooltip_text = "環素材源と召喚器だけから、自分で最初の配線を作ります"
+tooltip_text = "目印源と召喚器だけから、自分で最初の配線を作ります"
 script = ExtResource("5_plan_button")
 plan_id = &"empty"
-recipe_id = &"open_ring"
+recipe_id = &"watchful_eye"
 caption = "手組み"
 manual_layout = true
 
 [node name="ScoutButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(128, 50)
 layout_mode = 2
-tooltip_text = "環を直接召喚器へ送り、斥候を高速生産するテンプレート"
+tooltip_text = "目印を直接召喚器へ送り、斥候を高速生産するテンプレート"
 script = ExtResource("5_plan_button")
 plan_id = &"scout"
-recipe_id = &"open_ring"
+recipe_id = &"watchful_eye"
 caption = "斥候"
 
 [node name="SentinelButton" type="Button" parent="Toolbar"]

@@ -6,6 +6,7 @@ const RunFlow := preload("res://src/game/run_flow.gd")
 const SigilGhostControl := preload("res://src/ui/sigil_ghost.gd")
 const FactorySelectionIndicatorControl := preload("res://src/ui/factory_selection_indicator.gd")
 const MeaningRewardButtonControl := preload("res://src/ui/meaning_reward_button.gd")
+const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 
 const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
 
@@ -349,6 +350,11 @@ func _refresh_factory_goal_tools() -> void:
 func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
 	if glyph == null:
 		return
+	var canonical := glyph.canonical_serialization()
+	for meaning_glyph_id in MeaningGlyphsModel.IDS:
+		if MeaningGlyphsModel.glyph(meaning_glyph_id).canonical_serialization() == canonical:
+			relevant[&"meaning_source"] = true
+			return
 	if not glyph.combine_children.is_empty():
 		relevant[&"combiner"] = true
 	for component in glyph.components:

@@ -862,13 +862,13 @@ func _test_factory_meaning_glyph_source_summons_registered_recipe() -> void:
 
 func _test_factory_recipe_match_preview_is_non_destructive() -> void:
 	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
-	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	var eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	var event_count := simulation.summon_events.size()
 	var discard_count := simulation.discarded_glyphs
-	var matching := simulation.recipe_match_result(ring)
+	var matching := simulation.recipe_match_result(eye)
 	_expect(matching["ok"] and matching["is_match"], "match preview should identify an acquired exact recipe")
-	_expect(matching["recipe_id"] == &"open_ring", "match preview should expose the exact recipe ID")
+	_expect(matching["recipe_id"] == &"watchful_eye", "match preview should expose the exact recipe ID")
 	var mismatch := simulation.recipe_match_result(spike)
 	_expect(mismatch["ok"] and not mismatch["is_match"], "match preview should identify a non-matching Glyph")
 	_expect(mismatch["closest_recipe_id"] != &"", "mismatch preview should retain the closest acquired recipe")
@@ -2159,16 +2159,16 @@ func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
 func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 	var board := FactoryBoard.new()
 	board.configure(MvpContent.PLAN_SCOUT)
-	_expect(board.goal_equipment_present(&"ring_source"), "scout inventory should report its exact ring source as present")
+	_expect(board.goal_equipment_present(&"meaning_source"), "scout inventory should report its exact meaning source as present")
 	_expect(board.goal_equipment_present(&"summoner"), "scout inventory should report its summoner as present")
-	_expect(not board.goal_equipment_present(&"spike_source"), "ring source should not satisfy the separate spike inventory marker")
+	_expect(not board.goal_equipment_present(&"spike_source"), "meaning source should not satisfy the separate spike inventory marker")
 	_expect(not board.goal_equipment_present(&"rotator"), "absent processing equipment should remain missing")
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
 	_expect(board.configure_selected_node(1), "inventory fixture should switch its source Primitive")
-	_expect(not board.goal_equipment_present(&"ring_source") and board.goal_equipment_present(&"spike_source"), "source inventory should follow its current Primitive instead of node kind alone")
+	_expect(not board.goal_equipment_present(&"meaning_source") and board.goal_equipment_present(&"spike_source"), "source inventory should follow its current Glyph instead of node kind alone")
 	_expect(board.undo(), "inventory fixture should undo the source change")
-	_expect(board.goal_equipment_present(&"ring_source") and not board.goal_equipment_present(&"spike_source"), "Undo should restore the exact source inventory state")
+	_expect(board.goal_equipment_present(&"meaning_source") and not board.goal_equipment_present(&"spike_source"), "Undo should restore the exact source inventory state")
 	board.free()
 
 	var sentinel_board := FactoryBoard.new()
@@ -2230,7 +2230,7 @@ func _test_factory_mutations_fail_closed_without_undo_snapshot() -> void:
 
 	_expect(board.simulation.nodes.size() == nodes_before and board.simulation.lines.size() == lines_before, "failed undo capture should preserve graph membership")
 	_expect(board.node_positions == positions_before, "failed undo capture should preserve every equipment position")
-	_expect(board.simulation.nodes[&"ring_source"].config["primitive_id"] == "ring", "failed undo capture should preserve equipment settings")
+	_expect(board.simulation.nodes[&"ring_source"].config["meaning_glyph_id"] == MeaningGlyphsModel.EYE, "failed undo capture should preserve equipment settings")
 	_expect(board.simulation.nodes[&"ring_source"].output_buffer == invalid_glyph, "failed undo capture should not discard or replace corrupt work in progress")
 	_expect(board.undo_history.size() == undo_before and _factory_runtime_signature(board.undo_history[0]["simulation"]) == undo_signature_before, "failed undo capture should preserve earlier valid undo history")
 	_expect(board.node_serial == node_serial_before and board.connection_serial == connection_serial_before, "failed undo capture should preserve future equipment and line IDs")
@@ -2345,9 +2345,9 @@ func _test_factory_configuration_discards_work_transactionally() -> void:
 		board.advance_tick()
 	var committed_work_in_progress := board.work_in_progress_count()
 	_expect(committed_work_in_progress > 0, "configuration test should begin with work in progress")
-	_expect("環" in board.work_in_progress_summary(), "work in progress summary should name its glyph type")
+	_expect("目" in board.work_in_progress_summary(), "work in progress summary should name its meaning-Glyph type")
 	_expect(
-		"環素材→召喚器" in board.work_in_progress_impact_summary(),
+		"目印→召喚器" in board.work_in_progress_impact_summary(),
 		"work in progress impact should identify its transport line"
 	)
 	board.begin_edit()
@@ -2355,7 +2355,7 @@ func _test_factory_configuration_discards_work_transactionally() -> void:
 	board.selected_node_id = &"ring_source"
 	_expect(board.configure_selected_node(1), "source configuration should change during time stop")
 	_expect(board.pending_discard_count() == committed_work_in_progress, "configuration should disclose all pending discards")
-	_expect("環" in board.pending_discard_notice(), "discard notice should name the discarded glyph type")
+	_expect("目" in board.pending_discard_notice(), "discard notice should name the discarded glyph type")
 	_expect("影響:" in board.pending_discard_notice(), "discard notice should name affected equipment or lines")
 	_expect(board.preview_simulation.discarded_glyphs == committed_work_in_progress, "preview should count discarded work")
 	_expect(board.undo(), "configuration discard should be undoable")
@@ -2533,6 +2533,8 @@ func _test_factory_board_connections_change_output() -> void:
 	board.set_interaction_enabled(true)
 	_expect(board.disconnect_input(&"rotator", 0), "editor should disconnect a processor input")
 	_expect(board.disconnect_input(&"summoner", 0), "editor should disconnect a summoner input")
+	board.selected_node_id = &"ring_source"
+	_expect(board.configure_selected_node(2), "edited sentinel source should switch to the Eye recipe")
 	var result := board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
 	_expect(result["ok"], "editor should connect compatible output and input ports")
 	for _tick in 160:
@@ -2590,7 +2592,7 @@ func _test_factory_board_replaces_failure_with_success() -> void:
 	board.begin_edit()
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
-	_expect(board.configure_selected_node(0), "recovery scenario should restore ring production")
+	_expect(board.configure_selected_node(2), "recovery scenario should restore Eye production")
 	board.commit_edit()
 	board.set_interaction_enabled(false)
 	for _tick in 80:
@@ -2707,7 +2709,7 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	var match_board := FactoryBoard.new()
 	match_board.configure(MvpContent.PLAN_SCOUT)
 	var summon_line: FactoryLineModel = match_board.simulation.lines[&"line_1"]
-	summon_line.payload = GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	summon_line.payload = MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
 	_expect(
 		match_board.line_recipe_match_state(&"line_1") == &"match",
 		"summoner-bound matching Glyph should expose a positive arrival state"
@@ -2726,7 +2728,7 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		"mismatching arrival marker should use a cross in addition to color"
 	)
 	var summoner: FactoryNodeModel = match_board.simulation.nodes[&"summoner"]
-	summoner.input_buffers[0] = GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	summoner.input_buffers[0] = MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
 	_expect(
 		match_board.input_recipe_match_state(&"summoner", 0) == &"match",
 		"matching state should remain visible after the Glyph reaches the summoner input"
@@ -3267,7 +3269,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(timing_board.set_production_comparison_baseline(timing_baseline), "timing-only comparison should freeze the warm production schedule")
 	timing_board.set_interaction_enabled(true)
 	timing_board.selected_node_id = &"ring_source"
-	_expect(timing_board.configure_selected_node(1) and timing_board.configure_selected_node(0), "changing a source away and back should produce a valid retimed candidate")
+	_expect(timing_board.configure_selected_node(1) and timing_board.configure_selected_node(2), "changing a source away and back should produce a valid retimed candidate")
 	var timing_only_difference := timing_board.production_difference_state(&"scout")
 	_expect(timing_only_difference["count_state"] == &"unchanged" and timing_only_difference["timing_state"] == &"later", "resetting the warm source phase should disclose a later schedule even when the 32-second count is unchanged")
 	_expect(timing_board.undo() and timing_board.undo(), "timing-only comparison should undo both source configuration changes")
@@ -3372,6 +3374,7 @@ func _test_factory_production_preview_explains_first_mismatch() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
 	board.configure(MvpContent.PLAN_EMPTY)
+	board.simulation.nodes[&"ring_source"].config.erase("meaning_glyph_id")
 	board.simulation.nodes[&"ring_source"].config["primitive_id"] = "spike"
 	board.simulation.nodes[&"ring_source"].config["interval_ticks"] = 18
 	board.simulation.connect_nodes(
@@ -3411,6 +3414,7 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
 	board.configure(MvpContent.PLAN_SCOUT)
+	board.simulation.nodes[&"ring_source"].config.erase("meaning_glyph_id")
 	board.simulation.nodes[&"ring_source"].config["primitive_id"] = ""
 	board.selected_node_id = &"ring_source"
 	_expect(board.selected_node_details()["selected_index"] == -1, "invalid restored source setting should not masquerade as a valid ring selection")

@@ -43,7 +43,7 @@ func _initialize() -> void:
 	main.factory_tab.pressed.emit()
 	_expect(main.factory_board.visible and main.get_node("FactoryPalette").visible, "factory tab should restore factory controls")
 	_expect(main.factory_board.plan_id == MvpContent.PLAN_EMPTY, "first factory build should start from the guided empty workshop")
-	_expect(main.sigil_ghost.recipe_id == &"open_ring", "empty workshop should show the first scout sigil goal")
+	_expect(main.sigil_ghost.recipe_id == &"watchful_eye", "empty workshop should show the first meaning-Glyph scout goal")
 	_expect(main.get_node("Toolbar/EmptyButton").button_pressed, "current factory plan should remain visually selected")
 	_expect(main.get_node("Toolbar/EmptyButton").glyph != null, "manual plan button should show its target CanonicalGlyph")
 	_expect(main.get_node("Toolbar/EmptyButton").mode_badge_kind() == &"manual_wiring", "manual workshop should carry a wiring badge in addition to its shared target Glyph")
@@ -95,7 +95,7 @@ func _initialize() -> void:
 	main.factory_board.simulation.nodes[&"ring_source"].output_buffer = invalid_snapshot_glyph
 	main.get_node("Toolbar/SentinelButton").pressed.emit()
 	_expect(main.factory_board.plan_id == MvpContent.PLAN_SCOUT, "failed build snapshot should keep the committed factory plan")
-	_expect(main.sigil_ghost.recipe_id == &"open_ring" and main.get_node("Toolbar/ScoutButton").button_pressed and not main.get_node("Toolbar/SentinelButton").button_pressed, "failed build snapshot should restore goal and template selection to the actual plan")
+	_expect(main.sigil_ghost.recipe_id == &"watchful_eye" and main.get_node("Toolbar/ScoutButton").button_pressed and not main.get_node("Toolbar/SentinelButton").button_pressed, "failed build snapshot should restore goal and template selection to the actual plan")
 	_expect("工場状態を保存できません" in main.factory_board.connection_message, "failed build snapshot should retain its actionable diagnostic")
 	main.factory_board.simulation.nodes[&"ring_source"].output_buffer = null
 	main.factory_board.connection_message = ""
@@ -122,17 +122,17 @@ func _initialize() -> void:
 	_expect(main.get_node("FactoryPalette/SummonButton").equipment_kind == &"summoner", "summoner palette choice should expose its dedicated vector icon kind")
 	_expect(main.get_node("FactoryPalette/RingButton").mana_cost == 20, "palette should expose source mana cost without requiring a tooltip")
 	_expect(main.get_node("FactoryPalette/RotateButton").mana_cost == 15, "palette should expose processor mana cost with the same visual convention")
-	_expect(main.get_node("FactoryPalette/RingButton").goal_relevant, "scout target should visually link to its ring source tool")
+	_expect(main.get_node("FactoryPalette/MeaningButton").goal_relevant, "scout target should visually link to its meaning source tool")
 	_expect(not main.get_node("FactoryPalette/RotateButton").goal_relevant, "scout target should not mark an unused rotation tool")
-	_expect(main.get_node("FactoryPalette/RingButton").goal_state == &"present", "existing target source should use the subdued inventory marker")
+	_expect(main.get_node("FactoryPalette/MeaningButton").goal_state == &"present", "existing target source should use the subdued inventory marker")
 	_expect(main.get_node("FactoryPalette/SummonButton").goal_state == &"present", "existing summoner should remain present even when its one-node limit disables another")
 	main.factory_board.selected_node_id = &"ring_source"
 	main.factory_board.selection_changed.emit()
 	main.factory_board.simulation.nodes[&"ring_source"].output_buffer = invalid_snapshot_glyph
 	main.inspector_option.select(1)
 	main.inspector_option.item_selected.emit(1)
-	_expect(main.factory_board.simulation.nodes[&"ring_source"].config["primitive_id"] == "ring", "failed setting snapshot should preserve the actual equipment config")
-	_expect(main.inspector_option.selected == 0 and main.inspector_option.visual_index == 0, "failed setting snapshot should restore the dropdown to the actual config")
+	_expect(main.factory_board.simulation.nodes[&"ring_source"].config["meaning_glyph_id"] == &"eye", "failed setting snapshot should preserve the actual equipment config")
+	_expect(main.inspector_option.selected == 2 and main.inspector_option.visual_index == 2, "failed setting snapshot should restore the dropdown to the actual config")
 	_expect("工場状態を保存できません" in main.factory_board.connection_message, "failed setting snapshot should retain its actionable diagnostic")
 	main.factory_board.simulation.nodes[&"ring_source"].output_buffer = null
 	main.factory_board.connection_message = ""
@@ -183,7 +183,7 @@ func _initialize() -> void:
 	_expect(main.get_node("FactoryPalette/SpikeButton").goal_relevant, "combined target should visually mark its spike source")
 	_expect(main.get_node("FactoryPalette/CombineButton").goal_relevant, "combined target should visually mark the combine tool")
 	_expect(main.get_node("FactoryPalette/SpikeButton").goal_state == &"missing" and main.get_node("FactoryPalette/CombineButton").goal_state == &"missing", "combined target vocabulary should identify absent categories without revealing order or count")
-	main.sigil_ghost.show_recipe(&"open_ring")
+	main.sigil_ghost.show_recipe(&"watchful_eye")
 	main._refresh_factory_goal_tools()
 	_expect(main.get_node("FactoryPalette/RotateButton").custom_minimum_size.y >= 50.0, "palette icon should reserve readable vertical space")
 	_expect(
@@ -320,12 +320,12 @@ func _initialize() -> void:
 	var same_plan_undo_count: int = main.factory_board.undo_history.size()
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	_expect(main.factory_board.preview_simulation == same_plan_preview and main.factory_board.undo_history.size() == same_plan_undo_count, "reselecting the highlighted plan should not reset the time-stop factory")
-	_expect(main.sigil_ghost.recipe_id == &"open_ring" and main.get_node("Toolbar/ScoutButton").button_pressed, "same-plan no-op should preserve its goal UI")
+	_expect(main.sigil_ghost.recipe_id == &"watchful_eye" and main.get_node("Toolbar/ScoutButton").button_pressed, "same-plan no-op should preserve its goal UI")
 	var preserved_preview_recipe: SigilRecipeModel = main.factory_board.preview_simulation.recipes[0]
 	main.factory_board.preview_simulation.recipes[0] = null
 	main.get_node("Toolbar/SentinelButton").pressed.emit()
 	_expect(main.factory_board.pending_plan_id == MvpContent.PLAN_SCOUT, "failed preset snapshot should preserve the pending factory plan")
-	_expect(main.sigil_ghost.recipe_id == &"open_ring" and main.get_node("Toolbar/ScoutButton").button_pressed, "failed preset snapshot should not switch the goal UI ahead of factory state")
+	_expect(main.sigil_ghost.recipe_id == &"watchful_eye" and main.get_node("Toolbar/ScoutButton").button_pressed, "failed preset snapshot should not switch the goal UI ahead of factory state")
 	main.factory_board.preview_simulation.recipes[0] = preserved_preview_recipe
 	main.get_node("Toolbar/SentinelButton").pressed.emit()
 	_expect(main.sigil_ghost.recipe_id == &"azure_guard", "sentinel selection should update the completed sigil ghost")
@@ -335,7 +335,7 @@ func _initialize() -> void:
 	_expect(main.factory_board.pending_plan_id == MvpContent.PLAN_SCOUT, "undo should restore the plan before a preset preview")
 	var undone_difference: Dictionary = main.factory_board.production_difference_state(&"scout")
 	_expect(undone_difference["count_state"] == &"unchanged" and undone_difference["timing_state"] == &"unchanged", "preset undo should return the production comparison to baseline")
-	_expect(main.sigil_ghost.recipe_id == &"open_ring" and main.get_node("Toolbar/ScoutButton").button_pressed, "preset undo should restore goal Glyph and plan highlight")
+	_expect(main.sigil_ghost.recipe_id == &"watchful_eye" and main.get_node("Toolbar/ScoutButton").button_pressed, "preset undo should restore goal Glyph and plan highlight")
 	main.get_node("Toolbar/SentinelButton").pressed.emit()
 	main._unhandled_key_input(action_key)
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "Space should confirm edits and resume battle")

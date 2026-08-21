@@ -30,7 +30,7 @@ const SOURCE_OPTION_IDS := [
 	MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS, MeaningGlyphsModel.TARGET,
 	MeaningGlyphsModel.STAR, MeaningGlyphsModel.COMPASS,
 ]
-const SOURCE_OPTION_INTERVALS := [18, 54, 24, 30, 32, 36, 48]
+const SOURCE_OPTION_INTERVALS := [18, 54, 18, 30, 32, 36, 48]
 const PRODUCTION_DECREASE_COLOR := Color(1.0, 0.7, 0.28, 1.0)
 const PRODUCTION_COMPARISON_COLOR := Color(0.42, 0.58, 0.7, 0.88)
 const EDIT_ADDED_COLOR := Color(0.24, 0.9, 0.92, 0.96)
@@ -232,7 +232,7 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 			config = {"primitive_id": "spike", "interval_ticks": 54}
 		&"meaning_source":
 			prefix = "meaning_source"
-			config = {"meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": 24}
+			config = {"meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": 18}
 		&"rotator":
 			prefix = "rotator"
 			kind = FactoryNodeModel.NodeKind.ROTATOR
@@ -1431,6 +1431,10 @@ func _work_in_progress_entries(source_simulation: FactorySimulation) -> Array[Di
 
 
 func _glyph_type_label(glyph: GlyphModel) -> String:
+	var canonical := glyph.canonical_serialization()
+	for meaning_glyph_id in MeaningGlyphsModel.IDS:
+		if MeaningGlyphsModel.glyph(meaning_glyph_id).canonical_serialization() == canonical:
+			return MeaningGlyphsModel.label(meaning_glyph_id)
 	var component_labels := PackedStringArray()
 	for component in glyph.components:
 		var attributes := PackedStringArray([_primitive_name(component.primitive_id)])
@@ -1448,7 +1452,10 @@ func _glyph_type_label(glyph: GlyphModel) -> String:
 
 
 func _primitive_name(primitive_id: StringName) -> String:
-	return {&"ring": "環", &"spike": "棘", &"branch": "枝"}.get(primitive_id, String(primitive_id))
+	return {
+		&"ring": "環", &"spike": "棘", &"branch": "枝",
+		&"circle": "丸", &"triangle": "三角", &"square": "四角",
+	}.get(primitive_id, String(primitive_id))
 
 
 func _color_name(color_id: StringName) -> String:
@@ -3852,7 +3859,7 @@ func _apply_run_upgrades(target_simulation: FactorySimulation) -> void:
 
 func _apply_node_upgrades(node: FactoryNodeModel) -> void:
 	for upgrade_id in run_upgrades:
-		if upgrade_id == &"ring_speed" and node.kind == FactoryNodeModel.NodeKind.SOURCE and String(node.config.get("primitive_id", "")) == "ring":
+		if upgrade_id == &"ring_speed" and node.kind == FactoryNodeModel.NodeKind.SOURCE:
 			node.config["interval_ticks"] = maxi(int(round(float(node.config.get("interval_ticks", 18)) * 0.8)), 1)
 		elif upgrade_id == &"processing_speed" and node.kind not in [FactoryNodeModel.NodeKind.SOURCE, FactoryNodeModel.NodeKind.SUMMONER]:
 			node.config["processing_ticks"] = maxi(int(node.config.get("processing_ticks", 1)) - 1, 1)
