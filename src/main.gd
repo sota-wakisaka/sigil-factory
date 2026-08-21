@@ -1051,6 +1051,7 @@ func _set_plan_buttons_enabled(enabled: bool) -> void:
 	$Toolbar/EmptyButton.disabled = not enabled
 	$Toolbar/ScoutButton.disabled = not enabled
 	$Toolbar/SentinelButton.disabled = not enabled
+	$Toolbar/StarButton.disabled = not enabled
 	$Toolbar/GolemButton.disabled = not enabled
 
 

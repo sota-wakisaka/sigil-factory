@@ -21,6 +21,7 @@ func _initialize() -> void:
 
 	_expect(main.flow.phase == RunFlow.Phase.ROUTE_SELECTION, "UI should open at route selection")
 	_expect(main.phase_overlay.visible, "placeholder phases should use the overlay")
+	_expect(main.get_node("Toolbar/StarButton").disabled, "alternate Star plan should stay locked outside factory phases like every other plan")
 	_expect(main.route_choices.visible and main.route_choices.get_child_count() == 3, "route selection should offer three branches")
 	_expect(not main.run_upgrade_strip.visible, "first route should not reserve space for an empty upgrade inventory")
 	_expect(main.route_choices.get_child(0).route_id == MvpContent.ROUTE_SWARM and main.route_choices.get_child(2).route_id == MvpContent.ROUTE_ARMORED, "route cards should carry distinct encounter identities")
@@ -56,6 +57,7 @@ func _initialize() -> void:
 	_expect(main.get_node("Toolbar/EmptyButton").mode_badge_kind() == &"manual_wiring", "manual workshop should carry a wiring badge in addition to its shared target Glyph")
 	_expect(main.get_node("Toolbar/ScoutButton").mode_badge_kind() == &"template", "completed factory choice should remain visually distinct from manual wiring")
 	_expect(main.get_node("Toolbar/StarButton").glyph.canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR).canonical_serialization(), "alternate Star Sentinel should be available as a visible meaning-sigil template")
+	_expect(not main.get_node("Toolbar/StarButton").disabled, "alternate Star plan should unlock together with the other factory templates")
 	var manual_plan_tooltip = main.get_node("Toolbar/EmptyButton")._make_custom_tooltip("")
 	_expect("自分で最初の配線" in manual_plan_tooltip.context, "manual plan Glyph tooltip should retain its wiring purpose")
 	_expect(manual_plan_tooltip.context_lines().size() >= 2, "long plan purpose should wrap instead of clipping at the tooltip edge")
@@ -270,6 +272,7 @@ func _initialize() -> void:
 	_expect(main.threat_label.visible and main.status_label.visible, "running battle should expose battle-only information")
 	_expect(not main.factory_board.interaction_enabled, "running battle should lock node placement")
 	_expect(main.get_node("FactoryPalette/RingButton").disabled, "running battle should lock the equipment palette")
+	_expect(main.get_node("Toolbar/StarButton").disabled, "running battle should lock the alternate Star template with the other factory plans")
 	_expect("敵防壁HP" in main.status_label.text, "battle status should identify the active enemy shield")
 	_expect("残り 03:00" in main.status_label.text, "battle status should show the remaining time")
 	_expect("生産 斥候" in main.status_label.text and "衛兵" in main.status_label.text and "巨像" in main.status_label.text, "battle status should name each production count")
@@ -360,6 +363,7 @@ func _initialize() -> void:
 	_expect(main.pause_button.action_kind == "resume" and main.pause_button.text == "確定・再開", "reconfiguration should pair confirmation with a visual resume action")
 	_expect(main.cancel_button.action_kind == "cancel" and main.cancel_button.text == "破棄", "reconfiguration should keep discard visually distinct and terse")
 	_expect(main.speed_button.disabled, "time stop should disable speed controls")
+	_expect(not main.get_node("Toolbar/StarButton").disabled, "alternate Star plan should be editable during time stop")
 	var same_plan_preview: FactorySimulation = main.factory_board.preview_simulation
 	var same_plan_undo_count: int = main.factory_board.undo_history.size()
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
