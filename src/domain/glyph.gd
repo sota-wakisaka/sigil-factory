@@ -13,7 +13,8 @@ const MIN_COMBINE_CHILDREN := 2
 const MAX_COMBINE_CHILDREN := 8
 const CONNECTION_RADIAL := &"radial"
 const CONNECTION_PAIRWISE := &"pairwise"
-const COMBINE_CONNECTION_MODES := [CONNECTION_RADIAL, CONNECTION_PAIRWISE]
+const CONNECTION_NONE := &"none"
+const COMBINE_CONNECTION_MODES := [CONNECTION_RADIAL, CONNECTION_PAIRWISE, CONNECTION_NONE]
 
 
 func _init(
@@ -74,6 +75,20 @@ static func combine_many(
 	)
 
 
+static func radial_repeat(glyph: GlyphModel, count: int) -> GlyphModel:
+	if glyph == null or count < MIN_COMBINE_CHILDREN or count > MAX_COMBINE_CHILDREN:
+		return null
+	if 360 % count != 0:
+		return null
+	var copies: Array = []
+	var angle_step := int(360 / count)
+	for index in count:
+		var copy := glyph.copy()
+		copy.rotate_degrees(index * angle_step)
+		copies.append(copy)
+	return combine_many(copies, CONNECTION_NONE)
+
+
 func canonical_keys() -> Array[String]:
 	var keys: Array[String] = []
 	for component in components:
@@ -101,7 +116,11 @@ func canonical_serialization() -> String:
 		GlyphComponentModel.coordinate_key(combine_origin.x),
 		GlyphComponentModel.coordinate_key(combine_origin.y),
 	]
-	var combine_prefix := "C" if combine_connection_mode == CONNECTION_RADIAL else "M"
+	var combine_prefix: String = {
+		CONNECTION_RADIAL: "C",
+		CONNECTION_PAIRWISE: "M",
+		CONNECTION_NONE: "R",
+	}.get(combine_connection_mode, "?")
 	return "%s(%s;%s)" % [
 		combine_prefix,
 		_frame(origin_serialization),

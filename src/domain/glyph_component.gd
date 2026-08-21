@@ -41,7 +41,7 @@ func canonical_key() -> String:
 		_frame(String(primitive_id)),
 		coordinate_key(position.x),
 		coordinate_key(position.y),
-		rotation_degrees,
+		canonical_rotation_degrees(),
 		scale_step,
 		_frame(String(color_id)),
 	]
@@ -49,6 +49,17 @@ func canonical_key() -> String:
 	if scale_x_percent != 100 or scale_y_percent != 100:
 		result += "|a%d,%d" % [scale_x_percent, scale_y_percent]
 	return result
+
+
+func canonical_rotation_degrees() -> int:
+	match primitive_id:
+		&"circle":
+			return 0 if scale_x_percent == scale_y_percent else posmod(rotation_degrees, 180)
+		&"triangle":
+			return posmod(rotation_degrees, 120)
+		&"square":
+			return posmod(rotation_degrees, 90 if scale_x_percent == scale_y_percent else 180)
+	return rotation_degrees
 
 
 func stretch_percent(x_percent: int, y_percent: int) -> void:

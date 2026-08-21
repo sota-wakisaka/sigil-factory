@@ -8,13 +8,15 @@ const SOURCE := &"source"
 const ROTATE := &"rotate"
 const MOVE := &"move"
 const SCALE := &"scale"
+const REPEAT := &"repeat"
 const COLOR := &"color"
 const COMBINE := &"combine"
 const OUTPUT := &"output"
 
-const NODE_KINDS := [SOURCE, ROTATE, MOVE, SCALE, COLOR, COMBINE, OUTPUT]
+const NODE_KINDS := [SOURCE, ROTATE, MOVE, SCALE, REPEAT, COLOR, COMBINE, OUTPUT]
 const PRIMITIVES := [&"circle", &"triangle", &"square"]
 const COLORS := [&"white", &"blue", &"red"]
+const REPEAT_COUNTS := [2, 3, 4, 5, 6, 8]
 const MAX_COMBINE_INPUTS := GlyphModel.MAX_COMBINE_CHILDREN
 
 var nodes: Dictionary = {}
@@ -165,7 +167,7 @@ func input_count(node_id: StringName) -> int:
 			return 0
 		COMBINE:
 			return GlyphModel.MAX_COMBINE_CHILDREN
-		ROTATE, MOVE, SCALE, COLOR, OUTPUT:
+		ROTATE, MOVE, SCALE, REPEAT, COLOR, OUTPUT:
 			return 1
 	return 0
 
@@ -263,6 +265,10 @@ func _apply_node(kind: StringName, config: Dictionary, inputs: Array) -> Diction
 		SCALE:
 			glyph = inputs[0].copy()
 			glyph.stretch_percent(int(config["x_percent"]), int(config["y_percent"]))
+		REPEAT:
+			glyph = GlyphModel.radial_repeat(inputs[0], int(config["count"]))
+			if glyph == null:
+				return {"ok": false, "glyph": null, "error": &"invalid_repeat"}
 		COLOR:
 			glyph = inputs[0].copy()
 			glyph.recolor(StringName(config["color_id"]))
@@ -351,6 +357,11 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 				"error": &"",
 				"config": {"x_percent": x_percent, "y_percent": y_percent},
 			}
+		REPEAT:
+			var count := int(config.get("count", 6))
+			if not count in REPEAT_COUNTS:
+				return {"ok": false, "error": &"invalid_repeat", "config": {}}
+			return {"ok": true, "error": &"", "config": {"count": count}}
 		COLOR:
 			var color_id := StringName(config.get("color_id", &"blue"))
 			if not color_id in COLORS:

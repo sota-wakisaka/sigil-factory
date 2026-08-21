@@ -24,6 +24,8 @@ func _initialize() -> void:
 		_build_coincident_child_fixture(lab)
 	elif fixture == "triangle":
 		_build_triangle_fixture(lab)
+	elif fixture == "repeat":
+		lab.load_repeat_template()
 	await process_frame
 	await process_frame
 	await RenderingServer.frame_post_draw

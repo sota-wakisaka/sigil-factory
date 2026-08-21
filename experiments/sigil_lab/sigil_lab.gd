@@ -13,6 +13,7 @@ const NODE_NAMES := {
 	&"rotate": "回転",
 	&"move": "移動",
 	&"scale": "変形",
+	&"repeat": "反復",
 	&"color": "着色",
 	&"combine": "合成",
 	&"output": "完成",
@@ -73,6 +74,10 @@ func load_eye_template() -> void:
 	_load_eye_template()
 
 
+func load_repeat_template() -> void:
+	_load_repeat_template()
+
+
 func _build_ui() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -125,6 +130,13 @@ func _build_header() -> Control:
 	template_button.pressed.connect(_load_eye_template)
 	toolbar.add_child(template_button)
 
+	var repeat_button := Button.new()
+	repeat_button.text = "六花"
+	repeat_button.tooltip_text = "移動した三角を60°ずつ放射反復するテンプレート"
+	repeat_button.custom_minimum_size = Vector2(76, 34)
+	repeat_button.pressed.connect(_load_repeat_template)
+	toolbar.add_child(repeat_button)
+
 	var clear_button := Button.new()
 	clear_button.text = "クリア"
 	clear_button.tooltip_text = "完成ノード以外を削除する"
@@ -160,6 +172,7 @@ func _build_palette() -> Control:
 		["↻", SigilGraphModel.ROTATE, {"degrees": 45}, "中心を基準に1°単位で回転"],
 		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "上下左右へ移動"],
 		["↔↕", SigilGraphModel.SCALE, {"x_percent": 150, "y_percent": 100}, "横・縦を別々に拡大縮小"],
+		["×N", SigilGraphModel.REPEAT, {"count": 6}, "中心のまわりへ等角度で放射反復"],
 		["●", SigilGraphModel.COLOR, {"color_id": &"blue"}, "白・青・赤へ着色"],
 		["⊕", SigilGraphModel.COMBINE, {}, "2〜8個のGlyphを中心結合・相互結合"],
 	]:
@@ -270,7 +283,7 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 			var option := _source_option(node_id)
 			node.add_child(option)
 			option_controls[node_id] = option
-		SigilGraphModel.ROTATE, SigilGraphModel.MOVE, SigilGraphModel.SCALE, SigilGraphModel.COLOR:
+		SigilGraphModel.ROTATE, SigilGraphModel.MOVE, SigilGraphModel.SCALE, SigilGraphModel.REPEAT, SigilGraphModel.COLOR:
 			node.add_child(preview)
 			node.set_slot(0, true, 0, PORT_COLOR, true, 0, PORT_COLOR)
 			var option := _setting_option(node_id, kind)
@@ -360,6 +373,19 @@ func _setting_option(node_id: StringName, kind: StringName) -> Control:
 			value.value_changed.connect(_on_scale_value_changed.bind(node_id, StringName(axis)))
 			row.add_child(value)
 		return row
+	if kind == SigilGraphModel.REPEAT:
+		var repeat_option := OptionButton.new()
+		for count in SigilGraphModel.REPEAT_COUNTS:
+			repeat_option.add_item("%d回" % count)
+		repeat_option.custom_minimum_size = Vector2(108, 34)
+		repeat_option.tooltip_text = "元のシジルを含む反復数 // 中心原点のまわりへ等角度配置"
+		var count := int(graph.node_config(node_id).get("count", 6))
+		repeat_option.select(maxi(SigilGraphModel.REPEAT_COUNTS.find(count), 0))
+		repeat_option.item_selected.connect(func(index: int) -> void:
+			graph.set_node_config(node_id, {"count": SigilGraphModel.REPEAT_COUNTS[index]})
+			_refresh_all()
+		)
+		return repeat_option
 	var option := OptionButton.new()
 	match kind:
 		SigilGraphModel.MOVE:
@@ -483,6 +509,38 @@ func _load_eye_template() -> void:
 	_refresh_all()
 
 
+func _load_repeat_template() -> void:
+	_clear_workspace()
+	var petal := _add_node(
+		SigilGraphModel.SOURCE,
+		{"primitive_id": &"triangle"},
+		Vector2(30, 210)
+	)
+	var move := _add_node(
+		SigilGraphModel.MOVE,
+		{"offset": Vector2i(0, -4)},
+		Vector2(220, 210)
+	)
+	var repeat := _add_node(
+		SigilGraphModel.REPEAT,
+		{"count": 6},
+		Vector2(410, 210)
+	)
+	var center := _add_node(
+		SigilGraphModel.SOURCE,
+		{"primitive_id": &"circle"},
+		Vector2(220, 470)
+	)
+	var combine := _add_node(SigilGraphModel.COMBINE, {}, Vector2(620, 285))
+	var output_id := graph.output_node_id()
+	_connect_nodes(petal, 0, move, 0)
+	_connect_nodes(move, 0, repeat, 0)
+	_connect_nodes(repeat, 0, combine, 0)
+	_connect_nodes(center, 0, combine, 1)
+	_connect_nodes(combine, 0, output_id, 0)
+	_refresh_all()
+
+
 func _refresh_all() -> void:
 	for node_id in node_controls:
 		var result := graph.evaluate(node_id)
@@ -534,4 +592,5 @@ static func _error_text(error: StringName) -> String:
 		&"cycle": "循環する配線は作れません",
 		&"invalid_direction": "出力から入力へ接続してください",
 		&"invalid_glyph": "完全重複する素材は合成できません",
+		&"invalid_repeat": "反復できません // 中心から離した図形を使ってください",
 	}.get(error, "操作できません // %s" % error)

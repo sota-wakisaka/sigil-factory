@@ -11,6 +11,7 @@ var failures := 0
 func _initialize() -> void:
 	_test_graph_evaluation()
 	_test_basic_primitives_and_stretch()
+	_test_radial_repeat()
 	_test_eight_way_combine()
 	_test_free_angle_triangle()
 	_test_post_combine_move()
@@ -59,6 +60,38 @@ func _test_basic_primitives_and_stretch() -> void:
 		_expect(component.primitive_id == &"circle", "stretch should preserve the source primitive")
 		_expect(component.scale_x_percent == 250 and component.scale_y_percent == 75, "stretch should fold both axes into the canonical component")
 		_expect("|a250,75" in component.canonical_key(), "anisotropic scale should be part of matching identity")
+
+
+func _test_radial_repeat() -> void:
+	var graph = SigilGraphModel.new()
+	graph.add_node(&"triangle", SigilGraphModel.SOURCE, {"primitive_id": &"triangle"})
+	graph.add_node(&"move", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)})
+	graph.add_node(&"repeat", SigilGraphModel.REPEAT, {"count": 6})
+	graph.add_node(&"output", SigilGraphModel.OUTPUT)
+	graph.connect_nodes(&"triangle", 0, &"move", 0)
+	graph.connect_nodes(&"move", 0, &"repeat", 0)
+	graph.connect_nodes(&"repeat", 0, &"output", 0)
+	var result := graph.evaluate_output()
+	_expect(result["ok"], "a moved basic shape should repeat around the shared origin")
+	if result["ok"]:
+		var glyph = result["glyph"]
+		_expect(glyph.components.size() == 6, "repeat count should include the original and five rotated copies")
+		_expect(glyph.combine_children.size() == 6, "each repeated copy should remain a reusable child group")
+		_expect(glyph.combine_connection_mode == GlyphModel.CONNECTION_NONE, "repeat should not invent visible connector lines")
+		_expect(GlyphPainterModel.combine_visuals(glyph, 1.0, false)["connections"].is_empty(), "hidden repeat grouping should leave only repeated geometry")
+		var positions: Dictionary = {}
+		for component in glyph.components:
+			positions[component.canonical_key()] = true
+			_expect(absf(component.position.length() - 4.0) < 0.002, "each repeat should stay on the same radius")
+		_expect(positions.size() == 6, "six-way repeat should create six distinct canonical placements")
+	_expect(not graph.add_node(&"invalid_repeat", SigilGraphModel.REPEAT, {"count": 7}), "non-integral degree partitions should be rejected")
+	var centered := SigilGraphModel.new()
+	centered.add_node(&"circle", SigilGraphModel.SOURCE, {"primitive_id": &"circle"})
+	centered.add_node(&"repeat", SigilGraphModel.REPEAT, {"count": 6})
+	centered.add_node(&"output", SigilGraphModel.OUTPUT)
+	centered.connect_nodes(&"circle", 0, &"repeat", 0)
+	centered.connect_nodes(&"repeat", 0, &"output", 0)
+	_expect(not centered.evaluate_output()["ok"], "rotationally identical copies at the center should be rejected instead of overdrawn")
 
 
 func _test_eight_way_combine() -> void:
@@ -210,6 +243,8 @@ func _test_lab_scene() -> void:
 	var free_scale: StringName = lab.add_lab_node(SigilGraphModel.SCALE, {"x_percent": 200, "y_percent": 75}, Vector2(40, 40))
 	var scale_control: Control = lab.option_controls[free_scale]
 	_expect(scale_control.find_children("*", "SpinBox", true, false).size() == 2, "Lab stretch should expose independent horizontal and vertical controls")
+	var free_repeat: StringName = lab.add_lab_node(SigilGraphModel.REPEAT, {"count": 6}, Vector2(40, 40))
+	_expect(lab.option_controls[free_repeat] is OptionButton and lab.option_controls[free_repeat].item_count == 6, "Lab repeat should expose all exact equal-angle counts")
 	var output: Dictionary = lab.graph.evaluate_output()
 	_expect(output["ok"] and output["glyph"].components.size() == 2, "default eye template should combine two basic circles")
 	_expect(output["glyph"].combine_children.size() == 2, "default eye template should preserve its reusable two-part group")
@@ -225,6 +260,10 @@ func _test_lab_scene() -> void:
 	lab.load_cardinal_template()
 	await process_frame
 	_expect(lab.graph.evaluate_output()["ok"], "eye template should be reloadable after clearing")
+	lab.load_repeat_template()
+	await process_frame
+	var repeat_output: Dictionary = lab.graph.evaluate_output()
+	_expect(repeat_output["ok"] and repeat_output["glyph"].components.size() == 7, "six-flower template should combine six repeated triangles with one basic circle")
 	lab.free()
 
 
