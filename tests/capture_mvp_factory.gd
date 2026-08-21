@@ -31,13 +31,21 @@ func _initialize() -> void:
 		main._apply_phase()
 	elif capture_phase == "stage":
 		main.phase_button.pressed.emit()
-	elif capture_phase == "reward":
+	elif capture_phase in ["victory", "reward"]:
 		main.phase_button.pressed.emit()
 		main.phase_button.pressed.emit()
 		main._select_plan(plan_id)
 		main.pause_button.pressed.emit()
+		if capture_phase == "victory":
+			main.produced_units = {&"scout": 3, &"sentinel": 4, &"golem": 0}
+			main.produced_recipes = {&"watchful_eye": 3, &"stellar_sentinel": 4}
+			main.battle_board.simulation.player_damage_by_recipe = {
+				&"watchful_eye": 123.0,
+				&"stellar_sentinel": 456.0,
+			}
 		main.debug_victory_button.pressed.emit()
-		main.phase_button.pressed.emit()
+		if capture_phase == "reward":
+			main.phase_button.pressed.emit()
 	elif capture_phase == "factory":
 		main.phase_button.pressed.emit()
 		main.phase_button.pressed.emit()

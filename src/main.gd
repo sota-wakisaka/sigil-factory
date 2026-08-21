@@ -9,6 +9,7 @@ const MeaningRewardButtonControl := preload("res://src/ui/meaning_reward_button.
 const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 const StageThreatTimelineControl := preload("res://src/ui/stage_threat_timeline.gd")
 const RunUpgradeStripControl := preload("res://src/ui/run_upgrade_strip.gd")
+const BattleResultSigilStripControl := preload("res://src/ui/battle_result_sigil_strip.gd")
 
 const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
 
@@ -51,6 +52,7 @@ enum WorkspaceView {
 @onready var route_choices: HBoxContainer = $PhaseOverlay/Center/Panel/Content/RouteChoices
 @onready var stage_timeline: StageThreatTimelineControl = $PhaseOverlay/Center/Panel/Content/StageTimeline
 @onready var run_upgrade_strip: RunUpgradeStripControl = $PhaseOverlay/Center/Panel/Content/RunUpgradeStrip
+@onready var battle_result_sigil_strip: BattleResultSigilStripControl = $PhaseOverlay/Center/Panel/Content/BattleResultSigilStrip
 @onready var inspector_label: FactorySelectionIndicatorControl = $FactoryInspector/SelectionLabel
 @onready var inspector_option: FactorySettingOption = $FactoryInspector/SettingOption
 @onready var sigil_ghost: SigilGhostControl = $FactoryInspector/SigilGhost
@@ -750,6 +752,7 @@ func _apply_phase() -> void:
 	route_choices.visible = false
 	stage_timeline.visible = false
 	run_upgrade_strip.visible = false
+	battle_result_sigil_strip.visible = false
 	debug_victory_button.visible = false
 	speed_button.disabled = true
 	_update_speed_button()
@@ -811,6 +814,10 @@ func _apply_phase() -> void:
 			status_label.text = ""
 		RunFlow.Phase.VICTORY:
 			pause_button.disabled = true
+			battle_result_sigil_strip.configure(
+				produced_recipes,
+				battle_board.simulation.player_damage_by_recipe
+			)
 			_show_overlay("STAGE CLEAR", "敵リーダーを撃破", _battle_result_summary(), "OK：報酬を確認")
 		RunFlow.Phase.REWARD:
 			pause_button.disabled = true
@@ -962,12 +969,6 @@ func _battle_result_summary() -> String:
 		factory_change_count,
 		factory_board.simulation.discarded_glyphs,
 	]
-	var sigil_summary := _produced_sigil_summary()
-	if sigil_summary != "":
-		summary += "\n使用シジル: " + sigil_summary
-	var damage_summary := _sigil_damage_summary()
-	if damage_summary != "":
-		summary += "\nシジル与ダメージ: " + damage_summary
 	return summary
 
 

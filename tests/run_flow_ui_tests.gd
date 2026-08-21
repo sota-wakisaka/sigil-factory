@@ -414,10 +414,19 @@ func _initialize() -> void:
 	_expect(main.sigil_ghost.recipe_id == &"vigil_cross", "discard should restore the committed goal Glyph")
 	_expect(main.get_node("Toolbar/SentinelButton").button_pressed and not main.get_node("Toolbar/GolemButton").button_pressed, "discard should restore the committed plan highlight")
 
+	main.produced_recipes = {&"watchful_eye": 3, &"vigil_cross": 2}
+	main.battle_board.simulation.player_damage_by_recipe = {&"watchful_eye": 123.0, &"vigil_cross": 456.0}
 	main.debug_victory_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.VICTORY, "placeholder completion should defeat the leader")
 	_expect("生産: 斥候" in main.phase_body.text, "victory screen should summarize factory production")
 	_expect("時間停止 2回" in main.phase_body.text, "victory screen should summarize committed and discarded time stops")
+	_expect(main.battle_result_sigil_strip.visible and main.battle_result_sigil_strip.entries.size() == 2, "victory should replace meaning-sigil result sentences with a visual result strip")
+	var result_center: Vector2 = main.battle_result_sigil_strip.slot_rect(0).get_center()
+	_expect(main.battle_result_sigil_strip._get_tooltip(result_center) == "battle_result_sigil", "each result Glyph should expose its battle contribution on demand")
+	var result_tooltip = main.battle_result_sigil_strip._make_custom_tooltip("battle_result_sigil")
+	_expect(result_tooltip is GlyphTooltip and "召喚 3体" in result_tooltip.context and "与ダメージ 123" in result_tooltip.context, "result Glyph hover should preserve production and damage details")
+	result_tooltip.free()
+	_expect("使用シジル:" not in main.phase_body.text and "シジル与ダメージ:" not in main.phase_body.text, "visual result Glyphs should remove duplicate result prose")
 	main.produced_recipes = {&"watchful_eye": 3, &"stellar_sentinel": 2}
 	_expect(main._produced_sigil_summary() == "目 3 / 星衛兵 2", "battle results should retain which acquired sigil recipes produced the units")
 	main.battle_board.simulation.player_damage_by_recipe = {&"watchful_eye": 123.0, &"stellar_sentinel": 456.0}
