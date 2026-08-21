@@ -14,6 +14,7 @@ Design documents:
 - Click-through run flow from route selection to the next route
 - Draggable factory equipment with interactive input/output port wiring
 - Equipment palette for adding and deleting sources, processors, combiners, and summoners
+- Configurable meaning-Glyph sources for Eye, Cross, Target, Star, and Compass
 - Fixed 100-mana equipment capacity with immediate refunds when nodes are removed
 - A single generic summoner enforced by both palette actions and graph validation
 - Selection inspector for source material, rotation, and color configuration
@@ -22,8 +23,8 @@ Design documents:
 - Restored node and line identity/configuration validation before fixed-tick execution
 - Owned line snapshots that isolate connected routing and in-transit glyph state
 - Actionable validation reasons shared by pre-battle production preview and start rejection
-- Collision-safe canonical binary Combine structure with hierarchy-aware sigil matching
-- Recipe-boundary validation for primitive leaves, binary Combine arity, and component fields
+- Collision-safe canonical multi-input Combine structure with hierarchy-aware sigil matching
+- Recipe-boundary validation for primitive leaves, bounded multi-input Combine arity, and component fields
 - Cycle-safe Combine validation for malformed restored glyph trees
 - Unique recipe IDs and canonical structures with acquisition-order-independent registration
 - Side-effect-free structured diagnostics for rejected recipe registrations
@@ -36,7 +37,8 @@ Design documents:
 - Tick-start input and line snapshots that prevent same-tick cascading or slot reuse
 - Fixed-tick guard against malformed restored glyphs in equipment and transport lines
 - Edit-time recovery that discards only malformed work while preserving valid in-progress glyphs
-- Three production plans: fast scouts, anti-swarm sentinels, and anti-armor golems
+- Three meaning-sigil production plans: fast Eye scouts, anti-swarm Vigil Cross sentinels, and anti-armor Fortress Compass golems
+- A lower-mana Star Sentinel alternate recipe discoverable through manual factory editing
 - Transactional factory changes made during time stop
 - Work-in-progress discard preview with glyph-type summaries, full undo, and cancel restoration
 - Player-facing summon mismatch reasons based on the closest known recipe
@@ -50,7 +52,7 @@ Design documents:
 - 60-second advance warnings for major swarm, armor, and final wave changes
 - Victory, reward, next-route, defeat, and instant retry flow
 - Persistent run rewards for source, processor, or transport speed
-- Wave labels, matchup guidance, hit feedback, and post-battle analysis
+- Route and wave labels, hit feedback, and post-battle analysis without prescribed factory answers
 - Defeat advice classified from summon output, mismatches, reconfiguration, and missing counters
 - Before/after production impact shown when battle resumes
 - Fifteen-second post-change observation of enemy kills, allied losses, and objective damage
@@ -59,9 +61,9 @@ The MVP now preserves glyph production provenance through transport, processing,
 copying, and Combine operations. Provenance is exposed on summon events for future
 relic effects but does not affect structural sigil matching.
 
-Route selection currently offers three placeholder branches that share the same
-battle. The stage briefing, reward choice, reward persistence, and next-route
-loop are functional; route-specific encounters remain future content.
+Route selection offers swarm-heavy, mixed, and armor-heavy three-minute encounter
+schedules. Stage briefing, reward choice, reward persistence, and the next-route
+loop use the selected schedule throughout the battle.
 
 The intended strategy is to start with scouts, switch to sentinels for the swarm
 phase, and finish with golems against armored enemies. Balance validation ensures
@@ -78,8 +80,10 @@ that adaptive production wins while scout-only and golem-only production do not.
 3. Press **F6** or **F5** to run the main scene.
 
 The project opens on a mode menu. Choose **MVP** for the factory/battle loop or
-**SIGIL LAB** to build sigils freely by connecting the current MVP Glyph source,
-transform, color, and binary Combine nodes. Every mode includes a **MENU** button.
+**SIGIL LAB** to author sigils from Circle, Triangle, Square, and registered
+meaning Glyphs. The Lab supports free-angle rotation, fine four-direction movement,
+independent X/Y scaling, radial repetition, two-to-eight-input Combine, a completion
+node, and full-graph JSON export. Every mode includes a **MENU** button.
 
 Follow the highlighted progression bar from **Route Selection**. At the factory
 step, choose a production plan as a starting template or customize it with the
@@ -88,7 +92,10 @@ and then an outlined input port to connect them, and right-click an input port t
 disconnect it. Select equipment before pressing **Delete**. Incomplete factories
 cannot start and display the first missing connection. **Undo** restores placement,
 wiring, additions, and deletions made during the current edit session.
-Select a source, rotator, or colorizer to change its setting in the inspector.
+Select a source, rotator, colorizer, or combiner to change its setting in the inspector.
+Meaning sources can switch among every registered meaning Glyph. Hovering an
+uncommitted setting shows its resulting sigil, 32-second output, and first arrival
+without adding an Undo step or discarding work.
 While editing, a non-destructive 32-second simulation preview reports expected
 scout, sentinel, and golem output plus unmatched glyphs. When the preview finds
 a rejected glyph, it also names the closest known sigil and its highest-priority
@@ -103,7 +110,7 @@ After a committed reconfiguration resumes battle, a 15-second observation window
 records enemy defeats, allied losses, and damage dealt to the shield or leader so
 the player can compare the production prediction with the immediate battle result.
 
-The first factory step opens an unwired workshop containing a ring source and a
+The first factory step opens an unwired workshop containing an Eye source and a
 summoner. Connecting its two highlighted ports produces the first scout. The
 three completed production plans remain available as reference templates.
 
