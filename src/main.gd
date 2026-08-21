@@ -473,6 +473,7 @@ func _update_factory_change_summary(comparison: Dictionary) -> void:
 	}
 	var changes := PackedStringArray()
 	var timing_changed := false
+	var recipe_changed := false
 	for unit_id in [&"scout", &"sentinel", &"golem"]:
 		var unit_difference: Dictionary = comparison["units"].get(unit_id, {})
 		if unit_difference.is_empty():
@@ -481,14 +482,25 @@ func _update_factory_change_summary(comparison: Dictionary) -> void:
 		var after := int(unit_difference.get("after", 0))
 		var count_state: StringName = unit_difference.get("count_state", &"unchanged")
 		var timing_state: StringName = unit_difference.get("timing_state", &"unchanged")
+		var recipe_state: StringName = unit_difference.get("recipe_state", &"unchanged")
 		if count_state != &"unchanged":
 			changes.append("%s %d→%d" % [labels[unit_id], before, after])
 		if timing_state != &"unchanged":
 			timing_changed = true
+		if recipe_state != &"unchanged":
+			recipe_changed = true
 	var discarded: Dictionary = comparison.get("discarded", {})
 	var discarded_changed: bool = discarded.get("state", &"unchanged") != &"unchanged"
 	if changes.is_empty():
-		if timing_changed and discarded_changed:
+		if recipe_changed and timing_changed and discarded_changed:
+			changes.append("シジル・召喚時刻・不一致変更")
+		elif recipe_changed and timing_changed:
+			changes.append("シジル・召喚時刻変更")
+		elif recipe_changed and discarded_changed:
+			changes.append("シジル・不一致変更")
+		elif recipe_changed:
+			changes.append("使用シジル変更")
+		elif timing_changed and discarded_changed:
 			changes.append("召喚時刻・不一致変更")
 		elif timing_changed:
 			changes.append("召喚時刻変更")
@@ -497,8 +509,11 @@ func _update_factory_change_summary(comparison: Dictionary) -> void:
 				int(discarded.get("before", 0)),
 				int(discarded.get("after", 0)),
 			])
-	elif discarded_changed:
-		changes.append("不一致変更")
+	else:
+		if recipe_changed:
+			changes.append("シジル変更")
+		if discarded_changed:
+			changes.append("不一致変更")
 	if not bool(comparison.get("changed", false)):
 		last_factory_change_summary = "変更効果 // 次の32秒の生産予測は変化なし"
 	elif changes.is_empty():

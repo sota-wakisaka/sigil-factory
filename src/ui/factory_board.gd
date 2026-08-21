@@ -900,6 +900,7 @@ func production_difference_state(unit_id: StringName) -> Dictionary:
 			"validity": &"invalid",
 			"count_state": &"invalid",
 			"timing_state": &"invalid",
+			"recipe_state": &"invalid",
 			"before": before,
 			"after": null,
 			"delta": null,
@@ -910,6 +911,7 @@ func production_difference_state(unit_id: StringName) -> Dictionary:
 			"validity": &"valid",
 			"count_state": &"unchanged",
 			"timing_state": &"unchanged",
+			"recipe_state": &"unchanged",
 			"before": 0,
 			"after": 0,
 			"delta": 0,
@@ -932,15 +934,19 @@ func compare_production_snapshots(before: Dictionary, after: Dictionary) -> Dict
 	var after_counts: Variant = after.get("counts")
 	var before_events: Variant = before.get("event_offsets")
 	var after_events: Variant = after.get("event_offsets")
+	var before_recipes: Variant = before.get("recipe_ids", {})
+	var after_recipes: Variant = after.get("recipe_ids", {})
 	if (
 		not before_counts is Dictionary
 		or not after_counts is Dictionary
 		or not before_events is Dictionary
 		or not after_events is Dictionary
+		or not before_recipes is Dictionary
+		or not after_recipes is Dictionary
 	):
 		return invalid_result
 	var unit_ids: Array[StringName] = []
-	var sources: Array[Dictionary] = [before_counts, after_counts, before_events, after_events]
+	var sources: Array[Dictionary] = [before_counts, after_counts, before_events, after_events, before_recipes, after_recipes]
 	for source in sources:
 		for raw_unit_id in source:
 			var unit_id := StringName(raw_unit_id)
@@ -966,12 +972,20 @@ func compare_production_snapshots(before: Dictionary, after: Dictionary) -> Dict
 		elif after_count < before_count:
 			count_state = &"decrease"
 		var timing_state := production_timing_difference_state(before_offsets, after_offsets)
-		if count_state != &"unchanged" or timing_state != &"unchanged":
+		var before_recipe_id := StringName(before_recipes.get(unit_id, ""))
+		var after_recipe_id := StringName(after_recipes.get(unit_id, ""))
+		var recipe_state: StringName = &"unchanged"
+		if before_recipe_id != after_recipe_id:
+			recipe_state = &"appeared" if before_recipe_id == &"" else (&"disappeared" if after_recipe_id == &"" else &"changed")
+		if count_state != &"unchanged" or timing_state != &"unchanged" or recipe_state != &"unchanged":
 			changed = true
 		units[unit_id] = {
 			"validity": &"valid",
 			"count_state": count_state,
 			"timing_state": timing_state,
+			"recipe_state": recipe_state,
+			"before_recipe_id": before_recipe_id,
+			"after_recipe_id": after_recipe_id,
 			"before": before_count,
 			"after": after_count,
 			"delta": after_count - before_count,
@@ -2060,6 +2074,7 @@ func _draw_production_comparison(unit_id: StringName, center: Vector2) -> void:
 		return
 	var count_state: StringName = difference.get("count_state", &"unchanged")
 	var timing_state: StringName = difference.get("timing_state", &"unchanged")
+	var recipe_state: StringName = difference.get("recipe_state", &"unchanged")
 	var change_color := PRODUCTION_COMPARISON_COLOR
 	if count_state == &"increase":
 		change_color = PRODUCTION_INCREASE_COLOR
@@ -2071,7 +2086,10 @@ func _draw_production_comparison(unit_id: StringName, center: Vector2) -> void:
 		change_color,
 		false
 	)
-	_draw_production_change_symbol(change_center, count_state)
+	if count_state == &"unchanged" and recipe_state != &"unchanged":
+		_draw_production_recipe_change_symbol(change_center)
+	else:
+		_draw_production_change_symbol(change_center, count_state)
 	if count_state == &"unchanged" and timing_state == &"unchanged":
 		_draw_production_timeline(center, production_event_offsets(unit_id), 34.0, false, true)
 	else:
@@ -2127,6 +2145,18 @@ func _draw_production_change_symbol(center: Vector2, count_state: StringName) ->
 	elif count_state == &"unchanged":
 		draw_line(center + Vector2(-3, -1.7), center + Vector2(3, -1.7), PRODUCTION_COMPARISON_COLOR, 1.3, true)
 		draw_line(center + Vector2(-3, 1.7), center + Vector2(3, 1.7), PRODUCTION_COMPARISON_COLOR, 1.3, true)
+
+
+func _draw_production_recipe_change_symbol(center: Vector2) -> void:
+	var diamond := PackedVector2Array([
+		center + Vector2(0, -4),
+		center + Vector2(4, 0),
+		center + Vector2(0, 4),
+		center + Vector2(-4, 0),
+		center + Vector2(0, -4),
+	])
+	draw_polyline(diamond, PRODUCTION_COMPARISON_COLOR, 1.4, true)
+	draw_circle(center, 1.3, PRODUCTION_COMPARISON_COLOR)
 
 
 func _draw_production_timing_change_symbol(center: Vector2, timing_state: StringName) -> void:
@@ -3098,6 +3128,13 @@ func _get_tooltip(at_position: Vector2) -> String:
 						production_timing_tooltip(production_event_offsets(summary_unit)),
 					]
 				)
+				if difference.get("recipe_state", &"unchanged") != &"unchanged":
+					var before_recipe_id := StringName(difference.get("before_recipe_id", ""))
+					var after_recipe_id := StringName(difference.get("after_recipe_id", ""))
+					context += "\nシジル %s → %s" % [
+						"なし" if before_recipe_id == &"" else String(MvpContent.sigil_name(before_recipe_id)).trim_suffix("シジル"),
+						"なし" if after_recipe_id == &"" else String(MvpContent.sigil_name(after_recipe_id)).trim_suffix("シジル"),
+					]
 			_set_glyph_tooltip(
 				recipe.glyph,
 				"32秒予測 // %s" % String(MvpContent.sigil_name(recipe.id)).trim_suffix("シジル"),

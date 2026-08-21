@@ -321,6 +321,19 @@ func _initialize() -> void:
 	main.pre_edit_production_snapshot = summary_before.duplicate(true)
 	main._update_factory_change_summary(timing_only_comparison)
 	_expect("斥候 2→3" in main.last_factory_change_summary and "不一致変更" in main.last_factory_change_summary, "quantity and discard changes should both survive the compact post-commit status")
+	var recipe_before := {
+		"ok": true,
+		"horizon_ticks": 160,
+		"counts": {&"sentinel": 2},
+		"event_offsets": {&"sentinel": PackedInt32Array([30, 60])},
+		"recipe_ids": {&"sentinel": &"vigil_cross"},
+		"discarded": 0,
+	}
+	var recipe_after := recipe_before.duplicate(true)
+	recipe_after["recipe_ids"][&"sentinel"] = &"stellar_sentinel"
+	main.pre_edit_production_snapshot = recipe_before.duplicate(true)
+	main._update_factory_change_summary(main.factory_board.compare_production_snapshots(recipe_before, recipe_after))
+	_expect("使用シジル変更" in main.last_factory_change_summary and not "変化なし" in main.last_factory_change_summary, "post-commit status should preserve a recipe-only production change")
 	main.pre_edit_production_snapshot = live_edit_snapshot
 	main.last_factory_change_summary = prior_change_summary
 	_expect(main.factory_board.visible and not main.battle_board.visible, "time stop should return to the full-width factory tab")

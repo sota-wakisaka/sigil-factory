@@ -3362,6 +3362,19 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(comparison_board.compare_production_snapshots(synthetic_before, synthetic_after)["units"][&"scout"]["timing_state"] == &"reshaped", "mixed schedule movement should remain a distinct neutral state")
 	synthetic_after["event_offsets"][&"scout"] = PackedInt32Array([20, 55, 85])
 	_expect(comparison_board.compare_production_snapshots(synthetic_before, synthetic_after)["units"][&"scout"]["timing_state"] == &"reshaped", "non-uniform movement in one direction should preserve the changed interval shape")
+	var recipe_before := {
+		"ok": true,
+		"horizon_ticks": 160,
+		"counts": {&"sentinel": 2},
+		"event_offsets": {&"sentinel": PackedInt32Array([30, 60])},
+		"recipe_ids": {&"sentinel": &"vigil_cross"},
+		"discarded": 0,
+	}
+	var recipe_after := recipe_before.duplicate(true)
+	recipe_after["recipe_ids"][&"sentinel"] = &"stellar_sentinel"
+	var recipe_comparison := comparison_board.compare_production_snapshots(recipe_before, recipe_after)
+	_expect(recipe_comparison["changed"], "same-count and same-timing output should still change when its sigil recipe changes")
+	_expect(recipe_comparison["units"][&"sentinel"]["recipe_state"] == &"changed", "recipe identity should remain independent from quantity and schedule")
 	synthetic_after = synthetic_before.duplicate(true)
 	synthetic_after["discarded"] = 2
 	synthetic_comparison = comparison_board.compare_production_snapshots(synthetic_before, synthetic_after)
