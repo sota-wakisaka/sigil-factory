@@ -771,11 +771,27 @@ func _reward_forecast_summary(before: Dictionary, after: Dictionary) -> String:
 			var before_offsets: PackedInt32Array = difference.get("before_offsets", PackedInt32Array())
 			var after_offsets: PackedInt32Array = difference.get("after_offsets", PackedInt32Array())
 			if not before_offsets.is_empty() and not after_offsets.is_empty():
-				entries.append("%s 初着%.1f→%.1f秒" % [
-					MvpContent.unit_name(unit_id),
-					float(before_offsets[0]) * TICK_SECONDS,
-					float(after_offsets[0]) * TICK_SECONDS,
-				])
+				if before_offsets[0] != after_offsets[0]:
+					entries.append("%s 初着%.1f→%.1f秒" % [
+						MvpContent.unit_name(unit_id),
+						float(before_offsets[0]) * TICK_SECONDS,
+						float(after_offsets[0]) * TICK_SECONDS,
+					])
+				else:
+					entries.append("%s 召喚時刻変更" % MvpContent.unit_name(unit_id))
+		if difference.get("recipe_state", &"unchanged") != &"unchanged":
+			var next_recipe := StringName(difference.get("after_recipe_id", ""))
+			entries.append(
+				"%sへ変更" % MvpContent.sigil_name(next_recipe).replace("シジル", "")
+				if next_recipe != &""
+				else "%sの生産終了" % MvpContent.unit_name(unit_id)
+			)
+	var discarded: Dictionary = comparison.get("discarded", {})
+	if discarded.get("state", &"unchanged") != &"unchanged":
+		entries.append("不一致 %d→%d" % [
+			int(discarded.get("before", 0)),
+			int(discarded.get("after", 0)),
+		])
 	if entries.is_empty():
 		return "現在工場32秒 // 変化なし"
 	return "現在工場32秒 // " + " / ".join(entries)
