@@ -90,7 +90,7 @@ Primitiveより一段弱く表示する。
 
 ```text
 [ Primitive記号 ]
-    環素材
+	環素材
 ```
 
 Primitiveの字形は `SIGIL_SPEC.md` の通り、固定ベクターパスから描画する。
