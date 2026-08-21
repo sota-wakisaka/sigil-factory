@@ -15,6 +15,7 @@ Godot 4とGDScriptで開発している、シジル生産工場を中心とし�
 
 ## 仕様書
 
+- [`docs/FACTORY_PROTOTYPE.md`](docs/FACTORY_PROTOTYPE.md) — 現在のSigil Labを基礎にした次の工場プロトタイプ
 - [`docs/FACTORY_SPEC.md`](docs/FACTORY_SPEC.md) — 工場設備、配線、物流、編集
 - [`docs/SIGIL_SPEC.md`](docs/SIGIL_SPEC.md) — Glyph構造、変形、合成、正規化、一致判定
 - [`docs/SIGIL_VISUAL_SPEC.md`](docs/SIGIL_VISUAL_SPEC.md) — シジルと工場の視覚仕様
