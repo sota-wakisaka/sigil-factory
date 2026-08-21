@@ -2635,9 +2635,8 @@ func _draw_node_role_mark(node: FactoryNodeModel, center: Vector2) -> void:
 			_draw_rotator_role_mark(mark_center, role_state)
 		&"colorizer":
 			_draw_colorizer_role_mark(mark_center, role_state)
-		FactoryNodeModel.NodeKind.COMBINER:
-			draw_arc(mark_center + Vector2(-3, 0), 5.0, 0.0, TAU, 16, Color(0.5, 0.76, 0.94, 0.7), 1.3, true)
-			draw_arc(mark_center + Vector2(4, 0), 5.0, 0.0, TAU, 16, Color(0.5, 0.76, 0.94, 0.7), 1.3, true)
+		&"combiner":
+			_draw_combiner_role_mark(mark_center, role_state)
 
 
 func node_role_mark_state(node_id: StringName) -> Dictionary:
@@ -2668,7 +2667,14 @@ func _node_role_mark_state(node: FactoryNodeModel) -> Dictionary:
 				"pattern": pattern,
 			}
 		FactoryNodeModel.NodeKind.COMBINER:
-			return {"kind": FactoryNodeModel.NodeKind.COMBINER, "valid": true}
+			var connection_mode := StringName(
+				node.config.get("connection_mode", GlyphModel.CONNECTION_RADIAL)
+			)
+			return {
+				"kind": &"combiner",
+				"valid": connection_mode in COMBINE_OPTION_IDS,
+				"connection_mode": connection_mode,
+			}
 	return {"kind": &"none", "valid": true}
 
 
@@ -2692,6 +2698,30 @@ func colorizer_role_pattern(color_id: StringName) -> StringName:
 		&"white":
 			return &"hollow"
 	return &"invalid"
+
+
+func _draw_combiner_role_mark(center: Vector2, role_state: Dictionary) -> void:
+	var color := Color(0.5, 0.76, 0.94, 0.84)
+	if not role_state.get("valid", false):
+		for segment in 4:
+			var start_angle := float(segment) * TAU / 4.0
+			draw_arc(center, 6.0, start_angle, start_angle + TAU / 8.0, 4, color, 1.4, true)
+		return
+	match StringName(role_state.get("connection_mode", &"")):
+		GlyphModel.CONNECTION_RADIAL:
+			draw_circle(center, 1.7, color)
+			for endpoint in [center + Vector2(-6, -4), center + Vector2(6, -4), center + Vector2(0, 7)]:
+				draw_line(center, endpoint, color, 1.4, true)
+				draw_circle(endpoint, 1.6, color)
+		GlyphModel.CONNECTION_PAIRWISE:
+			var left := center + Vector2(-4, 0)
+			var right := center + Vector2(4, 0)
+			draw_arc(left, 3.2, 0.0, TAU, 14, color, 1.3, true)
+			draw_arc(right, 3.2, 0.0, TAU, 14, color, 1.3, true)
+			draw_line(left + Vector2(3.2, 0), right - Vector2(3.2, 0), color, 1.5, true)
+		GlyphModel.CONNECTION_SIMPLE:
+			draw_arc(center + Vector2(-3, 0), 4.5, 0.0, TAU, 16, color, 1.3, true)
+			draw_arc(center + Vector2(3, 0), 4.5, 0.0, TAU, 16, color, 1.3, true)
 
 
 func _draw_rotator_role_mark(center: Vector2, role_state: Dictionary) -> void:

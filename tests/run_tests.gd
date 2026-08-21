@@ -3131,6 +3131,19 @@ func _test_factory_processor_role_marks_follow_settings() -> void:
 	_expect(board.undo(), "colorizer role mark configuration should remain undoable")
 	_expect(board.node_role_mark_state(&"colorizer")["pattern"] == &"striped", "colorizer role mark should follow the color restored by undo")
 	_expect(board.colorizer_role_pattern(&"unknown") == &"invalid", "unknown colors should retain the invalid marker instead of a valid pattern")
+	var combiner_board := FactoryBoard.new()
+	combiner_board.configure(MvpContent.PLAN_VIGIL)
+	var combine_state := combiner_board.node_role_mark_state(&"combiner")
+	_expect(combine_state["valid"] and combine_state["connection_mode"] == GlyphModel.CONNECTION_SIMPLE, "meaning Sentinel should show its line-free combine rule on the board")
+	combiner_board.set_interaction_enabled(true)
+	combiner_board.selected_node_id = &"combiner"
+	_expect(combiner_board.configure_selected_node(0), "combine role mark fixture should accept radial mode")
+	_expect(combiner_board.node_role_mark_state(&"combiner")["connection_mode"] == GlyphModel.CONNECTION_RADIAL, "combiner role mark should follow a radial setting immediately")
+	_expect(combiner_board.configure_selected_node(1), "combine role mark fixture should accept pairwise mode")
+	_expect(combiner_board.node_role_mark_state(&"combiner")["connection_mode"] == GlyphModel.CONNECTION_PAIRWISE, "combiner role mark should follow a pairwise setting")
+	_expect(combiner_board.undo(), "combine role mark configuration should remain undoable")
+	_expect(combiner_board.node_role_mark_state(&"combiner")["connection_mode"] == GlyphModel.CONNECTION_RADIAL, "combiner role mark should follow the mode restored by Undo")
+	combiner_board.free()
 	board.free()
 
 
