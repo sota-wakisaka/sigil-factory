@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_test_eight_way_combine()
 	_test_free_angle_triangle()
 	_test_post_combine_move()
+	_test_hidden_structure_overlay()
 	_test_connection_guards()
 	_test_owned_results()
 	await _test_lab_scene()
@@ -133,6 +134,17 @@ func _test_post_combine_move() -> void:
 	_expect(result["glyph"].combine_origin == Vector2(0, -4), "Lab Move should carry the completed Combine center with it")
 
 
+func _test_hidden_structure_overlay() -> void:
+	var first := GlyphModel.new([GlyphComponentModel.new(&"circle", Vector2(-3, 0))])
+	var second := GlyphModel.new([GlyphComponentModel.new(&"square", Vector2(3, 0))])
+	var combined := GlyphModel.combine(first, second, GlyphModel.CONNECTION_RADIAL)
+	var final_visuals := GlyphPainterModel.combine_visuals(combined, 1.0, false)
+	var editing_visuals := GlyphPainterModel.combine_visuals(combined, 1.0, true)
+	_expect(final_visuals["circles"].is_empty(), "finished Lab art should not contain automatic hierarchy circles")
+	_expect(final_visuals["connections"].size() == 2, "hiding hierarchy should preserve deliberately selected connection geometry")
+	_expect(editing_visuals["circles"].size() == 1, "editing overlay should still reveal the Combine group boundary")
+
+
 func _test_connection_guards() -> void:
 	var graph = SigilGraphModel.new()
 	graph.add_node(&"source", SigilGraphModel.SOURCE)
@@ -172,6 +184,12 @@ func _test_lab_scene() -> void:
 	_expect(lab.name == "SigilLab", "Sigil Lab scene should use the consistent product term")
 	_expect(lab.graph_edit != null and lab.graph_edit.visible, "Sigil Lab should expose a connectable GraphEdit")
 	_expect(lab.node_controls.size() == 5, "default eye template should stay readable and editable")
+	_expect(not lab.structure_button.button_pressed and not lab.output_preview.show_structure, "finished preview should hide hierarchy by default")
+	lab.structure_button.button_pressed = true
+	lab.structure_button.toggled.emit(true)
+	_expect(lab.output_preview.show_structure, "hierarchy toggle should reveal the editing overlay on demand")
+	lab.structure_button.button_pressed = false
+	lab.structure_button.toggled.emit(false)
 	var combine_id: StringName = &""
 	for node_id in lab.graph.nodes:
 		if lab.graph.node_kind(node_id) == SigilGraphModel.COMBINE:

@@ -38,15 +38,15 @@ func _initialize() -> void:
 
 func _build_post_combine_move_fixture(lab) -> void:
 	lab.clear_workspace()
-	var ring: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"ring"}, Vector2(30, 170))
-	var spike: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"spike"}, Vector2(30, 400))
+	var circle: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, Vector2(30, 170))
+	var triangle: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}, Vector2(30, 400))
 	var left: StringName = lab.add_lab_node(SigilGraphModel.MOVE, {"offset": Vector2i(-3, 0)}, Vector2(200, 170))
 	var right: StringName = lab.add_lab_node(SigilGraphModel.MOVE, {"offset": Vector2i(3, 0)}, Vector2(200, 400))
 	var combine: StringName = lab.add_lab_node(SigilGraphModel.COMBINE, {}, Vector2(400, 245))
 	var group_move: StringName = lab.add_lab_node(SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, Vector2(610, 280))
 	var output_id: StringName = lab.graph.output_node_id()
-	lab.connect_lab_nodes(ring, left)
-	lab.connect_lab_nodes(spike, right)
+	lab.connect_lab_nodes(circle, left)
+	lab.connect_lab_nodes(triangle, right)
 	lab.connect_lab_nodes(left, combine, 0)
 	lab.connect_lab_nodes(right, combine, 1)
 	lab.connect_lab_nodes(combine, group_move)
@@ -55,14 +55,14 @@ func _build_post_combine_move_fixture(lab) -> void:
 
 func _build_coincident_child_fixture(lab) -> void:
 	lab.clear_workspace()
-	var ring: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"ring"}, Vector2(30, 170))
-	var ring_move: StringName = lab.add_lab_node(SigilGraphModel.MOVE, {"offset": Vector2i(0, 4)}, Vector2(210, 170))
-	var spike: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"spike"}, Vector2(210, 410))
+	var circle: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, Vector2(30, 170))
+	var circle_move: StringName = lab.add_lab_node(SigilGraphModel.MOVE, {"offset": Vector2i(0, 4)}, Vector2(210, 170))
+	var triangle: StringName = lab.add_lab_node(SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}, Vector2(210, 410))
 	var combine: StringName = lab.add_lab_node(SigilGraphModel.COMBINE, {}, Vector2(450, 240))
 	var output_id: StringName = lab.graph.output_node_id()
-	lab.connect_lab_nodes(ring, ring_move)
-	lab.connect_lab_nodes(ring_move, combine, 0)
-	lab.connect_lab_nodes(spike, combine, 1)
+	lab.connect_lab_nodes(circle, circle_move)
+	lab.connect_lab_nodes(circle_move, combine, 0)
+	lab.connect_lab_nodes(triangle, combine, 1)
 	lab.connect_lab_nodes(combine, output_id)
 
 
@@ -78,7 +78,7 @@ func _build_triangle_fixture(lab) -> void:
 		var y := 85.0 + float(input_index) * 205.0
 		var source: StringName = lab.add_lab_node(
 			SigilGraphModel.SOURCE,
-			{"primitive_id": &"spike"},
+			{"primitive_id": &"triangle"},
 			Vector2(20, y)
 		)
 		var move: StringName = lab.add_lab_node(

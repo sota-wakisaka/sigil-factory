@@ -17,12 +17,13 @@ static func draw_glyph(
 	glyph: GlyphModel,
 	center: Vector2,
 	scale: float = 1.0,
-	opacity: float = 1.0
+	opacity: float = 1.0,
+	show_combine_structure: bool = true
 ) -> bool:
 	if canvas == null or not can_draw(glyph) or scale <= 0.0 or opacity <= 0.0:
 		return false
 	var normalized_opacity := clampf(opacity, 0.0, 1.0)
-	var structure := combine_visuals(glyph, scale)
+	var structure := combine_visuals(glyph, scale, show_combine_structure)
 	for connection in structure["connections"]:
 		canvas.draw_line(
 			center + connection["from"],
@@ -32,15 +33,12 @@ static func draw_glyph(
 			true
 		)
 	for circle in structure["circles"]:
-		canvas.draw_arc(
+		_draw_structure_circle(
+			canvas,
 			center + circle["center"],
 			circle["radius"],
-			0.0,
-			TAU,
-			28,
-			_with_opacity(COMBINE_COLOR, normalized_opacity),
-			combine_stroke_width(scale),
-			true
+			_with_opacity(COMBINE_COLOR, normalized_opacity * 0.7),
+			combine_stroke_width(scale)
 		)
 	for component in glyph.components:
 		_draw_component(
@@ -53,12 +51,16 @@ static func draw_glyph(
 	return true
 
 
-static func combine_visuals(glyph: GlyphModel, scale: float = 1.0) -> Dictionary:
+static func combine_visuals(
+	glyph: GlyphModel,
+	scale: float = 1.0,
+	show_combine_structure: bool = true
+) -> Dictionary:
 	var circles: Array[Dictionary] = []
 	var connections: Array[Dictionary] = []
 	if not can_draw(glyph) or scale <= 0.0:
 		return {"circles": circles, "connections": connections}
-	_collect_combine_visuals(glyph, scale, circles, connections)
+	_collect_combine_visuals(glyph, scale, circles, connections, show_combine_structure)
 	return {
 		"circles": circles,
 		"connections": _merge_overlapping_connections(connections, scale),
@@ -69,7 +71,8 @@ static func _collect_combine_visuals(
 	glyph: GlyphModel,
 	scale: float,
 	circles: Array[Dictionary],
-	connections: Array[Dictionary]
+	connections: Array[Dictionary],
+	show_combine_structure: bool
 ) -> void:
 	if glyph.combine_children.is_empty():
 		return
@@ -78,11 +81,16 @@ static func _collect_combine_visuals(
 	var glyph_center := Vector2(glyph.combine_origin) * 6.0 * scale
 	var radius := _glyph_content_radius(glyph, glyph_center, scale)
 	radius += float(_combine_depth(glyph) - 1) * 6.0 * scale
-	circles.append({"center": glyph_center, "radius": radius})
+	if show_combine_structure:
+		circles.append({"center": glyph_center, "radius": radius})
 	var children := glyph.combine_children.duplicate()
 	children.sort_custom(_canonical_child_less)
 	if glyph.combine_connection_mode == GlyphModel.CONNECTION_PAIRWISE:
-		connections.append_array(_pairwise_visible_connections(children, scale))
+		connections.append_array(_pairwise_visible_connections(
+			children,
+			scale,
+			show_combine_structure
+		))
 	for child_value in children:
 		var child: GlyphModel = child_value
 		if glyph.combine_connection_mode == GlyphModel.CONNECTION_RADIAL:
@@ -93,10 +101,20 @@ static func _collect_combine_visuals(
 					"to": child_center,
 					"merge_overlaps": false,
 				})
-		_collect_combine_visuals(child, scale, circles, connections)
+		_collect_combine_visuals(
+			child,
+			scale,
+			circles,
+			connections,
+			show_combine_structure
+		)
 
 
-static func _pairwise_visible_connections(children: Array, scale: float) -> Array[Dictionary]:
+static func _pairwise_visible_connections(
+	children: Array,
+	scale: float,
+	clip_combine_structure: bool
+) -> Array[Dictionary]:
 	var connections: Array[Dictionary] = []
 	var centers: Array[Vector2] = []
 	var radii: Array[float] = []
@@ -106,7 +124,7 @@ static func _pairwise_visible_connections(children: Array, scale: float) -> Arra
 		var child: GlyphModel = child_value
 		var child_center := _glyph_center_offset(child, scale)
 		centers.append(child_center)
-		radii.append(_glyph_connection_radius(child, child_center, scale))
+		radii.append(_glyph_connection_radius(child, child_center, scale, clip_combine_structure))
 	for first_index in centers.size():
 		for second_index in range(first_index + 1, centers.size()):
 			connections.append_array(_visible_segment_gaps(
@@ -171,8 +189,15 @@ static func _visible_segment_gaps(
 	return result
 
 
-static func _glyph_connection_radius(glyph: GlyphModel, center: Vector2, scale: float) -> float:
+static func _glyph_connection_radius(
+	glyph: GlyphModel,
+	center: Vector2,
+	scale: float,
+	clip_combine_structure: bool = true
+) -> float:
 	if not glyph.combine_children.is_empty():
+		if not clip_combine_structure:
+			return _glyph_visible_component_radius(glyph, center, scale)
 		return (
 			_glyph_content_radius(glyph, center, scale)
 			+ float(_combine_depth(glyph) - 1) * 6.0 * scale
@@ -192,6 +217,21 @@ static func _glyph_connection_radius(glyph: GlyphModel, center: Vector2, scale: 
 				visible_radius = maxf(primitive_stroke_width(scale), 1.5 * scale)
 		radius = maxf(radius, center.distance_to(component_center) + visible_radius)
 	return radius
+
+
+static func _glyph_visible_component_radius(
+	glyph: GlyphModel,
+	center: Vector2,
+	scale: float
+) -> float:
+	var radius := 0.0
+	for component in glyph.components:
+		var component_center := Vector2(component.position) * 6.0 * scale
+		radius = maxf(
+			radius,
+			center.distance_to(component_center) + _component_max_radius(component, scale)
+		)
+	return maxf(radius, 0.5 * scale)
 
 
 static func _merge_overlapping_connections(
@@ -330,6 +370,22 @@ static func combine_stroke_width(scale: float) -> float:
 
 static func connection_stroke_width(scale: float) -> float:
 	return maxf(0.65, 0.8 * scale)
+
+
+static func _draw_structure_circle(
+	canvas: CanvasItem,
+	center: Vector2,
+	radius: float,
+	color: Color,
+	stroke: float
+) -> void:
+	const SEGMENTS := 32
+	for index in SEGMENTS:
+		if index % 2 != 0:
+			continue
+		var from_angle := TAU * float(index) / float(SEGMENTS)
+		var to_angle := TAU * float(index + 1) / float(SEGMENTS)
+		canvas.draw_arc(center, radius, from_angle, to_angle, 3, color, stroke, true)
 
 
 static func component_color(color_id: StringName) -> Color:

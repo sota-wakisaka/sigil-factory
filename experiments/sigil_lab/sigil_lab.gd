@@ -37,6 +37,7 @@ var status_label: Label
 var stats_label: Label
 var output_button: GraphNode
 var menu_button: Button
+var structure_button: Button
 
 
 func _ready() -> void:
@@ -192,6 +193,13 @@ func _build_output_panel() -> Control:
 	title.add_theme_color_override("font_color", Color(0.66, 0.86, 1.0))
 	column.add_child(title)
 
+	structure_button = Button.new()
+	structure_button.text = "階層"
+	structure_button.tooltip_text = "編集補助 // 合成グループの範囲だけを点線で表示"
+	structure_button.toggle_mode = true
+	structure_button.toggled.connect(set_structure_overlay)
+	column.add_child(structure_button)
+
 	output_preview = SigilPreviewModel.new()
 	output_preview.custom_minimum_size = Vector2(310, 310)
 	column.add_child(output_preview)
@@ -216,6 +224,14 @@ func _build_output_panel() -> Control:
 	stats_label.add_theme_color_override("font_color", Color(0.44, 0.64, 0.78))
 	column.add_child(stats_label)
 	return panel
+
+
+func set_structure_overlay(visible: bool) -> void:
+	output_preview.set_show_structure(visible)
+	for preview in small_previews:
+		preview.set_show_structure(visible)
+	for preview in node_previews.values():
+		preview.set_show_structure(visible)
 
 
 func _add_from_palette(kind: StringName, config: Dictionary) -> void:
@@ -244,6 +260,7 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 
 	var preview = SigilPreviewModel.new()
 	preview.custom_minimum_size = Vector2(108, 86)
+	preview.set_show_structure(structure_button != null and structure_button.button_pressed)
 	node_previews[node_id] = preview
 
 	match kind:
