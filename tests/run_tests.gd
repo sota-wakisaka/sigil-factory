@@ -2393,12 +2393,14 @@ func _test_factory_meaning_source_is_configurable() -> void:
 	)
 	_expect(board.configure_selected_node(6), "meaning source should switch to the Compass through the shared inspector")
 	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.COMPASS, "meaning selection should be stored explicitly")
+	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == MvpContent.source_interval_for_glyph(MeaningGlyphsModel.COMPASS), "meaning selection should use the same canonical source interval as shipped templates")
 	_expect(board.selected_node_details()["title"] == "方位印", "meaning source node should name its registered Glyph")
 	_expect(board.undo(), "meaning source selection should be undoable")
 	board.selected_node_id = source_id
 	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.EYE, "undo should restore the previous meaning Glyph")
 	_expect(board.configure_selected_node(0), "meaning source should also switch back to a primitive source")
 	_expect(board.simulation.nodes[source_id].config.get("primitive_id") == &"ring" and not board.simulation.nodes[source_id].config.has("meaning_glyph_id"), "source switch should not retain an ambiguous hidden definition")
+	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == MvpContent.source_interval_for_glyph(&"ring"), "primitive selection should share the same canonical interval lookup")
 	board.free()
 
 
@@ -2983,7 +2985,7 @@ func _test_factory_board_exposes_node_activity_progress() -> void:
 	var board := FactoryBoard.new()
 	board.configure(MvpContent.PLAN_SENTINEL)
 	var source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
-	source.source_timer = 11
+	source.source_timer = int(source.config.get("interval_ticks", 1)) / 2
 	_expect(
 		is_equal_approx(board.node_activity_progress(&"ring_source"), 0.5),
 		"source activity should expose fixed-tick generation progress"

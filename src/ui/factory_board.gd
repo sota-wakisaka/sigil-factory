@@ -30,7 +30,6 @@ const SOURCE_OPTION_IDS := [
 	MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS, MeaningGlyphsModel.TARGET,
 	MeaningGlyphsModel.STAR, MeaningGlyphsModel.COMPASS,
 ]
-const SOURCE_OPTION_INTERVALS := [18, 54, 18, 30, 32, 36, 48]
 const COMBINE_OPTION_LABELS := ["中心", "相互", "単純"]
 const COMBINE_OPTION_IDS := [
 	GlyphModel.CONNECTION_RADIAL,
@@ -232,13 +231,13 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 	match template_id:
 		&"ring_source":
 			prefix = "ring_source"
-			config = {"primitive_id": "ring", "interval_ticks": 18}
+			config = {"primitive_id": "ring", "interval_ticks": MvpContent.source_interval_for_glyph(&"ring")}
 		&"spike_source":
 			prefix = "spike_source"
-			config = {"primitive_id": "spike", "interval_ticks": 54}
+			config = {"primitive_id": "spike", "interval_ticks": MvpContent.source_interval_for_glyph(&"spike")}
 		&"meaning_source":
 			prefix = "meaning_source"
-			config = {"meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": 18}
+			config = {"meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": MvpContent.source_interval_for_glyph(MeaningGlyphsModel.EYE)}
 		&"rotator":
 			prefix = "rotator"
 			kind = FactoryNodeModel.NodeKind.ROTATOR
@@ -603,7 +602,7 @@ func _apply_setting_option(node: FactoryNodeModel, option_index: int) -> bool:
 				node.config["primitive_id"] = SOURCE_OPTION_IDS[option_index]
 			else:
 				node.config["meaning_glyph_id"] = SOURCE_OPTION_IDS[option_index]
-			node.config["interval_ticks"] = SOURCE_OPTION_INTERVALS[option_index]
+			node.config["interval_ticks"] = MvpContent.source_interval_for_glyph(SOURCE_OPTION_IDS[option_index])
 			node.source_timer = 0
 			_apply_node_upgrades(node)
 		FactoryNodeModel.NodeKind.ROTATOR:

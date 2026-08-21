@@ -339,19 +339,33 @@ static func node_mana_cost(kind: FactoryNodeModel.NodeKind) -> int:
 			return 15
 
 
+static func source_interval_for_glyph(glyph_id: StringName) -> int:
+	if glyph_id == &"ring" or glyph_id == MeaningGlyphsModel.EYE:
+		return 18
+	if glyph_id == &"spike":
+		return 54
+	if glyph_id == MeaningGlyphsModel.CROSS:
+		return 22
+	if glyph_id == MeaningGlyphsModel.TARGET or glyph_id == MeaningGlyphsModel.COMPASS:
+		return 54
+	if glyph_id == MeaningGlyphsModel.STAR:
+		return 36
+	return 18
+
+
 static func _build_scout_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_meaning_source(&"ring_source", MeaningGlyphsModel.EYE, 18))
+	simulation.add_node(_meaning_source(&"ring_source", MeaningGlyphsModel.EYE, source_interval_for_glyph(MeaningGlyphsModel.EYE)))
 	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_1", &"ring_source", &"summoner", 0, 3))
 
 
 static func _build_empty_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_meaning_source(&"ring_source", MeaningGlyphsModel.EYE, 18))
+	simulation.add_node(_meaning_source(&"ring_source", MeaningGlyphsModel.EYE, source_interval_for_glyph(MeaningGlyphsModel.EYE)))
 	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
 
 
 static func _build_sentinel_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_source(&"ring_source", &"ring", 22))
+	simulation.add_node(_source(&"ring_source", &"ring", source_interval_for_glyph(&"ring")))
 	simulation.add_node(FactoryNodeModel.new(
 		&"rotator",
 		FactoryNodeModel.NodeKind.ROTATOR,
@@ -369,8 +383,8 @@ static func _build_sentinel_factory(simulation: FactorySimulation) -> void:
 
 
 static func _build_vigil_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_meaning_source(&"eye_source", MeaningGlyphsModel.EYE, 22))
-	simulation.add_node(_meaning_source(&"cross_source", MeaningGlyphsModel.CROSS, 22))
+	simulation.add_node(_meaning_source(&"eye_source", MeaningGlyphsModel.EYE, source_interval_for_glyph(MeaningGlyphsModel.EYE)))
+	simulation.add_node(_meaning_source(&"cross_source", MeaningGlyphsModel.CROSS, source_interval_for_glyph(MeaningGlyphsModel.CROSS)))
 	simulation.add_node(FactoryNodeModel.new(
 		&"combiner",
 		FactoryNodeModel.NodeKind.COMBINER,
@@ -386,8 +400,8 @@ static func _build_vigil_factory(simulation: FactorySimulation) -> void:
 
 
 static func _build_golem_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_source(&"ring_source", &"ring", 36))
-	simulation.add_node(_source(&"spike_source", &"spike", 54))
+	simulation.add_node(_source(&"ring_source", &"ring", source_interval_for_glyph(&"ring")))
+	simulation.add_node(_source(&"spike_source", &"spike", source_interval_for_glyph(&"spike")))
 	simulation.add_node(FactoryNodeModel.new(
 		&"combiner",
 		FactoryNodeModel.NodeKind.COMBINER,
@@ -406,8 +420,8 @@ static func _build_golem_factory(simulation: FactorySimulation) -> void:
 
 
 static func _build_fortress_factory(simulation: FactorySimulation) -> void:
-	simulation.add_node(_meaning_source(&"target_source", MeaningGlyphsModel.TARGET, 54))
-	simulation.add_node(_meaning_source(&"compass_source", MeaningGlyphsModel.COMPASS, 54))
+	simulation.add_node(_meaning_source(&"target_source", MeaningGlyphsModel.TARGET, source_interval_for_glyph(MeaningGlyphsModel.TARGET)))
+	simulation.add_node(_meaning_source(&"compass_source", MeaningGlyphsModel.COMPASS, source_interval_for_glyph(MeaningGlyphsModel.COMPASS)))
 	simulation.add_node(FactoryNodeModel.new(
 		&"combiner",
 		FactoryNodeModel.NodeKind.COMBINER,
