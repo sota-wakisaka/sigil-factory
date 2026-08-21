@@ -16,6 +16,8 @@ var recipe_id: StringName = &""
 var glyph: GlyphModel
 var candidate_glyph: GlyphModel
 var candidate_state: StringName = &"missing"
+var candidate_recipe_id: StringName = &""
+var candidate_unit_id: StringName = &""
 var candidate_origin: StringName = &"missing"
 var candidate_forecast_state: StringName = &"valid"
 var display_name := ""
@@ -115,6 +117,8 @@ func show_candidate(
 
 
 func _refresh_candidate_state() -> void:
+	candidate_recipe_id = &""
+	candidate_unit_id = &""
 	if glyph == null or candidate_glyph == null:
 		candidate_state = &"missing"
 	elif glyph.canonical_serialization() == candidate_glyph.canonical_serialization():
@@ -125,6 +129,8 @@ func _refresh_candidate_state() -> void:
 		for recipe in MvpContent.recipes():
 			if recipe.glyph.canonical_serialization() == candidate_serialization:
 				candidate_state = &"owned_other"
+				candidate_recipe_id = recipe.id
+				candidate_unit_id = recipe.unit_id
 				break
 
 
@@ -312,7 +318,11 @@ func candidate_context() -> String:
 	}.get(candidate_origin, "候補なし")
 	match candidate_state:
 		&"owned_other":
-			return "%s // 取得済みの別シジル" % origin_context
+			return "%s // 取得済み: %s → %s" % [
+				origin_context,
+				String(MvpContent.sigil_name(candidate_recipe_id)).trim_suffix("シジル"),
+				MvpContent.unit_name(candidate_unit_id),
+			]
 		&"mismatch":
 			return "%s // 未登録" % origin_context
 	return origin_context
