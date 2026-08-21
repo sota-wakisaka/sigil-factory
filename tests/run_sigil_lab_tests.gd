@@ -422,8 +422,10 @@ func _test_lab_scene() -> void:
 		StringName(output_node.name) == cross_output,
 		"workspace reset should preserve the model ID as the GraphNode name"
 	)
-	await _drag_graph_connection(lab, cross_combine, cross_output)
-	_expect(lab.graph.evaluate_output()["ok"], "dropping the Cross output on completion should finish the Sigil")
+	_expect(lab.completion_buttons[cross_combine] is Button, "each result node should expose an explicit completion action")
+	lab.completion_buttons[cross_combine].pressed.emit()
+	await process_frame
+	_expect(lab.graph.evaluate_output()["ok"], "the explicit completion action should finish the Cross without port dragging")
 	_expect(not lab.export_graph_text().is_empty() and not lab.export_button.disabled, "a completed Cross should be available for text export")
 	lab.free()
 

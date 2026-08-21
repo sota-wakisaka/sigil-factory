@@ -30,6 +30,7 @@ var node_serial := 0
 var node_controls: Dictionary = {}
 var node_previews: Dictionary = {}
 var option_controls: Dictionary = {}
+var completion_buttons: Dictionary = {}
 
 var graph_edit: GraphEdit
 var output_preview
@@ -68,6 +69,10 @@ func connect_lab_nodes(
 	from_port: int = 0
 ) -> bool:
 	return _connect_nodes(from_node, from_port, to_node, to_port)
+
+
+func complete_lab_node(node_id: StringName) -> bool:
+	return _complete_from_node(node_id)
 
 
 func clear_workspace() -> void:
@@ -446,6 +451,15 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 			node.tooltip_text = "完成入力 // 青い点へ線をドロップ"
 
 	if kind != SigilGraphModel.OUTPUT:
+		var complete_button := Button.new()
+		complete_button.text = "◎"
+		complete_button.tooltip_text = "この結果を完成シジルにする"
+		complete_button.flat = true
+		complete_button.custom_minimum_size = Vector2(26, 24)
+		complete_button.pressed.connect(_complete_from_node.bind(node_id))
+		node.get_titlebar_hbox().add_child(complete_button)
+		completion_buttons[node_id] = complete_button
+
 		var remove_button := Button.new()
 		remove_button.text = "×"
 		remove_button.tooltip_text = "このノードと接続を削除"
@@ -581,6 +595,52 @@ func _on_disconnection_request(from_node: StringName, from_port: int, to_node: S
 		_refresh_all()
 
 
+func _complete_from_node(node_id: StringName) -> bool:
+	var output_id := graph.output_node_id()
+	if output_id == &"" or graph.node_kind(node_id) == &"" or node_id == output_id:
+		_set_status("完成にできません // ノードを確認してください", true)
+		return false
+	var source_result := graph.evaluate(node_id)
+	if not bool(source_result.get("ok", false)):
+		_set_status(_error_text(StringName(source_result.get("error", &"missing_input"))), true)
+		return false
+	var previous_connections: Array[Dictionary] = []
+	for connection in graph.connections:
+		if connection["to"] == output_id and int(connection["to_port"]) == 0:
+			previous_connections.append(connection.duplicate(true))
+	for connection in previous_connections:
+		graph.disconnect_nodes(
+			connection["from"],
+			int(connection["from_port"]),
+			connection["to"],
+			int(connection["to_port"])
+		)
+		graph_edit.disconnect_node(
+			connection["from"],
+			int(connection["from_port"]),
+			connection["to"],
+			int(connection["to_port"])
+		)
+	if _connect_nodes(node_id, 0, output_id, 0):
+		return true
+	for connection in previous_connections:
+		if graph.connect_nodes(
+			connection["from"],
+			int(connection["from_port"]),
+			connection["to"],
+			int(connection["to_port"])
+		):
+			graph_edit.connect_node(
+				connection["from"],
+				int(connection["from_port"]),
+				connection["to"],
+				int(connection["to_port"]),
+				true
+			)
+	_refresh_all()
+	return false
+
+
 func _remove_node(node_id: StringName) -> void:
 	if graph.node_kind(node_id) == SigilGraphModel.OUTPUT:
 		return
@@ -594,6 +654,7 @@ func _remove_node(node_id: StringName) -> void:
 	node_controls.erase(node_id)
 	node_previews.erase(node_id)
 	option_controls.erase(node_id)
+	completion_buttons.erase(node_id)
 	graph_edit.clear_connections()
 	for connection in graph.connections:
 		graph_edit.connect_node(
@@ -615,6 +676,7 @@ func _clear_workspace() -> void:
 	node_controls.clear()
 	node_previews.clear()
 	option_controls.clear()
+	completion_buttons.clear()
 	graph = SigilGraphModel.new()
 	node_serial = 0
 	var output_id := _add_node(SigilGraphModel.OUTPUT, {}, Vector2(810, 280))
