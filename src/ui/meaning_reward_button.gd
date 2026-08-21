@@ -3,6 +3,7 @@ extends Button
 
 const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
+const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 const MAX_LEVEL := 3
 
 @export var reward_id: StringName
@@ -47,6 +48,17 @@ func _refresh_tooltip() -> void:
 	tooltip_text = "%s // %s // %d/%d" % [caption, effect_caption, level, MAX_LEVEL]
 	if forecast_context != "":
 		tooltip_text += "\n" + forecast_context
+
+
+func _make_custom_tooltip(_for_text: String):
+	if glyph == null:
+		return null
+	var preview := GlyphTooltipModel.new()
+	var context := "%s // %d/%d" % [effect_caption, level, MAX_LEVEL]
+	if forecast_context != "":
+		context += "\n" + forecast_context
+	preview.configure(glyph, "報酬 // %s" % caption, context)
+	return preview
 
 
 func _draw() -> void:

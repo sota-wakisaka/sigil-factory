@@ -421,6 +421,10 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.REWARD, "victory OK should open rewards")
 	_expect(main.reward_choices.visible and main.reward_choices.get_child_count() == 3, "reward phase should offer three meaning-Glyph upgrades")
 	_expect("現在工場32秒" in main.reward_choices.get_child(0).tooltip_text, "reward hover should forecast the current factory effect before selection")
+	var reward_tooltip = main.reward_choices.get_child(0)._make_custom_tooltip("")
+	_expect(reward_tooltip is GlyphTooltip and reward_tooltip.custom_minimum_size.x >= 300.0, "meaning reward hover should enlarge its exact Glyph instead of relying on the card thumbnail")
+	_expect("現在工場32秒" in reward_tooltip.context, "large reward Glyph tooltip should retain the current-factory forecast")
+	reward_tooltip.free()
 	_expect("現在工場32秒" in main.phase_body.text, "selected reward should expose its current-factory forecast without requiring hover")
 	var reward_summary_before := {
 		"ok": true, "horizon_ticks": 160,
