@@ -338,7 +338,7 @@ caption = "衛兵"
 [node name="StarButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(110, 50)
 layout_mode = 2
-tooltip_text = "星グリフを直接送り、少ない魔力で衛兵を生産するテンプレート"
+tooltip_text = "星グリフを直接送り、少数・高速・強打の衛兵を生産するテンプレート"
 script = ExtResource("5_plan_button")
 plan_id = &"stellar"
 recipe_id = &"stellar_sentinel"

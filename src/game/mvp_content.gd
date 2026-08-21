@@ -343,6 +343,19 @@ static func sigil_name(recipe_id: StringName) -> String:
 			return String(recipe_id)
 
 
+static func recipe_combat_trait(recipe_id: StringName) -> String:
+	match recipe_id:
+		&"watchful_eye":
+			return "高速・単体・短命"
+		&"azure_guard", &"vigil_cross":
+			return "3体攻撃・対群体"
+		&"stellar_sentinel":
+			return "高速・強打・2体攻撃"
+		&"bound_colossus", &"fortress_compass":
+			return "高耐久・対装甲"
+	return ""
+
+
 static func default_recipe_id_for_unit(unit_id: StringName) -> StringName:
 	match unit_id:
 		&"sentinel":

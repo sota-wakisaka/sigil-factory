@@ -3211,6 +3211,9 @@ func _get_tooltip(at_position: Vector2) -> String:
 				cached_production_counts.get(summary_unit, 0),
 				production_timing_tooltip(production_event_offsets(summary_unit)),
 			]
+			var combat_trait := MvpContent.recipe_combat_trait(recipe.id)
+			if combat_trait != "":
+				context += "\n戦闘 // " + combat_trait
 			if production_comparison_active:
 				var difference := production_difference_state(summary_unit)
 				context = (

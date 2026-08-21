@@ -65,6 +65,7 @@ func _initialize() -> void:
 	var vigil_plan_tooltip = main.get_node("Toolbar/SentinelButton")._make_custom_tooltip("")
 	var star_plan_tooltip = main.get_node("Toolbar/StarButton")._make_custom_tooltip("")
 	_expect("魔力 80/100" in vigil_plan_tooltip.context and "魔力 40/100" in star_plan_tooltip.context, "alternate Sentinel templates should expose their throughput-versus-capacity tradeoff")
+	_expect("3体攻撃・対群体" in vigil_plan_tooltip.context and "高速・強打・2体攻撃" in star_plan_tooltip.context, "alternate Sentinel templates should expose their distinct battlefield roles before selection")
 	_expect(main.get_node("Toolbar/SentinelButton").forecast_mana == 80 and main.get_node("Toolbar/SentinelButton").forecast_count > main.get_node("Toolbar/StarButton").forecast_count, "plan buttons should encode the same mana-versus-throughput tradeoff without requiring hover")
 	vigil_plan_tooltip.free()
 	star_plan_tooltip.free()

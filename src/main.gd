@@ -287,7 +287,8 @@ func _refresh_plan_button_forecasts() -> void:
 			for unit_count in snapshot.get("counts", {}).values():
 				count += int(unit_count)
 		var mana := int(snapshot.get("mana", 0))
-		button.set_forecast_context("魔力 %d/%d // %s" % [
+		button.set_forecast_context("戦闘 %s\n魔力 %d/%d // %s" % [
+			MvpContent.recipe_combat_trait(button.recipe_id),
 			mana,
 			MvpContent.FACTORY_MANA_MAX,
 			("配線後に生産予測" if button.manual_layout else "%d体/32秒" % count),
