@@ -385,7 +385,7 @@ func _test_lab_scene() -> void:
 	_expect(
 		SigilPreviewModel.preview_stroke_width(2.0)
 		< GlyphPainterModel.primitive_stroke_width(2.0),
-		"Lab previews should use thinner strokes without changing shared MVP rendering"
+		"Lab previews should use thinner strokes without changing shared glyph rendering"
 	)
 	_expect(lab.name == "SigilLab", "Sigil Lab scene should use the consistent product term")
 	_expect(lab.graph_edit != null and lab.graph_edit.visible, "Sigil Lab should expose a connectable GraphEdit")

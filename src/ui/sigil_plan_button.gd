@@ -1,7 +1,7 @@
 class_name SigilPlanButton
 extends Button
 
-const MvpContent := preload("res://src/game/mvp_content.gd")
+const FactoryContent := preload("res://src/factory/factory_content.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 
@@ -29,7 +29,7 @@ func _ready() -> void:
 
 
 func _load_recipe() -> bool:
-	for recipe in MvpContent.recipes():
+	for recipe in FactoryContent.recipes():
 		if recipe.id != recipe_id:
 			continue
 		glyph = recipe.glyph.copy()

@@ -1,7 +1,7 @@
 class_name SigilGhost
 extends Control
 
-const MvpContent := preload("res://src/game/mvp_content.gd")
+const FactoryContent := preload("res://src/factory/factory_content.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 const GlyphComparisonTooltipModel := preload("res://src/ui/glyph_comparison_tooltip.gd")
@@ -81,12 +81,12 @@ func comparison_slot_size() -> Vector2:
 
 
 func show_recipe(next_recipe_id: StringName) -> bool:
-	for recipe in MvpContent.recipes():
+	for recipe in FactoryContent.recipes():
 		if recipe.id != next_recipe_id:
 			continue
 		recipe_id = recipe.id
 		glyph = recipe.glyph.copy()
-		display_name = MvpContent.sigil_name(recipe_id).replace("シジル", "")
+		display_name = FactoryContent.sigil_name(recipe_id).replace("シジル", "")
 		tooltip_text = "%sシジルを拡大表示" % display_name
 		tooltip_glyph = glyph
 		tooltip_title = "目標シジル // %s" % display_name
@@ -129,7 +129,7 @@ func _refresh_candidate_state() -> void:
 	else:
 		candidate_state = &"mismatch"
 		var candidate_serialization := candidate_glyph.canonical_serialization()
-		for recipe in MvpContent.recipes():
+		for recipe in FactoryContent.recipes():
 			if recipe.glyph.canonical_serialization() == candidate_serialization:
 				candidate_state = &"owned_other"
 				candidate_recipe_id = recipe.id
@@ -322,9 +322,9 @@ func candidate_context() -> String:
 		&"owned_other":
 			return "%s // 取得済み: %s → %s // %s" % [
 				origin_context,
-				String(MvpContent.sigil_name(candidate_recipe_id)).trim_suffix("シジル"),
-				MvpContent.unit_name(candidate_unit_id),
-				MvpContent.recipe_combat_trait(candidate_recipe_id),
+				String(FactoryContent.sigil_name(candidate_recipe_id)).trim_suffix("シジル"),
+				FactoryContent.unit_name(candidate_unit_id),
+				FactoryContent.recipe_factory_trait(candidate_recipe_id),
 			]
 		&"mismatch":
 			return "%s // 未登録" % origin_context
@@ -332,5 +332,5 @@ func candidate_context() -> String:
 
 
 func target_context() -> String:
-	var combat_trait := MvpContent.recipe_combat_trait(recipe_id)
-	return "完成形" if combat_trait == "" else "完成形 // 戦闘 %s" % combat_trait
+	var factory_trait := FactoryContent.recipe_factory_trait(recipe_id)
+	return "完成形" if factory_trait == "" else "完成形 // 工程 %s" % factory_trait

@@ -5,7 +5,7 @@ signal summon_produced(unit_id: StringName, recipe_id: StringName)
 signal selection_changed
 signal factory_changed
 
-const MvpContent := preload("res://src/game/mvp_content.gd")
+const FactoryContent := preload("res://src/factory/factory_content.gd")
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
 const FactoryLineModel := preload("res://src/factory/factory_line.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
@@ -57,7 +57,7 @@ const INTERACTION_LEGEND_TOOLTIPS := [
 	"右クリック // 配線を切断",
 ]
 
-var plan_id: StringName = MvpContent.PLAN_SCOUT
+var plan_id: StringName = FactoryContent.PLAN_SCOUT
 var simulation: FactorySimulation
 var node_positions: Dictionary = {}
 var observed_event_count := 0
@@ -120,9 +120,9 @@ func _ready() -> void:
 func configure(next_plan_id: StringName) -> void:
 	clear_production_comparison_baseline()
 	plan_id = next_plan_id
-	simulation = MvpContent.build_factory(plan_id)
+	simulation = FactoryContent.build_factory(plan_id)
 	_apply_run_upgrades(simulation)
-	node_positions = MvpContent.layout_for_plan(plan_id)
+	node_positions = FactoryContent.layout_for_plan(plan_id)
 	observed_event_count = 0
 	observed_failure_count = 0
 	editing = false
@@ -232,10 +232,10 @@ func add_node_from_palette(template_id: StringName, preferred_meaning_glyph_id: 
 	match template_id:
 		&"ring_source":
 			prefix = "ring_source"
-			config = {"primitive_id": "ring", "interval_ticks": MvpContent.source_interval_for_glyph(&"ring")}
+			config = {"primitive_id": "ring", "interval_ticks": FactoryContent.source_interval_for_glyph(&"ring")}
 		&"spike_source":
 			prefix = "spike_source"
-			config = {"primitive_id": "spike", "interval_ticks": MvpContent.source_interval_for_glyph(&"spike")}
+			config = {"primitive_id": "spike", "interval_ticks": FactoryContent.source_interval_for_glyph(&"spike")}
 		&"meaning_source":
 			prefix = "meaning_source"
 			var glyph_id := (
@@ -243,7 +243,7 @@ func add_node_from_palette(template_id: StringName, preferred_meaning_glyph_id: 
 				if MeaningGlyphsModel.has(preferred_meaning_glyph_id)
 				else MeaningGlyphsModel.EYE
 			)
-			config = {"meaning_glyph_id": glyph_id, "interval_ticks": MvpContent.source_interval_for_glyph(glyph_id)}
+			config = {"meaning_glyph_id": glyph_id, "interval_ticks": FactoryContent.source_interval_for_glyph(glyph_id)}
 		&"rotator":
 			prefix = "rotator"
 			kind = FactoryNodeModel.NodeKind.ROTATOR
@@ -266,11 +266,11 @@ func add_node_from_palette(template_id: StringName, preferred_meaning_glyph_id: 
 			return &""
 	var display_simulation := _display_simulation()
 	if kind == FactoryNodeModel.NodeKind.SUMMONER and _summoner_count(display_simulation) >= 1:
-		connection_message = "召喚器を追加できません: 現MVPは1基までです"
+		connection_message = "召喚器を追加できません: 現在の工場は1基までです"
 		queue_redraw()
 		return &""
-	var node_cost := MvpContent.node_mana_cost(kind)
-	if mana_used(display_simulation) + node_cost > MvpContent.FACTORY_MANA_MAX:
+	var node_cost := FactoryContent.node_mana_cost(kind)
+	if mana_used(display_simulation) + node_cost > FactoryContent.FACTORY_MANA_MAX:
 		connection_message = "設備を追加できません: 魔力不足（必要%d / 空き%d）" % [
 			node_cost,
 			mana_available(display_simulation),
@@ -296,7 +296,7 @@ func add_node_from_palette(template_id: StringName, preferred_meaning_glyph_id: 
 	display_simulation.add_node(new_node)
 	_display_positions()[node_id] = _next_palette_reference_position(_display_positions())
 	selected_node_id = node_id
-	connection_message = "%sを追加しました" % MvpContent.node_name(kind)
+	connection_message = "%sを追加しました" % FactoryContent.node_name(kind)
 	_refresh_production_preview()
 	selection_changed.emit()
 	queue_redraw()
@@ -385,7 +385,7 @@ func undo() -> bool:
 
 func validation_result() -> Dictionary:
 	var result := _display_simulation().validate_graph()
-	if mana_used(_display_simulation()) > MvpContent.FACTORY_MANA_MAX:
+	if mana_used(_display_simulation()) > FactoryContent.FACTORY_MANA_MAX:
 		result["ok"] = false
 		result["errors"].append("mana_exceeded")
 	result["message"] = _validation_message(result["errors"])
@@ -398,16 +398,16 @@ func mana_used(source_simulation: FactorySimulation = null) -> int:
 		return 0
 	var total := 0
 	for node in target_simulation.nodes.values():
-		total += MvpContent.node_mana_cost(node.kind)
+		total += FactoryContent.node_mana_cost(node.kind)
 	return total
 
 
 func mana_available(source_simulation: FactorySimulation = null) -> int:
-	return maxi(MvpContent.FACTORY_MANA_MAX - mana_used(source_simulation), 0)
+	return maxi(FactoryContent.FACTORY_MANA_MAX - mana_used(source_simulation), 0)
 
 
 func mana_fill_ratio(source_simulation: FactorySimulation = null) -> float:
-	return clampf(float(mana_used(source_simulation)) / float(MvpContent.FACTORY_MANA_MAX), 0.0, 1.0)
+	return clampf(float(mana_used(source_simulation)) / float(FactoryContent.FACTORY_MANA_MAX), 0.0, 1.0)
 
 
 func palette_availability(template_id: StringName) -> Dictionary:
@@ -430,7 +430,7 @@ func palette_availability(template_id: StringName) -> Dictionary:
 	var display_simulation := _display_simulation()
 	if kind == FactoryNodeModel.NodeKind.SUMMONER and _summoner_count(display_simulation) >= 1:
 		return {"available": false, "reason": &"summoner_limit"}
-	if mana_used(display_simulation) + MvpContent.node_mana_cost(kind) > MvpContent.FACTORY_MANA_MAX:
+	if mana_used(display_simulation) + FactoryContent.node_mana_cost(kind) > FactoryContent.FACTORY_MANA_MAX:
 		return {"available": false, "reason": &"mana"}
 	return {"available": true, "reason": &""}
 
@@ -506,7 +506,7 @@ func can_undo() -> bool:
 func mana_status_text() -> String:
 	return "魔力 %d/%d // 空き%d" % [
 		mana_used(),
-		MvpContent.FACTORY_MANA_MAX,
+		FactoryContent.FACTORY_MANA_MAX,
 		mana_available(),
 	]
 
@@ -525,7 +525,7 @@ func set_run_upgrades(upgrades: Array[StringName]) -> void:
 func is_guided_connection_pending() -> bool:
 	var display_simulation := _display_simulation()
 	return (
-		display_plan_id() == MvpContent.PLAN_EMPTY
+		display_plan_id() == FactoryContent.PLAN_EMPTY
 		and display_simulation != null
 		and display_simulation.lines.is_empty()
 		and connecting_from_node_id == &""
@@ -697,7 +697,7 @@ func _apply_setting_option(node: FactoryNodeModel, option_index: int) -> bool:
 				node.config["primitive_id"] = SOURCE_OPTION_IDS[option_index]
 			else:
 				node.config["meaning_glyph_id"] = SOURCE_OPTION_IDS[option_index]
-			node.config["interval_ticks"] = MvpContent.source_interval_for_glyph(SOURCE_OPTION_IDS[option_index])
+			node.config["interval_ticks"] = FactoryContent.source_interval_for_glyph(SOURCE_OPTION_IDS[option_index])
 			node.source_timer = 0
 			_apply_node_upgrades(node)
 		FactoryNodeModel.NodeKind.ROTATOR:
@@ -910,7 +910,7 @@ func prospective_upgrade_snapshot(upgrade_id: StringName) -> Dictionary:
 
 
 func plan_production_snapshot(next_plan_id: StringName) -> Dictionary:
-	var hypothetical := MvpContent.build_factory(next_plan_id)
+	var hypothetical := FactoryContent.build_factory(next_plan_id)
 	for node in hypothetical.nodes.values():
 		_apply_node_upgrades(node)
 	for line in hypothetical.lines.values():
@@ -1283,10 +1283,10 @@ func apply_plan(next_plan_id: StringName) -> bool:
 	if not _push_undo_snapshot():
 		return false
 	plan_id = next_plan_id
-	simulation = MvpContent.build_factory(plan_id)
+	simulation = FactoryContent.build_factory(plan_id)
 	_clear_node_hover()
 	_apply_run_upgrades(simulation)
-	node_positions = MvpContent.layout_for_plan(plan_id)
+	node_positions = FactoryContent.layout_for_plan(plan_id)
 	observed_event_count = 0
 	observed_failure_count = 0
 	selected_node_id = &""
@@ -1504,12 +1504,12 @@ func preview_plan(next_plan_id: StringName) -> bool:
 	var discarded_work_in_progress := work_in_progress_count()
 	var committed_tick := simulation.tick_index
 	pending_plan_id = next_plan_id
-	preview_simulation = MvpContent.build_factory(pending_plan_id)
+	preview_simulation = FactoryContent.build_factory(pending_plan_id)
 	_clear_node_hover()
 	_apply_run_upgrades(preview_simulation)
 	preview_simulation.discarded_glyphs = discarded_before_edit + discarded_work_in_progress
 	preview_simulation.tick_index = committed_tick
-	preview_node_positions = MvpContent.layout_for_plan(pending_plan_id)
+	preview_node_positions = FactoryContent.layout_for_plan(pending_plan_id)
 	selected_node_id = &""
 	_refresh_production_preview()
 	selection_changed.emit()
@@ -1669,7 +1669,7 @@ func advance_tick() -> void:
 	while observed_event_count < simulation.summon_events.size():
 		var event := simulation.summon_events[observed_event_count]
 		observed_event_count += 1
-		connection_message = "召喚成功 // %s" % MvpContent.sigil_name(event["recipe_id"])
+		connection_message = "召喚成功 // %s" % FactoryContent.sigil_name(event["recipe_id"])
 		summon_produced.emit(event["unit_id"], event["recipe_id"])
 	while observed_failure_count < simulation.summon_failure_events.size():
 		var event := simulation.summon_failure_events[observed_failure_count]
@@ -1685,7 +1685,7 @@ func _summon_failure_message(event: Dictionary) -> String:
 	var recipe_id: StringName = event.get("closest_recipe_id", &"")
 	if recipe_id == &"":
 		return "召喚失敗 // %s" % reason
-	return "召喚失敗 // %sとの差分: %s" % [MvpContent.sigil_name(recipe_id), reason]
+	return "召喚失敗 // %sとの差分: %s" % [FactoryContent.sigil_name(recipe_id), reason]
 
 
 func _refresh_flow_warning() -> void:
@@ -2083,12 +2083,12 @@ func production_recipe_id(unit_id: StringName) -> StringName:
 		var predicted_recipe_id := StringName(cached_production_recipe_ids.get(unit_id, ""))
 		if predicted_recipe_id != &"":
 			return predicted_recipe_id
-	return MvpContent.default_recipe_id_for_unit(unit_id)
+	return FactoryContent.default_recipe_id_for_unit(unit_id)
 
 
 func production_summary_glyph(unit_id: StringName) -> GlyphModel:
 	var recipe_id := production_recipe_id(unit_id)
-	for recipe in MvpContent.recipes():
+	for recipe in FactoryContent.recipes():
 		if recipe.id == recipe_id:
 			return recipe.glyph
 	return null
@@ -2523,7 +2523,7 @@ func _draw_mana_meter() -> void:
 	draw_string(
 		ThemeDB.fallback_font,
 		meter_rect.position + Vector2(meter_rect.size.x - 52.0, 9),
-		"%d/%d" % [mana_used(), MvpContent.FACTORY_MANA_MAX],
+		"%d/%d" % [mana_used(), FactoryContent.FACTORY_MANA_MAX],
 		HORIZONTAL_ALIGNMENT_CENTER,
 		52.0,
 		10,
@@ -3204,16 +3204,16 @@ func _get_tooltip(at_position: Vector2) -> String:
 	var summary_unit := production_summary_unit_at(at_position)
 	if summary_unit != &"":
 		var summary_recipe_id := production_recipe_id(summary_unit)
-		for recipe in MvpContent.recipes():
+		for recipe in FactoryContent.recipes():
 			if recipe.id != summary_recipe_id:
 				continue
 			var context := "生産見込み %d体 // %s" % [
 				cached_production_counts.get(summary_unit, 0),
 				production_timing_tooltip(production_event_offsets(summary_unit)),
 			]
-			var combat_trait := MvpContent.recipe_combat_trait(recipe.id)
-			if combat_trait != "":
-				context += "\n戦闘 // " + combat_trait
+			var factory_trait := FactoryContent.recipe_factory_trait(recipe.id)
+			if factory_trait != "":
+				context += "\n工程 // " + factory_trait
 			if production_comparison_active:
 				var difference := production_difference_state(summary_unit)
 				context = (
@@ -3233,12 +3233,12 @@ func _get_tooltip(at_position: Vector2) -> String:
 					var before_recipe_id := StringName(difference.get("before_recipe_id", ""))
 					var after_recipe_id := StringName(difference.get("after_recipe_id", ""))
 					context += "\nシジル %s → %s" % [
-						"なし" if before_recipe_id == &"" else String(MvpContent.sigil_name(before_recipe_id)).trim_suffix("シジル"),
-						"なし" if after_recipe_id == &"" else String(MvpContent.sigil_name(after_recipe_id)).trim_suffix("シジル"),
+						"なし" if before_recipe_id == &"" else String(FactoryContent.sigil_name(before_recipe_id)).trim_suffix("シジル"),
+						"なし" if after_recipe_id == &"" else String(FactoryContent.sigil_name(after_recipe_id)).trim_suffix("シジル"),
 					]
 			_set_glyph_tooltip(
 				recipe.glyph,
-				"32秒予測 // %s" % String(MvpContent.sigil_name(recipe.id)).trim_suffix("シジル"),
+				"32秒予測 // %s" % String(FactoryContent.sigil_name(recipe.id)).trim_suffix("シジル"),
 				context
 			)
 			return "glyph_preview"
@@ -3350,10 +3350,10 @@ func production_summary_center(index: int) -> Vector2:
 
 
 func production_summary_is_goal(unit_id: StringName) -> bool:
-	var target_recipe_id := MvpContent.recipe_id_for_plan(display_plan_id())
+	var target_recipe_id := FactoryContent.recipe_id_for_plan(display_plan_id())
 	if int(cached_production_counts.get(unit_id, 0)) > 0:
 		return production_recipe_id(unit_id) == target_recipe_id
-	for recipe in MvpContent.recipes():
+	for recipe in FactoryContent.recipes():
 		if recipe.id == target_recipe_id:
 			return recipe.unit_id == unit_id
 	return false
@@ -3474,8 +3474,8 @@ func line_goal_match_state(line_id: StringName) -> StringName:
 		glyph = cached_node_output_glyphs.get(line.from_node_id)
 	if not GlyphPainterModel.can_draw(glyph):
 		return &"empty"
-	var target_recipe_id := MvpContent.recipe_id_for_plan(display_plan_id())
-	for recipe in MvpContent.recipes():
+	var target_recipe_id := FactoryContent.recipe_id_for_plan(display_plan_id())
+	for recipe in FactoryContent.recipes():
 		if recipe.id != target_recipe_id:
 			continue
 		return (
@@ -3487,8 +3487,8 @@ func line_goal_match_state(line_id: StringName) -> StringName:
 
 
 func _goal_glyph() -> GlyphModel:
-	var target_recipe_id := MvpContent.recipe_id_for_plan(display_plan_id())
-	for recipe in MvpContent.recipes():
+	var target_recipe_id := FactoryContent.recipe_id_for_plan(display_plan_id())
+	for recipe in FactoryContent.recipes():
 		if recipe.id == target_recipe_id:
 			return recipe.glyph
 	return null
@@ -3884,7 +3884,7 @@ func _node_label(node: FactoryNodeModel) -> String:
 			return "結合未設定"
 		FactoryNodeModel.NodeKind.SUMMONER:
 			return "召喚器"
-	return MvpContent.node_name(node.kind)
+	return FactoryContent.node_name(node.kind)
 func _scaled_position(reference_position: Vector2) -> Vector2:
 	return Vector2(
 		reference_position.x / REFERENCE_SIZE.x * size.x,
@@ -4044,7 +4044,7 @@ func _connection_result_text(result: Dictionary) -> String:
 		"occupied_port":
 			return "接続できません: 入力はすでに接続されています"
 		"occupied_output":
-			return "接続できません: 出力はすでに接続されています。分岐器はMVP対象外です"
+			return "接続できません: 出力はすでに接続されています"
 		"self_connection":
 			return "接続できません: 同じ設備には接続できません"
 		"invalid_payload":
@@ -4070,7 +4070,7 @@ func _validation_message(errors: Array) -> String:
 	if error == "mana_exceeded":
 		return "工場魔力が上限を超えています"
 	if error == "multiple_summoners":
-		return "召喚器は現MVPでは1基だけ配置できます"
+		return "召喚器は現在の工場に1基だけ配置できます"
 	if error == "cycle":
 		return "配線が循環しています。循環するラインを解除してください"
 	if error.begins_with("missing_from_node:") or error.begins_with("missing_to_node:"):
@@ -4181,7 +4181,7 @@ func _preview_failure_summary(event: Dictionary) -> String:
 	var recipe_id: StringName = event.get("closest_recipe_id", &"")
 	if recipe_id == &"":
 		return reason
-	return "%s: %s" % [String(MvpContent.sigil_name(recipe_id)).trim_suffix("シジル"), reason]
+	return "%s: %s" % [String(FactoryContent.sigil_name(recipe_id)).trim_suffix("シジル"), reason]
 
 
 func _localize_preview_diagnostic(diagnostic: String) -> String:

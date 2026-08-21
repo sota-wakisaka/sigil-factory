@@ -9,16 +9,12 @@ const SigilRecipeModel := preload("res://src/domain/sigil_recipe.gd")
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
 const FactoryLineModel := preload("res://src/factory/factory_line.gd")
 const FactorySimulation := preload("res://src/factory/factory_simulation.gd")
-const MvpContent := preload("res://src/game/mvp_content.gd")
-const UnitSpecModel := preload("res://src/battle/unit_spec.gd")
-const ThreatEventModel := preload("res://src/battle/threat_event.gd")
-const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
+const FactoryContent := preload("res://src/factory/factory_content.gd")
 const FactoryBoard := preload("res://src/ui/factory_board.gd")
 const SigilGhost := preload("res://src/ui/sigil_ghost.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 const GlyphComparisonTooltipModel := preload("res://src/ui/glyph_comparison_tooltip.gd")
-const RunFlow := preload("res://src/game/run_flow.gd")
 
 var failures := 0
 
@@ -57,7 +53,7 @@ func _initialize() -> void:
 	_test_factory_rejects_ambiguous_recipes()
 	_test_recipe_registration_reports_stable_errors()
 	_test_recipe_registration_rejects_missing_objects()
-	_test_mvp_recipe_set_validation_reports_content_location()
+	_test_factory_recipe_set_validation_reports_content_location()
 	_test_factory_rejects_invalid_recipe_structures()
 	_test_glyph_preserves_invalid_restored_elements_for_diagnostics()
 	_test_shared_glyph_painter_rejects_invalid_structures()
@@ -81,19 +77,8 @@ func _initialize() -> void:
 	_test_factory_tick_preserves_work_during_corrupt_recipe_state()
 	_test_factory_validation_order_is_stable()
 	_test_factory_flow_diagnostics_distinguish_blockages()
-	_test_mvp_plans_produce_expected_units()
-	_test_mvp_routes_have_distinct_valid_schedules()
+	_test_factory_plans_produce_expected_outputs()
 	_test_empty_factory_requires_player_wiring()
-	_test_battle_units_fight_and_die()
-	_test_recipe_combat_variant_preserves_sigil_identity()
-	_test_battle_attributes_damage_to_sigil_recipe()
-	_test_battle_units_expose_their_sigil_origin()
-	_test_preferred_attack_marks_weakness_feedback()
-	_test_enemy_shield_takes_damage_and_opens()
-	_test_battle_ends_at_time_limit()
-	_test_battle_enforces_spawn_capacity_and_rate()
-	_test_threat_forecast_respects_horizon()
-	_test_major_change_forecast_uses_long_horizon()
 	_test_factory_edit_is_transactional()
 	_test_factory_edit_recovers_only_invalid_work_in_progress()
 	_test_factory_edit_preserves_custom_graph()
@@ -127,8 +112,7 @@ func _initialize() -> void:
 	_test_factory_production_preview_explains_first_mismatch()
 	_test_factory_board_explains_restored_validation_errors()
 	_test_sigil_ghost_tracks_plan_recipe()
-	_test_run_upgrade_accelerates_ring_source()
-	_test_run_flow_covers_one_route()
+	_test_factory_upgrade_accelerates_ring_source()
 
 	if failures == 0:
 		print("All domain and factory tests passed.")
@@ -863,20 +847,20 @@ func _test_factory_meaning_glyph_source_summons_registered_recipe() -> void:
 	_expect(validation_errors.has("ambiguous_source_glyph:ambiguous"), "a source should not hide two competing Glyph definitions")
 	_expect(validation_errors.has("unknown_meaning_glyph:unknown:missing"), "unknown meaning Glyph IDs should fail closed before simulation")
 	var star_board := FactoryBoard.new()
-	star_board.configure(MvpContent.PLAN_EMPTY)
+	star_board.configure(FactoryContent.PLAN_EMPTY)
 	star_board.set_interaction_enabled(true)
 	star_board.selected_node_id = &"ring_source"
 	_expect(star_board.configure_selected_node(5), "the registered Star should be selectable as one source")
 	_expect(star_board.connect_nodes_interactive(&"ring_source", &"summoner", 0)["ok"], "the low-mana Star route should connect directly to the summoner")
 	var star_preview := star_board.production_snapshot()
 	var vigil_board := FactoryBoard.new()
-	vigil_board.configure(MvpContent.PLAN_VIGIL)
+	vigil_board.configure(FactoryContent.PLAN_VIGIL)
 	_expect(int(star_preview["counts"][&"sentinel"]) > 0, "Star should be an acquired Sentinel recipe instead of guaranteed discard")
 	_expect(star_board.production_recipe_id(&"sentinel") == &"stellar_sentinel", "production summary should retain which acquired recipe creates the predicted Sentinel")
 	_expect(star_board.production_summary_glyph(&"sentinel").canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR).canonical_serialization(), "production summary should draw Star instead of the standard Vigil Cross for this alternate route")
-	star_board.plan_id = MvpContent.PLAN_VIGIL
+	star_board.plan_id = FactoryContent.PLAN_VIGIL
 	_expect(not star_board.production_summary_is_goal(&"sentinel"), "an alternate acquired Sentinel recipe should not borrow the selected Vigil goal ring")
-	_expect(star_board.production_operation_entries() == [{"unit_id": &"sentinel", "recipe_id": &"stellar_sentinel", "count": int(star_preview["counts"][&"sentinel"])}], "battle handoff should describe the actual Star recipe instead of the workshop template name")
+	_expect(star_board.production_operation_entries() == [{"unit_id": &"sentinel", "recipe_id": &"stellar_sentinel", "count": int(star_preview["counts"][&"sentinel"])}], "production summary should describe the actual Star recipe instead of the workshop template name")
 	_expect(int(star_preview["counts"][&"sentinel"]) < int(vigil_board.production_snapshot()["counts"][&"sentinel"]), "single-source Star Sentinel should trade lower throughput for its cheaper graph")
 	_expect(star_board.mana_used() < vigil_board.mana_used(), "Star Sentinel should require less factory mana than Eye plus Cross")
 	star_board.free()
@@ -885,7 +869,7 @@ func _test_factory_meaning_glyph_source_summons_registered_recipe() -> void:
 
 func _test_factory_combines_meaning_glyphs_into_alternate_recipe() -> void:
 	var simulation := FactorySimulation.new()
-	for recipe in MvpContent.recipes():
+	for recipe in FactoryContent.recipes():
 		_expect(simulation.add_recipe(recipe), "alternate meaning recipe fixture should register every acquired recipe")
 	var eye_source := FactoryNodeModel.new(
 		&"eye_source",
@@ -921,7 +905,7 @@ func _test_factory_combines_meaning_glyphs_into_alternate_recipe() -> void:
 
 
 func _test_factory_recipe_match_preview_is_non_destructive() -> void:
-	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
+	var simulation := FactoryContent.build_factory(FactoryContent.PLAN_SCOUT)
 	var eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	var event_count := simulation.summon_events.size()
@@ -1035,7 +1019,7 @@ func _test_factory_rejects_ambiguous_recipes() -> void:
 		simulation.recipes[0].id == &"b_spike" and simulation.recipes[1].id == &"z_ring",
 		"accepted recipes should use stable ID order instead of acquisition order"
 	)
-	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 6, "all MVP recipes should have unique IDs and structures")
+	_expect(FactoryContent.build_factory(FactoryContent.PLAN_SCOUT).recipes.size() == 6, "all factory recipes should have unique IDs and structures")
 
 
 func _test_recipe_registration_reports_stable_errors() -> void:
@@ -1105,21 +1089,21 @@ func _test_recipe_registration_rejects_missing_objects() -> void:
 	)
 	_expect(simulation.recipes.size() == 1, "corrupt registry diagnostics should not add the candidate")
 	var null_candidates: Array[SigilRecipeModel] = [null]
-	var set_result := MvpContent.validate_recipe_set(null_candidates)
+	var set_result := FactoryContent.validate_recipe_set(null_candidates)
 	_expect(
 		set_result["errors"] == PackedStringArray(["recipe[0]=<null>:missing_recipe"]),
 		"recipe set validation should retain a missing candidate's content location"
 	)
 
 
-func _test_mvp_recipe_set_validation_reports_content_location() -> void:
+func _test_factory_recipe_set_validation_reports_content_location() -> void:
 	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	var candidates: Array[SigilRecipeModel] = [
 		SigilRecipeModel.new(&"ring_recipe", ring, &"scout"),
 		SigilRecipeModel.new(&"ring_recipe", ring, &"sentinel"),
 		SigilRecipeModel.new(&"", GlyphModel.new(), &""),
 	]
-	var result := MvpContent.validate_recipe_set(candidates)
+	var result := FactoryContent.validate_recipe_set(candidates)
 	_expect(not result["ok"], "invalid recipe set should fail content validation")
 	_expect(result["accepted_count"] == 1, "content validation should count only accepted recipes")
 	_expect(
@@ -1132,8 +1116,8 @@ func _test_mvp_recipe_set_validation_reports_content_location() -> void:
 		]),
 		"recipe set diagnostics should identify content index, ID, and stable rejection reasons"
 	)
-	var mvp_result := MvpContent.validate_recipe_set(MvpContent.recipes())
-	_expect(mvp_result["ok"] and mvp_result["accepted_count"] == 6, "shipped MVP recipes should pass aggregate validation")
+	var content_result := FactoryContent.validate_recipe_set(FactoryContent.recipes())
+	_expect(content_result["ok"] and content_result["accepted_count"] == 6, "shipped factory recipes should pass aggregate validation")
 
 
 func _test_factory_rejects_invalid_recipe_structures() -> void:
@@ -1387,7 +1371,7 @@ func _test_factory_duplicate_owns_recipe_data() -> void:
 
 
 func _test_factory_duplicate_reports_invalid_state() -> void:
-	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
+	var simulation := FactoryContent.build_factory(FactoryContent.PLAN_SCOUT)
 	var invalid_glyph := GlyphModel.new([
 		GlyphComponentModel.new(&"ring"),
 		GlyphComponentModel.new(&"spike"),
@@ -1562,7 +1546,7 @@ func _test_factory_disconnects_lines() -> void:
 
 
 func _test_factory_removes_node_and_connected_lines() -> void:
-	var simulation := MvpContent.build_factory(MvpContent.PLAN_SENTINEL)
+	var simulation := FactoryContent.build_factory(FactoryContent.PLAN_SENTINEL)
 	_expect(simulation.remove_node(&"rotator"), "existing factory node should be removable")
 	_expect(not simulation.nodes.has(&"rotator"), "removed factory node should leave the graph")
 	for line in simulation.lines.values():
@@ -1570,7 +1554,7 @@ func _test_factory_removes_node_and_connected_lines() -> void:
 
 
 func _test_factory_graph_validation_reports_dangling_nodes() -> void:
-	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
+	var simulation := FactoryContent.build_factory(FactoryContent.PLAN_SCOUT)
 	_expect(simulation.validate_graph()["ok"], "complete preset factory should validate")
 	simulation.add_node(FactoryNodeModel.new(&"dangling", FactoryNodeModel.NodeKind.ROTATOR))
 	var result := simulation.validate_graph()
@@ -1678,7 +1662,7 @@ func _test_factory_validation_rejects_invalid_restored_configuration() -> void:
 
 
 func _test_factory_validation_rejects_invalid_work_in_progress() -> void:
-	var simulation := MvpContent.build_factory(MvpContent.PLAN_SENTINEL)
+	var simulation := FactoryContent.build_factory(FactoryContent.PLAN_SENTINEL)
 	simulation.nodes[&"ring_source"].output_buffer = GlyphModel.new([
 		GlyphComponentModel.new(&"ring"),
 		GlyphComponentModel.new(&"spike"),
@@ -1711,7 +1695,7 @@ func _test_factory_validation_rejects_invalid_work_in_progress() -> void:
 	_expect(simulation.last_runtime_glyph_errors.is_empty(), "discarding invalid work should clear stopped-tick errors")
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_SENTINEL)
+	board.configure(FactoryContent.PLAN_SENTINEL)
 	board.simulation.nodes[&"ring_source"].output_buffer = GlyphModel.new([
 		GlyphComponentModel.new(&"ring"),
 		GlyphComponentModel.new(&"spike"),
@@ -1725,7 +1709,7 @@ func _test_factory_validation_rejects_invalid_work_in_progress() -> void:
 
 
 func _test_factory_tick_preserves_work_during_corrupt_recipe_state() -> void:
-	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
+	var simulation := FactoryContent.build_factory(FactoryContent.PLAN_SCOUT)
 	var summoner: FactoryNodeModel = simulation.nodes[&"summoner"]
 	var waiting := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	summoner.input_buffers[0] = waiting
@@ -1754,7 +1738,7 @@ func _test_factory_tick_preserves_work_during_corrupt_recipe_state() -> void:
 	_expect(simulation.last_runtime_recipe_errors.is_empty(), "successful resumed tick should clear recipe errors")
 
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	board.simulation.recipes[0].glyph = null
 	var board_validation := board.validation_result()
 	_expect(not board_validation["ok"], "factory board should block a corrupted acquired recipe")
@@ -1819,28 +1803,28 @@ func _test_factory_flow_diagnostics_distinguish_blockages() -> void:
 	_expect(codes.has("material_shortage"), "partially filled combiner should diagnose missing material")
 
 
-func _test_mvp_plans_produce_expected_units() -> void:
+func _test_factory_plans_produce_expected_outputs() -> void:
 	var expected_names := {
-		MvpContent.PLAN_EMPTY: "手組み工場",
-		MvpContent.PLAN_SCOUT: "目の斥候",
-		MvpContent.PLAN_SENTINEL: "蒼環の衛兵",
-		MvpContent.PLAN_VIGIL: "警戒十字の衛兵",
-		MvpContent.PLAN_STELLAR: "星印の衛兵",
-		MvpContent.PLAN_GOLEM: "結合の巨像",
-		MvpContent.PLAN_FORTRESS: "要塞方位の巨像",
+		FactoryContent.PLAN_EMPTY: "手組み工場",
+		FactoryContent.PLAN_SCOUT: "目の斥候",
+		FactoryContent.PLAN_SENTINEL: "蒼環の衛兵",
+		FactoryContent.PLAN_VIGIL: "警戒十字の衛兵",
+		FactoryContent.PLAN_STELLAR: "星印の衛兵",
+		FactoryContent.PLAN_GOLEM: "結合の巨像",
+		FactoryContent.PLAN_FORTRESS: "要塞方位の巨像",
 	}
 	var expectations := {
-		MvpContent.PLAN_SCOUT: &"scout",
-		MvpContent.PLAN_SENTINEL: &"sentinel",
-		MvpContent.PLAN_VIGIL: &"sentinel",
-		MvpContent.PLAN_STELLAR: &"sentinel",
-		MvpContent.PLAN_GOLEM: &"golem",
-		MvpContent.PLAN_FORTRESS: &"golem",
+		FactoryContent.PLAN_SCOUT: &"scout",
+		FactoryContent.PLAN_SENTINEL: &"sentinel",
+		FactoryContent.PLAN_VIGIL: &"sentinel",
+		FactoryContent.PLAN_STELLAR: &"sentinel",
+		FactoryContent.PLAN_GOLEM: &"golem",
+		FactoryContent.PLAN_FORTRESS: &"golem",
 	}
 	for plan_id in expected_names:
-		_expect(MvpContent.plan_name(plan_id) == expected_names[plan_id], "MVP plan names should describe the visible meaning sigil in Japanese")
+		_expect(FactoryContent.plan_name(plan_id) == expected_names[plan_id], "factory plan names should describe the visible meaning sigil in Japanese")
 	for plan_id in expectations:
-		var simulation := MvpContent.build_factory(plan_id)
+		var simulation := FactoryContent.build_factory(plan_id)
 		for _tick in 160:
 			simulation.tick()
 		var expected_unit: StringName = expectations[plan_id]
@@ -1851,47 +1835,15 @@ func _test_mvp_plans_produce_expected_units() -> void:
 				break
 		_expect(
 			produced_expected_unit,
-			"MVP plan %s should produce %s" % [plan_id, expected_unit]
+			"factory plan %s should produce %s" % [plan_id, expected_unit]
 		)
 
 
-func _test_mvp_routes_have_distinct_valid_schedules() -> void:
-	var signatures: Dictionary = {}
-	for route_id in MvpContent.ROUTE_IDS:
-		var schedule := MvpContent.threat_schedule(route_id)
-		_expect(not schedule.is_empty(), "%s should provide a battle schedule" % route_id)
-		var previous_tick := -1
-		var unit_counts: Dictionary = {}
-		for event in schedule:
-			_expect(event.tick >= previous_tick, "%s threats should stay ordered" % route_id)
-			_expect(event.tick <= 900, "%s threats should fit the three-minute encounter" % route_id)
-			previous_tick = event.tick
-			unit_counts[event.unit_id] = int(unit_counts.get(event.unit_id, 0)) + event.count
-		var signature := JSON.stringify(unit_counts)
-		_expect(not signatures.has(signature), "%s should change the encountered enemy mix" % route_id)
-		signatures[signature] = route_id
-		var battle := MvpContent.build_battle(route_id)
-		_expect(battle.schedule.size() == schedule.size(), "%s should reach the battle simulation unchanged" % route_id)
-		_expect(is_equal_approx(battle.enemy_durability_multiplier, 1.0), "the first route should preserve the validated battle balance")
-	var later_battle := MvpContent.build_battle(MvpContent.ROUTE_MIXED, 3)
-	var first_battle := MvpContent.build_battle(MvpContent.ROUTE_MIXED, 1)
-	_expect(
-		is_equal_approx(later_battle.enemy_durability_multiplier, 1.08)
-		and later_battle.specs[&"brute"].max_health > first_battle.specs[&"brute"].max_health
-		and later_battle.specs[&"scout"].max_health == first_battle.specs[&"scout"].max_health,
-		"later routes should raise enemy durability without silently changing allied sigils"
-	)
-	_expect(
-		MvpContent.threat_schedule(&"unknown").size() == MvpContent.threat_schedule(MvpContent.ROUTE_MIXED).size(),
-		"unknown routes should fail safely to the mixed encounter"
-	)
-
-
 func _test_empty_factory_requires_player_wiring() -> void:
-	var simulation := MvpContent.build_factory(MvpContent.PLAN_EMPTY)
+	var simulation := FactoryContent.build_factory(FactoryContent.PLAN_EMPTY)
 	_expect(simulation.nodes.size() == 2, "empty workshop should start with source and summoner")
 	_expect(simulation.lines.is_empty(), "empty workshop should require the player to create its first line")
-	_expect(not simulation.validate_graph()["ok"], "unwired empty workshop should not start battle")
+	_expect(not simulation.validate_graph()["ok"], "unwired empty workshop should not start production")
 	var connection := simulation.connect_nodes(FactoryLineModel.new(&"first_line", &"ring_source", &"summoner", 0, 3))
 	_expect(connection["ok"], "player should be able to complete the empty workshop")
 	for _tick in 80:
@@ -1899,213 +1851,9 @@ func _test_empty_factory_requires_player_wiring() -> void:
 	_expect(not simulation.summon_events.is_empty(), "completed empty workshop should produce its first scout")
 
 
-func _test_battle_units_fight_and_die() -> void:
-	var battle := BattleSimulation.new()
-	battle.add_spec(UnitSpecModel.new(&"ally", 30.0, 10.0, 1, 10.0, 30.0))
-	battle.add_spec(UnitSpecModel.new(&"enemy", 20.0, 1.0, 2, 5.0, 20.0))
-	battle.spawn_player(&"ally")
-	_expect(battle.units[0].summon_flash_ticks > 0, "new player unit should receive summon feedback")
-	battle.spawn_enemy(&"enemy")
-	for _tick in 100:
-		battle.tick()
-		if battle.player_kills > 0:
-			break
-	_expect(battle.player_kills == 1, "player unit should kill weaker enemy")
-	_expect(battle.units.size() == 1, "dead unit should be removed from battle")
-
-
-func _test_recipe_combat_variant_preserves_sigil_identity() -> void:
-	var battle := MvpContent.build_battle()
-	var base_spec: UnitSpecModel = battle.specs[&"sentinel"]
-	var base_health := base_spec.max_health
-	var base_damage := base_spec.attack_damage
-	var base_speed := base_spec.move_speed
-	var modifiers := MvpContent.recipe_combat_modifiers(&"stellar_sentinel")
-	_expect(
-		battle.spawn_player_from_recipe(&"sentinel", &"stellar_sentinel", modifiers),
-		"an acquired recipe should spawn its combat variant"
-	)
-	var stellar_unit: BattleUnitModel = battle.units[0]
-	_expect(stellar_unit.recipe_id == &"stellar_sentinel", "battle units should retain the producing sigil recipe")
-	_expect(
-		stellar_unit.spec.max_health < base_health
-		and stellar_unit.spec.attack_damage > base_damage
-		and stellar_unit.spec.move_speed > base_speed
-		and stellar_unit.spec.target_count == 2,
-		"the Star Sentinel should trade durability and coverage for speed and damage"
-	)
-	_expect(
-		is_equal_approx(base_spec.max_health, base_health)
-		and is_equal_approx(base_spec.attack_damage, base_damage)
-		and is_equal_approx(base_spec.move_speed, base_speed)
-		and base_spec.target_count == 3,
-		"recipe variants should not mutate the shared base unit specification"
-	)
-	_expect(
-		battle.battle_events[-1]["recipe_id"] == &"stellar_sentinel",
-		"spawn events should retain the producing sigil recipe"
-	)
-
-
-func _test_battle_attributes_damage_to_sigil_recipe() -> void:
-	var battle := BattleSimulation.new()
-	battle.add_spec(UnitSpecModel.new(&"ally", 50.0, 10.0, 1, 1.0, 1000.0))
-	battle.add_spec(UnitSpecModel.new(&"enemy", 50.0, 1.0, 10, 1.0, 10.0))
-	_expect(
-		battle.spawn_player_from_recipe(&"ally", &"test_sigil"),
-		"recipe-attributed player fixture should spawn"
-	)
-	battle.spawn_enemy(&"enemy")
-	battle.tick()
-	_expect(
-		is_equal_approx(float(battle.player_damage_by_recipe.get(&"test_sigil", 0.0)), 10.0),
-		"player damage should be attributed to the producing sigil recipe"
-	)
-	_expect(
-		not battle.player_damage_by_recipe.has(&""),
-		"unattributed enemy attacks should not create a blank recipe bucket"
-	)
-
-
-func _test_battle_units_expose_their_sigil_origin() -> void:
-	var board := BattleBoard.new()
-	board.size = Vector2(1196, 401)
-	board.reset_battle()
-	board.spawn_player(&"sentinel", &"stellar_sentinel")
-	var stellar_unit: BattleUnitModel = board.simulation.units[0]
-	var center := board.unit_center(stellar_unit)
-	_expect(board.unit_at(center) == stellar_unit, "battle units should expose a stable hover target")
-	_expect(board._get_tooltip(center) == "battle_unit_glyph", "player units should open a visual producing-sigil tooltip")
-	_expect(
-		board.tooltip_glyph.canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR).canonical_serialization()
-		and "高速・強打・2体攻撃" in board.tooltip_context,
-		"battle unit inspection should preserve the exact source sigil and combat role"
-	)
-	var tooltip = board._make_custom_tooltip("battle_unit_glyph")
-	_expect(tooltip is GlyphTooltipModel, "battle unit origin should reuse the readable large Glyph tooltip")
-	tooltip.free()
-	board.free()
-
-
-func _test_preferred_attack_marks_weakness_feedback() -> void:
-	var battle := BattleSimulation.new()
-	battle.add_spec(UnitSpecModel.new(&"counter", 100.0, 2.0, 1, 1.0, 1000.0, 0.0, 1, &"target", 2.0))
-	battle.add_spec(UnitSpecModel.new(&"target", 100.0, 1.0, 10, 1.0, 10.0))
-	battle.spawn_player(&"counter")
-	battle.spawn_enemy(&"target")
-	battle.tick()
-	var target: BattleUnitModel = battle.units[1]
-	_expect(target.hit_flash_ticks > 0, "damaged unit should receive hit feedback")
-	_expect(target.weakness_flash_ticks > 0, "preferred target hit should receive weakness feedback")
-
-
-func _test_enemy_shield_takes_damage_and_opens() -> void:
-	var battle := BattleSimulation.new()
-	battle.add_spec(UnitSpecModel.new(
-		&"breaker", 100.0, BattleSimulation.ENEMY_SHIELD_MAX_HEALTH,
-		1, 100.0, 20.0, 0.0, 1, &"", 1.0, 100
-	))
-	battle.spawn_player(&"breaker")
-	for _tick in 10:
-		battle.tick()
-		if not battle.is_enemy_shield_active():
-			break
-	_expect(battle.enemy_shield_health < BattleSimulation.ENEMY_SHIELD_MAX_HEALTH, "units at the wall should damage the enemy shield")
-	_expect(not battle.is_enemy_shield_active(), "depleted enemy shield should open the route")
-	var position_before := battle.units[0].position
-	battle.tick()
-	_expect(battle.units[0].position > position_before, "units should advance after breaking the shield")
-
-
-func _test_battle_ends_at_time_limit() -> void:
-	var battle := BattleSimulation.new()
-	battle.battle_duration_ticks = 2
-	battle.tick()
-	_expect(not battle.is_finished(), "battle should run before its time limit")
-	battle.tick()
-	_expect(battle.is_finished(), "battle should end when its time limit expires")
-	_expect(battle.winner() == BattleSimulation.Side.ENEMY, "failing to defeat the leader in time should lose the stage")
-
-
-func _test_battle_enforces_spawn_capacity_and_rate() -> void:
-	var rate_battle := BattleSimulation.new()
-	var durable := UnitSpecModel.new(&"durable", 100.0, 1.0, 100, 0.0, 1.0, 0.0, 1, &"", 1.0, 10000)
-	rate_battle.add_spec(durable)
-	for _index in BattleSimulation.MAX_SPAWNS_PER_SIDE_PER_TICK:
-		_expect(rate_battle.spawn_player(&"durable"), "spawns through the per-tick limit should succeed")
-	_expect(not rate_battle.spawn_player(&"durable"), "spawn beyond the same-tick rate limit should be rejected")
-	_expect(
-		rate_battle.battle_events[-1]["reason"] == &"rate_cap",
-		"same-tick rejection should retain its rate-cap reason"
-	)
-	rate_battle.tick()
-	_expect(rate_battle.spawn_player(&"durable"), "spawn rate budget should reset on the next battle tick")
-	var rate_board := BattleBoard.new()
-	rate_board.simulation = rate_battle
-	_expect("上限拒否 青1" in rate_board.capacity_status_text(), "battlefield should disclose rejected player summons")
-	rate_board.free()
-
-	var capacity_battle := BattleSimulation.new()
-	capacity_battle.add_spec(durable)
-	var batches := int(BattleSimulation.MAX_UNITS_PER_SIDE / BattleSimulation.MAX_SPAWNS_PER_SIDE_PER_TICK)
-	for batch in batches:
-		for _index in BattleSimulation.MAX_SPAWNS_PER_SIDE_PER_TICK:
-			_expect(capacity_battle.spawn_player(&"durable"), "spawns below the simultaneous unit cap should succeed")
-		if batch < batches - 1:
-			capacity_battle.tick()
-	_expect(
-		capacity_battle.active_unit_count(BattleSimulation.Side.PLAYER) == BattleSimulation.MAX_UNITS_PER_SIDE,
-		"battle should reach but never exceed its per-side simultaneous unit cap"
-	)
-	_expect(not capacity_battle.spawn_player(&"durable"), "spawn beyond the simultaneous unit cap should be rejected")
-	_expect(
-		capacity_battle.battle_events[-1]["reason"] == &"unit_cap",
-		"simultaneous-count rejection should retain its unit-cap reason"
-	)
-
-
-func _test_threat_forecast_respects_horizon() -> void:
-	var battle := BattleSimulation.new()
-	battle.add_spec(UnitSpecModel.new(&"enemy", 10.0, 1.0, 2, 1.0, 10.0))
-	battle.set_schedule([
-		ThreatEventModel.new(10, &"enemy", 1, "NEAR"),
-		ThreatEventModel.new(30, &"enemy", 1, "FAR"),
-	])
-	var forecast := battle.upcoming_threats(15)
-	_expect(forecast.size() == 1, "forecast should only include events inside horizon")
-	if forecast.size() == 1:
-		_expect(forecast[0].label == "NEAR", "forecast should return the near threat")
-
-
-func _test_major_change_forecast_uses_long_horizon() -> void:
-	var battle := MvpContent.build_battle()
-	_expect(battle.upcoming_major_changes(299).is_empty(), "major wave should remain outside a shorter-than-sixty-second horizon")
-	var changes := battle.upcoming_major_changes(300)
-	_expect(changes.size() == 1, "sixty-second horizon should include the first major wave change")
-	if changes.size() == 1:
-		_expect(changes[0].tick == 300 and changes[0].unit_id == &"swarm", "first major change should mark the swarm phase")
-	var board := BattleBoard.new()
-	board.simulation = battle
-	_expect(
-		board.major_change_text(300, 120, 0.2) == "編成警告 60s: 群体兵",
-		"long-horizon warning should disclose timing and wave without prescribing a counter"
-	)
-	battle.tick_index = 180
-	_expect(
-		board.major_change_text(300, 120, 0.2) == "",
-		"major warning should not duplicate a change already inside the near horizon"
-	)
-	battle.tick_index = 270
-	_expect(
-		board.major_change_text(300, 120, 0.2) == "編成警告 60s: 装甲兵",
-		"warning should look past the near swarm change to the next major armor phase"
-	)
-	board.free()
-
-
 func _test_factory_edit_is_transactional() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	for _tick in 18:
 		board.advance_tick()
 	var committed_tick := board.simulation.tick_index
@@ -2125,9 +1873,9 @@ func _test_factory_edit_is_transactional() -> void:
 	_expect(board.cursor_shape_at(work_center) == Control.CURSOR_HELP, "time-stop Glyph should advertise its visual details")
 	_expect(board._get_tooltip(work_center) == "glyph_preview", "time-stop Glyph should open a large CanonicalGlyph tooltip")
 	_expect("工場内" in board.tooltip_context, "time-stop Glyph tooltip should retain its grouped item count")
-	board.preview_plan(MvpContent.PLAN_GOLEM)
-	_expect(board.plan_id == MvpContent.PLAN_SCOUT, "preview should not change committed plan")
-	_expect(board.display_plan_id() == MvpContent.PLAN_GOLEM, "factory visuals should use the pending goal during reconfiguration")
+	board.preview_plan(FactoryContent.PLAN_GOLEM)
+	_expect(board.plan_id == FactoryContent.PLAN_SCOUT, "preview should not change committed plan")
+	_expect(board.display_plan_id() == FactoryContent.PLAN_GOLEM, "factory visuals should use the pending goal during reconfiguration")
 	_expect(board.node_edit_state(&"ring_source") == &"changed", "preset preview should mark changed shared equipment")
 	_expect(board.node_edit_state(&"combiner") == &"added", "preset preview should mark newly added equipment")
 	_expect(board.line_edit_state(&"line_summon") == &"added", "preset preview should mark newly added factory lines")
@@ -2155,9 +1903,9 @@ func _test_factory_edit_is_transactional() -> void:
 	_expect(board.work_in_progress_count() == committed_work_in_progress, "cancel should restore all work in progress")
 	_expect(board.simulation.discarded_glyphs == 0, "cancel should not count preview discards")
 	board.begin_edit()
-	board.preview_plan(MvpContent.PLAN_GOLEM)
+	board.preview_plan(FactoryContent.PLAN_GOLEM)
 	board.commit_edit()
-	_expect(board.plan_id == MvpContent.PLAN_GOLEM, "commit should apply pending plan")
+	_expect(board.plan_id == FactoryContent.PLAN_GOLEM, "commit should apply pending plan")
 	_expect(board.simulation != original_simulation, "commit should replace factory atomically")
 	_expect(board.simulation.discarded_glyphs == committed_work_in_progress, "commit should count discarded work in progress")
 	board.free()
@@ -2165,7 +1913,7 @@ func _test_factory_edit_is_transactional() -> void:
 
 func _test_factory_edit_recovers_only_invalid_work_in_progress() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SENTINEL)
+	board.configure(FactoryContent.PLAN_SENTINEL)
 	var valid_glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	var invalid_glyph := GlyphModel.new([
 		GlyphComponentModel.new(&"ring"),
@@ -2202,7 +1950,7 @@ func _test_factory_edit_recovers_only_invalid_work_in_progress() -> void:
 func _test_factory_edit_preserves_custom_graph() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_SENTINEL)
+	board.configure(FactoryContent.PLAN_SENTINEL)
 	board.set_interaction_enabled(true)
 	board.disconnect_input(&"rotator", 0)
 	board.disconnect_input(&"summoner", 0)
@@ -2225,7 +1973,7 @@ func _test_factory_nodes_can_be_repositioned() -> void:
 	var board := FactoryBoard.new()
 	root.add_child(board)
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	var original := board.node_positions[&"ring_source"] as Vector2
 	_expect(not board.move_node(&"ring_source", Vector2(300, 160)), "running factory should reject node movement")
 	board.set_interaction_enabled(true)
@@ -2270,7 +2018,7 @@ func _test_factory_nodes_can_be_repositioned() -> void:
 func _test_factory_editor_undo_restores_graph() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	board.set_interaction_enabled(true)
 	var original_node_count := board.simulation.nodes.size()
 	var added_id := board.add_node_from_palette(&"rotator")
@@ -2293,7 +2041,7 @@ func _test_factory_editor_undo_restores_graph() -> void:
 func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(1196, 401)
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
 	_expect(board.mana_used() == 40, "empty workshop source and summoner should use 40 mana")
 	var first_added: StringName = &""
@@ -2309,7 +2057,7 @@ func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
 	board.connecting_from_node_id = first_added
 	_expect(summoner_center.direction_to(board._input_port_position(&"summoner", 0)).dot(summoner_center.direction_to(first_center)) > 0.99, "wiring target input should turn toward the selected source")
 	board.connecting_from_node_id = &""
-	_expect(board.mana_used() == MvpContent.FACTORY_MANA_MAX, "four processors should fill the remaining workshop mana")
+	_expect(board.mana_used() == FactoryContent.FACTORY_MANA_MAX, "four processors should fill the remaining workshop mana")
 	var node_count_at_limit := board.simulation.nodes.size()
 	_expect(board.add_node_from_palette(&"rotator") == &"", "factory should reject equipment beyond its mana budget")
 	_expect(board.simulation.nodes.size() == node_count_at_limit, "rejected equipment should not mutate the factory graph")
@@ -2317,7 +2065,7 @@ func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
 	_expect(board.remove_selected_node(), "removing the last affordable node should refund its mana")
 	_expect(board.mana_available() == 15, "removing a processor should refund its full fixed cost")
 	_expect(board.add_node_from_palette(&"colorizer") != &"", "refunded mana should be immediately reusable")
-	_expect(board.mana_used() == MvpContent.FACTORY_MANA_MAX, "replacement equipment should consume the refunded capacity")
+	_expect(board.mana_used() == FactoryContent.FACTORY_MANA_MAX, "replacement equipment should consume the refunded capacity")
 	var over_budget := FactoryNodeModel.new(&"forced_source", FactoryNodeModel.NodeKind.SOURCE)
 	board.simulation.add_node(over_budget)
 	var validation := board.validation_result()
@@ -2326,14 +2074,14 @@ func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
 	board.free()
 
 	var golem_board := FactoryBoard.new()
-	golem_board.configure(MvpContent.PLAN_GOLEM)
+	golem_board.configure(FactoryContent.PLAN_GOLEM)
 	_expect(golem_board.mana_used() == 95, "complete golem template should fit with five mana remaining")
 	golem_board.free()
 
 
 func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	_expect(board.goal_equipment_present(&"meaning_source"), "scout inventory should report its exact meaning source as present")
 	_expect(board.goal_equipment_present(&"summoner"), "scout inventory should report its summoner as present")
 	_expect(not board.goal_equipment_present(&"spike_source"), "meaning source should not satisfy the separate spike inventory marker")
@@ -2347,7 +2095,7 @@ func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 	board.free()
 
 	var sentinel_board := FactoryBoard.new()
-	sentinel_board.configure(MvpContent.PLAN_SENTINEL)
+	sentinel_board.configure(FactoryContent.PLAN_SENTINEL)
 	_expect(sentinel_board.goal_equipment_present(&"rotator") and sentinel_board.goal_equipment_present(&"colorizer"), "sentinel inventory should expose both processing categories")
 	sentinel_board.set_interaction_enabled(true)
 	sentinel_board.selected_node_id = &"rotator"
@@ -2357,7 +2105,7 @@ func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 	sentinel_board.free()
 
 	var meaning_board := FactoryBoard.new()
-	meaning_board.configure(MvpContent.PLAN_VIGIL)
+	meaning_board.configure(FactoryContent.PLAN_VIGIL)
 	var required_meaning: Array[StringName] = [MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS]
 	_expect(meaning_board.meaning_source_presence(required_meaning) == &"present", "meaning inventory should recognize every distinct target Glyph source")
 	meaning_board.set_interaction_enabled(true)
@@ -2375,7 +2123,7 @@ func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 func _test_factory_mutations_fail_closed_without_undo_snapshot() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(1196, 401)
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	board.set_interaction_enabled(true)
 	var extra_rotator_id := board.add_node_from_palette(&"rotator")
 	_expect(extra_rotator_id != &"", "snapshot failure fixture should first create one valid undo entry")
@@ -2400,7 +2148,7 @@ func _test_factory_mutations_fail_closed_without_undo_snapshot() -> void:
 	var connect_result := board.connect_nodes_interactive(&"ring_source", extra_rotator_id, 0)
 	_expect(not connect_result["ok"] and connect_result["error"] == "undo_snapshot", "failed undo capture should reject rewiring before replacing an input")
 	_expect(not board.disconnect_input(&"summoner", 0), "failed undo capture should reject disconnection")
-	_expect(not board.apply_plan(MvpContent.PLAN_SENTINEL), "failed undo capture should reject template replacement")
+	_expect(not board.apply_plan(FactoryContent.PLAN_SENTINEL), "failed undo capture should reject template replacement")
 
 	var drag_start := board.node_local_position(&"ring_source")
 	var drag_target := drag_start
@@ -2430,14 +2178,14 @@ func _test_factory_mutations_fail_closed_without_undo_snapshot() -> void:
 	board.free()
 
 	var edit_board := FactoryBoard.new()
-	edit_board.configure(MvpContent.PLAN_SENTINEL)
+	edit_board.configure(FactoryContent.PLAN_SENTINEL)
 	_expect(edit_board.begin_edit(), "preview snapshot failure fixture should enter editing while valid")
 	edit_board.set_interaction_enabled(true)
 	var preview_before: FactorySimulation = edit_board.preview_simulation
 	var pending_plan_before := edit_board.pending_plan_id
 	var edit_undo_before := edit_board.undo_history.size()
 	edit_board.preview_simulation.nodes[&"ring_source"].output_buffer = invalid_glyph
-	_expect(not edit_board.preview_plan(MvpContent.PLAN_GOLEM), "failed undo capture should reject a transactional template preview")
+	_expect(not edit_board.preview_plan(FactoryContent.PLAN_GOLEM), "failed undo capture should reject a transactional template preview")
 	_expect(edit_board.preview_simulation == preview_before and edit_board.pending_plan_id == pending_plan_before, "failed template preview should preserve the current edit simulation and plan")
 	_expect(edit_board.undo_history.size() == edit_undo_before and edit_board.preview_simulation.nodes[&"ring_source"].output_buffer == invalid_glyph, "failed template preview should preserve edit history and work in progress")
 	edit_board.cancel_edit()
@@ -2446,12 +2194,12 @@ func _test_factory_mutations_fail_closed_without_undo_snapshot() -> void:
 
 func _test_factory_enforces_single_summoner() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
 	var initial_node_count := board.simulation.nodes.size()
-	_expect(board.add_node_from_palette(&"summoner") == &"", "palette should reject a second summoner in the MVP")
+	_expect(board.add_node_from_palette(&"summoner") == &"", "palette should reject a second summoner in the current factory")
 	_expect(board.simulation.nodes.size() == initial_node_count, "rejected second summoner should not mutate the graph")
-	_expect("1基まで" in board.connection_message, "summoner rejection should explain the MVP limit")
+	_expect("1基まで" in board.connection_message, "summoner rejection should explain the current factory limit")
 	_expect(board.remove_factory_node(&"summoner"), "existing summoner should remain removable")
 	var replacement_id := board.add_node_from_palette(&"summoner")
 	_expect(replacement_id != &"", "removing the original summoner should allow one replacement")
@@ -2465,7 +2213,7 @@ func _test_factory_enforces_single_summoner() -> void:
 func _test_factory_node_configuration_is_undoable() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	board.set_interaction_enabled(true)
 	var rotator_id := board.add_node_from_palette(&"rotator")
 	_expect(board.configure_selected_node(1), "selected rotator should accept a 180-degree setting")
@@ -2508,7 +2256,7 @@ func _test_factory_node_configuration_is_undoable() -> void:
 		"undo should restore the radial combiner default"
 	)
 	_expect(board.selected_node_details()["title"] == "中心結合", "combiner label should follow the mode restored by undo")
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	_expect(board.selected_node_id == &"", "switching factory templates should clear stale inspector selection")
 	board.free()
 
@@ -2516,7 +2264,7 @@ func _test_factory_node_configuration_is_undoable() -> void:
 func _test_factory_meaning_source_is_configurable() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(1196, 401)
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
 	var source_id := board.add_node_from_palette(&"meaning_source")
 	_expect(source_id != &"", "factory palette should add a registered meaning Glyph source")
@@ -2533,20 +2281,20 @@ func _test_factory_meaning_source_is_configurable() -> void:
 	)
 	_expect(board.configure_selected_node(6), "meaning source should switch to the Compass through the shared inspector")
 	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.COMPASS, "meaning selection should be stored explicitly")
-	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == MvpContent.source_interval_for_glyph(MeaningGlyphsModel.COMPASS), "meaning selection should use the same canonical source interval as shipped templates")
+	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == FactoryContent.source_interval_for_glyph(MeaningGlyphsModel.COMPASS), "meaning selection should use the same canonical source interval as shipped templates")
 	_expect(board.selected_node_details()["title"] == "方位印", "meaning source node should name its registered Glyph")
 	_expect(board.undo(), "meaning source selection should be undoable")
 	board.selected_node_id = source_id
 	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.EYE, "undo should restore the previous meaning Glyph")
 	_expect(board.configure_selected_node(0), "meaning source should also switch back to a primitive source")
 	_expect(board.simulation.nodes[source_id].config.get("primitive_id") == &"ring" and not board.simulation.nodes[source_id].config.has("meaning_glyph_id"), "source switch should not retain an ambiguous hidden definition")
-	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == MvpContent.source_interval_for_glyph(&"ring"), "primitive selection should share the same canonical interval lookup")
+	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == FactoryContent.source_interval_for_glyph(&"ring"), "primitive selection should share the same canonical interval lookup")
 	board.free()
 
 
 func _test_factory_configuration_discards_work_transactionally() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	for _tick in 18:
 		board.advance_tick()
 	var committed_work_in_progress := board.work_in_progress_count()
@@ -2575,7 +2323,7 @@ func _test_factory_configuration_discards_work_transactionally() -> void:
 
 func _test_factory_preset_preview_is_undoable() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	board.begin_edit()
 	board.set_interaction_enabled(true)
 	var added_node_id := board.add_node_from_palette(&"rotator")
@@ -2586,16 +2334,16 @@ func _test_factory_preset_preview_is_undoable() -> void:
 	var undo_before_same_click := board.undo_history.size()
 	var discarded_before_same_click := board.preview_simulation.discarded_glyphs
 	var timing_before_same_click := board.cached_production_event_offsets.duplicate(true)
-	_expect(not board.preview_plan(MvpContent.PLAN_SCOUT), "reselecting the active template should be an explicit no-op")
+	_expect(not board.preview_plan(FactoryContent.PLAN_SCOUT), "reselecting the active template should be an explicit no-op")
 	_expect(board.preview_simulation == preview_before_same_click, "same-template no-op should preserve the custom preview object and runtime state")
 	_expect(board.preview_node_positions == positions_before_same_click and board.preview_simulation.nodes.has(added_node_id), "same-template no-op should preserve custom equipment and positions")
 	_expect(board.undo_history.size() == undo_before_same_click, "same-template no-op should not consume an undo step")
 	_expect(board.preview_simulation.discarded_glyphs == discarded_before_same_click, "same-template no-op should not discard work")
 	_expect(board.cached_production_event_offsets == timing_before_same_click, "same-template no-op should not recalculate or replace the timing forecast")
-	_expect(board.preview_plan(MvpContent.PLAN_GOLEM), "different preset should create a transactional preview")
-	_expect(board.pending_plan_id == MvpContent.PLAN_GOLEM and board.undo_history.size() == 2, "preset preview should become one undoable edit")
+	_expect(board.preview_plan(FactoryContent.PLAN_GOLEM), "different preset should create a transactional preview")
+	_expect(board.pending_plan_id == FactoryContent.PLAN_GOLEM and board.undo_history.size() == 2, "preset preview should become one undoable edit")
 	_expect(board.undo(), "preset preview should undo to the preceding custom graph")
-	_expect(board.pending_plan_id == MvpContent.PLAN_SCOUT, "undoing a preset should restore its preceding goal")
+	_expect(board.pending_plan_id == FactoryContent.PLAN_SCOUT, "undoing a preset should restore its preceding goal")
 	_expect(board.preview_simulation.nodes.size() == edited_node_count and board.preview_simulation.nodes.has(added_node_id), "undoing a preset should restore all custom equipment")
 	_expect(board.undo(), "custom edit before a preset should remain separately undoable")
 	_expect(not board.preview_simulation.nodes.has(added_node_id), "second undo should restore the original transaction graph")
@@ -2604,7 +2352,7 @@ func _test_factory_preset_preview_is_undoable() -> void:
 
 func _test_source_configuration_resets_generation_progress() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	var committed_source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
 	committed_source.config["primitive_id"] = "spike"
 	committed_source.config["interval_ticks"] = 54
@@ -2616,7 +2364,7 @@ func _test_source_configuration_resets_generation_progress() -> void:
 	var preview_source: FactoryNodeModel = board.preview_simulation.nodes[&"ring_source"]
 	_expect(preview_source.source_timer == 0, "changing source Primitive should reset incompatible generation progress")
 	board.cancel_edit()
-	_expect(board.display_plan_id() == MvpContent.PLAN_SCOUT, "cancel should restore the committed goal for factory visuals")
+	_expect(board.display_plan_id() == FactoryContent.PLAN_SCOUT, "cancel should restore the committed goal for factory visuals")
 	_expect(
 		board.node_edit_state(&"ring_source") == &"unchanged"
 		and board.removed_edit_node_ids().is_empty()
@@ -2641,9 +2389,9 @@ func _test_source_configuration_resets_generation_progress() -> void:
 
 func _test_factory_setting_preview_is_non_destructive() -> void:
 	var cases := [
-		{"plan": MvpContent.PLAN_SCOUT, "node_id": &"ring_source", "option": 1},
-		{"plan": MvpContent.PLAN_SENTINEL, "node_id": &"rotator", "option": 1},
-		{"plan": MvpContent.PLAN_SENTINEL, "node_id": &"colorizer", "option": 1},
+		{"plan": FactoryContent.PLAN_SCOUT, "node_id": &"ring_source", "option": 1},
+		{"plan": FactoryContent.PLAN_SENTINEL, "node_id": &"rotator", "option": 1},
+		{"plan": FactoryContent.PLAN_SENTINEL, "node_id": &"colorizer", "option": 1},
 	]
 	for case in cases:
 		var board := FactoryBoard.new()
@@ -2683,7 +2431,7 @@ func _test_factory_setting_preview_is_non_destructive() -> void:
 		board.cancel_edit()
 		board.free()
 	var simple_combine_board := FactoryBoard.new()
-	simple_combine_board.configure(MvpContent.PLAN_VIGIL)
+	simple_combine_board.configure(FactoryContent.PLAN_VIGIL)
 	simple_combine_board.set_interaction_enabled(true)
 	simple_combine_board.selected_node_id = &"combiner"
 	var combine_details := simple_combine_board.selected_node_details()
@@ -2695,7 +2443,7 @@ func _test_factory_setting_preview_is_non_destructive() -> void:
 	_expect(not simple_combine_board.setting_option_candidate(1)["active"], "disabled pairwise mode should not expose a misleading hypothetical result")
 	simple_combine_board.free()
 	var invalid_board := FactoryBoard.new()
-	invalid_board.configure(MvpContent.PLAN_SCOUT)
+	invalid_board.configure(FactoryContent.PLAN_SCOUT)
 	_expect(invalid_board.begin_edit(), "invalid setting preview fixture should enter a transaction")
 	invalid_board.set_interaction_enabled(true)
 	_expect(invalid_board.disconnect_input(&"summoner", 0), "invalid setting preview fixture should break the final route")
@@ -2714,7 +2462,7 @@ func _test_factory_setting_preview_is_non_destructive() -> void:
 
 func _test_factory_rewiring_discards_work_transactionally() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	for _tick in 18:
 		board.advance_tick()
 	var committed_work_in_progress := board.work_in_progress_count()
@@ -2748,7 +2496,7 @@ func _test_factory_rewiring_discards_work_transactionally() -> void:
 func _test_factory_board_connections_change_output() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_SENTINEL)
+	board.configure(FactoryContent.PLAN_SENTINEL)
 	board.set_interaction_enabled(true)
 	_expect(board.disconnect_input(&"rotator", 0), "editor should disconnect a processor input")
 	_expect(board.disconnect_input(&"summoner", 0), "editor should disconnect a summoner input")
@@ -2770,7 +2518,7 @@ func _test_factory_board_connections_change_output() -> void:
 func _test_factory_board_shows_summon_failure_reason() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
 	_expect(board.configure_selected_node(1), "failure feedback test should switch the source to spike")
@@ -2781,7 +2529,7 @@ func _test_factory_board_shows_summon_failure_reason() -> void:
 		board.advance_tick()
 		if not board.simulation.summon_failure_events.is_empty():
 			break
-	_expect("召喚失敗" in board.connection_message, "factory board should expose summon failure during battle")
+	_expect("召喚失敗" in board.connection_message, "factory board should expose summon failure during simulation")
 	_expect(board.connection_feedback_kind() == &"error", "summon failure should collapse its permanent sentence into an error badge")
 	board.size = Vector2(1196, 401)
 	_expect(board.connection_feedback_badge_at(Vector2(28, 27)), "connection feedback badge should expose a stable hover target")
@@ -2796,7 +2544,7 @@ func _test_factory_board_shows_summon_failure_reason() -> void:
 
 func _test_factory_board_replaces_failure_with_success() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
 	board.configure_selected_node(1)
@@ -2827,7 +2575,7 @@ func _test_factory_board_replaces_failure_with_success() -> void:
 
 func _test_factory_board_shows_distinct_flow_warning() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	var blocked := FactoryNodeModel.new(&"blocked", FactoryNodeModel.NodeKind.ROTATOR)
 	var glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	blocked.input_buffers[0] = glyph.copy()
@@ -2847,7 +2595,7 @@ func _test_factory_board_shows_distinct_flow_warning() -> void:
 
 func _test_factory_board_holds_transient_flow_warning() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	var blocked := FactoryNodeModel.new(&"blocked", FactoryNodeModel.NodeKind.ROTATOR)
 	var glyph := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	blocked.output_buffer = glyph
@@ -2867,8 +2615,8 @@ func _test_factory_board_holds_transient_flow_warning() -> void:
 func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(1196, 401)
-	board.configure(MvpContent.PLAN_SENTINEL)
-	_expect(MvpContent.layout_for_plan(MvpContent.PLAN_SENTINEL)[&"summoner"] == Vector2(410, 195), "factory templates should place the summoner at the radial workspace center")
+	board.configure(FactoryContent.PLAN_SENTINEL)
+	_expect(FactoryContent.layout_for_plan(FactoryContent.PLAN_SENTINEL)[&"summoner"] == Vector2(410, 195), "factory templates should place the summoner at the radial workspace center")
 	_expect(board.line_goal_match_state(&"line_1") == &"not_applicable", "raw material path should not be judged against the final recipe")
 	_expect(board.line_goal_match_state(&"line_2") == &"not_applicable", "intermediate processing should not look like a failed final recipe")
 	_expect(board.line_goal_match_state(&"line_3") == &"match", "only the summoner path should show final recipe success")
@@ -2892,7 +2640,7 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	var line: FactoryLineModel = board.simulation.lines[&"line_1"]
 	_expect(
 		board.predicted_glyph_for_line(&"line_1") != null,
-		"empty pre-battle line should expose a persistent predicted Glyph marker"
+		"empty idle-factory line should expose a persistent predicted Glyph marker"
 	)
 	_expect(
 		board.line_has_preview_space(Vector2.ZERO, Vector2(FactoryBoard.MIN_PREDICTED_LINE_GLYPH_LENGTH, 0)),
@@ -2923,7 +2671,7 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	)
 	board.free()
 	var match_board := FactoryBoard.new()
-	match_board.configure(MvpContent.PLAN_SCOUT)
+	match_board.configure(FactoryContent.PLAN_SCOUT)
 	var summon_line: FactoryLineModel = match_board.simulation.lines[&"line_1"]
 	summon_line.payload = MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
 	_expect(
@@ -2957,14 +2705,14 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	match_board.free()
 	var combine_board := FactoryBoard.new()
 	combine_board.size = Vector2(1196, 401)
-	combine_board.configure(MvpContent.PLAN_GOLEM)
+	combine_board.configure(FactoryContent.PLAN_GOLEM)
 	var combiner: FactoryNodeModel = combine_board.simulation.nodes[&"combiner"]
 	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	var combiner_output_preview := combine_board.display_glyph_for_node(&"combiner")
 	_expect(
 		combiner_output_preview != null and not combiner_output_preview.combine_children.is_empty(),
-		"combiner center should expose its predicted combined output before battle"
+		"combiner center should expose its predicted combined output before production starts"
 	)
 	var combiner_center := combine_board.node_local_position(&"combiner") + Vector2(0, 3)
 	_expect(
@@ -3066,7 +2814,7 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		combine_board.visible_input_glyph_for_node(&"combiner", 2) == null,
 		"input Glyph lookup should reject an out-of-range port"
 	)
-	combine_board.configure(MvpContent.PLAN_SCOUT)
+	combine_board.configure(FactoryContent.PLAN_SCOUT)
 	_expect(
 		combine_board.hovered_node_glyph_id == &""
 		and combine_board.hovered_input_glyph_node_id == &""
@@ -3079,7 +2827,7 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(1196, 401)
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	_expect(board.final_summoner_candidate_glyph() == null, "unwired factory should not invent a final candidate Glyph")
 	_expect(board.final_summoner_candidate()["state"] == &"missing", "unwired factory should identify its missing final candidate")
 	_expect(board.output_validation_state(&"ring_source") == &"missing", "unwired factory should mark the exact missing output port")
@@ -3103,18 +2851,18 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	_expect(source_tooltip.get_script() == GlyphComparisonTooltipModel, "factory equipment hover should reuse the large target comparison")
 	_expect(source_tooltip.custom_minimum_size.x >= 300.0, "factory Glyph tooltip should provide a readable large preview")
 	source_tooltip.free()
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
 	_expect(board.configure_selected_node(0), "tooltip fixture should switch the unwired source to one Primitive")
 	var primitive_source_center := board.node_local_position(&"ring_source")
 	_expect(board._get_tooltip(primitive_source_center) == "glyph_comparison" and board.tooltip_context == "素材Primitive", "legacy primitive sources should retain their distinct material context")
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	var predicted_candidate := board.final_summoner_candidate_glyph()
 	_expect(board.final_summoner_candidate()["state"] == &"predicted", "non-destructive final output should retain its predicted origin")
 	_expect(predicted_candidate != null, "valid factory should expose its predicted final summoner candidate")
 	_expect(
-		predicted_candidate.canonical_serialization() == MvpContent.recipes()[0].glyph.canonical_serialization(),
+		predicted_candidate.canonical_serialization() == FactoryContent.recipes()[0].glyph.canonical_serialization(),
 		"predicted final candidate should preserve the produced CanonicalGlyph"
 	)
 	var transported := GlyphModel.new([GlyphComponentModel.new(&"ring")])
@@ -3139,7 +2887,7 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 
 func _test_factory_board_exposes_node_activity_progress() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SENTINEL)
+	board.configure(FactoryContent.PLAN_SENTINEL)
 	var source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
 	source.source_timer = int(source.config.get("interval_ticks", 1)) / 2
 	_expect(
@@ -3171,7 +2919,7 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	var board := FactoryBoard.new()
 	root.add_child(board)
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
 	var port_hover := InputEventMouseMotion.new()
 	port_hover.position = board._output_port_position(&"ring_source")
@@ -3217,7 +2965,7 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 	board.free()
 	var invalid_board := FactoryBoard.new()
 	invalid_board.size = Vector2(1196, 401)
-	invalid_board.configure(MvpContent.PLAN_SENTINEL)
+	invalid_board.configure(FactoryContent.PLAN_SENTINEL)
 	invalid_board.set_interaction_enabled(true)
 	_expect(invalid_board.disconnect_input(&"colorizer", 0), "invalid connection test should expose a missing target input")
 	var rejected_input := invalid_board._input_port_position(&"colorizer", 0)
@@ -3238,7 +2986,7 @@ func _test_factory_ports_connect_through_mouse_input() -> void:
 func _test_factory_overlapping_hits_follow_draw_order() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(1196, 401)
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	var back_source := FactoryNodeModel.new(&"back_source", FactoryNodeModel.NodeKind.SOURCE, {"primitive_id": "ring", "interval_ticks": 18})
 	var front_source := FactoryNodeModel.new(&"front_source", FactoryNodeModel.NodeKind.SOURCE, {"primitive_id": "spike", "interval_ticks": 54})
 	board.simulation.nodes[back_source.id] = back_source
@@ -3268,7 +3016,7 @@ func _test_factory_overlapping_hits_follow_draw_order() -> void:
 
 func _test_factory_processor_role_marks_follow_settings() -> void:
 	var board := FactoryBoard.new()
-	board.configure(MvpContent.PLAN_SENTINEL)
+	board.configure(FactoryContent.PLAN_SENTINEL)
 	board.set_interaction_enabled(true)
 	var rotator_state := board.node_role_mark_state(&"rotator")
 	_expect(rotator_state["valid"] and rotator_state["direction"] == Vector2i.RIGHT, "90-degree rotator role mark should point right like the setting option")
@@ -3291,7 +3039,7 @@ func _test_factory_processor_role_marks_follow_settings() -> void:
 	_expect(board.node_role_mark_state(&"colorizer")["pattern"] == &"striped", "colorizer role mark should follow the color restored by undo")
 	_expect(board.colorizer_role_pattern(&"unknown") == &"invalid", "unknown colors should retain the invalid marker instead of a valid pattern")
 	var combiner_board := FactoryBoard.new()
-	combiner_board.configure(MvpContent.PLAN_VIGIL)
+	combiner_board.configure(FactoryContent.PLAN_VIGIL)
 	var combine_state := combiner_board.node_role_mark_state(&"combiner")
 	_expect(combine_state["valid"] and combine_state["connection_mode"] == GlyphModel.CONNECTION_SIMPLE, "meaning Sentinel should show its line-free combine rule on the board")
 	combiner_board.set_interaction_enabled(true)
@@ -3322,7 +3070,7 @@ func _test_factory_interaction_legend_is_explanatory_and_non_destructive() -> vo
 	var board := FactoryBoard.new()
 	root.add_child(board)
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
 	var expected_tooltips := [
@@ -3366,7 +3114,7 @@ func _test_factory_interaction_legend_is_explanatory_and_non_destructive() -> vo
 func _test_factory_production_preview_is_non_destructive() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	var tick_before := board.simulation.tick_index
 	var preview := board.production_preview(160)
 	var scout_offsets: PackedInt32Array = preview["event_offsets"][&"scout"]
@@ -3406,14 +3154,14 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect("間隔 2.0秒" in board.production_timing_tooltip(PackedInt32Array([10, 20, 30])), "regular event spacing should expose its observed interval")
 	_expect("2.0–3.0秒" in board.production_timing_tooltip(PackedInt32Array([10, 20, 35])), "variable spacing should expose its observed range instead of an average")
 	var preview_line_center := board._output_port_position(&"ring_source").lerp(board._input_port_position(&"summoner", 0), 0.5)
-	_expect(board.display_glyph_for_line(&"line_1") != null, "empty pre-battle line should expose its predicted CanonicalGlyph")
+	_expect(board.display_glyph_for_line(&"line_1") != null, "empty idle-factory line should expose its predicted CanonicalGlyph")
 	_expect(board._get_tooltip(preview_line_center) == "glyph_comparison" and "32秒予測" in board.tooltip_context, "empty line hover should compare its predicted transport Glyph with the target")
-	_expect(board.line_goal_match_state(&"line_1") == &"match", "summoner path should compare its predicted Glyph with the selected goal before battle")
+	_expect(board.line_goal_match_state(&"line_1") == &"match", "summoner path should compare its predicted Glyph with the selected goal before production starts")
 	_expect(board.line_recipe_match_state(&"line_1") == &"match", "empty final line should preview the same registered-recipe acceptance used by summoning")
-	board.plan_id = MvpContent.PLAN_SENTINEL
+	board.plan_id = FactoryContent.PLAN_SENTINEL
 	_expect(board.line_goal_match_state(&"line_1") == &"mismatch", "a valid owned recipe may intentionally differ from the selected goal")
 	_expect(board.line_recipe_match_state(&"line_1") == &"match", "a valid owned non-goal recipe should remain a successful final-line signal")
-	board.plan_id = MvpContent.PLAN_SCOUT
+	board.plan_id = FactoryContent.PLAN_SCOUT
 	board.selected_node_id = &"ring_source"
 	board.configure_selected_node(1)
 	_expect(board.line_goal_match_state(&"line_1") == &"mismatch", "changing the source should immediately mark the summoner path as a goal mismatch")
@@ -3433,7 +3181,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 
 	var comparison_board := FactoryBoard.new()
 	comparison_board.size = Vector2(1196, 401)
-	comparison_board.configure(MvpContent.PLAN_SCOUT)
+	comparison_board.configure(FactoryContent.PLAN_SCOUT)
 	comparison_board.set_interaction_enabled(true)
 	var baseline := comparison_board.production_snapshot()
 	var baseline_scout_count := int(baseline["counts"][&"scout"])
@@ -3492,7 +3240,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(comparison_board.compare_production_snapshots(discard_before, discard_before)["discarded"]["state"] == &"unchanged", "equal nonzero forecast discard should collapse to one value")
 	synthetic_after["horizon_ticks"] = 120
 	_expect(comparison_board.compare_production_snapshots(synthetic_before, synthetic_after)["validity"] == &"invalid", "mismatched forecast windows should not produce a false comparison")
-	comparison_board.preview_plan(MvpContent.PLAN_GOLEM)
+	comparison_board.preview_plan(FactoryContent.PLAN_GOLEM)
 	_expect(comparison_board.production_difference_state(&"scout")["count_state"] == &"decrease", "golem proposal should disclose lost scout output before commit")
 	_expect(comparison_board.production_difference_state(&"golem")["count_state"] == &"increase", "golem proposal should disclose gained golem output before commit")
 	comparison_board._get_tooltip(comparison_board.production_summary_center(2) + Vector2(0, 38))
@@ -3521,7 +3269,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 
 
 	var timing_board := FactoryBoard.new()
-	timing_board.configure(MvpContent.PLAN_SCOUT)
+	timing_board.configure(FactoryContent.PLAN_SCOUT)
 	timing_board.simulation.tick()
 	timing_board._refresh_production_preview()
 	_expect(timing_board.begin_edit(), "timing-only comparison should enter a transaction from warm factory state")
@@ -3538,7 +3286,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	timing_board.cancel_edit()
 	timing_board.free()
 	var sentinel_board := FactoryBoard.new()
-	sentinel_board.configure(MvpContent.PLAN_SENTINEL)
+	sentinel_board.configure(FactoryContent.PLAN_SENTINEL)
 	var source_preview := sentinel_board.predicted_output_glyph_for_node(&"ring_source")
 	var rotation_preview := sentinel_board.predicted_output_glyph_for_node(&"rotator")
 	var color_preview := sentinel_board.predicted_output_glyph_for_node(&"colorizer")
@@ -3558,7 +3306,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 
 func _test_factory_downstream_route_focus_is_non_destructive() -> void:
 	var sentinel_board := FactoryBoard.new()
-	sentinel_board.configure(MvpContent.PLAN_SENTINEL)
+	sentinel_board.configure(FactoryContent.PLAN_SENTINEL)
 	var runtime_before := _factory_runtime_signature(sentinel_board.simulation)
 	var production_before := sentinel_board.production_snapshot()
 	var sentinel_route := sentinel_board.focused_downstream_route(&"ring_source")
@@ -3572,7 +3320,7 @@ func _test_factory_downstream_route_focus_is_non_destructive() -> void:
 	sentinel_board.free()
 
 	var golem_board := FactoryBoard.new()
-	golem_board.configure(MvpContent.PLAN_GOLEM)
+	golem_board.configure(FactoryContent.PLAN_GOLEM)
 	var ring_route := golem_board.focused_downstream_route(&"ring_source")
 	_expect(
 		ring_route["node_ids"] == [&"colorizer", &"combiner", &"ring_source", &"summoner"]
@@ -3633,7 +3381,7 @@ func _test_factory_downstream_route_focus_is_non_destructive() -> void:
 func _test_factory_production_preview_explains_first_mismatch() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_EMPTY)
+	board.configure(FactoryContent.PLAN_EMPTY)
 	board.simulation.nodes[&"ring_source"].config.erase("meaning_glyph_id")
 	board.simulation.nodes[&"ring_source"].config["primitive_id"] = "spike"
 	board.simulation.nodes[&"ring_source"].config["interval_ticks"] = 18
@@ -3650,7 +3398,7 @@ func _test_factory_production_preview_explains_first_mismatch() -> void:
 	if not first_failure.is_empty():
 		_expect(
 			first_failure["closest_recipe_id"] == &"bound_colossus",
-			"preview should identify the closest recipe before battle"
+			"preview should identify the closest recipe before production starts"
 		)
 		var diagnostics: PackedStringArray = first_failure["diagnostics"]
 		_expect(diagnostics[0] == "部品不足: ring", "preview should retain the highest-priority correction")
@@ -3673,7 +3421,7 @@ func _test_factory_production_preview_explains_first_mismatch() -> void:
 func _test_factory_board_explains_restored_validation_errors() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	board.simulation.nodes[&"ring_source"].config.erase("meaning_glyph_id")
 	board.simulation.nodes[&"ring_source"].config["primitive_id"] = ""
 	board.selected_node_id = &"ring_source"
@@ -3706,7 +3454,7 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 	_expect(board.selected_node_details()["selected_index"] == 0, "repaired source setting should select its valid ring option")
 	board.free()
 	var processor_board := FactoryBoard.new()
-	processor_board.configure(MvpContent.PLAN_SENTINEL)
+	processor_board.configure(FactoryContent.PLAN_SENTINEL)
 	processor_board.set_interaction_enabled(true)
 	processor_board.simulation.nodes[&"rotator"].config["processing_ticks"] = 0
 	processor_board.selected_node_id = &"rotator"
@@ -3715,7 +3463,7 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 	_expect(processor_board.simulation.nodes[&"rotator"].config["processing_ticks"] >= 1, "rotator repair should restore a valid processing time")
 	processor_board.free()
 	var interval_board := FactoryBoard.new()
-	interval_board.configure(MvpContent.PLAN_SCOUT)
+	interval_board.configure(FactoryContent.PLAN_SCOUT)
 	interval_board.set_interaction_enabled(true)
 	interval_board.simulation.nodes[&"ring_source"].config["interval_ticks"] = 0
 	interval_board.selected_node_id = &"ring_source"
@@ -3736,7 +3484,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	var target_tooltip = ghost._make_custom_tooltip(ghost.tooltip_text)
 	_expect(target_tooltip.get_script() == GlyphTooltipModel, "sigil goal hover should create a visual Glyph tooltip")
 	_expect(target_tooltip.custom_minimum_size.x >= 300.0, "visual Glyph tooltip should be substantially larger than the persistent sample")
-	_expect("3体攻撃・対群体" in target_tooltip.context, "goal inspection should connect its completed shape to its combat role")
+	_expect("回転・着色の直列加工" in target_tooltip.context, "goal inspection should connect its completed shape to its factory process")
 	_expect(
 		target_tooltip.glyph.canonical_serialization() == ghost.glyph.canonical_serialization(),
 		"visual Glyph tooltip should draw the same CanonicalGlyph as the target"
@@ -3751,7 +3499,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	_expect(ghost.candidate_state == &"owned_other", "a registered non-goal recipe should not look like a summon failure")
 	_expect(ghost.candidate_recipe_id == &"stellar_sentinel" and ghost.candidate_unit_id == &"sentinel", "alternate output should retain the exact acquired recipe result")
 	_expect("星衛兵 → 衛兵" in ghost.candidate_context(), "alternate registered output should identify its result only on demand")
-	_expect("高速・強打・2体攻撃" in ghost.candidate_context(), "alternate registered output should expose its distinct combat role on demand")
+	_expect("単一素材・中頻度" in ghost.candidate_context(), "alternate registered output should expose its distinct factory process on demand")
 	ghost.show_candidate(MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR), &"hypothetical", &"glyph", "32秒: 星衛兵→衛兵 4体・初回3.0秒")
 	_expect("32秒: 星衛兵→衛兵 4体" in ghost.candidate_context(), "hypothetical comparison tooltip should retain its production quantity and first arrival")
 	var mismatching_candidate := GlyphModel.new([GlyphComponentModel.new(&"spike")])
@@ -3783,7 +3531,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	)
 	comparison_tooltip.free()
 	var sentinel_recipe: SigilRecipeModel
-	for recipe in MvpContent.recipes():
+	for recipe in FactoryContent.recipes():
 		if recipe.id == &"azure_guard":
 			sentinel_recipe = recipe
 	var attribute_comparison = GlyphComparisonTooltipModel.new()
@@ -3826,11 +3574,11 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	_expect(ghost._get_tooltip(Vector2(266, 40)) == "設定候補 // 予測できません", "invalid hypothetical output should remain distinct from an empty valid forecast")
 	ghost.show_candidate(null)
 	var expected: SigilRecipeModel
-	for recipe in MvpContent.recipes():
+	for recipe in FactoryContent.recipes():
 		if recipe.id == &"azure_guard":
 			expected = recipe
 			break
-	_expect(expected != null, "ghost test recipe should exist in MVP content")
+	_expect(expected != null, "ghost test recipe should exist in factory content")
 	if expected != null:
 		_expect(
 			ghost.glyph.canonical_serialization() == expected.glyph.canonical_serialization(),
@@ -3843,65 +3591,39 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	ghost.free()
 
 
-func _test_run_upgrade_accelerates_ring_source() -> void:
+func _test_factory_upgrade_accelerates_ring_source() -> void:
 	var board := FactoryBoard.new()
 	board.set_run_upgrades([&"ring_speed"])
-	board.configure(MvpContent.PLAN_SCOUT)
+	board.configure(FactoryContent.PLAN_SCOUT)
 	var source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
 	var runtime_before := _factory_runtime_signature(board.simulation)
 	var preview_before := board.production_snapshot()
 	var prospective := board.prospective_upgrade_snapshot(&"ring_speed")
-	_expect(prospective["ok"] and board.compare_production_snapshots(preview_before, prospective)["changed"], "reward choice should forecast its production effect before acquisition")
-	_expect(_factory_runtime_signature(board.simulation) == runtime_before and board.production_snapshot() == preview_before and board.run_upgrades == [&"ring_speed"], "prospective reward forecast should not mutate factory state or acquired upgrades")
-	_expect(source.config["interval_ticks"] < 18, "ring speed reward should accelerate future factories")
-	var plan_forecast := board.plan_production_snapshot(MvpContent.PLAN_STELLAR)
+	_expect(prospective["ok"] and board.compare_production_snapshots(preview_before, prospective)["changed"], "upgrade choice should forecast its production effect before acquisition")
+	_expect(_factory_runtime_signature(board.simulation) == runtime_before and board.production_snapshot() == preview_before and board.run_upgrades == [&"ring_speed"], "prospective upgrade forecast should not mutate factory state or acquired upgrades")
+	_expect(source.config["interval_ticks"] < 18, "ring speed upgrade should accelerate future factories")
+	var plan_forecast := board.plan_production_snapshot(FactoryContent.PLAN_STELLAR)
 	_expect(plan_forecast["ok"] and plan_forecast["mana"] == 40 and int(plan_forecast["counts"][&"sentinel"]) > 0, "plan hover should forecast an alternate template's mana and production")
 	_expect(_factory_runtime_signature(board.simulation) == runtime_before and board.production_snapshot() == preview_before, "plan hover forecast should not mutate the active factory")
-	_expect(board.node_upgrade_state_for(source) == {"upgrade_id": &"ring_speed", "level": 1}, "source equipment should expose its visible reward level")
-	_expect("集束 1/3" in board.node_upgrade_tooltip(source), "source hover should disclose the applied reward only on demand")
+	_expect(board.node_upgrade_state_for(source) == {"upgrade_id": &"ring_speed", "level": 1}, "source equipment should expose its visible upgrade level")
+	_expect("集束 1/3" in board.node_upgrade_tooltip(source), "source hover should disclose the applied upgrade only on demand")
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
 	board.configure_selected_node(1)
 	board.configure_selected_node(0)
-	_expect(source.config["interval_ticks"] < 18, "ring speed reward should survive source reconfiguration")
+	_expect(source.config["interval_ticks"] < 18, "ring speed upgrade should survive source reconfiguration")
 	board.free()
 	var processing_board := FactoryBoard.new()
 	processing_board.set_run_upgrades([&"processing_speed", &"line_speed"])
-	processing_board.configure(MvpContent.PLAN_SENTINEL)
+	processing_board.configure(FactoryContent.PLAN_SENTINEL)
 	var rotator: FactoryNodeModel = processing_board.simulation.nodes[&"rotator"]
 	var first_line: FactoryLineModel = processing_board.simulation.lines[&"line_1"]
-	_expect(rotator.config["processing_ticks"] == 1, "processing reward should accelerate processors")
-	_expect(first_line.travel_ticks == 1, "line reward should accelerate transport")
-	_expect(processing_board.node_upgrade_state_for(rotator) == {"upgrade_id": &"processing_speed", "level": 1}, "processor equipment should expose its applied reward level")
-	_expect(processing_board.run_upgrade_level(&"line_speed") == 1, "factory lines should expose their applied transport reward level")
-	_expect(processing_board.node_upgrade_state_for(processing_board.simulation.nodes[&"summoner"])["level"] == 0, "summoners should not claim an unrelated processing reward")
+	_expect(rotator.config["processing_ticks"] == 1, "processing upgrade should accelerate processors")
+	_expect(first_line.travel_ticks == 1, "line upgrade should accelerate transport")
+	_expect(processing_board.node_upgrade_state_for(rotator) == {"upgrade_id": &"processing_speed", "level": 1}, "processor equipment should expose its applied upgrade level")
+	_expect(processing_board.run_upgrade_level(&"line_speed") == 1, "factory lines should expose their applied transport upgrade level")
+	_expect(processing_board.node_upgrade_state_for(processing_board.simulation.nodes[&"summoner"])["level"] == 0, "summoners should not claim an unrelated processing upgrade")
 	processing_board.free()
-
-
-func _test_run_flow_covers_one_route() -> void:
-	for route_id in MvpContent.ROUTE_IDS:
-		var schedule := MvpContent.threat_schedule(route_id)
-		var major_events := MvpContent.major_threat_events(route_id)
-		_expect(not major_events.is_empty() and major_events[0].tick == schedule[0].tick, "stage timeline should always include the route's first threat")
-		for event in major_events.slice(1):
-			_expect(event.is_major_change, "stage timeline markers should come from the real major-wave schedule")
-	var flow := RunFlow.new()
-	_expect(flow.phase == RunFlow.Phase.ROUTE_SELECTION, "run should start at route selection")
-	_expect(flow.advance(), "route selection should advance")
-	_expect(flow.phase == RunFlow.Phase.STAGE_INFO, "route should lead to stage information")
-	flow.advance()
-	_expect(flow.phase == RunFlow.Phase.FACTORY_BUILD, "stage information should lead to factory build")
-	flow.advance()
-	_expect(flow.phase == RunFlow.Phase.BATTLE, "factory build should start battle")
-	_expect(flow.pause_for_reconfiguration(), "battle should allow reconfiguration")
-	_expect(flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "pause should enter reconfiguration")
-	_expect(flow.resume_battle(), "reconfiguration should resume battle")
-	_expect(flow.mark_victory(), "battle should accept victory")
-	flow.advance()
-	_expect(flow.phase == RunFlow.Phase.REWARD, "victory should lead to reward")
-	flow.advance()
-	_expect(flow.phase == RunFlow.Phase.ROUTE_SELECTION, "reward should lead to the next route")
-	_expect(flow.route_number == 2, "finishing a route should increment its number")
 
 
 func _expect(condition: bool, message: String) -> void:

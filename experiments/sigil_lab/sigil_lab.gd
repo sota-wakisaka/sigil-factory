@@ -7,8 +7,6 @@ const SigilPreviewModel := preload("res://experiments/sigil_lab/sigil_preview.gd
 const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_glyphs.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
 
-const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
-
 const PORT_COLOR := Color(0.3, 0.82, 1.0, 1.0)
 const NODE_NAMES := {
 	&"source": "素材",
@@ -40,7 +38,6 @@ var small_previews: Array = []
 var status_label: Label
 var stats_label: Label
 var output_button: GraphNode
-var menu_button: Button
 var structure_button: Button
 var export_button: Button
 var export_dialog: Window
@@ -177,7 +174,7 @@ func _build_header() -> Control:
 	toolbar.add_theme_constant_override("separation", 8)
 
 	var title := Label.new()
-	title.text = "SIGIL LAB // MVP Glyph Editor"
+	title.text = "SIGIL LAB // Glyph Editor"
 	title.add_theme_color_override("font_color", Color(0.78, 0.9, 1.0))
 	title.add_theme_font_size_override("font_size", 20)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -218,14 +215,6 @@ func _build_header() -> Control:
 	export_button.pressed.connect(_show_export_dialog)
 	toolbar.add_child(export_button)
 
-	menu_button = Button.new()
-	menu_button.text = "← MENU"
-	menu_button.tooltip_text = "メインメニューへ戻る"
-	menu_button.custom_minimum_size = Vector2(96, 34)
-	menu_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
-	)
-	toolbar.add_child(menu_button)
 	return toolbar
 
 

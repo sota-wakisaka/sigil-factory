@@ -1,4 +1,4 @@
-class_name MvpContent
+class_name FactoryContent
 extends RefCounted
 
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
@@ -8,9 +8,6 @@ const SigilRecipeModel := preload("res://src/domain/sigil_recipe.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
 const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
-const UnitSpecModel := preload("res://src/battle/unit_spec.gd")
-const ThreatEventModel := preload("res://src/battle/threat_event.gd")
-const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 
 const PLAN_SCOUT := &"scout"
 const PLAN_SENTINEL := &"sentinel"
@@ -20,111 +17,6 @@ const PLAN_GOLEM := &"golem"
 const PLAN_FORTRESS := &"fortress"
 const PLAN_EMPTY := &"empty"
 const FACTORY_MANA_MAX := 100
-const ROUTE_SWARM := &"swarm_route"
-const ROUTE_MIXED := &"mixed_route"
-const ROUTE_ARMORED := &"armored_route"
-const ROUTE_IDS := [ROUTE_SWARM, ROUTE_MIXED, ROUTE_ARMORED]
-
-
-static func build_battle(route_id: StringName = ROUTE_MIXED, route_number: int = 1) -> BattleSimulation:
-	var battle := BattleSimulation.new()
-	var durability_multiplier := route_durability_multiplier(route_number)
-	battle.enemy_durability_multiplier = durability_multiplier
-	for spec in unit_specs():
-		if spec.id in [&"raider", &"swarm", &"brute"]:
-			spec.max_health *= durability_multiplier
-		battle.add_spec(spec)
-	battle.set_schedule(threat_schedule(route_id))
-	return battle
-
-
-static func route_durability_multiplier(route_number: int) -> float:
-	return minf(1.0 + float(maxi(route_number, 1) - 1) * 0.04, 2.0)
-
-
-static func unit_specs() -> Array[UnitSpecModel]:
-	return [
-		UnitSpecModel.new(&"scout", 36.0, 8.0, 4, 7.5, 30.0, 0.0, 1, &"", 1.0, 480),
-		UnitSpecModel.new(&"sentinel", 90.0, 9.0, 5, 4.5, 65.0, 2.0, 3, &"swarm", 1.8, 720),
-		UnitSpecModel.new(&"golem", 260.0, 38.0, 7, 3.0, 44.0, 6.0, 1, &"brute", 1.8, 960),
-		UnitSpecModel.new(&"raider", 55.0, 8.0, 5, 6.0, 28.0, 1.0, 1, &"", 1.0, 600),
-		UnitSpecModel.new(&"swarm", 24.0, 7.0, 3, 8.0, 24.0, 0.0, 1, &"golem", 5.0, 520),
-		UnitSpecModel.new(&"brute", 190.0, 24.0, 7, 3.2, 40.0, 5.0, 1, &"", 1.0, 900),
-	]
-
-
-static func threat_schedule(route_id: StringName = ROUTE_MIXED) -> Array[ThreatEventModel]:
-	match route_id:
-		ROUTE_SWARM:
-			return _swarm_route_schedule()
-		ROUTE_ARMORED:
-			return _armored_route_schedule()
-	return _mixed_route_schedule()
-
-
-static func major_threat_events(route_id: StringName = ROUTE_MIXED) -> Array[ThreatEventModel]:
-	var major_events: Array[ThreatEventModel] = []
-	for event in threat_schedule(route_id):
-		if major_events.is_empty() or event.is_major_change:
-			major_events.append(event)
-	return major_events
-
-
-static func _mixed_route_schedule() -> Array[ThreatEventModel]:
-	var events: Array[ThreatEventModel] = []
-	# One battle tick represents 0.2 seconds. A standard encounter lasts three minutes.
-	for tick in range(100, 300, 30):
-		events.append(ThreatEventModel.new(tick, &"raider", 1, "襲撃兵"))
-	for tick in range(300, 570, 30):
-		events.append(ThreatEventModel.new(tick, &"swarm", 4, "群体兵", &"center", tick == 300))
-	for tick in range(570, 780, 42):
-		events.append(ThreatEventModel.new(tick, &"brute", 1, "装甲兵", &"center", tick == 570))
-	for tick in range(780, 893, 30):
-		events.append(ThreatEventModel.new(tick, &"brute", 1, "最終装甲兵", &"center", tick == 780))
-		events.append(ThreatEventModel.new(tick + 8, &"swarm", 5, "最終群体兵"))
-	return events
-
-
-static func _swarm_route_schedule() -> Array[ThreatEventModel]:
-	var events: Array[ThreatEventModel] = []
-	for tick in range(100, 280, 30):
-		events.append(ThreatEventModel.new(tick, &"raider", 1, "襲撃兵"))
-	for tick in range(280, 700, 30):
-		events.append(ThreatEventModel.new(tick, &"swarm", 4, "群体兵", &"center", tick == 280))
-	for tick in range(700, 901, 30):
-		events.append(ThreatEventModel.new(tick, &"swarm", 5, "最終群体兵", &"center", tick == 700))
-		if tick % 60 == 40:
-			events.append(ThreatEventModel.new(tick + 8, &"brute", 1, "護衛装甲兵"))
-	return events
-
-
-static func _armored_route_schedule() -> Array[ThreatEventModel]:
-	var events: Array[ThreatEventModel] = []
-	for tick in range(100, 280, 30):
-		events.append(ThreatEventModel.new(tick, &"raider", 1, "襲撃兵"))
-	for tick in range(280, 460, 45):
-		events.append(ThreatEventModel.new(tick, &"swarm", 3, "群体兵", &"center", tick == 280))
-	for tick in range(460, 901, 34):
-		events.append(ThreatEventModel.new(tick, &"brute", 1, "装甲兵", &"center", tick == 460))
-	return events
-
-
-static func route_name(route_id: StringName) -> String:
-	match route_id:
-		ROUTE_SWARM:
-			return "群体の道"
-		ROUTE_ARMORED:
-			return "装甲の道"
-	return "混成の道"
-
-
-static func route_description(route_id: StringName) -> String:
-	match route_id:
-		ROUTE_SWARM:
-			return "群体中心 // 0:56から長い群体波"
-		ROUTE_ARMORED:
-			return "装甲中心 // 1:32から装甲波"
-	return "混成 // 0:20 襲撃 → 1:00 群体 → 1:54 装甲"
 
 
 static func build_factory(plan_id: StringName) -> FactorySimulation:
@@ -133,7 +25,7 @@ static func build_factory(plan_id: StringName) -> FactorySimulation:
 	var content_validation := validate_recipe_set(recipe_set)
 	assert(
 		content_validation["ok"],
-		"Invalid MVP recipe content: %s" % ", ".join(content_validation["errors"])
+		"Invalid factory recipe content: %s" % ", ".join(content_validation["errors"])
 	)
 	for recipe in recipe_set:
 		simulation.add_recipe(recipe)
@@ -229,18 +121,6 @@ static func recipes() -> Array[SigilRecipeModel]:
 	]
 
 
-static func recipe_combat_modifiers(recipe_id: StringName) -> Dictionary:
-	match recipe_id:
-		&"stellar_sentinel":
-			return {
-				&"max_health_multiplier": 0.8,
-				&"attack_damage_multiplier": 1.45,
-				&"move_speed_multiplier": 1.35,
-				&"target_count": 2,
-			}
-	return {}
-
-
 static func layout_for_plan(plan_id: StringName) -> Dictionary:
 	match plan_id:
 		PLAN_EMPTY:
@@ -312,17 +192,17 @@ static func plan_description(plan_id: StringName) -> String:
 		PLAN_EMPTY:
 			return "構築練習 // 目の出力を召喚器へ接続"
 		PLAN_SENTINEL:
-			return "対群体 // 3体同時攻撃・中速"
+			return "環 // 回転・着色の直列加工"
 		PLAN_VIGIL:
-			return "目＋十字 // 単純結合で対群体衛兵を生産"
+			return "目＋十字 // 2素材の単純結合"
 		PLAN_STELLAR:
-			return "星 // 少数・高速・強打の2体攻撃衛兵"
+			return "星 // 単一素材の短工程"
 		PLAN_GOLEM:
-			return "対装甲 // 高耐久・低速・長工程"
+			return "環＋棘 // 結合後に着色"
 		PLAN_FORTRESS:
-			return "的＋方位 // 単純結合で対装甲巨像を生産"
+			return "的＋方位 // 2素材の単純結合"
 		_:
-			return "目 // 高速生産・短寿命"
+			return "目 // 単一素材の短工程"
 
 
 static func sigil_name(recipe_id: StringName) -> String:
@@ -343,16 +223,20 @@ static func sigil_name(recipe_id: StringName) -> String:
 			return String(recipe_id)
 
 
-static func recipe_combat_trait(recipe_id: StringName) -> String:
+static func recipe_factory_trait(recipe_id: StringName) -> String:
 	match recipe_id:
 		&"watchful_eye":
-			return "高速・単体・短命"
-		&"azure_guard", &"vigil_cross":
-			return "3体攻撃・対群体"
+			return "単一素材・短工程"
+		&"azure_guard":
+			return "回転・着色の直列加工"
+		&"vigil_cross":
+			return "2素材・単純結合"
 		&"stellar_sentinel":
-			return "高速・強打・2体攻撃"
-		&"bound_colossus", &"fortress_compass":
-			return "高耐久・対装甲"
+			return "単一素材・中頻度"
+		&"bound_colossus":
+			return "2素材・結合後加工"
+		&"fortress_compass":
+			return "2素材・単純結合"
 	return ""
 
 
