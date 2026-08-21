@@ -6,6 +6,7 @@ signal battle_finished(winner: int)
 const MvpContent := preload("res://src/game/mvp_content.gd")
 const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
+const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 
 const PANEL_COLOR := Color(0.055, 0.035, 0.06, 0.96)
 const LANE_COLOR := Color(0.34, 0.22, 0.38, 0.8)
@@ -127,6 +128,15 @@ func unit_at(at_position: Vector2) -> BattleUnitModel:
 		var unit: BattleUnitModel = simulation.units[index]
 		if at_position.distance_to(unit_center(unit)) <= _unit_radius(unit) + 7.0:
 			return unit
+	return null
+
+
+func unit_sigil_glyph(unit: BattleUnitModel) -> GlyphModel:
+	if unit == null or unit.side != BattleSimulation.Side.PLAYER or unit.recipe_id == &"":
+		return null
+	for recipe in MvpContent.recipes():
+		if recipe.id == unit.recipe_id:
+			return recipe.glyph
 	return null
 
 
@@ -263,6 +273,17 @@ func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 	var center := unit_center(unit)
 	var display_color := Color.WHITE if unit.hit_flash_ticks > 0 else color
 	_draw_unit_shape(unit.spec.id, center, radius, display_color)
+	var sigil_glyph := unit_sigil_glyph(unit)
+	if sigil_glyph != null:
+		GlyphPainterModel.draw_glyph(
+			self,
+			sigil_glyph,
+			center,
+			GlyphPainterModel.fit_scale(sigil_glyph, maxf(radius - 2.5, 4.5), false, 0.22, 1.5),
+			0.96,
+			false,
+			0.75
+		)
 	if unit.side == BattleSimulation.Side.PLAYER and unit.summon_flash_ticks > 0:
 		draw_arc(center, radius + 6.0, 0.0, TAU, 24, Color(0.58, 0.92, 1.0, 0.85), 2.0)
 		draw_string(

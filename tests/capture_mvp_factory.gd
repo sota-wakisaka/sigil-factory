@@ -43,7 +43,12 @@ func _initialize() -> void:
 			main.battle_board.simulation.tick_index = main.battle_board.simulation.battle_duration_ticks - 1
 			main.battle_board.advance_tick()
 		elif capture_phase == "battle":
-			pass
+			main.battle_board.spawn_player(&"scout", &"watchful_eye")
+			main.battle_board.spawn_player(&"sentinel", &"vigil_cross")
+			main.battle_board.spawn_player(&"sentinel", &"stellar_sentinel")
+			main.battle_board.spawn_player(&"golem", &"fortress_compass")
+			for index in main.battle_board.simulation.units.size():
+				main.battle_board.simulation.units[index].position = 90.0 + float(index) * 75.0
 		if capture_phase == "victory":
 			main.produced_units = {&"scout": 3, &"sentinel": 4, &"golem": 0}
 			main.produced_recipes = {&"watchful_eye": 3, &"stellar_sentinel": 4}
