@@ -909,6 +909,25 @@ func prospective_upgrade_snapshot(upgrade_id: StringName) -> Dictionary:
 	}
 
 
+func plan_production_snapshot(next_plan_id: StringName) -> Dictionary:
+	var hypothetical := MvpContent.build_factory(next_plan_id)
+	for node in hypothetical.nodes.values():
+		_apply_node_upgrades(node)
+	for line in hypothetical.lines.values():
+		_apply_line_upgrades(line)
+	var result := _production_preview_for_simulation(hypothetical, PRODUCTION_PREVIEW_TICKS)
+	return {
+		"ok": bool(result.get("ok", false)),
+		"horizon_ticks": PRODUCTION_PREVIEW_TICKS,
+		"counts": result.get("counts", {}).duplicate(true),
+		"event_offsets": result.get("event_offsets", {}).duplicate(true),
+		"recipe_ids": result.get("recipe_ids", {}).duplicate(true),
+		"discarded": int(result.get("discarded", 0)),
+		"errors": result.get("errors", []).duplicate(),
+		"mana": mana_used(hypothetical),
+	}
+
+
 func set_production_comparison_baseline(snapshot: Dictionary) -> bool:
 	clear_production_comparison_baseline()
 	if (

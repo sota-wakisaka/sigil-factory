@@ -279,6 +279,20 @@ func _sync_plan_ui(plan_id: StringName) -> void:
 	_refresh_factory_goal_candidate()
 
 
+func _refresh_plan_button_forecasts() -> void:
+	for button in [$Toolbar/EmptyButton, $Toolbar/ScoutButton, $Toolbar/SentinelButton, $Toolbar/StarButton, $Toolbar/GolemButton]:
+		var snapshot := factory_board.plan_production_snapshot(button.plan_id)
+		var count := 0
+		if bool(snapshot.get("ok", false)):
+			for unit_count in snapshot.get("counts", {}).values():
+				count += int(unit_count)
+		button.set_forecast_context("魔力 %d/%d // %s" % [
+			int(snapshot.get("mana", 0)),
+			MvpContent.FACTORY_MANA_MAX,
+			("配線後に生産予測" if button.manual_layout else "%d体/32秒" % count),
+		])
+
+
 func _set_factory_feedback(message: String) -> void:
 	plan_label.text = message
 	factory_state.configure(message)
@@ -711,6 +725,7 @@ func _apply_phase() -> void:
 			)
 		RunFlow.Phase.FACTORY_BUILD:
 			_show_workspace(WorkspaceView.FACTORY)
+			_refresh_plan_button_forecasts()
 			_set_plan_buttons_enabled(true)
 			_set_factory_palette_enabled(true)
 			factory_board.set_interaction_enabled(true)

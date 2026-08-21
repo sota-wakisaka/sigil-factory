@@ -12,6 +12,7 @@ const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 
 var glyph: GlyphModel
 var plan_description := ""
+var forecast_context := ""
 
 
 func _ready() -> void:
@@ -39,6 +40,10 @@ func _load_recipe() -> bool:
 func set_plan_selected(selected: bool) -> void:
 	set_pressed_no_signal(selected)
 	queue_redraw()
+
+
+func set_forecast_context(next_context: String) -> void:
+	forecast_context = next_context
 
 
 func _draw() -> void:
@@ -80,5 +85,8 @@ func glyph_draw_scale() -> float:
 
 func _make_custom_tooltip(_for_text: String):
 	var preview := GlyphTooltipModel.new()
-	preview.configure(glyph, "目標候補 // %s" % caption, plan_description)
+	var context := plan_description
+	if forecast_context != "":
+		context += "\n" + forecast_context
+	preview.configure(glyph, "目標候補 // %s" % caption, context)
 	return preview
