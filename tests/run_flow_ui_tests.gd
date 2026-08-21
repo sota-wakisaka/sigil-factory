@@ -475,6 +475,7 @@ func _initialize() -> void:
 	main.acquired_rewards = maxed_rewards
 	main._apply_phase()
 	_expect("強化は完成" in main.phase_title.text and main.phase_button.text == "次のルートへ", "maxed run rewards should stop promising an unavailable choice")
+	_expect(not main.reward_choices.get_child(0).forecast_visible and not main.reward_choices.get_child(1).forecast_visible and not main.reward_choices.get_child(2).forecast_visible, "completed rewards should hide forecast slots instead of looking unpredictable")
 	_expect(main._reward_summary() == "集束 3/3 / 交差 3/3 / 先見 3/3", "route progression should compact repeated rewards into stable levels")
 	main.acquired_rewards = saved_rewards
 	main._apply_phase()

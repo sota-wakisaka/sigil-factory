@@ -18,6 +18,7 @@ var forecast_glyph: GlyphModel
 var forecast_before := -1
 var forecast_after := -1
 var forecast_timing_changed := false
+var forecast_visible := false
 var forecast_valid := false
 
 
@@ -50,6 +51,7 @@ func set_forecast_context(next_context: String) -> void:
 
 
 func set_forecast_visual(state: Dictionary) -> void:
+	forecast_visible = bool(state.get("visible", not state.is_empty()))
 	forecast_valid = bool(state.get("valid", false))
 	forecast_glyph = state.get("glyph")
 	if forecast_glyph != null:
@@ -112,6 +114,8 @@ func _draw() -> void:
 
 
 func _draw_forecast(accent: Color) -> void:
+	if not forecast_visible:
+		return
 	var divider_x := size.x - 68.0
 	draw_line(Vector2(divider_x, 30.0), Vector2(divider_x, size.y - 10.0), Color(accent, 0.2), 1.0)
 	if not forecast_valid:

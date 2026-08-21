@@ -855,7 +855,7 @@ func _prepare_reward_options() -> bool:
 			)
 		)
 		button.set_forecast_visual(
-			{"valid": false}
+			{}
 			if button.disabled
 			else _reward_forecast_visual(baseline, prospective)
 		)
@@ -912,7 +912,7 @@ func _reward_forecast_summary(before: Dictionary, after: Dictionary) -> String:
 func _reward_forecast_visual(before: Dictionary, after: Dictionary) -> Dictionary:
 	var comparison := factory_board.compare_production_snapshots(before, after)
 	if comparison.get("validity", &"invalid") != &"valid":
-		return {"valid": false}
+		return {"visible": true, "valid": false}
 	var fallback := {}
 	for unit_id: StringName in [&"scout", &"sentinel", &"golem"]:
 		var difference: Dictionary = comparison.get("units", {}).get(unit_id, {})
@@ -921,6 +921,7 @@ func _reward_forecast_visual(before: Dictionary, after: Dictionary) -> Dictionar
 			recipe_id = StringName(difference.get("before_recipe_id", ""))
 		var glyph := _recipe_glyph(recipe_id)
 		var state := {
+			"visible": true,
 			"valid": true,
 			"glyph": glyph,
 			"before": int(difference.get("before", 0)),
@@ -935,7 +936,7 @@ func _reward_forecast_visual(before: Dictionary, after: Dictionary) -> Dictionar
 			or difference.get("recipe_state", &"unchanged") != &"unchanged"
 		):
 			return state
-	return fallback if not fallback.is_empty() else {"valid": true, "before": 0, "after": 0}
+	return fallback if not fallback.is_empty() else {"visible": true, "valid": true, "before": 0, "after": 0}
 
 
 func _recipe_glyph(recipe_id: StringName) -> GlyphModel:
