@@ -26,6 +26,8 @@ func _initialize() -> void:
 		_build_triangle_fixture(lab)
 	elif fixture == "repeat":
 		lab.load_repeat_template()
+	elif fixture == "distribution":
+		lab.load_distribution_template()
 	await process_frame
 	await process_frame
 	await RenderingServer.frame_post_draw

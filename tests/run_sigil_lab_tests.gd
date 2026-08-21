@@ -12,6 +12,7 @@ func _initialize() -> void:
 	_test_graph_evaluation()
 	_test_basic_primitives_and_stretch()
 	_test_radial_repeat()
+	_test_explicit_distribution()
 	_test_eight_way_combine()
 	_test_free_angle_triangle()
 	_test_post_combine_move()
@@ -92,6 +93,30 @@ func _test_radial_repeat() -> void:
 	centered.connect_nodes(&"circle", 0, &"repeat", 0)
 	centered.connect_nodes(&"repeat", 0, &"output", 0)
 	_expect(not centered.evaluate_output()["ok"], "rotationally identical copies at the center should be rejected instead of overdrawn")
+
+
+func _test_explicit_distribution() -> void:
+	var graph = SigilGraphModel.new()
+	graph.add_node(&"source", SigilGraphModel.SOURCE, {"primitive_id": &"square"})
+	graph.add_node(&"distribute", SigilGraphModel.DISTRIBUTE)
+	graph.add_node(&"up", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)})
+	graph.add_node(&"right", SigilGraphModel.MOVE, {"offset": Vector2i(4, 0)})
+	graph.add_node(&"combine", SigilGraphModel.COMBINE)
+	graph.add_node(&"output", SigilGraphModel.OUTPUT)
+	_expect(graph.output_count(&"distribute") == 8, "Distributor should expose eight explicit branch outputs")
+	_expect(graph.connect_nodes(&"source", 0, &"distribute", 0), "source should feed the Distributor once")
+	_expect(graph.connect_nodes(&"distribute", 0, &"up", 0), "Distributor output one should feed its own branch")
+	_expect(graph.connect_nodes(&"distribute", 1, &"right", 0), "Distributor output two should independently feed another branch")
+	_expect(graph.connect_nodes(&"up", 0, &"combine", 0), "first branch should reconnect to Combine")
+	_expect(graph.connect_nodes(&"right", 0, &"combine", 1), "second branch should reconnect to Combine")
+	_expect(graph.connect_nodes(&"combine", 0, &"output", 0), "distributed branches should reach output")
+	var result := graph.evaluate_output()
+	_expect(result["ok"] and result["glyph"].components.size() == 2, "Distributor should copy one input into independently transformed outputs")
+	if result["ok"]:
+		var positions: Array = []
+		for component in result["glyph"].components:
+			positions.append(component.position)
+		_expect(positions.has(Vector2(0, -4)) and positions.has(Vector2(4, 0)), "each distributed branch should keep its own transform")
 
 
 func _test_eight_way_combine() -> void:
@@ -186,6 +211,7 @@ func _test_connection_guards() -> void:
 	graph.add_node(&"output", SigilGraphModel.OUTPUT)
 	_expect(graph.connect_nodes(&"source", 0, &"first", 0), "first input should accept a source")
 	_expect(not graph.connect_nodes(&"source", 0, &"first", 0) and graph.last_error == &"input_occupied", "occupied inputs should reject replacement without disconnect")
+	_expect(not graph.connect_nodes(&"source", 0, &"second", 0) and graph.last_error == &"output_occupied", "ordinary outputs should require an explicit Distributor before branching")
 	_expect(graph.connect_nodes(&"first", 0, &"second", 0), "second processor should connect downstream")
 	_expect(not graph.connect_nodes(&"second", 0, &"first", 0) and graph.last_error == &"input_occupied", "occupied input should remain protected before cycle evaluation")
 	graph.disconnect_nodes(&"source", 0, &"first", 0)
@@ -196,16 +222,16 @@ func _test_connection_guards() -> void:
 func _test_owned_results() -> void:
 	var graph = SigilGraphModel.new()
 	graph.add_node(&"source", SigilGraphModel.SOURCE, {"primitive_id": &"circle"})
-	graph.add_node(&"color", SigilGraphModel.COLOR, {"color_id": &"blue"})
+	graph.add_node(&"scale", SigilGraphModel.SCALE, {"x_percent": 200, "y_percent": 100})
 	graph.add_node(&"output", SigilGraphModel.OUTPUT)
-	graph.connect_nodes(&"source", 0, &"color", 0)
-	graph.connect_nodes(&"color", 0, &"output", 0)
+	graph.connect_nodes(&"source", 0, &"scale", 0)
+	graph.connect_nodes(&"scale", 0, &"output", 0)
 	var first := graph.evaluate_output()
-	first["glyph"].recolor(&"red")
+	first["glyph"].stretch_percent(200, 200)
 	var second := graph.evaluate_output()
-	_expect(second["glyph"].components[0].color_id == &"blue", "returned Glyph mutations must not alter graph evaluation")
-	graph.set_node_config(&"color", {"color_id": &"white"})
-	_expect(graph.evaluate_output()["glyph"].components[0].color_id == &"white", "setting changes should immediately change output")
+	_expect(second["glyph"].components[0].scale_x_percent == 200, "returned Glyph mutations must not alter graph evaluation")
+	graph.set_node_config(&"scale", {"x_percent": 150, "y_percent": 100})
+	_expect(graph.evaluate_output()["glyph"].components[0].scale_x_percent == 150, "setting changes should immediately change output")
 
 
 func _test_lab_scene() -> void:
@@ -245,6 +271,9 @@ func _test_lab_scene() -> void:
 	_expect(scale_control.find_children("*", "SpinBox", true, false).size() == 2, "Lab stretch should expose independent horizontal and vertical controls")
 	var free_repeat: StringName = lab.add_lab_node(SigilGraphModel.REPEAT, {"count": 6}, Vector2(40, 40))
 	_expect(lab.option_controls[free_repeat] is OptionButton and lab.option_controls[free_repeat].item_count == 6, "Lab repeat should expose all exact equal-angle counts")
+	var free_distributor: StringName = lab.add_lab_node(SigilGraphModel.DISTRIBUTE, {}, Vector2(40, 40))
+	_expect(lab.graph.output_count(free_distributor) == 8, "Lab Distributor should expose eight graph outputs")
+	_expect(not SigilGraphModel.NODE_KINDS.has(&"color"), "color processing should be omitted from the Lab grammar")
 	var output: Dictionary = lab.graph.evaluate_output()
 	_expect(output["ok"] and output["glyph"].components.size() == 2, "default eye template should combine two basic circles")
 	_expect(output["glyph"].combine_children.size() == 2, "default eye template should preserve its reusable two-part group")
@@ -264,6 +293,10 @@ func _test_lab_scene() -> void:
 	await process_frame
 	var repeat_output: Dictionary = lab.graph.evaluate_output()
 	_expect(repeat_output["ok"] and repeat_output["glyph"].components.size() == 7, "six-flower template should combine six repeated triangles with one basic circle")
+	lab.load_distribution_template()
+	await process_frame
+	var distribution_output: Dictionary = lab.graph.evaluate_output()
+	_expect(distribution_output["ok"] and distribution_output["glyph"].components.size() == 4, "distribution template should branch one square into four independently moved copies")
 	lab.free()
 
 

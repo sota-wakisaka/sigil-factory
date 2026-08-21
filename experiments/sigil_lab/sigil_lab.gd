@@ -14,7 +14,7 @@ const NODE_NAMES := {
 	&"move": "移動",
 	&"scale": "変形",
 	&"repeat": "反復",
-	&"color": "着色",
+	&"distribute": "分配",
 	&"combine": "合成",
 	&"output": "完成",
 }
@@ -58,8 +58,13 @@ func add_lab_node(kind: StringName, config: Dictionary = {}, position: Vector2 =
 	return _add_node(kind, config, position)
 
 
-func connect_lab_nodes(from_node: StringName, to_node: StringName, to_port: int = 0) -> bool:
-	return _connect_nodes(from_node, 0, to_node, to_port)
+func connect_lab_nodes(
+	from_node: StringName,
+	to_node: StringName,
+	to_port: int = 0,
+	from_port: int = 0
+) -> bool:
+	return _connect_nodes(from_node, from_port, to_node, to_port)
 
 
 func clear_workspace() -> void:
@@ -76,6 +81,10 @@ func load_eye_template() -> void:
 
 func load_repeat_template() -> void:
 	_load_repeat_template()
+
+
+func load_distribution_template() -> void:
+	_load_distribution_template()
 
 
 func _build_ui() -> void:
@@ -137,6 +146,13 @@ func _build_header() -> Control:
 	repeat_button.pressed.connect(_load_repeat_template)
 	toolbar.add_child(repeat_button)
 
+	var distribution_button := Button.new()
+	distribution_button.text = "分岐"
+	distribution_button.tooltip_text = "1つの四角を4方向へ分配して加工するテンプレート"
+	distribution_button.custom_minimum_size = Vector2(76, 34)
+	distribution_button.pressed.connect(_load_distribution_template)
+	toolbar.add_child(distribution_button)
+
 	var clear_button := Button.new()
 	clear_button.text = "クリア"
 	clear_button.tooltip_text = "完成ノード以外を削除する"
@@ -173,7 +189,7 @@ func _build_palette() -> Control:
 		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "上下左右へ移動"],
 		["↔↕", SigilGraphModel.SCALE, {"x_percent": 150, "y_percent": 100}, "横・縦を別々に拡大縮小"],
 		["×N", SigilGraphModel.REPEAT, {"count": 6}, "中心のまわりへ等角度で放射反復"],
-		["●", SigilGraphModel.COLOR, {"color_id": &"blue"}, "白・青・赤へ着色"],
+		["⇶", SigilGraphModel.DISTRIBUTE, {}, "1つのシジルを最大8本の枝へ分配"],
 		["⊕", SigilGraphModel.COMBINE, {}, "2〜8個のGlyphを中心結合・相互結合"],
 	]:
 		var button := Button.new()
@@ -283,12 +299,22 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 			var option := _source_option(node_id)
 			node.add_child(option)
 			option_controls[node_id] = option
-		SigilGraphModel.ROTATE, SigilGraphModel.MOVE, SigilGraphModel.SCALE, SigilGraphModel.REPEAT, SigilGraphModel.COLOR:
+		SigilGraphModel.ROTATE, SigilGraphModel.MOVE, SigilGraphModel.SCALE, SigilGraphModel.REPEAT:
 			node.add_child(preview)
 			node.set_slot(0, true, 0, PORT_COLOR, true, 0, PORT_COLOR)
 			var option := _setting_option(node_id, kind)
 			node.add_child(option)
 			option_controls[node_id] = option
+		SigilGraphModel.DISTRIBUTE:
+			node.add_child(preview)
+			node.set_slot(0, true, 0, PORT_COLOR, true, 0, PORT_COLOR)
+			for output_index in range(1, graph.output_count(node_id)):
+				var output_label := Label.new()
+				output_label.text = str(output_index + 1)
+				output_label.custom_minimum_size = Vector2(108, 26)
+				output_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+				node.add_child(output_label)
+				node.set_slot(output_index, false, 0, PORT_COLOR, true, 0, PORT_COLOR)
 		SigilGraphModel.COMBINE:
 			for input_index in SigilGraphModel.MAX_COMBINE_INPUTS:
 				var input_label := Label.new()
@@ -395,15 +421,6 @@ func _setting_option(node_id: StringName, kind: StringName) -> Control:
 			option.select(maxi(MOVE_OPTIONS.find(current_offset), 0))
 			option.item_selected.connect(func(index: int) -> void:
 				graph.set_node_config(node_id, {"offset": MOVE_OPTIONS[index]})
-				_refresh_all()
-			)
-		SigilGraphModel.COLOR:
-			for label in ["白", "青", "赤"]:
-				option.add_item(label)
-			var color_id := StringName(graph.node_config(node_id).get("color_id", &"blue"))
-			option.select(maxi([&"white", &"blue", &"red"].find(color_id), 0))
-			option.item_selected.connect(func(index: int) -> void:
-				graph.set_node_config(node_id, {"color_id": [&"white", &"blue", &"red"][index]})
 				_refresh_all()
 			)
 	return option
@@ -541,6 +558,42 @@ func _load_repeat_template() -> void:
 	_refresh_all()
 
 
+func _load_distribution_template() -> void:
+	_clear_workspace()
+	var source := _add_node(
+		SigilGraphModel.SOURCE,
+		{"primitive_id": &"square"},
+		Vector2(20, 285)
+	)
+	var distributor := _add_node(SigilGraphModel.DISTRIBUTE, {}, Vector2(180, 205))
+	var offsets := [
+		Vector2i(0, -4),
+		Vector2i(4, 0),
+		Vector2i(0, 4),
+		Vector2i(-4, 0),
+	]
+	var branches: Array[StringName] = []
+	for index in offsets.size():
+		var branch := _add_node(
+			SigilGraphModel.MOVE,
+			{"offset": offsets[index]},
+			Vector2(390, 70 + index * 155)
+		)
+		branches.append(branch)
+	var combine := _add_node(
+		SigilGraphModel.COMBINE,
+		{"connection_mode": GlyphModel.CONNECTION_PAIRWISE},
+		Vector2(610, 230)
+	)
+	var output_id := graph.output_node_id()
+	_connect_nodes(source, 0, distributor, 0)
+	for index in branches.size():
+		_connect_nodes(distributor, index, branches[index], 0)
+		_connect_nodes(branches[index], 0, combine, index)
+	_connect_nodes(combine, 0, output_id, 0)
+	_refresh_all()
+
+
 func _refresh_all() -> void:
 	for node_id in node_controls:
 		var result := graph.evaluate(node_id)
@@ -589,6 +642,7 @@ static func _error_text(error: StringName) -> String:
 		&"missing_input": "配線待ち // 入力が不足しています",
 		&"missing_output": "完成ノードがありません",
 		&"input_occupied": "入力は接続済み // 右クリックで切断",
+		&"output_occupied": "出力は使用中 // 分岐には分配ノードを使用",
 		&"cycle": "循環する配線は作れません",
 		&"invalid_direction": "出力から入力へ接続してください",
 		&"invalid_glyph": "完全重複する素材は合成できません",

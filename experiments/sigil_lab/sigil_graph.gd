@@ -9,13 +9,12 @@ const ROTATE := &"rotate"
 const MOVE := &"move"
 const SCALE := &"scale"
 const REPEAT := &"repeat"
-const COLOR := &"color"
+const DISTRIBUTE := &"distribute"
 const COMBINE := &"combine"
 const OUTPUT := &"output"
 
-const NODE_KINDS := [SOURCE, ROTATE, MOVE, SCALE, REPEAT, COLOR, COMBINE, OUTPUT]
+const NODE_KINDS := [SOURCE, ROTATE, MOVE, SCALE, REPEAT, DISTRIBUTE, COMBINE, OUTPUT]
 const PRIMITIVES := [&"circle", &"triangle", &"square"]
-const COLORS := [&"white", &"blue", &"red"]
 const REPEAT_COUNTS := [2, 3, 4, 5, 6, 8]
 const MAX_COMBINE_INPUTS := GlyphModel.MAX_COMBINE_CHILDREN
 
@@ -107,13 +106,21 @@ func connection_result(
 		return _connection_error(&"missing_node")
 	if from_node_id == to_node_id:
 		return _connection_error(&"cycle")
-	if from_port != 0 or to_port < 0 or to_port >= input_count(to_node_id):
+	if (
+		from_port < 0
+		or from_port >= output_count(from_node_id)
+		or to_port < 0
+		or to_port >= input_count(to_node_id)
+	):
 		return _connection_error(&"invalid_port")
 	if node_kind(from_node_id) == OUTPUT or node_kind(to_node_id) == SOURCE:
 		return _connection_error(&"invalid_direction")
 	for connection in connections:
 		if connection["to"] == to_node_id and int(connection["to_port"]) == to_port:
 			return _connection_error(&"input_occupied")
+	for connection in connections:
+		if connection["from"] == from_node_id and int(connection["from_port"]) == from_port:
+			return _connection_error(&"output_occupied")
 	if _would_create_cycle(from_node_id, to_node_id):
 		return _connection_error(&"cycle")
 	return {"ok": true, "error": &""}
@@ -167,7 +174,18 @@ func input_count(node_id: StringName) -> int:
 			return 0
 		COMBINE:
 			return GlyphModel.MAX_COMBINE_CHILDREN
-		ROTATE, MOVE, SCALE, REPEAT, COLOR, OUTPUT:
+		ROTATE, MOVE, SCALE, REPEAT, DISTRIBUTE, OUTPUT:
+			return 1
+	return 0
+
+
+func output_count(node_id: StringName) -> int:
+	match node_kind(node_id):
+		OUTPUT:
+			return 0
+		DISTRIBUTE:
+			return GlyphModel.MAX_COMBINE_CHILDREN
+		SOURCE, ROTATE, MOVE, SCALE, REPEAT, COMBINE:
 			return 1
 	return 0
 
@@ -269,9 +287,8 @@ func _apply_node(kind: StringName, config: Dictionary, inputs: Array) -> Diction
 			glyph = GlyphModel.radial_repeat(inputs[0], int(config["count"]))
 			if glyph == null:
 				return {"ok": false, "glyph": null, "error": &"invalid_repeat"}
-		COLOR:
+		DISTRIBUTE:
 			glyph = inputs[0].copy()
-			glyph.recolor(StringName(config["color_id"]))
 		COMBINE:
 			glyph = GlyphModel.combine_many(
 				inputs,
@@ -362,11 +379,8 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 			if not count in REPEAT_COUNTS:
 				return {"ok": false, "error": &"invalid_repeat", "config": {}}
 			return {"ok": true, "error": &"", "config": {"count": count}}
-		COLOR:
-			var color_id := StringName(config.get("color_id", &"blue"))
-			if not color_id in COLORS:
-				return {"ok": false, "error": &"invalid_color", "config": {}}
-			return {"ok": true, "error": &"", "config": {"color_id": color_id}}
+		DISTRIBUTE:
+			return {"ok": true, "error": &"", "config": {}}
 		COMBINE:
 			var connection_mode := StringName(config.get(
 				"connection_mode",
