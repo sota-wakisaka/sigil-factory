@@ -29,6 +29,13 @@ func _initialize() -> void:
 	main.acquired_rewards = upgrades
 	if capture_phase == "stage":
 		main.phase_button.pressed.emit()
+	elif capture_phase == "reward":
+		main.phase_button.pressed.emit()
+		main.phase_button.pressed.emit()
+		main._select_plan(plan_id)
+		main.pause_button.pressed.emit()
+		main.debug_victory_button.pressed.emit()
+		main.phase_button.pressed.emit()
 	elif capture_phase == "factory":
 		main.phase_button.pressed.emit()
 		main.phase_button.pressed.emit()

@@ -407,6 +407,7 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.REWARD, "victory OK should open rewards")
 	_expect(main.reward_choices.visible and main.reward_choices.get_child_count() == 3, "reward phase should offer three meaning-Glyph upgrades")
 	_expect("現在工場32秒" in main.reward_choices.get_child(0).tooltip_text, "reward hover should forecast the current factory effect before selection")
+	_expect("現在工場32秒" in main.phase_body.text, "selected reward should expose its current-factory forecast without requiring hover")
 	var reward_summary_before := {
 		"ok": true, "horizon_ticks": 160,
 		"counts": {&"scout": 2},
@@ -420,6 +421,9 @@ func _initialize() -> void:
 	reward_summary_after["discarded"] = 2
 	_expect("不一致 0→2" in main._reward_forecast_summary(reward_summary_before, reward_summary_after), "reward forecast should disclose discard-only changes")
 	_expect(main.reward_choices.get_child(0).button_pressed, "reward phase should begin with one explicit selection")
+	main.reward_choices.get_child(1).pressed.emit()
+	_expect(main.reward_choices.get_child(1).button_pressed and main.phase_body.text.ends_with(main.reward_choices.get_child(1).forecast_context), "changing reward selection should update the visible forecast")
+	main.reward_choices.get_child(0).pressed.emit()
 	_expect(main.reward_choices.get_child(0).level == 0 and not main.reward_choices.get_child(0).disabled, "an unowned meaning reward should show an empty three-step register")
 	var first_reward = main.reward_choices.get_child(0)
 	first_reward.set_level(first_reward.MAX_LEVEL)

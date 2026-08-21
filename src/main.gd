@@ -742,7 +742,8 @@ func _apply_phase() -> void:
 		RunFlow.Phase.REWARD:
 			pause_button.disabled = true
 			if _prepare_reward_options():
-				_show_overlay("REWARD", "ラン強化を1つ獲得", "選んだ強化は次のルート以降の工場へ適用されます。", "獲得して次のルートへ")
+				_show_overlay("REWARD", "ラン強化を1つ獲得", "", "獲得して次のルートへ")
+				_refresh_reward_selection_context()
 			else:
 				_show_overlay("REWARD", "ラン強化は完成", "3種類の工場強化が最大になりました。", "次のルートへ")
 
@@ -822,6 +823,15 @@ func _select_reward(selected_button: MeaningRewardButtonControl) -> void:
 		return
 	for button in reward_choices.get_children():
 		button.set_reward_selected(button == selected_button)
+	_refresh_reward_selection_context()
+
+
+func _refresh_reward_selection_context() -> void:
+	for button in reward_choices.get_children():
+		if button.button_pressed and not button.disabled:
+			phase_body.text = "次ルート以降の工場へ適用\n%s" % button.forecast_context
+			return
+	phase_body.text = "獲得できる強化がありません"
 
 
 func _prepare_route_options() -> void:
