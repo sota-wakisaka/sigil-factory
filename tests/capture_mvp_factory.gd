@@ -7,6 +7,7 @@ func _initialize() -> void:
 	var output := "C:/Users/sotaw/AppData/Local/Temp/sigil-factory-mvp.png"
 	var plan_id := MvpContent.PLAN_VIGIL
 	var capture_phase := "factory"
+	var viewport_size := Vector2i(1536, 900)
 	var upgrades: Array[StringName] = []
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--output="):
@@ -18,8 +19,12 @@ func _initialize() -> void:
 				upgrades.append(StringName(upgrade_id))
 		elif argument.begins_with("--phase="):
 			capture_phase = argument.trim_prefix("--phase=")
+		elif argument.begins_with("--size="):
+			var dimensions := argument.trim_prefix("--size=").split("x", false)
+			if dimensions.size() == 2:
+				viewport_size = Vector2i(maxi(int(dimensions[0]), 640), maxi(int(dimensions[1]), 360))
 	var viewport := SubViewport.new()
-	viewport.size = Vector2i(1536, 900)
+	viewport.size = viewport_size
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	root.add_child(viewport)
 	var scene: PackedScene = load("res://src/main.tscn")
