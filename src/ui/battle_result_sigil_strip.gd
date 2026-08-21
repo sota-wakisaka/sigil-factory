@@ -34,7 +34,7 @@ func configure(produced_by_recipe: Dictionary, damage_by_recipe: Dictionary, nex
 			&"damage": damage,
 		})
 	visible = not entries.is_empty() or not metrics.is_empty()
-	custom_minimum_size.y = SLOT_SIZE.y + (METRIC_SLOT_SIZE.y if not metrics.is_empty() else 0.0) if visible else 0.0
+	custom_minimum_size.y = (SLOT_SIZE.y if not entries.is_empty() else 0.0) + (METRIC_SLOT_SIZE.y if not metrics.is_empty() else 0.0) if visible else 0.0
 	tooltip_entry.clear()
 	queue_redraw()
 
@@ -58,7 +58,10 @@ func metric_rect(index: int) -> Rect2:
 		return Rect2()
 	var total_width := METRIC_SLOT_SIZE.x * float(METRIC_KEYS.size())
 	return Rect2(
-		Vector2((size.x - total_width) * 0.5 + METRIC_SLOT_SIZE.x * index, SLOT_SIZE.y),
+		Vector2(
+			(size.x - total_width) * 0.5 + METRIC_SLOT_SIZE.x * index,
+			SLOT_SIZE.y if not entries.is_empty() else 0.0
+		),
 		METRIC_SLOT_SIZE
 	)
 

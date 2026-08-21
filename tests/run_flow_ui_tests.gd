@@ -541,6 +541,8 @@ func _initialize() -> void:
 	main.produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	main.factory_board.simulation.discarded_glyphs = 3
 	_expect("召喚 0体 // 不一致 3" == main._defeat_advice(), "zero successful summons with discards should report the exact failed output")
+	main.battle_result_sigil_strip.configure({}, {}, main._battle_result_metrics())
+	_expect(main.battle_result_sigil_strip.custom_minimum_size.y == main.battle_result_sigil_strip.METRIC_SLOT_SIZE.y and main.battle_result_sigil_strip.metric_rect(0).position.y == 0.0, "a zero-summon result should collapse the empty sigil row above its factual metrics")
 	main.produced_units = {&"scout": 20, &"sentinel": 0, &"golem": 5}
 	main.factory_board.simulation.discarded_glyphs = 0
 	_expect(main._defeat_advice() == "", "defeat analysis should not prescribe a missing unit answer when visual production facts are available")
