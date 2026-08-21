@@ -4,6 +4,7 @@ const RunFlow := preload("res://src/game/run_flow.gd")
 const MvpContent := preload("res://src/game/mvp_content.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
+const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 
 var failures := 0
 
@@ -199,6 +200,7 @@ func _initialize() -> void:
 	main.sigil_ghost.show_recipe(&"vigil_cross")
 	main._refresh_factory_goal_tools()
 	_expect(main.get_node("FactoryPalette/MeaningButton").goal_state == &"partial", "a multi-Glyph target should distinguish one present meaning source from its complete source vocabulary")
+	_expect(main.get_node("FactoryPalette/MeaningButton").preview_glyph.canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.CROSS).canonical_serialization(), "meaning palette should picture the missing registered Glyph instead of always showing Eye")
 	_expect("一部" in main.get_node("FactoryPalette/MeaningButton").tooltip_text, "partial meaning-source inventory should remain explainable on demand")
 	main.sigil_ghost.show_recipe(&"watchful_eye")
 	main._refresh_factory_goal_tools()

@@ -82,6 +82,11 @@ func set_goal_relevant(relevant: bool) -> void:
 	set_goal_state(&"missing" if relevant else &"irrelevant")
 
 
+func set_preview_glyph(next_glyph: GlyphModel) -> void:
+	preview_glyph = next_glyph.copy() if next_glyph != null else null
+	queue_redraw()
+
+
 func set_goal_state(next_state: StringName) -> void:
 	goal_state = (
 		next_state

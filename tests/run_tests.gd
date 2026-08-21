@@ -2286,6 +2286,10 @@ func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 	meaning_board.selected_node_id = &"cross_source"
 	_expect(meaning_board.remove_selected_node(), "meaning inventory fixture should remove one source")
 	_expect(meaning_board.meaning_source_presence(required_meaning) == &"partial", "one remaining target Glyph should be partial instead of falsely complete")
+	_expect(meaning_board.first_missing_meaning_source(required_meaning) == MeaningGlyphsModel.CROSS, "meaning palette should identify the exact missing target source")
+	var replacement_cross := meaning_board.add_node_from_palette(&"meaning_source", MeaningGlyphsModel.CROSS)
+	_expect(replacement_cross != &"" and meaning_board.simulation.nodes[replacement_cross].config.get("meaning_glyph_id") == MeaningGlyphsModel.CROSS, "meaning palette should create the missing registered Glyph directly")
+	_expect(meaning_board.undo(), "preferred meaning source addition should remain one undoable action")
 	_expect(meaning_board.undo() and meaning_board.meaning_source_presence(required_meaning) == &"present", "Undo should restore complete meaning-source inventory")
 	meaning_board.free()
 

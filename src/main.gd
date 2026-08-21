@@ -301,7 +301,12 @@ func _refresh_factory_validation_state() -> void:
 
 
 func _add_factory_node(template_id: StringName) -> void:
-	factory_board.add_node_from_palette(template_id)
+	var preferred_meaning_glyph_id := &""
+	if template_id == &"meaning_source":
+		preferred_meaning_glyph_id = factory_board.first_missing_meaning_source(
+			_required_meaning_source_ids()
+		)
+	factory_board.add_node_from_palette(template_id, preferred_meaning_glyph_id)
 
 
 func _delete_factory_node() -> void:
@@ -341,6 +346,10 @@ func _refresh_factory_goal_tools() -> void:
 	_collect_goal_equipment(sigil_ghost.glyph, relevant, required_meaning_ids)
 	relevant[&"summoner"] = true
 	for button in $FactoryPalette.get_children():
+		if button.equipment_kind == &"meaning_source":
+			button.set_preview_glyph(MeaningGlyphsModel.glyph(
+				factory_board.first_missing_meaning_source(required_meaning_ids)
+			))
 		if button.equipment_kind in [&"delete", &"undo"]:
 			button.set_goal_state(&"irrelevant")
 		else:
@@ -357,6 +366,13 @@ func _refresh_factory_goal_tools() -> void:
 				else:
 					goal_state = &"missing"
 			button.set_goal_state(goal_state)
+
+
+func _required_meaning_source_ids() -> Array[StringName]:
+	var relevant := {}
+	var required_ids: Array[StringName] = []
+	_collect_goal_equipment(sigil_ghost.glyph, relevant, required_ids)
+	return required_ids
 
 
 func _collect_goal_equipment(

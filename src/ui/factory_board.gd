@@ -223,7 +223,7 @@ func node_local_position(node_id: StringName) -> Vector2:
 	return _scaled_position(_display_positions().get(node_id, Vector2.ZERO))
 
 
-func add_node_from_palette(template_id: StringName) -> StringName:
+func add_node_from_palette(template_id: StringName, preferred_meaning_glyph_id: StringName = &"") -> StringName:
 	if not interaction_enabled:
 		return &""
 	var kind := FactoryNodeModel.NodeKind.SOURCE
@@ -238,7 +238,12 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 			config = {"primitive_id": "spike", "interval_ticks": MvpContent.source_interval_for_glyph(&"spike")}
 		&"meaning_source":
 			prefix = "meaning_source"
-			config = {"meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": MvpContent.source_interval_for_glyph(MeaningGlyphsModel.EYE)}
+			var glyph_id := (
+				preferred_meaning_glyph_id
+				if MeaningGlyphsModel.has(preferred_meaning_glyph_id)
+				else MeaningGlyphsModel.EYE
+			)
+			config = {"meaning_glyph_id": glyph_id, "interval_ticks": MvpContent.source_interval_for_glyph(glyph_id)}
 		&"rotator":
 			prefix = "rotator"
 			kind = FactoryNodeModel.NodeKind.ROTATOR
@@ -475,6 +480,23 @@ func meaning_source_presence(required_ids: Array[StringName]) -> StringName:
 	if present.is_empty():
 		return &"missing"
 	return &"present" if present.size() == required_ids.size() else &"partial"
+
+
+func first_missing_meaning_source(required_ids: Array[StringName]) -> StringName:
+	var display_simulation := _display_simulation()
+	for required_id in required_ids:
+		var found := false
+		if display_simulation != null:
+			for node: FactoryNodeModel in display_simulation.nodes.values():
+				if (
+					node.kind == FactoryNodeModel.NodeKind.SOURCE
+					and StringName(node.config.get("meaning_glyph_id", "")) == required_id
+				):
+					found = true
+					break
+		if not found:
+			return required_id
+	return required_ids[0] if not required_ids.is_empty() else MeaningGlyphsModel.EYE
 
 
 func can_undo() -> bool:
