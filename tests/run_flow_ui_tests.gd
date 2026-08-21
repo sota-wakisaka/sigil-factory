@@ -5,6 +5,7 @@ const MvpContent := preload("res://src/game/mvp_content.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
 const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
+const ThreatIconPainterModel := preload("res://src/ui/threat_icon_painter.gd")
 
 var failures := 0
 
@@ -36,6 +37,7 @@ func _initialize() -> void:
 	_expect(main.stage_timeline.visible and main.stage_timeline.route_id == MvpContent.ROUTE_MIXED and main.stage_timeline.marker_count() == 4, "stage preview should visualize the selected route's major waves")
 	_expect(main.stage_timeline.event_count() == 29, "stage preview should retain every scheduled spawn instead of reducing each wave to one marker")
 	_expect(main.stage_timeline.lane_event_count(&"raider") == 7 and main.stage_timeline.lane_event_count(&"swarm") == 13 and main.stage_timeline.lane_event_count(&"brute") == 9, "stage preview should separate the mixed schedule into factual enemy lanes")
+	_expect(ThreatIconPainterModel.shape_id(&"raider") == &"circle" and ThreatIconPainterModel.shape_id(&"swarm") == &"triangle" and ThreatIconPainterModel.shape_id(&"brute") == &"square", "route and stage threat icons should use the same shapes as the battlefield legend")
 	_expect("混成の道" in main.phase_body.text, "stage information should retain the selected encounter")
 	_expect("制限 3:00" in main.phase_body.text, "stage information should disclose the battle duration")
 	_expect("1:00 群体 → 1:54 装甲" in main.stage_timeline.tooltip_text, "stage timeline hover should disclose the selected enemy sequence without prescribing an answer")
