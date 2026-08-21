@@ -34,6 +34,8 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.STAGE_INFO, "route OK should show stage information")
 	_expect(main.phase_kicker.text == "RUN 01 // STAGE", "stage preview should retain the current run number")
 	_expect(main.stage_timeline.visible and main.stage_timeline.route_id == MvpContent.ROUTE_MIXED and main.stage_timeline.marker_count() == 4, "stage preview should visualize the selected route's major waves")
+	_expect(main.stage_timeline.event_count() == 29, "stage preview should retain every scheduled spawn instead of reducing each wave to one marker")
+	_expect(main.stage_timeline.lane_event_count(&"raider") == 7 and main.stage_timeline.lane_event_count(&"swarm") == 13 and main.stage_timeline.lane_event_count(&"brute") == 9, "stage preview should separate the mixed schedule into factual enemy lanes")
 	_expect("混成の道" in main.phase_body.text, "stage information should retain the selected encounter")
 	_expect("制限 3:00" in main.phase_body.text, "stage information should disclose the battle duration")
 	_expect("1:00 群体 → 1:54 装甲" in main.stage_timeline.tooltip_text, "stage timeline hover should disclose the selected enemy sequence without prescribing an answer")

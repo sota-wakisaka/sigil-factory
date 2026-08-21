@@ -472,7 +472,7 @@ script = ExtResource("11_route_button")
 route_id = &"armored_route"
 
 [node name="StageTimeline" type="Control" parent="PhaseOverlay/Center/Panel/Content"]
-custom_minimum_size = Vector2(0, 96)
+custom_minimum_size = Vector2(0, 132)
 layout_mode = 2
 visible = false
 mouse_default_cursor_shape = 2

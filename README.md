@@ -37,7 +37,7 @@ Design documents:
 - Tick-start input and line snapshots that prevent same-tick cascading or slot reuse
 - Fixed-tick guard against malformed restored glyphs in equipment and transport lines
 - Edit-time recovery that discards only malformed work while preserving valid in-progress glyphs
-- Three meaning-sigil production plans: fast Eye scouts, anti-swarm Vigil Cross sentinels, and anti-armor Fortress Compass golems
+- Four meaning-sigil production plans: fast Eye scouts, anti-swarm Vigil Cross sentinels, mixed-wave Star sentinels, and anti-armor Fortress Compass golems
 - A lower-mana Star Sentinel alternate recipe discoverable through manual factory editing
 - Transactional factory changes made during time stop
 - Work-in-progress discard preview with glyph-type summaries, full undo, and cancel restoration
@@ -116,7 +116,7 @@ the player can compare the production prediction with the immediate battle resul
 
 The first factory step opens an unwired workshop containing an Eye source and a
 summoner. Connecting its two highlighted ports produces the first scout. The
-three completed production plans remain available as reference templates.
+four completed production plans remain available as reference templates.
 
 Press **Build Complete / Start Battle** when the graph is ready.
 During battle, press **Time Stop**, select a production plan, then confirm the
