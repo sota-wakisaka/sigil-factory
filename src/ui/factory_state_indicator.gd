@@ -14,7 +14,7 @@ func configure(message: String) -> void:
 	tooltip_text = message
 	if "構築可能" in message:
 		state = &"ready"
-	elif message == "Ⅱ":
+	elif message.begins_with("Ⅱ"):
 		state = &"paused"
 	elif "未接続" in message or "配線待ち" in message:
 		state = &"pending"

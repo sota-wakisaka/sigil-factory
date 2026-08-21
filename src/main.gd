@@ -336,18 +336,24 @@ func _set_factory_feedback(message: String) -> void:
 func _refresh_factory_validation_state() -> void:
 	if flow.phase == RunFlow.Phase.FACTORY_BUILD:
 		if factory_board.plan_id == MvpContent.PLAN_EMPTY and factory_board.is_guided_connection_pending():
+			pause_button.disabled = true
 			_set_factory_feedback("◇ 配線待ち")
 			return
 		var result := factory_board.validation_result()
+		pause_button.disabled = not bool(result["ok"])
 		if result["ok"]:
 			_set_factory_feedback("✓ 構築可能")
 		else:
 			_set_factory_feedback("◇ 未接続 // %s" % result["message"])
 	elif flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
-		var feedback := "◇ 未確定"
+		var result := factory_board.validation_result()
+		pause_button.disabled = not bool(result["ok"])
+		var feedback := "Ⅱ // 未確定"
 		var discard_notice := factory_board.pending_discard_notice()
 		if discard_notice != "":
 			feedback += " // " + discard_notice
+		if not result["ok"]:
+			feedback += " // 修復待ち"
 		_set_factory_feedback(feedback)
 
 
@@ -828,7 +834,7 @@ func _apply_phase() -> void:
 			pause_button.disabled = false
 			pause_button.configure_action("resume", "確定・再開", "有効な工場変更を一括確定し、リアルタイム戦闘を再開します")
 			cancel_button.disabled = false
-			_set_factory_feedback("Ⅱ")
+			_refresh_factory_validation_state()
 			status_label.text = ""
 		RunFlow.Phase.VICTORY:
 			pause_button.disabled = true
