@@ -46,7 +46,7 @@ enum WorkspaceView {
 @onready var phase_body: Label = $PhaseOverlay/Center/Panel/Content/Body
 @onready var phase_button: Button = $PhaseOverlay/Center/Panel/Content/AdvanceButton
 @onready var reward_choices: HBoxContainer = $PhaseOverlay/Center/Panel/Content/RewardChoices
-@onready var route_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RouteOption
+@onready var route_choices: HBoxContainer = $PhaseOverlay/Center/Panel/Content/RouteChoices
 @onready var inspector_label: FactorySelectionIndicatorControl = $FactoryInspector/SelectionLabel
 @onready var inspector_option: FactorySettingOption = $FactoryInspector/SettingOption
 @onready var sigil_ghost: SigilGhostControl = $FactoryInspector/SigilGhost
@@ -95,6 +95,8 @@ func _ready() -> void:
 	debug_victory_button.pressed.connect(_complete_battle_placeholder)
 	for button in reward_choices.get_children():
 		button.pressed.connect(_select_reward.bind(button))
+	for button in route_choices.get_children():
+		button.pressed.connect(_select_route.bind(button))
 	phase_button.pressed.connect(_advance_overlay)
 	factory_board.summon_produced.connect(_on_summon_produced)
 	factory_board.selection_changed.connect(_refresh_factory_inspector)
@@ -187,9 +189,6 @@ func _draw() -> void:
 
 
 func _advance_overlay() -> void:
-	if flow.phase == RunFlow.Phase.ROUTE_SELECTION:
-		selected_route_id = route_option.get_item_metadata(route_option.selected)
-		selected_route_name = MvpContent.route_name(selected_route_id)
 	if flow.phase == RunFlow.Phase.REWARD:
 		_acquire_selected_reward()
 	if not flow.advance():
@@ -660,7 +659,7 @@ func _apply_phase() -> void:
 	_update_progress()
 	phase_overlay.visible = false
 	reward_choices.visible = false
-	route_option.visible = false
+	route_choices.visible = false
 	debug_victory_button.visible = false
 	speed_button.disabled = true
 	_update_speed_button()
@@ -805,15 +804,22 @@ func _select_reward(selected_button: MeaningRewardButtonControl) -> void:
 
 
 func _prepare_route_options() -> void:
-	route_option.clear()
-	route_option.add_item("群体の道 // 数で押す敵編成")
-	route_option.set_item_metadata(0, MvpContent.ROUTE_SWARM)
-	route_option.add_item("混成の道 // 3兵種が順に出現")
-	route_option.set_item_metadata(1, MvpContent.ROUTE_MIXED)
-	route_option.add_item("装甲の道 // 高耐久中心の敵編成")
-	route_option.set_item_metadata(2, MvpContent.ROUTE_ARMORED)
-	route_option.select(1)
-	route_option.visible = true
+	route_choices.visible = true
+	var selected_button = null
+	for button in route_choices.get_children():
+		var selected: bool = button.route_id == selected_route_id
+		button.set_route_selected(selected)
+		if selected:
+			selected_button = button
+	if selected_button == null and route_choices.get_child_count() > 0:
+		_select_route(route_choices.get_child(0))
+
+
+func _select_route(selected_button) -> void:
+	for button in route_choices.get_children():
+		button.set_route_selected(button == selected_button)
+	selected_route_id = selected_button.route_id
+	selected_route_name = MvpContent.route_name(selected_route_id)
 
 
 func _acquire_selected_reward() -> void:

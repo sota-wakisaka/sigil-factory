@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/factory_board.gd" id="2_factory"]
@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://src/ui/factory_state_indicator.gd" id="9_factory_state"]
 [ext_resource type="Script" path="res://src/ui/factory_selection_indicator.gd" id="7_selection_indicator"]
 [ext_resource type="Script" path="res://src/ui/meaning_reward_button.gd" id="10_reward_button"]
+[ext_resource type="Script" path="res://src/ui/route_choice_button.gd" id="11_route_button"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -431,11 +432,32 @@ text = "進みたいルートを選択します。"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="RouteOption" type="OptionButton" parent="PhaseOverlay/Center/Panel/Content"]
-custom_minimum_size = Vector2(0, 48)
+[node name="RouteChoices" type="HBoxContainer" parent="PhaseOverlay/Center/Panel/Content"]
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
 visible = false
-theme_override_font_sizes/font_size = 16
+theme_override_constants/separation = 10
+
+[node name="Swarm" type="Button" parent="PhaseOverlay/Center/Panel/Content/RouteChoices"]
+custom_minimum_size = Vector2(220, 104)
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("11_route_button")
+route_id = &"swarm_route"
+
+[node name="Mixed" type="Button" parent="PhaseOverlay/Center/Panel/Content/RouteChoices"]
+custom_minimum_size = Vector2(220, 104)
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("11_route_button")
+route_id = &"mixed_route"
+
+[node name="Armored" type="Button" parent="PhaseOverlay/Center/Panel/Content/RouteChoices"]
+custom_minimum_size = Vector2(220, 104)
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("11_route_button")
+route_id = &"armored_route"
 
 [node name="RewardChoices" type="HBoxContainer" parent="PhaseOverlay/Center/Panel/Content"]
 custom_minimum_size = Vector2(0, 92)

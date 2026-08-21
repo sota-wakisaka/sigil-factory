@@ -6,6 +6,7 @@ const MvpContent := preload("res://src/game/mvp_content.gd")
 func _initialize() -> void:
 	var output := "C:/Users/sotaw/AppData/Local/Temp/sigil-factory-mvp.png"
 	var plan_id := MvpContent.PLAN_VIGIL
+	var capture_phase := "factory"
 	var upgrades: Array[StringName] = []
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--output="):
@@ -15,6 +16,8 @@ func _initialize() -> void:
 		elif argument.begins_with("--upgrades="):
 			for upgrade_id in argument.trim_prefix("--upgrades=").split(",", false):
 				upgrades.append(StringName(upgrade_id))
+		elif argument.begins_with("--phase="):
+			capture_phase = argument.trim_prefix("--phase=")
 	var viewport := SubViewport.new()
 	viewport.size = Vector2i(1536, 900)
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
@@ -24,9 +27,10 @@ func _initialize() -> void:
 	viewport.add_child(main)
 	await process_frame
 	main.acquired_rewards = upgrades
-	main.phase_button.pressed.emit()
-	main.phase_button.pressed.emit()
-	main._select_plan(plan_id)
+	if capture_phase == "factory":
+		main.phase_button.pressed.emit()
+		main.phase_button.pressed.emit()
+		main._select_plan(plan_id)
 	await process_frame
 	await process_frame
 	await process_frame

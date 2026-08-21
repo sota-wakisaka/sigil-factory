@@ -20,8 +20,11 @@ func _initialize() -> void:
 
 	_expect(main.flow.phase == RunFlow.Phase.ROUTE_SELECTION, "UI should open at route selection")
 	_expect(main.phase_overlay.visible, "placeholder phases should use the overlay")
-	_expect(main.route_option.visible and main.route_option.item_count == 3, "route selection should offer three branches")
-	_expect(main.route_option.get_item_metadata(0) == MvpContent.ROUTE_SWARM and main.route_option.get_item_metadata(2) == MvpContent.ROUTE_ARMORED, "route cards should carry distinct encounter identities")
+	_expect(main.route_choices.visible and main.route_choices.get_child_count() == 3, "route selection should offer three branches")
+	_expect(main.route_choices.get_child(0).route_id == MvpContent.ROUTE_SWARM and main.route_choices.get_child(2).route_id == MvpContent.ROUTE_ARMORED, "route cards should carry distinct encounter identities")
+	main.route_choices.get_child(0).pressed.emit()
+	_expect(main.selected_route_id == MvpContent.ROUTE_SWARM and main.route_choices.get_child(0).button_pressed, "route cards should select their encounter directly")
+	main.route_choices.get_child(1).pressed.emit()
 	_expect("敵編成が異なる" in main.phase_body.text and not "現在共通" in main.phase_body.text, "route introduction should agree with the distinct encounter schedules")
 
 	main.phase_button.pressed.emit()
