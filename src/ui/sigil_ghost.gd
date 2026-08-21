@@ -90,7 +90,7 @@ func show_recipe(next_recipe_id: StringName) -> bool:
 		tooltip_text = "%sシジルを拡大表示" % display_name
 		tooltip_glyph = glyph
 		tooltip_title = "目標シジル // %s" % display_name
-		tooltip_context = "CanonicalGlyphの完成形"
+		tooltip_context = target_context()
 		_refresh_candidate_state()
 		queue_redraw()
 		return true
@@ -283,7 +283,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 		return ""
 	tooltip_glyph = glyph
 	tooltip_title = "目標シジル // %s" % display_name
-	tooltip_context = "CanonicalGlyphの完成形"
+	tooltip_context = target_context()
 	return "target"
 
 
@@ -320,11 +320,17 @@ func candidate_context() -> String:
 		origin_context += " // " + candidate_forecast_context
 	match candidate_state:
 		&"owned_other":
-			return "%s // 取得済み: %s → %s" % [
+			return "%s // 取得済み: %s → %s // %s" % [
 				origin_context,
 				String(MvpContent.sigil_name(candidate_recipe_id)).trim_suffix("シジル"),
 				MvpContent.unit_name(candidate_unit_id),
+				MvpContent.recipe_combat_trait(candidate_recipe_id),
 			]
 		&"mismatch":
 			return "%s // 未登録" % origin_context
 	return origin_context
+
+
+func target_context() -> String:
+	var combat_trait := MvpContent.recipe_combat_trait(recipe_id)
+	return "完成形" if combat_trait == "" else "完成形 // 戦闘 %s" % combat_trait

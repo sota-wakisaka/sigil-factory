@@ -3736,6 +3736,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	var target_tooltip = ghost._make_custom_tooltip(ghost.tooltip_text)
 	_expect(target_tooltip.get_script() == GlyphTooltipModel, "sigil goal hover should create a visual Glyph tooltip")
 	_expect(target_tooltip.custom_minimum_size.x >= 300.0, "visual Glyph tooltip should be substantially larger than the persistent sample")
+	_expect("3体攻撃・対群体" in target_tooltip.context, "goal inspection should connect its completed shape to its combat role")
 	_expect(
 		target_tooltip.glyph.canonical_serialization() == ghost.glyph.canonical_serialization(),
 		"visual Glyph tooltip should draw the same CanonicalGlyph as the target"
@@ -3750,6 +3751,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	_expect(ghost.candidate_state == &"owned_other", "a registered non-goal recipe should not look like a summon failure")
 	_expect(ghost.candidate_recipe_id == &"stellar_sentinel" and ghost.candidate_unit_id == &"sentinel", "alternate output should retain the exact acquired recipe result")
 	_expect("星衛兵 → 衛兵" in ghost.candidate_context(), "alternate registered output should identify its result only on demand")
+	_expect("高速・強打・2体攻撃" in ghost.candidate_context(), "alternate registered output should expose its distinct combat role on demand")
 	ghost.show_candidate(MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR), &"hypothetical", &"glyph", "32秒: 星衛兵→衛兵 4体・初回3.0秒")
 	_expect("32秒: 星衛兵→衛兵 4体" in ghost.candidate_context(), "hypothetical comparison tooltip should retain its production quantity and first arrival")
 	var mismatching_candidate := GlyphModel.new([GlyphComponentModel.new(&"spike")])
