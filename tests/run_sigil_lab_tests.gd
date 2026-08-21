@@ -283,9 +283,30 @@ func _test_lab_scene() -> void:
 			has_ellipse = true
 	_expect(has_ellipse, "default eye template should derive its outer ellipse from a stretched circle")
 	_expect(lab.output_preview.glyph.canonical_serialization() == output["glyph"].canonical_serialization(), "large preview should show the actual graph output")
+	var export_document: String = lab.export_graph_text()
+	var export_data = JSON.parse_string(export_document)
+	_expect(not export_document.is_empty() and export_data is Dictionary, "completed Lab graphs should export as JSON text")
+	if export_data is Dictionary:
+		_expect(export_data["format"] == "sigil_lab_graph" and int(export_data["version"]) == 1, "export should identify its stable graph format version")
+		_expect(export_data["canonical_glyph"] == output["glyph"].canonical_serialization(), "export should include the exact completed Glyph identity")
+		_expect(export_data["nodes"].size() == 5 and export_data["connections"].size() == 4, "export should include only the five nodes and four connections that produce the eye")
+		var exported_source_found := false
+		for exported_node in export_data["nodes"]:
+			_expect(exported_node["position"] is Array and exported_node["position"].size() == 2, "exported nodes should preserve their editor positions")
+			if exported_node["kind"] == "source":
+				exported_source_found = true
+				_expect(exported_node["config"]["primitive_id"] is String, "StringName settings should become portable JSON strings")
+		_expect(exported_source_found, "export should retain basic source nodes")
+	_expect(export_document == lab.export_graph_text(), "unchanged Lab graphs should produce byte-stable export text")
+	_expect(not lab.export_button.disabled, "text export should be enabled for a completed Sigil")
+	lab.export_button.pressed.emit()
+	await process_frame
+	_expect(lab.export_dialog.visible and lab.export_text.text == export_document, "text export button should open the completed JSON in a selectable dialog")
+	lab.export_dialog.hide()
 	lab.clear_workspace()
 	await process_frame
 	_expect(lab.graph.nodes.size() == 1 and not lab.graph.evaluate_output()["ok"], "clear should retain only an empty completion node")
+	_expect(lab.export_graph_text().is_empty() and lab.export_button.disabled, "incomplete graphs should not export misleading text")
 	lab.load_cardinal_template()
 	await process_frame
 	_expect(lab.graph.evaluate_output()["ok"], "eye template should be reloadable after clearing")

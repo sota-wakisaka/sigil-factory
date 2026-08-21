@@ -28,6 +28,8 @@ func _initialize() -> void:
 		lab.load_repeat_template()
 	elif fixture == "distribution":
 		lab.load_distribution_template()
+	elif fixture == "export":
+		lab.export_button.pressed.emit()
 	await process_frame
 	await process_frame
 	await RenderingServer.frame_post_draw

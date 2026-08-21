@@ -39,6 +39,9 @@ var stats_label: Label
 var output_button: GraphNode
 var menu_button: Button
 var structure_button: Button
+var export_button: Button
+var export_dialog: Window
+var export_text: TextEdit
 
 
 func _ready() -> void:
@@ -87,6 +90,49 @@ func load_distribution_template() -> void:
 	_load_distribution_template()
 
 
+func export_graph_text() -> String:
+	var output_result := graph.evaluate_output()
+	if not bool(output_result.get("ok", false)):
+		return ""
+	var included_nodes := _output_dependency_nodes()
+	var node_ids: Array = included_nodes.keys()
+	node_ids.sort_custom(func(first, second) -> bool: return String(first) < String(second))
+	var exported_nodes: Array[Dictionary] = []
+	for node_id_value in node_ids:
+		var node_id := StringName(node_id_value)
+		var node: GraphNode = node_controls.get(node_id)
+		var position := node.position_offset if node != null else Vector2.ZERO
+		exported_nodes.append({
+			"id": String(node_id),
+			"kind": String(graph.node_kind(node_id)),
+			"config": _json_value(graph.node_config(node_id)),
+			"position": [
+				snappedf(position.x, 0.001),
+				snappedf(position.y, 0.001),
+			],
+		})
+	var exported_connections: Array[Dictionary] = []
+	for connection in graph.connections:
+		if not included_nodes.has(connection["from"]) or not included_nodes.has(connection["to"]):
+			continue
+		exported_connections.append({
+			"from": String(connection["from"]),
+			"from_port": int(connection["from_port"]),
+			"to": String(connection["to"]),
+			"to_port": int(connection["to_port"]),
+		})
+	var glyph = output_result["glyph"]
+	var document := {
+		"format": "sigil_lab_graph",
+		"version": 1,
+		"canonical_glyph": glyph.canonical_serialization(),
+		"output_node": String(graph.output_node_id()),
+		"nodes": exported_nodes,
+		"connections": exported_connections,
+	}
+	return JSON.stringify(document, "\t", false)
+
+
 func _build_ui() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -118,6 +164,7 @@ func _build_ui() -> void:
 	graph_edit.disconnection_request.connect(_on_disconnection_request)
 	body.add_child(graph_edit)
 	body.add_child(_build_output_panel())
+	_build_export_dialog()
 
 
 func _build_header() -> Control:
@@ -222,12 +269,21 @@ func _build_output_panel() -> Control:
 	title.add_theme_color_override("font_color", Color(0.66, 0.86, 1.0))
 	column.add_child(title)
 
+	var tool_row := HBoxContainer.new()
+	tool_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	tool_row.add_theme_constant_override("separation", 6)
 	structure_button = Button.new()
 	structure_button.text = "階層"
 	structure_button.tooltip_text = "編集補助 // 合成グループの範囲だけを点線で表示"
 	structure_button.toggle_mode = true
 	structure_button.toggled.connect(set_structure_overlay)
-	column.add_child(structure_button)
+	tool_row.add_child(structure_button)
+	export_button = Button.new()
+	export_button.text = "文字出力"
+	export_button.tooltip_text = "完成シジルのノード・設定・配線をJSONで書き出す"
+	export_button.pressed.connect(_show_export_dialog)
+	tool_row.add_child(export_button)
+	column.add_child(tool_row)
 
 	output_preview = SigilPreviewModel.new()
 	output_preview.custom_minimum_size = Vector2(310, 310)
@@ -253,6 +309,69 @@ func _build_output_panel() -> Control:
 	stats_label.add_theme_color_override("font_color", Color(0.44, 0.64, 0.78))
 	column.add_child(stats_label)
 	return panel
+
+
+func _build_export_dialog() -> void:
+	export_dialog = Window.new()
+	export_dialog.title = "完成シジル // JSON書き出し"
+	export_dialog.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
+	export_dialog.size = Vector2i(760, 560)
+	export_dialog.min_size = Vector2i(620, 420)
+	export_dialog.transient = true
+	export_dialog.exclusive = true
+	export_dialog.close_requested.connect(export_dialog.hide)
+	add_child(export_dialog)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_bottom", 14)
+	export_dialog.add_child(margin)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	margin.add_child(column)
+	var note := Label.new()
+	note.text = "この文字列で完成形とノード構成を再現できます"
+	note.add_theme_color_override("font_color", Color(0.62, 0.8, 0.94))
+	column.add_child(note)
+	export_text = TextEdit.new()
+	export_text.editable = false
+	export_text.wrap_mode = TextEdit.LINE_WRAPPING_NONE
+	export_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	export_text.add_theme_font_size_override("font_size", 14)
+	column.add_child(export_text)
+	var action_row := HBoxContainer.new()
+	action_row.alignment = BoxContainer.ALIGNMENT_END
+	action_row.add_theme_constant_override("separation", 8)
+	column.add_child(action_row)
+	var copy_button := Button.new()
+	copy_button.text = "クリップボードへコピー"
+	copy_button.pressed.connect(_copy_export_text)
+	action_row.add_child(copy_button)
+	var close_button := Button.new()
+	close_button.text = "閉じる"
+	close_button.pressed.connect(export_dialog.hide)
+	action_row.add_child(close_button)
+
+
+func _show_export_dialog() -> void:
+	var document := export_graph_text()
+	if document.is_empty():
+		_set_status("文字出力できません // 完成ノードまで接続してください", true)
+		return
+	export_text.text = document
+	export_text.scroll_vertical = 0
+	export_text.scroll_horizontal = 0
+	export_dialog.popup_centered()
+
+
+func _copy_export_text() -> void:
+	if export_text == null or export_text.text.is_empty():
+		return
+	DisplayServer.clipboard_set(export_text.text)
+	_set_status("完成シジルのJSONをコピーしました", false)
 
 
 func set_structure_overlay(visible: bool) -> void:
@@ -608,14 +727,55 @@ func _refresh_all() -> void:
 	for preview in small_previews:
 		preview.set_glyph(output_glyph)
 	if output_glyph != null:
+		export_button.disabled = false
 		_set_status("完成 // 配線と設定を変更して比較", false)
 		stats_label.text = "素材 %d // 合成 %d" % [
 			output_glyph.components.size(),
 			_combine_count(output_glyph),
 		]
 	else:
+		export_button.disabled = true
 		_set_status(_error_text(StringName(output_result.get("error", &"missing_input"))), true)
 		stats_label.text = "出力ノードまで接続してください"
+
+
+func _output_dependency_nodes() -> Dictionary:
+	var included: Dictionary = {}
+	var output_id := graph.output_node_id()
+	if output_id == &"":
+		return included
+	var pending: Array[StringName] = [output_id]
+	while not pending.is_empty():
+		var node_id: StringName = pending.pop_back()
+		if included.has(node_id):
+			continue
+		included[node_id] = true
+		for connection in graph.connections:
+			if connection["to"] == node_id:
+				pending.append(connection["from"])
+	return included
+
+
+static func _json_value(value):
+	if value is StringName:
+		return String(value)
+	if value is Vector2i:
+		return [value.x, value.y]
+	if value is Vector2:
+		return [value.x, value.y]
+	if value is Dictionary:
+		var result := {}
+		var keys: Array = value.keys()
+		keys.sort_custom(func(first, second) -> bool: return String(first) < String(second))
+		for key in keys:
+			result[String(key)] = _json_value(value[key])
+		return result
+	if value is Array:
+		var result: Array = []
+		for item in value:
+			result.append(_json_value(item))
+		return result
+	return value
 
 
 func _set_status(text: String, error: bool) -> void:
