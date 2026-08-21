@@ -241,14 +241,10 @@ func _on_main_action() -> void:
 	elif flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		if not _factory_is_valid("変更を確定できません"):
 			return
-		var candidate_snapshot := factory_board.production_snapshot().duplicate(true)
-		var production_comparison := factory_board.compare_production_snapshots(
-			pre_edit_production_snapshot,
-			candidate_snapshot
-		)
+		# The factory already showed the exact old/new result before confirmation;
+		# the battle HUD resumes with only the committed operation summary.
 		factory_board.commit_edit()
-		_update_factory_change_summary(production_comparison)
-		_begin_factory_change_tracking()
+		pre_edit_production_snapshot.clear()
 		factory_change_count += 1
 		flow.resume_battle()
 		_apply_phase()
@@ -523,7 +519,6 @@ func _cancel_edit() -> void:
 	factory_board.cancel_edit()
 	_sync_plan_ui(factory_board.plan_id)
 	pre_edit_production_snapshot.clear()
-	last_factory_change_summary = "変更効果 // 変更を破棄したため生産構成は変更していません"
 	flow.resume_battle()
 	_apply_phase()
 
@@ -677,10 +672,6 @@ func _recipe_damage_delta(before: Dictionary) -> Dictionary:
 
 func _refresh_battle_plan_label() -> void:
 	plan_label.text = "稼働術式: %s" % _active_factory_operation_text()
-	if last_factory_change_summary != "":
-		plan_label.text += "\n" + last_factory_change_summary
-	if last_factory_change_battle_impact != "":
-		plan_label.text += "\n" + last_factory_change_battle_impact
 
 
 func _active_factory_operation_text() -> String:
@@ -768,9 +759,6 @@ func _reset_stage() -> void:
 	time_stop_count = 0
 	factory_change_count = 0
 	pre_edit_production_snapshot.clear()
-	last_factory_change_summary = ""
-	factory_change_battle_baseline.clear()
-	last_factory_change_battle_impact = ""
 
 
 func _apply_phase() -> void:
@@ -1142,7 +1130,6 @@ func _refresh_factory_palette_state() -> void:
 
 func _refresh_status() -> void:
 	var battle := battle_board.simulation
-	_refresh_factory_change_tracking()
 	if flow.phase == RunFlow.Phase.BATTLE:
 		_refresh_battle_plan_label()
 	var remaining_seconds := maxf(

@@ -416,20 +416,8 @@ func _initialize() -> void:
 	main._unhandled_key_input(action_key)
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "Space should confirm edits and resume battle")
 	_expect(not main.factory_board.production_comparison_active, "commit should clear the pre-commit comparison session")
-	_expect("変更効果" in main.plan_label.text, "battle resume should explain the production effect of reconfiguration")
-	_expect("斥候" in main.plan_label.text and "衛兵" in main.plan_label.text, "production effect should name changed unit outputs")
-	_expect("変更追跡 0/15秒" in main.plan_label.text, "battle resume should begin a bounded impact observation window")
-	main.battle_board.simulation.tick_index += 75
-	main.battle_board.simulation.player_kills += 3
-	main.battle_board.simulation.enemy_kills += 1
-	main.battle_board.simulation.enemy_shield_health -= 120.0
-	main.battle_board.simulation.player_damage_by_recipe[&"vigil_cross"] = 75.0
-	main._refresh_status()
-	_expect("変更後15秒" in main.plan_label.text, "impact observation should become a fixed result after fifteen seconds")
-	_expect("敵撃破 +3" in main.plan_label.text, "impact result should report enemies defeated after the change")
-	_expect("味方損失 +1" in main.plan_label.text, "impact result should report allied losses after the change")
-	_expect("目標ダメージ 120" in main.plan_label.text, "impact result should report objective damage after the change")
-	_expect("シジル打撃 警戒十字 +75" in main.plan_label.text, "impact result should attribute observed attacks to the active meaning sigil")
+	_expect("警戒十字" in main.plan_label.text and "衛兵" in main.plan_label.text, "battle resume should retain the active meaning sigil and its production rate")
+	_expect(not "\n" in main.plan_label.text and not "変更効果" in main.plan_label.text, "battle HUD should stay on one factual operation line instead of repeating the pre-commit comparison as prose")
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "second time stop should open another transactional preview")
 	_expect(main.factory_board.production_comparison_active, "each time stop should capture a fresh production baseline")
