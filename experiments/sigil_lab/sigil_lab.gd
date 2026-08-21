@@ -156,8 +156,6 @@ func _build_ui() -> void:
 	graph_edit.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	graph_edit.custom_minimum_size.x = 820.0
 	graph_edit.right_disconnects = true
-	graph_edit.add_theme_constant_override("port_grab_distance_horizontal", 28)
-	graph_edit.add_theme_constant_override("port_grab_distance_vertical", 18)
 	graph_edit.connection_lines_curvature = 0.34
 	graph_edit.connection_request.connect(_on_connection_request)
 	graph_edit.disconnection_request.connect(_on_disconnection_request)
@@ -400,7 +398,6 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 	var node := GraphNode.new()
 	node.name = String(node_id)
 	node.title = NODE_NAMES.get(kind, String(kind))
-	node.set_meta(SigilGraphEditModel.NODE_KIND_META, kind)
 	node.position_offset = position
 	node.resizable = false
 
@@ -446,7 +443,7 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 		SigilGraphModel.OUTPUT:
 			node.add_child(preview)
 			node.set_slot(0, true, 0, PORT_COLOR, false, 0, PORT_COLOR)
-			node.tooltip_text = "完成入力 // 青い点またはノード内へ線をドロップ"
+			node.tooltip_text = "完成入力 // 青い点へ線をドロップ"
 
 	if kind != SigilGraphModel.OUTPUT:
 		var remove_button := Button.new()

@@ -410,11 +410,11 @@ func _test_lab_scene() -> void:
 		Vector2(440, 200)
 	)
 	var cross_output: StringName = lab.graph.output_node_id()
-	lab.connect_lab_nodes(cross_source, cross_horizontal)
-	lab.connect_lab_nodes(cross_source, cross_vertical)
-	lab.connect_lab_nodes(cross_horizontal, cross_combine, 0)
-	lab.connect_lab_nodes(cross_vertical, cross_combine, 1)
 	await process_frame
+	await _drag_graph_connection(lab, cross_source, cross_horizontal)
+	await _drag_graph_connection(lab, cross_source, cross_vertical)
+	await _drag_graph_connection(lab, cross_horizontal, cross_combine, 0, 0)
+	await _drag_graph_connection(lab, cross_vertical, cross_combine, 0, 1)
 	var cross_result: Dictionary = lab.graph.evaluate(cross_combine)
 	_expect(cross_result["ok"] and cross_result["glyph"].components.size() == 2, "two stretched squares should form a valid Cross intermediate Glyph")
 	var output_node: GraphNode = lab.node_controls[cross_output]
@@ -422,27 +422,28 @@ func _test_lab_scene() -> void:
 		StringName(output_node.name) == cross_output,
 		"workspace reset should preserve the model ID as the GraphNode name"
 	)
-	var body_drop_position := output_node.position + output_node.size * output_node.scale * 0.5
-	_expect(
-		lab.graph_edit.completion_hotzone_contains(output_node, body_drop_position),
-		"the entire completion node body should be a connection hotzone"
-	)
 	await _drag_graph_connection(lab, cross_combine, cross_output)
 	_expect(lab.graph.evaluate_output()["ok"], "dropping the Cross output on completion should finish the Sigil")
 	_expect(not lab.export_graph_text().is_empty() and not lab.export_button.disabled, "a completed Cross should be available for text export")
 	lab.free()
 
 
-func _drag_graph_connection(lab, from_node_id: StringName, to_node_id: StringName) -> void:
+func _drag_graph_connection(
+	lab,
+	from_node_id: StringName,
+	to_node_id: StringName,
+	from_port: int = 0,
+	to_port: int = 0
+) -> void:
 	var from_node: GraphNode = lab.node_controls[from_node_id]
 	var to_node: GraphNode = lab.node_controls[to_node_id]
 	var from_position := (
 		from_node.global_position
-		+ from_node.get_output_port_position(0) * from_node.scale
+		+ from_node.get_output_port_position(from_port) * from_node.scale
 	)
 	var to_position := (
 		to_node.global_position
-		+ to_node.get_input_port_position(0) * to_node.scale
+		+ to_node.get_input_port_position(to_port) * to_node.scale
 	)
 	_send_mouse_motion(from_position, Vector2.ZERO, false)
 	_send_mouse_button(from_position, true)
