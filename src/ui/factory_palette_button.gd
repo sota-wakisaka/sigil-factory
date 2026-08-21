@@ -56,6 +56,13 @@ func _make_custom_tooltip(_for_text: String):
 	if preview_glyph == null:
 		return null
 	var context := "一定周期 // ◆%d" % mana_cost
+	var title := "素材 // %s" % caption
+	if equipment_kind == &"meaning_source":
+		var registered := PackedStringArray()
+		for glyph_id in MeaningGlyphsModel.IDS:
+			registered.append(MeaningGlyphsModel.label(glyph_id))
+		context = "登録済み: %s\n選択後に切替 // ◆%d" % ["・".join(registered), mana_cost]
+		title = "印源 // 登録済み意味Glyph"
 	var unavailable_reason := _availability_reason_text(availability_reason)
 	if unavailable_reason != "":
 		context = "%s\n%s" % [unavailable_reason, context]
@@ -65,7 +72,7 @@ func _make_custom_tooltip(_for_text: String):
 	var preview := GlyphTooltipModel.new()
 	preview.configure(
 		preview_glyph,
-		"素材 // %s" % caption,
+		title,
 		context
 	)
 	return preview

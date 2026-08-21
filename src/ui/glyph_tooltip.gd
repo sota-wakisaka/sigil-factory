@@ -110,7 +110,14 @@ func _detail_lines() -> PackedStringArray:
 
 
 func _primitive_name(primitive_id: StringName) -> String:
-	return {&"ring": "環", &"spike": "棘", &"branch": "枝"}.get(primitive_id, String(primitive_id))
+	return {
+		&"ring": "環",
+		&"spike": "棘",
+		&"branch": "枝",
+		&"circle": "丸",
+		&"triangle": "三角",
+		&"square": "四角",
+	}.get(primitive_id, String(primitive_id))
 
 
 func _color_name(color_id: StringName) -> String:
