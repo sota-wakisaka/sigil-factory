@@ -162,10 +162,8 @@ func _get_tooltip(at_position: Vector2) -> String:
 	var health_text := "HP %.0f/%.0f" % [maxf(unit.health, 0.0), unit.spec.max_health]
 	if unit.side != BattleSimulation.Side.PLAYER or unit.recipe_id == &"":
 		return "%s // %s" % [MvpContent.unit_name(unit.spec.id), health_text]
-	for recipe in MvpContent.recipes():
-		if recipe.id != unit.recipe_id:
-			continue
-		tooltip_glyph = recipe.glyph.copy()
+	tooltip_glyph = unit_sigil_glyph(unit)
+	if tooltip_glyph != null:
 		tooltip_title = "%s → %s" % [
 			String(MvpContent.sigil_name(unit.recipe_id)).trim_suffix("シジル"),
 			MvpContent.unit_name(unit.spec.id),
