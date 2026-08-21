@@ -384,11 +384,23 @@ func _initialize() -> void:
 	_expect(first_reward.disabled and not first_reward.button_pressed, "a completed meaning reward should become unavailable")
 	first_reward.set_level(0)
 	first_reward.set_reward_selected(true)
+	var saved_rewards: Array[StringName] = main.acquired_rewards.duplicate()
+	var maxed_rewards: Array[StringName] = [
+		&"ring_speed", &"ring_speed", &"ring_speed",
+		&"processing_speed", &"processing_speed", &"processing_speed",
+		&"line_speed", &"line_speed", &"line_speed",
+	]
+	main.acquired_rewards = maxed_rewards
+	main._apply_phase()
+	_expect("強化は完成" in main.phase_title.text and main.phase_button.text == "次のルートへ", "maxed run rewards should stop promising an unavailable choice")
+	_expect(main._reward_summary() == "集束 3/3 / 交差 3/3 / 先見 3/3", "route progression should compact repeated rewards into stable levels")
+	main.acquired_rewards = saved_rewards
+	main._apply_phase()
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.ROUTE_SELECTION, "reward OK should return to route selection")
 	_expect(main.flow.route_number == 2, "UI should display the next route")
 	_expect(main.acquired_rewards.size() == 1, "selected reward should persist into the next route")
-	_expect("集束" in main.phase_body.text, "next route should display the acquired meaning-Glyph reward")
+	_expect("集束 1/3" in main.phase_body.text, "next route should display the acquired meaning-Glyph reward level")
 	var upgraded_source: FactoryNodeModel = main.factory_board.simulation.nodes[&"ring_source"]
 	_expect(upgraded_source.config["interval_ticks"] < 18, "selected reward should modify the next route factory")
 

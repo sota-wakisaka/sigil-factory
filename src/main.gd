@@ -693,8 +693,10 @@ func _apply_phase() -> void:
 			_show_overlay("STAGE CLEAR", "敵リーダーを撃破", _battle_result_summary(), "OK：報酬を確認")
 		RunFlow.Phase.REWARD:
 			pause_button.disabled = true
-			_prepare_reward_options()
-			_show_overlay("REWARD", "ラン強化を1つ獲得", "選んだ強化は次のルート以降の工場へ適用されます。", "獲得して次のルートへ")
+			if _prepare_reward_options():
+				_show_overlay("REWARD", "ラン強化を1つ獲得", "選んだ強化は次のルート以降の工場へ適用されます。", "獲得して次のルートへ")
+			else:
+				_show_overlay("REWARD", "ラン強化は完成", "3種類の工場強化が最大になりました。", "次のルートへ")
 
 
 func _show_overlay(kicker: String, title: String, body: String, button_text: String) -> void:
@@ -705,7 +707,7 @@ func _show_overlay(kicker: String, title: String, body: String, button_text: Str
 	phase_overlay.visible = true
 
 
-func _prepare_reward_options() -> void:
+func _prepare_reward_options() -> bool:
 	var buttons := reward_choices.get_children()
 	var selected_available := false
 	for button in buttons:
@@ -714,6 +716,7 @@ func _prepare_reward_options() -> void:
 		button.set_reward_selected(should_select)
 		selected_available = selected_available or should_select
 	reward_choices.visible = true
+	return selected_available
 
 
 func _select_reward(selected_button: MeaningRewardButtonControl) -> void:
@@ -746,11 +749,14 @@ func _reward_summary() -> String:
 	if acquired_rewards.is_empty():
 		return "なし"
 	var names := PackedStringArray()
-	for reward_id in acquired_rewards:
-		match reward_id:
-			&"ring_speed": names.append("集束")
-			&"processing_speed": names.append("交差")
-			&"line_speed": names.append("先見")
+	for entry in [
+		{&"id": &"ring_speed", &"label": "集束"},
+		{&"id": &"processing_speed", &"label": "交差"},
+		{&"id": &"line_speed", &"label": "先見"},
+	]:
+		var level := acquired_rewards.count(entry[&"id"])
+		if level > 0:
+			names.append("%s %d/3" % [entry[&"label"], level])
 	return " / ".join(names)
 
 
