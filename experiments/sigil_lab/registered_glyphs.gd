@@ -4,13 +4,25 @@ extends RefCounted
 const GlyphModel := preload("res://src/domain/glyph.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 
+const EYE := &"eye"
 const CROSS := &"cross"
-const IDS := [CROSS]
+const TARGET := &"target"
+const STAR := &"star"
+const COMPASS := &"compass"
+const IDS := [EYE, CROSS, TARGET, STAR, COMPASS]
 const LABELS := {
+	EYE: "目",
 	CROSS: "十字",
+	TARGET: "的",
+	STAR: "星",
+	COMPASS: "方位",
 }
 const SOURCE_GRAPH_PATHS := {
+	EYE: "res://experiments/sigil_lab/registered/eye.json",
 	CROSS: "res://experiments/sigil_lab/registered/cross.json",
+	TARGET: "res://experiments/sigil_lab/registered/target.json",
+	STAR: "res://experiments/sigil_lab/registered/star.json",
+	COMPASS: "res://experiments/sigil_lab/registered/compass.json",
 }
 
 
@@ -28,9 +40,25 @@ static func source_graph_path(glyph_id: StringName) -> String:
 
 static func glyph(glyph_id: StringName) -> GlyphModel:
 	match glyph_id:
+		EYE:
+			return _eye()
 		CROSS:
 			return _cross()
+		TARGET:
+			return _target()
+		STAR:
+			return _star()
+		COMPASS:
+			return _compass()
 	return null
+
+
+static func _eye() -> GlyphModel:
+	var circle := GlyphModel.new([GlyphComponentModel.new(&"circle")])
+	return GlyphModel.combine_many(
+		[circle, circle.stretched_percent(250, 100)],
+		GlyphModel.CONNECTION_SIMPLE
+	)
 
 
 static func _cross() -> GlyphModel:
@@ -40,5 +68,29 @@ static func _cross() -> GlyphModel:
 			square.stretched_percent(200, 50),
 			square.stretched_percent(50, 200),
 		],
+		GlyphModel.CONNECTION_SIMPLE
+	)
+
+
+static func _target() -> GlyphModel:
+	var circle := GlyphModel.new([GlyphComponentModel.new(&"circle")])
+	return GlyphModel.combine_many(
+		[circle, circle.stretched_percent(250, 250)],
+		GlyphModel.CONNECTION_SIMPLE
+	)
+
+
+static func _star() -> GlyphModel:
+	var triangle := GlyphModel.new([GlyphComponentModel.new(&"triangle")])
+	return GlyphModel.combine_many(
+		[triangle, triangle.rotated_degrees(180)],
+		GlyphModel.CONNECTION_SIMPLE
+	)
+
+
+static func _compass() -> GlyphModel:
+	var cross := _cross()
+	return GlyphModel.combine_many(
+		[cross, cross.rotated_degrees(45)],
 		GlyphModel.CONNECTION_SIMPLE
 	)

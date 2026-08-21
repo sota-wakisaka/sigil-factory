@@ -1,6 +1,6 @@
 # Sigil Factory — シジル仕様書
 
-更新日: 2026-08-21
+更新日: 2026-08-22
 
 この文書は、シジル / グリフの生成・加工・合成・描画・一致判定に関する詳細仕様をまとめる。
 シジル関連の具体仕様については `GAME_DESIGN.md` の概要より本書を優先する。
@@ -319,22 +319,32 @@ Combine
 - 可視線が0本になる中心結合 / 相互結合は4.5により作成自体を許可せず、「見た目は同じだが接続方式だけ違う」完成データを増やさない
 - Combine階層が異なる場合は、Primitive配置が偶然一致しても別CanonicalGlyphとする
 
-### 4.7 登録意味グリフ「十字」
+### 4.7 登録意味グリフ
 
-最初の登録意味グリフとして「十字」を定義する。
+基本図形の変形・単純結合だけで意味を推測できる小さな中間グリフを登録し、上位シジルの部品として再利用する。
+
+| 登録名 | 構造 | 読み取る意味 |
+| --- | --- | --- |
+| 目 | 丸 + 横長の丸 | 観測・視界 |
+| 十字 | 横長の四角 + 縦長の四角 | 交差・中心 |
+| 的 | 大小の同心円 | 目標・焦点 |
+| 星 | 正向き三角 + 反転三角 | 星・天体 |
+| 方位 | 十字 + 45°回転した十字 | 方角・全周 |
 
 ```text
-horizontal = Scale(Square, 200%, 50%)
-vertical   = Scale(Square, 50%, 200%)
-Cross      = SimpleCombine(horizontal, vertical)
+Eye     = SimpleCombine(Circle, Scale(Circle, 250%, 100%))
+Cross   = SimpleCombine(Scale(Square, 200%, 50%), Scale(Square, 50%, 200%))
+Target  = SimpleCombine(Circle, Scale(Circle, 250%, 250%))
+Star    = SimpleCombine(Triangle, Rotate(Triangle, 180°))
+Compass = SimpleCombine(Cross, Rotate(Cross, 45°))
 ```
 
-- 2つの長方形はどちらも中心 `(0, 0)` に置く
-- 結合線は0本なので単純結合を使用する
-- 登録時も内部の2子Combine構造を保持する
+- 全登録グリフは結合線0本の単純結合を使用する
+- 登録時も内部の子Combine構造を保持する
 - 登録後は1つの意味グリフとして呼び出し、Move / Rotate / Scale / Repeat / Combineへ再入力できる
 - 登録名や元グラフのノードID・配置は一致判定へ含めず、展開後のCanonicalGlyphだけを一致対象にする
-- 登録元グラフは `experiments/sigil_lab/registered/cross.json` に保存する
+- 各登録元グラフは `experiments/sigil_lab/registered/<id>.json` に保存する
+- 新規登録は「名前を見なくても多くの人が同じ意味を答えられる」ものだけに限定し、解釈が割れる装飾形は追加しない
 
 ---
 

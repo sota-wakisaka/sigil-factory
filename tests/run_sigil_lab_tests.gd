@@ -12,7 +12,7 @@ var failures := 0
 func _initialize() -> void:
 	_test_graph_evaluation()
 	_test_basic_primitives_and_stretch()
-	_test_registered_cross_glyph()
+	_test_registered_meaning_glyphs()
 	_test_line_free_combine_requires_simple_mode()
 	_test_pure_transform_composition()
 	_test_radial_repeat()
@@ -67,22 +67,35 @@ func _test_basic_primitives_and_stretch() -> void:
 		_expect("|a250,75" in component.canonical_key(), "anisotropic scale should be part of matching identity")
 
 
-func _test_registered_cross_glyph() -> void:
-	var cross := RegisteredGlyphsModel.glyph(RegisteredGlyphsModel.CROSS)
-	var expected_canonical := "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50))"
-	_expect(cross != null, "the authored Cross should be available as a registered meaning Glyph")
-	if cross != null:
-		_expect(cross.canonical_serialization() == expected_canonical, "the registered Cross should preserve the authored canonical structure")
-		_expect(cross.combine_connection_mode == GlyphModel.CONNECTION_SIMPLE, "the centered Cross should use line-free Simple Combine")
-		_expect(GlyphPainterModel.combine_visuals(cross, 1.0, false)["connections"].is_empty(), "Simple Combine should not invent connector lines")
-	var graph_text := FileAccess.get_file_as_string(RegisteredGlyphsModel.source_graph_path(
-		RegisteredGlyphsModel.CROSS
-	))
-	var graph_document = JSON.parse_string(graph_text)
-	_expect(graph_document is Dictionary, "the registered Cross should retain its authored Lab graph")
-	if graph_document is Dictionary:
-		_expect(graph_document["canonical_glyph"] == expected_canonical, "the saved Cross graph and registered Glyph should share one canonical identity")
-		_expect(graph_document["nodes"].size() == 6 and graph_document["connections"].size() == 5, "the saved Cross graph should retain its complete construction")
+func _test_registered_meaning_glyphs() -> void:
+	var expected_canonicals := {
+		RegisteredGlyphsModel.EYE: "S(3:0,0;32:P(26:p6:circle|0,0|0|1|c5:white),41:P(35:p6:circle|0,0|0|1|c5:white|a250,100))",
+		RegisteredGlyphsModel.CROSS: "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50))",
+		RegisteredGlyphsModel.TARGET: "S(3:0,0;41:P(35:p6:circle|0,0|0|1|c5:white|a250,250),32:P(26:p6:circle|0,0|0|1|c5:white))",
+		RegisteredGlyphsModel.STAR: "S(3:0,0;34:P(28:p8:triangle|0,0|0|1|c5:white),35:P(29:p8:triangle|0,0|60|1|c5:white))",
+		RegisteredGlyphsModel.COMPASS: "S(3:0,0;96:S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50)),98:S(3:0,0;41:P(35:p6:square|0,0|45|1|c5:white|a50,200),41:P(35:p6:square|0,0|45|1|c5:white|a200,50)))",
+	}
+	var seen_canonicals: Dictionary = {}
+	_expect(RegisteredGlyphsModel.IDS.size() == 5, "the initial meaning-Glyph set should stay intentionally small")
+	for glyph_id in RegisteredGlyphsModel.IDS:
+		var glyph := RegisteredGlyphsModel.glyph(glyph_id)
+		_expect(glyph != null, "%s should be available as a registered meaning Glyph" % glyph_id)
+		if glyph == null:
+			continue
+		var expected_canonical: String = expected_canonicals[glyph_id]
+		_expect(glyph.canonical_serialization() == expected_canonical, "%s should preserve its authored canonical structure" % glyph_id)
+		_expect(glyph.combine_connection_mode == GlyphModel.CONNECTION_SIMPLE, "%s should use line-free Simple Combine" % glyph_id)
+		_expect(GlyphPainterModel.combine_visuals(glyph, 1.0, false)["connections"].is_empty(), "%s should not invent connector lines" % glyph_id)
+		_expect(not seen_canonicals.has(expected_canonical), "%s should remain visually and canonically distinct" % glyph_id)
+		seen_canonicals[expected_canonical] = true
+		var graph_text := FileAccess.get_file_as_string(
+			RegisteredGlyphsModel.source_graph_path(glyph_id)
+		)
+		var graph_document = JSON.parse_string(graph_text)
+		_expect(graph_document is Dictionary, "%s should retain its authored Lab graph" % glyph_id)
+		if graph_document is Dictionary:
+			_expect(graph_document["canonical_glyph"] == expected_canonical, "%s graph and registry entry should share one identity" % glyph_id)
+			_expect(graph_document["nodes"].size() >= 4 and graph_document["connections"].size() >= 4, "%s graph should retain its complete construction" % glyph_id)
 	var graph = SigilGraphModel.new()
 	_expect(graph.add_node(&"cross", SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.CROSS}), "a registered Cross source should be accepted")
 	_expect(graph.add_node(&"rotate", SigilGraphModel.ROTATE, {"degrees": 45}), "registered Glyphs should accept downstream transforms")
@@ -393,7 +406,10 @@ func _test_lab_scene() -> void:
 	var free_repeat: StringName = lab.add_lab_node(SigilGraphModel.REPEAT, {"count": 6}, Vector2(40, 40))
 	_expect(lab.option_controls[free_repeat] is OptionButton and lab.option_controls[free_repeat].item_count == 6, "Lab repeat should expose all exact equal-angle counts")
 	var registered_cross: StringName = lab.add_lab_node(SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.CROSS}, Vector2(40, 40))
-	_expect(lab.option_controls[registered_cross] is OptionButton and lab.option_controls[registered_cross].get_item_text(0) == "十字", "the authored Cross should be reusable from the meaning-Glyph palette")
+	_expect(lab.option_controls[registered_cross] is OptionButton and lab.option_controls[registered_cross].item_count == 5, "all authored meaning Glyphs should be reusable from one compact palette node")
+	if lab.option_controls[registered_cross] is OptionButton:
+		var registered_option: OptionButton = lab.option_controls[registered_cross]
+		_expect(registered_option.get_item_text(0) == "目" and registered_option.get_item_text(4) == "方位", "meaning-Glyph choices should follow the documented learning order")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"distribute"), "Distributor should be removed from the Lab grammar")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"color"), "color processing should be omitted from the Lab grammar")
 	var output: Dictionary = lab.graph.evaluate_output()

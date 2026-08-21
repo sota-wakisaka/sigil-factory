@@ -1,0 +1,18 @@
+{
+	"format": "sigil_lab_graph",
+	"version": 1,
+	"canonical_glyph": "S(3:0,0;96:S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50)),98:S(3:0,0;41:P(35:p6:square|0,0|45|1|c5:white|a50,200),41:P(35:p6:square|0,0|45|1|c5:white|a200,50)))",
+	"output_node": "output_1",
+	"nodes": [
+		{"id": "output_1", "kind": "output", "config": {}, "position": [700.0, 120.0]},
+		{"id": "registered_2", "kind": "registered", "config": {"glyph_id": "cross"}, "position": [40.0, 180.0]},
+		{"id": "rotate_3", "kind": "rotate", "config": {"degrees": 45}, "position": [240.0, 300.0]},
+		{"id": "combine_4", "kind": "combine", "config": {"connection_mode": "simple"}, "position": [460.0, 150.0]}
+	],
+	"connections": [
+		{"from": "combine_4", "from_port": 0, "to": "output_1", "to_port": 0},
+		{"from": "rotate_3", "from_port": 0, "to": "combine_4", "to_port": 1},
+		{"from": "registered_2", "from_port": 0, "to": "combine_4", "to_port": 0},
+		{"from": "registered_2", "from_port": 0, "to": "rotate_3", "to_port": 0}
+	]
+}

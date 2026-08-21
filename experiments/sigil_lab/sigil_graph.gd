@@ -411,7 +411,7 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 				return {"ok": false, "error": &"invalid_primitive", "config": {}}
 			return {"ok": true, "error": &"", "config": {"primitive_id": primitive_id}}
 		REGISTERED:
-			var glyph_id := StringName(config.get("glyph_id", RegisteredGlyphsModel.CROSS))
+			var glyph_id := StringName(config.get("glyph_id", RegisteredGlyphsModel.EYE))
 			if not RegisteredGlyphsModel.has(glyph_id):
 				return {"ok": false, "error": &"invalid_registered_glyph", "config": {}}
 			return {"ok": true, "error": &"", "config": {"glyph_id": glyph_id}}
