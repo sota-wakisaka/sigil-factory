@@ -65,6 +65,7 @@ var battle_speed_index := 0
 var time_stop_count := 0
 var factory_change_count := 0
 var acquired_rewards: Array[StringName] = []
+var defeat_active := false
 var selected_route_id: StringName = MvpContent.ROUTE_MIXED
 var selected_route_name := MvpContent.route_name(MvpContent.ROUTE_MIXED)
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
@@ -198,6 +199,12 @@ func _draw() -> void:
 
 
 func _advance_overlay() -> void:
+	if defeat_active:
+		defeat_active = false
+		flow.phase = RunFlow.Phase.FACTORY_BUILD
+		_reset_stage()
+		_apply_phase()
+		return
 	if flow.phase == RunFlow.Phase.REWARD:
 		_acquire_selected_reward()
 	if not flow.advance():
@@ -716,13 +723,15 @@ func _on_battle_finished(winner: int) -> void:
 		_enter_victory()
 	else:
 		var reason := _defeat_reason()
-		status_label.text = "DEFEAT // %s" % reason
-		plan_label.text = "敗因分析 // %s // %s" % [reason, _defeat_advice()]
-		var damage_summary := _sigil_damage_summary()
-		if damage_summary != "":
-			plan_label.text += "\nシジル与ダメージ: " + damage_summary
-		debug_victory_button.text = "再挑戦"
-		debug_victory_button.visible = true
+		defeat_active = true
+		pause_button.disabled = true
+		speed_button.disabled = true
+		debug_victory_button.visible = false
+		battle_result_sigil_strip.configure(
+			produced_recipes,
+			battle_board.simulation.player_damage_by_recipe
+		)
+		_show_overlay("DEFEAT", reason, _defeat_advice(), "工場を再構築")
 
 
 func _enter_victory() -> void:
@@ -732,6 +741,7 @@ func _enter_victory() -> void:
 
 
 func _reset_stage() -> void:
+	defeat_active = false
 	battle_board.reset_battle(selected_route_id, flow.route_number)
 	factory_board.set_run_upgrades(acquired_rewards)
 	factory_board.configure(MvpContent.PLAN_EMPTY)
@@ -1064,21 +1074,21 @@ func _defeat_advice() -> String:
 	var discarded := factory_board.simulation.discarded_glyphs
 	if total_produced == 0:
 		return (
-			"改善: 配線 // 成功召喚0・廃棄/不一致%d。完成見本と失敗差分を確認" % discarded
+			"召喚 0体 // 不一致 %d" % discarded
 			if discarded > 0
-			else "改善: 生産量 // 成功召喚0。配線を完成させ32秒予測を確認"
+			else "召喚 0体 // 工場出力なし"
 		)
 	if discarded >= maxi(int(total_produced / 5), 2):
-		return "改善: 配線 // 廃棄/不一致%d。完成見本と召喚失敗差分を確認" % discarded
+		return "召喚 %d体 // 不一致 %d" % [total_produced, discarded]
 	if factory_change_count == 0:
-		return "改善: 判断・相性 // 再構成0回。群体兵で衛兵、装甲兵で巨像へ切替"
+		return "再構成 0回 // 生産 斥候%d  衛兵%d  巨像%d" % [scout_count, sentinel_count, golem_count]
 	if sentinel_count == 0:
-		return "改善: 兵種相性 // 衛兵0。群体兵の60秒警告で衛兵術式へ切替"
+		return "生産 斥候%d  衛兵0  巨像%d" % [scout_count, golem_count]
 	if golem_count == 0:
-		return "改善: 兵種相性 // 巨像0。装甲兵の60秒警告で巨像術式へ切替"
+		return "生産 斥候%d  衛兵%d  巨像0" % [scout_count, sentinel_count]
 	if battle_board.simulation.is_enemy_shield_active():
-		return "改善: 生産量 // 防壁突破前。32秒予測で召喚数が増える構成を選択"
-	return "改善: 対リーダー火力 // 装甲波以降の巨像生産を早める"
+		return "敵防壁 残りHP %.0f // 召喚 %d体" % [battle_board.simulation.enemy_shield_health, total_produced]
+	return "敵リーダー 残りHP %.0f // 召喚 %d体" % [battle_board.simulation.enemy_leader_health, total_produced]
 
 
 func _update_progress() -> void:

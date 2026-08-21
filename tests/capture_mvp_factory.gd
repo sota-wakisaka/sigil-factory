@@ -31,11 +31,19 @@ func _initialize() -> void:
 		main._apply_phase()
 	elif capture_phase == "stage":
 		main.phase_button.pressed.emit()
-	elif capture_phase in ["victory", "reward"]:
+	elif capture_phase in ["battle", "defeat", "victory", "reward"]:
 		main.phase_button.pressed.emit()
 		main.phase_button.pressed.emit()
 		main._select_plan(plan_id)
 		main.pause_button.pressed.emit()
+		if capture_phase == "defeat":
+			main.produced_units = {&"scout": 30, &"sentinel": 0, &"golem": 0}
+			main.produced_recipes = {&"watchful_eye": 30}
+			main.battle_board.simulation.player_damage_by_recipe = {&"watchful_eye": 321.0}
+			main.battle_board.simulation.tick_index = main.battle_board.simulation.battle_duration_ticks - 1
+			main.battle_board.advance_tick()
+		elif capture_phase == "battle":
+			pass
 		if capture_phase == "victory":
 			main.produced_units = {&"scout": 3, &"sentinel": 4, &"golem": 0}
 			main.produced_recipes = {&"watchful_eye": 3, &"stellar_sentinel": 4}
@@ -43,7 +51,8 @@ func _initialize() -> void:
 				&"watchful_eye": 123.0,
 				&"stellar_sentinel": 456.0,
 			}
-		main.debug_victory_button.pressed.emit()
+		if capture_phase in ["victory", "reward"]:
+			main.debug_victory_button.pressed.emit()
 		if capture_phase == "reward":
 			main.phase_button.pressed.emit()
 	elif capture_phase == "factory":

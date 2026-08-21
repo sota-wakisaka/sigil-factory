@@ -508,21 +508,21 @@ func _initialize() -> void:
 	main.battle_board.simulation.player_damage_by_recipe = {&"watchful_eye": 321.0}
 	main.battle_board.simulation.tick_index = main.battle_board.simulation.battle_duration_ticks - 1
 	main.battle_board.advance_tick()
-	_expect("DEFEAT" in main.status_label.text, "time limit should display defeat analysis")
-	_expect("シジル与ダメージ: 目 321" in main.plan_label.text, "defeat analysis should preserve which produced sigil contributed damage")
-	_expect("再構成0回" in main.plan_label.text, "defeat analysis should identify a missed reconfiguration decision")
-	_expect("群体兵で衛兵、装甲兵で巨像" in main.plan_label.text, "defeat analysis should recommend concrete counter production")
+	_expect(main.defeat_active and main.phase_overlay.visible and main.phase_kicker.text == "DEFEAT", "time limit should open a dedicated defeat summary")
+	_expect(main.battle_result_sigil_strip.visible and main.battle_result_sigil_strip.entries.size() == 1, "defeat should preserve the producing sigil and its damage as a visual result")
+	_expect("再構成 0回" in main.phase_body.text, "defeat analysis should state the missed reconfiguration without prescribing an answer")
+	_expect("群体兵で衛兵" not in main.phase_body.text and "改善:" not in main.phase_body.text, "defeat summary should leave the next factory judgment to the player")
 	main.factory_change_count = 1
 	main.produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	main.factory_board.simulation.discarded_glyphs = 3
-	_expect("改善: 配線" in main._defeat_advice(), "zero successful summons with discards should identify wiring or matching")
+	_expect("召喚 0体 // 不一致 3" == main._defeat_advice(), "zero successful summons with discards should report the exact failed output")
 	main.produced_units = {&"scout": 20, &"sentinel": 0, &"golem": 5}
 	main.factory_board.simulation.discarded_glyphs = 0
 	_expect("衛兵0" in main._defeat_advice(), "missing swarm counter should be identified explicitly")
 	main.produced_units = {&"scout": 20, &"sentinel": 5, &"golem": 0}
 	_expect("巨像0" in main._defeat_advice(), "missing armor counter should be identified explicitly")
-	_expect(main.debug_victory_button.text == "再挑戦", "defeat should turn the temporary action into retry")
-	main.debug_victory_button.pressed.emit()
+	_expect(main.phase_button.text == "工場を再構築", "defeat summary should expose one central retry action")
+	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "retry should return to factory build")
 
 	main.queue_free()
