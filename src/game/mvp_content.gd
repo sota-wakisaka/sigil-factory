@@ -61,6 +61,14 @@ static func threat_schedule(route_id: StringName = ROUTE_MIXED) -> Array[ThreatE
 	return _mixed_route_schedule()
 
 
+static func major_threat_events(route_id: StringName = ROUTE_MIXED) -> Array[ThreatEventModel]:
+	var major_events: Array[ThreatEventModel] = []
+	for event in threat_schedule(route_id):
+		if major_events.is_empty() or event.is_major_change:
+			major_events.append(event)
+	return major_events
+
+
 static func _mixed_route_schedule() -> Array[ThreatEventModel]:
 	var events: Array[ThreatEventModel] = []
 	# One battle tick represents 0.2 seconds. A standard encounter lasts three minutes.

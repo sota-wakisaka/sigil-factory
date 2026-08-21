@@ -3792,6 +3792,12 @@ func _test_run_upgrade_accelerates_ring_source() -> void:
 
 
 func _test_run_flow_covers_one_route() -> void:
+	for route_id in MvpContent.ROUTE_IDS:
+		var schedule := MvpContent.threat_schedule(route_id)
+		var major_events := MvpContent.major_threat_events(route_id)
+		_expect(not major_events.is_empty() and major_events[0].tick == schedule[0].tick, "stage timeline should always include the route's first threat")
+		for event in major_events.slice(1):
+			_expect(event.is_major_change, "stage timeline markers should come from the real major-wave schedule")
 	var flow := RunFlow.new()
 	_expect(flow.phase == RunFlow.Phase.ROUTE_SELECTION, "run should start at route selection")
 	_expect(flow.advance(), "route selection should advance")
