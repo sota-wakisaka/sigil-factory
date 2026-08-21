@@ -20,6 +20,7 @@ var route_number := 1
 var tooltip_glyph: GlyphModel
 var tooltip_title := ""
 var tooltip_context := ""
+var recipe_glyphs: Dictionary = {}
 
 
 func _ready() -> void:
@@ -27,6 +28,7 @@ func _ready() -> void:
 
 
 func reset_battle(next_route_id: StringName = MvpContent.ROUTE_MIXED, next_route_number: int = 1) -> void:
+	_ensure_recipe_glyphs()
 	route_id = next_route_id if next_route_id in MvpContent.ROUTE_IDS else MvpContent.ROUTE_MIXED
 	route_number = maxi(next_route_number, 1)
 	simulation = MvpContent.build_battle(route_id, route_number)
@@ -132,12 +134,22 @@ func unit_at(at_position: Vector2) -> BattleUnitModel:
 
 
 func unit_sigil_glyph(unit: BattleUnitModel) -> GlyphModel:
+	var glyph := _unit_sigil_glyph_ref(unit)
+	return glyph.copy() if glyph != null else null
+
+
+func _unit_sigil_glyph_ref(unit: BattleUnitModel) -> GlyphModel:
 	if unit == null or unit.side != BattleSimulation.Side.PLAYER or unit.recipe_id == &"":
 		return null
+	_ensure_recipe_glyphs()
+	return recipe_glyphs.get(unit.recipe_id)
+
+
+func _ensure_recipe_glyphs() -> void:
+	if not recipe_glyphs.is_empty():
+		return
 	for recipe in MvpContent.recipes():
-		if recipe.id == unit.recipe_id:
-			return recipe.glyph
-	return null
+		recipe_glyphs[recipe.id] = recipe.glyph.copy()
 
 
 func _get_tooltip(at_position: Vector2) -> String:
@@ -273,7 +285,7 @@ func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 	var center := unit_center(unit)
 	var display_color := Color.WHITE if unit.hit_flash_ticks > 0 else color
 	_draw_unit_shape(unit.spec.id, center, radius, display_color)
-	var sigil_glyph := unit_sigil_glyph(unit)
+	var sigil_glyph := _unit_sigil_glyph_ref(unit)
 	if sigil_glyph != null:
 		GlyphPainterModel.draw_glyph(
 			self,
