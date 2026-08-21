@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/factory_board.gd" id="2_factory"]
@@ -12,6 +12,7 @@
 [ext_resource type="Script" path="res://src/ui/factory_selection_indicator.gd" id="7_selection_indicator"]
 [ext_resource type="Script" path="res://src/ui/meaning_reward_button.gd" id="10_reward_button"]
 [ext_resource type="Script" path="res://src/ui/route_choice_button.gd" id="11_route_button"]
+[ext_resource type="Script" path="res://src/ui/stage_threat_timeline.gd" id="12_stage_timeline"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -458,6 +459,13 @@ layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("11_route_button")
 route_id = &"armored_route"
+
+[node name="StageTimeline" type="Control" parent="PhaseOverlay/Center/Panel/Content"]
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+visible = false
+mouse_default_cursor_shape = 2
+script = ExtResource("12_stage_timeline")
 
 [node name="RewardChoices" type="HBoxContainer" parent="PhaseOverlay/Center/Panel/Content"]
 custom_minimum_size = Vector2(0, 92)

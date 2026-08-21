@@ -27,7 +27,9 @@ func _initialize() -> void:
 	viewport.add_child(main)
 	await process_frame
 	main.acquired_rewards = upgrades
-	if capture_phase == "factory":
+	if capture_phase == "stage":
+		main.phase_button.pressed.emit()
+	elif capture_phase == "factory":
 		main.phase_button.pressed.emit()
 		main.phase_button.pressed.emit()
 		main._select_plan(plan_id)

@@ -7,6 +7,7 @@ const SigilGhostControl := preload("res://src/ui/sigil_ghost.gd")
 const FactorySelectionIndicatorControl := preload("res://src/ui/factory_selection_indicator.gd")
 const MeaningRewardButtonControl := preload("res://src/ui/meaning_reward_button.gd")
 const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
+const StageThreatTimelineControl := preload("res://src/ui/stage_threat_timeline.gd")
 
 const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
 
@@ -47,6 +48,7 @@ enum WorkspaceView {
 @onready var phase_button: Button = $PhaseOverlay/Center/Panel/Content/AdvanceButton
 @onready var reward_choices: HBoxContainer = $PhaseOverlay/Center/Panel/Content/RewardChoices
 @onready var route_choices: HBoxContainer = $PhaseOverlay/Center/Panel/Content/RouteChoices
+@onready var stage_timeline: StageThreatTimelineControl = $PhaseOverlay/Center/Panel/Content/StageTimeline
 @onready var inspector_label: FactorySelectionIndicatorControl = $FactoryInspector/SelectionLabel
 @onready var inspector_option: FactorySettingOption = $FactoryInspector/SettingOption
 @onready var sigil_ghost: SigilGhostControl = $FactoryInspector/SigilGhost
@@ -660,6 +662,7 @@ func _apply_phase() -> void:
 	phase_overlay.visible = false
 	reward_choices.visible = false
 	route_choices.visible = false
+	stage_timeline.visible = false
 	debug_victory_button.visible = false
 	speed_button.disabled = true
 	_update_speed_button()
@@ -680,10 +683,12 @@ func _apply_phase() -> void:
 		RunFlow.Phase.STAGE_INFO:
 			var durability_percent := roundi((MvpContent.route_durability_multiplier(flow.route_number) - 1.0) * 100.0)
 			var durability_text := "標準耐久" if durability_percent == 0 else "敵部隊耐久 +%d%%" % durability_percent
+			stage_timeline.configure(selected_route_id, flow.route_number)
+			stage_timeline.visible = true
 			_show_overlay(
 				"STAGE PREVIEW",
 				"ステージ情報を確認",
-				"%s // %s // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n%s" % [selected_route_name, durability_text, MvpContent.route_description(selected_route_id)],
+				"%s // %s // 制限 3:00 // 敵防壁とリーダーを撃破" % [selected_route_name, durability_text],
 				"OK：工場構築へ"
 			)
 		RunFlow.Phase.FACTORY_BUILD:

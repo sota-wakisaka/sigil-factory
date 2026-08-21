@@ -29,9 +29,10 @@ func _initialize() -> void:
 
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.STAGE_INFO, "route OK should show stage information")
+	_expect(main.stage_timeline.visible and main.stage_timeline.route_id == MvpContent.ROUTE_MIXED and main.stage_timeline.marker_count() == 4, "stage preview should visualize the selected route's major waves")
 	_expect("混成の道" in main.phase_body.text, "stage information should retain the selected encounter")
-	_expect("制限時間 3:00" in main.phase_body.text, "stage information should disclose the battle duration")
-	_expect("襲撃 → 1:00 群体 → 1:54 装甲" in main.phase_body.text, "stage information should disclose the selected enemy sequence without prescribing an answer")
+	_expect("制限 3:00" in main.phase_body.text, "stage information should disclose the battle duration")
+	_expect("1:00 群体 → 1:54 装甲" in main.stage_timeline.tooltip_text, "stage timeline hover should disclose the selected enemy sequence without prescribing an answer")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "stage OK should open factory build")
 	_expect(main.battle_board.route_id == MvpContent.ROUTE_MIXED, "selected route should configure the real battle schedule")

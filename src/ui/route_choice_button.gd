@@ -2,6 +2,7 @@ class_name RouteChoiceButton
 extends Button
 
 const MvpContent := preload("res://src/game/mvp_content.gd")
+const ThreatIconPainter := preload("res://src/ui/threat_icon_painter.gd")
 
 @export var route_id: StringName
 
@@ -31,7 +32,7 @@ func _draw() -> void:
 	var spacing := 32.0
 	var start_x := size.x * 0.5 - spacing * float(formation.size() - 1) * 0.5
 	for index in formation.size():
-		_draw_enemy(Vector2(start_x + spacing * index, 42.0), formation[index], accent)
+		ThreatIconPainter.draw_enemy(self, Vector2(start_x + spacing * index, 42.0), formation[index], accent)
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(12, size.y - 22),
@@ -50,22 +51,3 @@ func _formation() -> Array[StringName]:
 		MvpContent.ROUTE_ARMORED:
 			return [&"swarm", &"brute", &"brute", &"brute"]
 	return [&"raider", &"swarm", &"brute"]
-
-
-func _draw_enemy(center: Vector2, kind: StringName, color: Color) -> void:
-	match kind:
-		&"swarm":
-			for offset in [Vector2(-5, 3), Vector2(0, -5), Vector2(5, 3)]:
-				draw_circle(center + offset, 3.0, color)
-		&"brute":
-			var points := PackedVector2Array([
-				center + Vector2(-8, -7), center + Vector2(8, -7),
-				center + Vector2(6, 6), center + Vector2(0, 10), center + Vector2(-6, 6),
-			])
-			draw_polyline(points, color, 2.0, true)
-			draw_line(points[points.size() - 1], points[0], color, 2.0, true)
-		_:
-			var points := PackedVector2Array([
-				center + Vector2(0, -9), center + Vector2(9, 7), center + Vector2(-9, 7), center + Vector2(0, -9),
-			])
-			draw_polyline(points, color, 2.0, true)
