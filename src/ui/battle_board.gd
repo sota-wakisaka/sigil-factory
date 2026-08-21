@@ -29,9 +29,13 @@ func reset_battle(next_route_id: StringName = MvpContent.ROUTE_MIXED, next_route
 	queue_redraw()
 
 
-func spawn_player(unit_id: StringName) -> void:
+func spawn_player(unit_id: StringName, recipe_id: StringName = &"") -> void:
 	if simulation != null and not simulation.is_finished():
-		simulation.spawn_player(unit_id)
+		simulation.spawn_player_from_recipe(
+			unit_id,
+			recipe_id,
+			MvpContent.recipe_combat_modifiers(recipe_id)
+		)
 		queue_redraw()
 
 

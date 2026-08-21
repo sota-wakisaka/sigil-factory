@@ -654,7 +654,7 @@ func _complete_battle_placeholder() -> void:
 func _on_summon_produced(unit_id: StringName, recipe_id: StringName) -> void:
 	produced_units[unit_id] = int(produced_units.get(unit_id, 0)) + 1
 	produced_recipes[recipe_id] = int(produced_recipes.get(recipe_id, 0)) + 1
-	battle_board.spawn_player(unit_id)
+	battle_board.spawn_player(unit_id, recipe_id)
 
 
 func _on_battle_finished(winner: int) -> void:

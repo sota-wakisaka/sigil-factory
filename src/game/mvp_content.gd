@@ -229,6 +229,18 @@ static func recipes() -> Array[SigilRecipeModel]:
 	]
 
 
+static func recipe_combat_modifiers(recipe_id: StringName) -> Dictionary:
+	match recipe_id:
+		&"stellar_sentinel":
+			return {
+				&"max_health_multiplier": 0.8,
+				&"attack_damage_multiplier": 1.35,
+				&"move_speed_multiplier": 1.35,
+				&"target_count": 2,
+			}
+	return {}
+
+
 static func layout_for_plan(plan_id: StringName) -> Dictionary:
 	match plan_id:
 		PLAN_EMPTY:
@@ -304,7 +316,7 @@ static func plan_description(plan_id: StringName) -> String:
 		PLAN_VIGIL:
 			return "目＋十字 // 単純結合で対群体衛兵を生産"
 		PLAN_STELLAR:
-			return "星 // 少ない魔力で対群体衛兵を生産"
+			return "星 // 少数・高速・強打の2体攻撃衛兵"
 		PLAN_GOLEM:
 			return "対装甲 // 高耐久・低速・長工程"
 		PLAN_FORTRESS:

@@ -55,6 +55,10 @@ func spawn_player(unit_id: StringName) -> bool:
 	return _spawn_unit(unit_id, Side.PLAYER, PLAYER_SPAWN)
 
 
+func spawn_player_from_recipe(unit_id: StringName, recipe_id: StringName, modifiers: Dictionary = {}) -> bool:
+	return _spawn_unit(unit_id, Side.PLAYER, PLAYER_SPAWN, recipe_id, modifiers)
+
+
 func spawn_enemy(unit_id: StringName) -> bool:
 	return _spawn_unit(unit_id, Side.ENEMY, ENEMY_SPAWN)
 
@@ -119,7 +123,13 @@ func active_unit_count(side: int) -> int:
 	return count
 
 
-func _spawn_unit(unit_id: StringName, side: int, position: float) -> bool:
+func _spawn_unit(
+	unit_id: StringName,
+	side: int,
+	position: float,
+	recipe_id: StringName = &"",
+	modifiers: Dictionary = {}
+) -> bool:
 	if not specs.has(unit_id):
 		return false
 	_ensure_spawn_budget()
@@ -127,7 +137,9 @@ func _spawn_unit(unit_id: StringName, side: int, position: float) -> bool:
 		return _reject_spawn(unit_id, side, &"unit_cap")
 	if int(successful_spawns_this_tick.get(side, 0)) >= MAX_SPAWNS_PER_SIDE_PER_TICK:
 		return _reject_spawn(unit_id, side, &"rate_cap")
-	var unit := BattleUnitModel.new(next_instance_id, specs[unit_id], side, position)
+	var base_spec: UnitSpecModel = specs[unit_id]
+	var unit_spec := base_spec.variant(modifiers) if not modifiers.is_empty() else base_spec
+	var unit := BattleUnitModel.new(next_instance_id, unit_spec, side, position, recipe_id)
 	next_instance_id += 1
 	units.append(unit)
 	successful_spawns_this_tick[side] = int(successful_spawns_this_tick.get(side, 0)) + 1
@@ -135,6 +147,7 @@ func _spawn_unit(unit_id: StringName, side: int, position: float) -> bool:
 		"type": "spawn",
 		"tick": tick_index,
 		"unit_id": unit_id,
+		"recipe_id": recipe_id,
 		"side": side,
 		"instance_id": unit.instance_id,
 	})

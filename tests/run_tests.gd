@@ -85,6 +85,7 @@ func _initialize() -> void:
 	_test_mvp_routes_have_distinct_valid_schedules()
 	_test_empty_factory_requires_player_wiring()
 	_test_battle_units_fight_and_die()
+	_test_recipe_combat_variant_preserves_sigil_identity()
 	_test_preferred_attack_marks_weakness_feedback()
 	_test_enemy_shield_takes_damage_and_opens()
 	_test_battle_ends_at_time_limit()
@@ -1909,6 +1910,39 @@ func _test_battle_units_fight_and_die() -> void:
 			break
 	_expect(battle.player_kills == 1, "player unit should kill weaker enemy")
 	_expect(battle.units.size() == 1, "dead unit should be removed from battle")
+
+
+func _test_recipe_combat_variant_preserves_sigil_identity() -> void:
+	var battle := MvpContent.build_battle()
+	var base_spec: UnitSpecModel = battle.specs[&"sentinel"]
+	var base_health := base_spec.max_health
+	var base_damage := base_spec.attack_damage
+	var base_speed := base_spec.move_speed
+	var modifiers := MvpContent.recipe_combat_modifiers(&"stellar_sentinel")
+	_expect(
+		battle.spawn_player_from_recipe(&"sentinel", &"stellar_sentinel", modifiers),
+		"an acquired recipe should spawn its combat variant"
+	)
+	var stellar_unit: BattleUnitModel = battle.units[0]
+	_expect(stellar_unit.recipe_id == &"stellar_sentinel", "battle units should retain the producing sigil recipe")
+	_expect(
+		stellar_unit.spec.max_health < base_health
+		and stellar_unit.spec.attack_damage > base_damage
+		and stellar_unit.spec.move_speed > base_speed
+		and stellar_unit.spec.target_count == 2,
+		"the Star Sentinel should trade durability and coverage for speed and damage"
+	)
+	_expect(
+		is_equal_approx(base_spec.max_health, base_health)
+		and is_equal_approx(base_spec.attack_damage, base_damage)
+		and is_equal_approx(base_spec.move_speed, base_speed)
+		and base_spec.target_count == 3,
+		"recipe variants should not mutate the shared base unit specification"
+	)
+	_expect(
+		battle.battle_events[-1]["recipe_id"] == &"stellar_sentinel",
+		"spawn events should retain the producing sigil recipe"
+	)
 
 
 func _test_preferred_attack_marks_weakness_feedback() -> void:

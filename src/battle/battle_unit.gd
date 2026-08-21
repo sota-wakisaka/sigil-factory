@@ -3,6 +3,7 @@ extends RefCounted
 
 var instance_id: int
 var spec: UnitSpecModel
+var recipe_id: StringName
 var side: int
 var position: float
 var health: float
@@ -17,12 +18,14 @@ func _init(
 	initial_instance_id: int,
 	initial_spec: UnitSpecModel,
 	initial_side: int,
-	initial_position: float
+	initial_position: float,
+	initial_recipe_id: StringName = &""
 ) -> void:
 	instance_id = initial_instance_id
 	spec = initial_spec
 	side = initial_side
 	position = initial_position
+	recipe_id = initial_recipe_id
 	health = spec.max_health
 
 

@@ -45,3 +45,19 @@ func damage_against(target: UnitSpecModel) -> float:
 	if preferred_target_id != &"" and target.id == preferred_target_id:
 		multiplier = preferred_multiplier
 	return maxf(attack_damage * multiplier - target.armor, 1.0)
+
+
+func variant(modifiers: Dictionary) -> UnitSpecModel:
+	return UnitSpecModel.new(
+		id,
+		max_health * float(modifiers.get(&"max_health_multiplier", 1.0)),
+		attack_damage * float(modifiers.get(&"attack_damage_multiplier", 1.0)),
+		maxi(int(round(float(attack_interval_ticks) * float(modifiers.get(&"attack_interval_multiplier", 1.0)))), 1),
+		move_speed * float(modifiers.get(&"move_speed_multiplier", 1.0)),
+		attack_range * float(modifiers.get(&"attack_range_multiplier", 1.0)),
+		armor + float(modifiers.get(&"armor_bonus", 0.0)),
+		int(modifiers.get(&"target_count", target_count)),
+		StringName(modifiers.get(&"preferred_target_id", preferred_target_id)),
+		preferred_multiplier * float(modifiers.get(&"preferred_multiplier", 1.0)),
+		maxi(int(round(float(max_lifetime_ticks) * float(modifiers.get(&"max_lifetime_multiplier", 1.0)))), 1)
+	)
