@@ -535,7 +535,7 @@ func _initialize() -> void:
 	main.battle_board.advance_tick()
 	_expect(main.defeat_active and main.phase_overlay.visible and main.phase_kicker.text == "RUN 02 // DEFEAT", "time limit should open a defeat summary with the current run number")
 	_expect(main.battle_result_sigil_strip.visible and main.battle_result_sigil_strip.entries.size() == 1, "defeat should preserve the producing sigil and its damage as a visual result")
-	_expect("再構成 0回" in main.phase_body.text, "defeat analysis should state the missed reconfiguration without prescribing an answer")
+	_expect(main.phase_body.text == "" and main.battle_result_sigil_strip.metrics[&"rebuilds"] == 0, "defeat analysis should keep reconfiguration factual in the visual metrics without duplicating prose")
 	_expect("群体兵で衛兵" not in main.phase_body.text and "改善:" not in main.phase_body.text, "defeat summary should leave the next factory judgment to the player")
 	main.factory_change_count = 1
 	main.produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
@@ -543,9 +543,9 @@ func _initialize() -> void:
 	_expect("召喚 0体 // 不一致 3" == main._defeat_advice(), "zero successful summons with discards should report the exact failed output")
 	main.produced_units = {&"scout": 20, &"sentinel": 0, &"golem": 5}
 	main.factory_board.simulation.discarded_glyphs = 0
-	_expect("衛兵0" in main._defeat_advice(), "missing swarm counter should be identified explicitly")
+	_expect(main._defeat_advice() == "", "defeat analysis should not prescribe a missing unit answer when visual production facts are available")
 	main.produced_units = {&"scout": 20, &"sentinel": 5, &"golem": 0}
-	_expect("巨像0" in main._defeat_advice(), "missing armor counter should be identified explicitly")
+	_expect(main._defeat_advice() == "", "defeat analysis should not prescribe a different unit answer after the factory mix changes")
 	_expect(main.phase_button.text == "工場を再構築", "defeat summary should expose one central retry action")
 	var defeated_speed: float = main.current_battle_speed()
 	main._cycle_battle_speed()

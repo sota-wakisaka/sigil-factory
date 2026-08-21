@@ -861,6 +861,7 @@ func _show_overlay(kicker: String, title: String, body: String, button_text: Str
 	phase_kicker.text = kicker
 	phase_title.text = title
 	phase_body.text = body
+	phase_body.custom_minimum_size.y = 0.0 if body.is_empty() else 90.0
 	phase_button.text = button_text
 	phase_overlay.visible = true
 
@@ -1089,17 +1090,7 @@ func _defeat_advice() -> String:
 			if discarded > 0
 			else "召喚 0体 // 工場出力なし"
 		)
-	if discarded >= maxi(int(total_produced / 5), 2):
-		return "召喚 %d体 // 不一致 %d" % [total_produced, discarded]
-	if factory_change_count == 0:
-		return "再構成 0回 // 生産 斥候%d  衛兵%d  巨像%d" % [scout_count, sentinel_count, golem_count]
-	if sentinel_count == 0:
-		return "生産 斥候%d  衛兵0  巨像%d" % [scout_count, golem_count]
-	if golem_count == 0:
-		return "生産 斥候%d  衛兵%d  巨像0" % [scout_count, sentinel_count]
-	if battle_board.simulation.is_enemy_shield_active():
-		return "敵防壁 残りHP %.0f // 召喚 %d体" % [battle_board.simulation.enemy_shield_health, total_produced]
-	return "敵リーダー 残りHP %.0f // 召喚 %d体" % [battle_board.simulation.enemy_leader_health, total_produced]
+	return ""
 
 
 func _update_progress() -> void:
