@@ -50,6 +50,7 @@ func _initialize() -> void:
 	_test_factory_replay_is_independent_of_insertion_order()
 	_test_factory_pipeline_summons_matching_unit()
 	_test_factory_meaning_glyph_source_summons_registered_recipe()
+	_test_factory_combines_meaning_glyphs_into_alternate_recipe()
 	_test_factory_recipe_match_preview_is_non_destructive()
 	_test_factory_records_closest_summon_failure()
 	_test_factory_closest_recipe_is_order_independent()
@@ -860,6 +861,43 @@ func _test_factory_meaning_glyph_source_summons_registered_recipe() -> void:
 	_expect(validation_errors.has("unknown_meaning_glyph:unknown:missing"), "unknown meaning Glyph IDs should fail closed before simulation")
 
 
+func _test_factory_combines_meaning_glyphs_into_alternate_recipe() -> void:
+	var simulation := FactorySimulation.new()
+	for recipe in MvpContent.recipes():
+		_expect(simulation.add_recipe(recipe), "alternate meaning recipe fixture should register every acquired recipe")
+	var eye_source := FactoryNodeModel.new(
+		&"eye_source",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": 1}
+	)
+	var cross_source := FactoryNodeModel.new(
+		&"cross_source",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"meaning_glyph_id": MeaningGlyphsModel.CROSS, "interval_ticks": 1}
+	)
+	var combiner := FactoryNodeModel.new(
+		&"combiner",
+		FactoryNodeModel.NodeKind.COMBINER,
+		{
+			"processing_ticks": 1,
+			"connection_mode": GlyphModel.CONNECTION_SIMPLE,
+		}
+	)
+	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
+	for node in [eye_source, cross_source, combiner, summoner]:
+		_expect(simulation.add_node(node), "meaning-combination pipeline should accept its equipment")
+	_expect(simulation.connect_nodes(FactoryLineModel.new(&"eye", &"eye_source", &"combiner", 0, 1))["ok"], "Eye should feed the first combine input")
+	_expect(simulation.connect_nodes(FactoryLineModel.new(&"cross", &"cross_source", &"combiner", 1, 1))["ok"], "Cross should feed the second combine input")
+	_expect(simulation.connect_nodes(FactoryLineModel.new(&"summon", &"combiner", &"summoner", 0, 1))["ok"], "combined meaning Glyph should feed the summoner")
+	for _tick in 12:
+		simulation.tick()
+	_expect(not simulation.summon_events.is_empty(), "Eye plus Cross should summon through the acquired alternate recipe")
+	if not simulation.summon_events.is_empty():
+		_expect(simulation.summon_events[0]["recipe_id"] == &"vigil_cross", "simple meaning combination should preserve its recipe identity")
+		_expect(simulation.summon_events[0]["unit_id"] == &"sentinel", "alternate meaning recipe should summon the intended Sentinel")
+	_expect(simulation.discarded_glyphs == 0, "valid alternate meaning recipe should not be discarded")
+
+
 func _test_factory_recipe_match_preview_is_non_destructive() -> void:
 	var simulation := MvpContent.build_factory(MvpContent.PLAN_SCOUT)
 	var eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
@@ -975,7 +1013,7 @@ func _test_factory_rejects_ambiguous_recipes() -> void:
 		simulation.recipes[0].id == &"b_spike" and simulation.recipes[1].id == &"z_ring",
 		"accepted recipes should use stable ID order instead of acquisition order"
 	)
-	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 3, "all MVP recipes should have unique IDs and structures")
+	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 4, "all MVP recipes should have unique IDs and structures")
 
 
 func _test_recipe_registration_reports_stable_errors() -> void:
@@ -1073,7 +1111,7 @@ func _test_mvp_recipe_set_validation_reports_content_location() -> void:
 		"recipe set diagnostics should identify content index, ID, and stable rejection reasons"
 	)
 	var mvp_result := MvpContent.validate_recipe_set(MvpContent.recipes())
-	_expect(mvp_result["ok"] and mvp_result["accepted_count"] == 3, "shipped MVP recipes should pass aggregate validation")
+	_expect(mvp_result["ok"] and mvp_result["accepted_count"] == 4, "shipped MVP recipes should pass aggregate validation")
 
 
 func _test_factory_rejects_invalid_recipe_structures() -> void:
