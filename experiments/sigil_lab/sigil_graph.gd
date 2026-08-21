@@ -263,7 +263,10 @@ func _apply_node(kind: StringName, config: Dictionary, inputs: Array) -> Diction
 			glyph = inputs[0].copy()
 			glyph.recolor(StringName(config["color_id"]))
 		COMBINE:
-			glyph = GlyphModel.combine_many(inputs)
+			glyph = GlyphModel.combine_many(
+				inputs,
+				StringName(config.get("connection_mode", GlyphModel.CONNECTION_RADIAL))
+			)
 		OUTPUT:
 			glyph = inputs[0].copy()
 		_:
@@ -334,7 +337,19 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 			if not color_id in COLORS:
 				return {"ok": false, "error": &"invalid_color", "config": {}}
 			return {"ok": true, "error": &"", "config": {"color_id": color_id}}
-		COMBINE, OUTPUT:
+		COMBINE:
+			var connection_mode := StringName(config.get(
+				"connection_mode",
+				GlyphModel.CONNECTION_RADIAL
+			))
+			if not connection_mode in GlyphModel.COMBINE_CONNECTION_MODES:
+				return {"ok": false, "error": &"invalid_connection_mode", "config": {}}
+			return {
+				"ok": true,
+				"error": &"",
+				"config": {"connection_mode": connection_mode},
+			}
+		OUTPUT:
 			return {"ok": true, "error": &"", "config": {}}
 	return {"ok": false, "error": &"invalid_kind", "config": {}}
 

@@ -46,7 +46,10 @@ static func compare(actual: GlyphModel, target: GlyphModel) -> Dictionary:
 
 	var diagnostics := PackedStringArray()
 	if actual.canonical_keys() == target.canonical_keys():
-		_add_unique(diagnostics, "合成階層が違います")
+		if _combine_structure_without_modes(actual) == _combine_structure_without_modes(target):
+			_add_unique(diagnostics, "接続方式が違います")
+		else:
+			_add_unique(diagnostics, "合成階層が違います")
 	var used_actual_indices: Dictionary = {}
 	var target_components: Array[GlyphComponentModel] = target.components.duplicate()
 	target_components.sort_custom(
@@ -187,9 +190,25 @@ static func _diagnostic_priority(value: String) -> int:
 		return 4
 	if value == "位置が違います":
 		return 5
-	if value == "合成階層が違います":
+	if value == "接続方式が違います":
 		return 6
-	return 7
+	if value == "合成階層が違います":
+		return 7
+	return 8
+
+
+static func _combine_structure_without_modes(value: GlyphModel) -> String:
+	if value.combine_children.is_empty():
+		return value.canonical_serialization()
+	var children := PackedStringArray()
+	for child in value.combine_children:
+		children.append(_combine_structure_without_modes(child))
+	children.sort()
+	return "C(%s,%s;%s)" % [
+		GlyphComponentModel.coordinate_key(value.combine_origin.x),
+		GlyphComponentModel.coordinate_key(value.combine_origin.y),
+		",".join(children),
+	]
 
 
 static func _add_unique(values: PackedStringArray, value: String) -> void:

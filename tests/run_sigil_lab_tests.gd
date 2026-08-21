@@ -1,7 +1,9 @@
 extends SceneTree
 
 const SigilGraphModel := preload("res://experiments/sigil_lab/sigil_graph.gd")
+const GlyphModel := preload("res://src/domain/glyph.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
+const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 
 var failures := 0
 
@@ -41,7 +43,7 @@ func _test_graph_evaluation() -> void:
 
 func _test_eight_way_combine() -> void:
 	var graph = SigilGraphModel.new()
-	graph.add_node(&"combine", SigilGraphModel.COMBINE)
+	graph.add_node(&"combine", SigilGraphModel.COMBINE, {"connection_mode": GlyphModel.CONNECTION_PAIRWISE})
 	graph.add_node(&"output", SigilGraphModel.OUTPUT)
 	for input_index in SigilGraphModel.MAX_COMBINE_INPUTS:
 		var source_id := StringName("source_%d" % input_index)
@@ -63,7 +65,7 @@ func _test_eight_way_combine() -> void:
 
 func _test_free_angle_triangle() -> void:
 	var graph = SigilGraphModel.new()
-	graph.add_node(&"combine", SigilGraphModel.COMBINE)
+	graph.add_node(&"combine", SigilGraphModel.COMBINE, {"connection_mode": GlyphModel.CONNECTION_PAIRWISE})
 	graph.add_node(&"output", SigilGraphModel.OUTPUT)
 	for input_index in 3:
 		var source_id := StringName("triangle_source_%d" % input_index)
@@ -79,6 +81,8 @@ func _test_free_angle_triangle() -> void:
 	var result := graph.evaluate_output()
 	_expect(result["ok"], "cardinal movement plus free-angle rotation should form a triangle")
 	if result["ok"]:
+		_expect(result["glyph"].combine_connection_mode == GlyphModel.CONNECTION_PAIRWISE, "Lab should preserve the selected pairwise connection mode")
+		_expect(GlyphPainterModel.combine_visuals(result["glyph"])["connections"].size() == 3, "pairwise triangle should connect each child without a center spoke")
 		var positions: Array[String] = []
 		for component in result["glyph"].components:
 			positions.append("%s,%s" % [
@@ -155,6 +159,12 @@ func _test_lab_scene() -> void:
 			combine_id = node_id
 			break
 	_expect(combine_id != &"" and lab.graph.input_count(combine_id) == 8, "Lab Combine nodes should expose eight inputs")
+	_expect(lab.option_controls[combine_id] is OptionButton and lab.option_controls[combine_id].item_count == 2, "Lab Combine should expose radial and pairwise modes")
+	if lab.option_controls[combine_id] is OptionButton:
+		var combine_option: OptionButton = lab.option_controls[combine_id]
+		combine_option.select(1)
+		combine_option.item_selected.emit(1)
+		_expect(lab.graph.node_config(combine_id)["connection_mode"] == GlyphModel.CONNECTION_PAIRWISE, "changing the Combine option should update the graph output mode")
 	var free_rotate: StringName = lab.add_lab_node(SigilGraphModel.ROTATE, {"degrees": 120}, Vector2(40, 40))
 	_expect(lab.option_controls[free_rotate] is SpinBox, "Lab rotation should use a free-angle numeric control")
 	if lab.option_controls[free_rotate] is SpinBox:

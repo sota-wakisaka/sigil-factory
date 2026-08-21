@@ -31,6 +31,8 @@ func _initialize() -> void:
 	_test_diagnostics_are_stable_for_duplicate_primitives()
 	_test_diagnostics_follow_player_facing_priority()
 	_test_combine_structure_is_order_independent()
+	_test_combine_connection_modes_are_visible_and_canonical()
+	_test_pairwise_connections_remove_overlaps()
 	_test_combine_children_use_hash_then_serialization_order()
 	_test_combine_hierarchy_affects_matching()
 	_test_production_context_does_not_affect_matching()
@@ -289,6 +291,62 @@ func _test_combine_structure_is_order_independent() -> void:
 		"combine input order should not affect canonical structure"
 	)
 	_expect(first.canonical_hash() == second.canonical_hash(), "equal structures should share a stable hash")
+
+
+func _test_combine_connection_modes_are_visible_and_canonical() -> void:
+	var top := GlyphModel.new([GlyphComponentModel.new(&"spike", Vector2(0, -4))])
+	var right := GlyphModel.new([GlyphComponentModel.new(&"spike", Vector2(3.464, 2), 0, 1, &"white", 120)])
+	var left := GlyphModel.new([GlyphComponentModel.new(&"spike", Vector2(-3.464, 2), 0, 1, &"white", 240)])
+	var radial := GlyphModel.combine_many([top, right, left], GlyphModel.CONNECTION_RADIAL)
+	var pairwise := GlyphModel.combine_many([top, right, left], GlyphModel.CONNECTION_PAIRWISE)
+	_expect(
+		not SigilMatcher.compare(radial, pairwise)["is_match"],
+		"radial and pairwise Combine modes should remain distinct CanonicalGlyphs"
+	)
+	_expect(
+		SigilMatcher.compare(radial, pairwise)["diagnostics"].has("接続方式が違います"),
+		"connection-only mismatches should identify the selected Combine mode"
+	)
+	_expect(
+		pairwise.copy().canonical_serialization() == pairwise.canonical_serialization(),
+		"Glyph copies should preserve the Combine connection mode"
+	)
+	var visuals := GlyphPainterModel.combine_visuals(pairwise)
+	_expect(visuals["connections"].size() == 3, "three pairwise children should form three edge-to-edge connections")
+	var child_centers: Array[Vector2] = [
+		Vector2(0, -24),
+		Vector2(20.784, 12),
+		Vector2(-20.784, 12),
+	]
+	for connection in visuals["connections"]:
+		for child_center in child_centers:
+			_expect(
+				connection["from"].distance_to(child_center) > 0.1
+				and connection["to"].distance_to(child_center) > 0.1,
+				"pairwise connections should stop before entering child Glyphs"
+			)
+
+
+func _test_pairwise_connections_remove_overlaps() -> void:
+	var left := GlyphModel.new([GlyphComponentModel.new(&"ring", Vector2(-4, 0))])
+	var center := GlyphModel.new([GlyphComponentModel.new(&"spike", Vector2.ZERO)])
+	var right := GlyphModel.new([GlyphComponentModel.new(&"branch", Vector2(4, 0))])
+	var pairwise := GlyphModel.combine_many(
+		[left, center, right],
+		GlyphModel.CONNECTION_PAIRWISE
+	)
+	var visuals := GlyphPainterModel.combine_visuals(pairwise)
+	_expect(
+		visuals["connections"].size() == 2,
+		"collinear pairwise edges should merge instead of drawing darker overlapping lines"
+	)
+	for connection in visuals["connections"]:
+		var from: Vector2 = connection["from"]
+		var to: Vector2 = connection["to"]
+		_expect(
+			from.distance_to(Vector2.ZERO) >= 2.7 and to.distance_to(Vector2.ZERO) >= 2.7,
+			"pairwise edges should be cut where they pass through the centered child Glyph"
+		)
 
 
 func _test_combine_children_use_hash_then_serialization_order() -> void:

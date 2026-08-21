@@ -1,6 +1,7 @@
 extends SceneTree
 
 const SigilGraphModel := preload("res://experiments/sigil_lab/sigil_graph.gd")
+const GlyphModel := preload("res://src/domain/glyph.gd")
 
 
 func _initialize() -> void:
@@ -67,7 +68,11 @@ func _build_coincident_child_fixture(lab) -> void:
 
 func _build_triangle_fixture(lab) -> void:
 	lab.clear_workspace()
-	var combine: StringName = lab.add_lab_node(SigilGraphModel.COMBINE, {}, Vector2(610, 245))
+	var combine: StringName = lab.add_lab_node(
+		SigilGraphModel.COMBINE,
+		{"connection_mode": GlyphModel.CONNECTION_PAIRWISE},
+		Vector2(610, 245)
+	)
 	var output_id: StringName = lab.graph.output_node_id()
 	for input_index in 3:
 		var y := 85.0 + float(input_index) * 205.0

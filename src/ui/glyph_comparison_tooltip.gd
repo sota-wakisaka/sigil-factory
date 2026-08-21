@@ -130,7 +130,7 @@ func _combine_signature(value: GlyphModel) -> String:
 	for child in value.combine_children:
 		children.append(_combine_signature(child))
 	children.sort()
-	return "C(%s)" % ",".join(children)
+	return "C[%s](%s)" % [value.combine_connection_mode, ",".join(children)]
 
 
 func _draw_difference_badges() -> void:

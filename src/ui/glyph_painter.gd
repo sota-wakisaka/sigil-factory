@@ -59,7 +59,10 @@ static func combine_visuals(glyph: GlyphModel, scale: float = 1.0) -> Dictionary
 	if not can_draw(glyph) or scale <= 0.0:
 		return {"circles": circles, "connections": connections}
 	_collect_combine_visuals(glyph, scale, circles, connections)
-	return {"circles": circles, "connections": connections}
+	return {
+		"circles": circles,
+		"connections": _merge_overlapping_connections(connections, scale),
+	}
 
 
 static func _collect_combine_visuals(
@@ -78,12 +81,202 @@ static func _collect_combine_visuals(
 	circles.append({"center": glyph_center, "radius": radius})
 	var children := glyph.combine_children.duplicate()
 	children.sort_custom(_canonical_child_less)
+	if glyph.combine_connection_mode == GlyphModel.CONNECTION_PAIRWISE:
+		connections.append_array(_pairwise_visible_connections(children, scale))
 	for child_value in children:
 		var child: GlyphModel = child_value
-		var child_center := _glyph_center_offset(child, scale)
-		if glyph_center.distance_to(child_center) >= 2.0 * scale:
-			connections.append({"from": glyph_center, "to": child_center})
+		if glyph.combine_connection_mode == GlyphModel.CONNECTION_RADIAL:
+			var child_center := _glyph_center_offset(child, scale)
+			if glyph_center.distance_to(child_center) >= 2.0 * scale:
+				connections.append({
+					"from": glyph_center,
+					"to": child_center,
+					"merge_overlaps": false,
+				})
 		_collect_combine_visuals(child, scale, circles, connections)
+
+
+static func _pairwise_visible_connections(children: Array, scale: float) -> Array[Dictionary]:
+	var connections: Array[Dictionary] = []
+	var centers: Array[Vector2] = []
+	var radii: Array[float] = []
+	for child_value in children:
+		if not child_value is GlyphModel:
+			continue
+		var child: GlyphModel = child_value
+		var child_center := _glyph_center_offset(child, scale)
+		centers.append(child_center)
+		radii.append(_glyph_connection_radius(child, child_center, scale))
+	for first_index in centers.size():
+		for second_index in range(first_index + 1, centers.size()):
+			connections.append_array(_visible_segment_gaps(
+				centers[first_index],
+				centers[second_index],
+				centers,
+				radii,
+				scale
+			))
+	return connections
+
+
+static func _visible_segment_gaps(
+	start: Vector2,
+	end: Vector2,
+	centers: Array[Vector2],
+	radii: Array[float],
+	scale: float
+) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var delta := end - start
+	var length_squared := delta.length_squared()
+	if length_squared <= 0.000001:
+		return result
+	var segment_length := sqrt(length_squared)
+	var blocked: Array[Vector2] = []
+	for index in centers.size():
+		var relative := centers[index] - start
+		var center_t := relative.dot(delta) / length_squared
+		var closest := start + delta * center_t
+		var perpendicular_squared := centers[index].distance_squared_to(closest)
+		var radius := radii[index]
+		if perpendicular_squared >= radius * radius:
+			continue
+		var half_t := sqrt(maxf(radius * radius - perpendicular_squared, 0.0)) / segment_length
+		var blocked_start := maxf(center_t - half_t, 0.0)
+		var blocked_end := minf(center_t + half_t, 1.0)
+		if blocked_start < blocked_end:
+			blocked.append(Vector2(blocked_start, blocked_end))
+	blocked.sort_custom(func(first: Vector2, second: Vector2) -> bool: return first.x < second.x)
+	var cursor := 0.0
+	var minimum_gap := maxf(0.35 * scale, 0.05)
+	for interval in blocked:
+		if interval.x > cursor:
+			var visible_start := start + delta * cursor
+			var visible_end := start + delta * interval.x
+			if visible_start.distance_to(visible_end) >= minimum_gap:
+				result.append({
+					"from": visible_start,
+					"to": visible_end,
+					"merge_overlaps": true,
+				})
+		cursor = maxf(cursor, interval.y)
+	if cursor < 1.0:
+		var visible_start := start + delta * cursor
+		if visible_start.distance_to(end) >= minimum_gap:
+			result.append({
+				"from": visible_start,
+				"to": end,
+				"merge_overlaps": true,
+			})
+	return result
+
+
+static func _glyph_connection_radius(glyph: GlyphModel, center: Vector2, scale: float) -> float:
+	if not glyph.combine_children.is_empty():
+		return (
+			_glyph_content_radius(glyph, center, scale)
+			+ float(_combine_depth(glyph) - 1) * 6.0 * scale
+			+ combine_stroke_width(scale) * 0.5
+		)
+	var radius := 0.0
+	for component in glyph.components:
+		var component_center := Vector2(component.position) * 6.0 * scale
+		var component_radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
+		var visible_radius := component_radius
+		match component.primitive_id:
+			&"spike":
+				# The connector is painted behind the filled triangle. A smaller
+				# cut reaches the visible edge without showing through its interior.
+				visible_radius = component_radius * 0.55
+			&"branch":
+				visible_radius = maxf(primitive_stroke_width(scale), 1.5 * scale)
+		radius = maxf(radius, center.distance_to(component_center) + visible_radius)
+	return radius
+
+
+static func _merge_overlapping_connections(
+	candidates: Array[Dictionary],
+	scale: float
+) -> Array[Dictionary]:
+	var preserved: Array[Dictionary] = []
+	var merged: Array[Dictionary] = []
+	var epsilon := maxf(0.01 * scale, 0.0001)
+	for candidate in candidates:
+		if not bool(candidate.get("merge_overlaps", false)):
+			preserved.append({"from": candidate["from"], "to": candidate["to"]})
+			continue
+		var next := _ordered_connection(candidate)
+		if next["from"].distance_to(next["to"]) <= epsilon:
+			continue
+		var index := 0
+		while index < merged.size():
+			if _connections_overlap_on_same_line(next, merged[index], epsilon):
+				next = _merge_connection_pair(next, merged[index])
+				merged.remove_at(index)
+				index = 0
+				continue
+			index += 1
+		merged.append(next)
+	merged.sort_custom(_connection_less)
+	preserved.append_array(merged)
+	return preserved
+
+
+static func _connections_overlap_on_same_line(
+	first: Dictionary,
+	second: Dictionary,
+	epsilon: float
+) -> bool:
+	var first_delta: Vector2 = first["to"] - first["from"]
+	var second_delta: Vector2 = second["to"] - second["from"]
+	var first_length := first_delta.length()
+	var second_length := second_delta.length()
+	if first_length <= epsilon or second_length <= epsilon:
+		return false
+	if absf(_cross(first_delta, second_delta)) > epsilon * first_length * second_length:
+		return false
+	if absf(_cross(second["from"] - first["from"], first_delta)) > epsilon * first_length:
+		return false
+	var axis := first_delta / first_length
+	var first_min := 0.0
+	var first_max := first_length
+	var second_a: float = (Vector2(second["from"]) - Vector2(first["from"])).dot(axis)
+	var second_b: float = (Vector2(second["to"]) - Vector2(first["from"])).dot(axis)
+	var second_min := minf(second_a, second_b)
+	var second_max := maxf(second_a, second_b)
+	return maxf(first_min, second_min) <= minf(first_max, second_max) + epsilon
+
+
+static func _merge_connection_pair(first: Dictionary, second: Dictionary) -> Dictionary:
+	var origin: Vector2 = first["from"]
+	var axis: Vector2 = (first["to"] - origin).normalized()
+	var points: Array[Vector2] = [first["from"], first["to"], second["from"], second["to"]]
+	points.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+		return (a - origin).dot(axis) < (b - origin).dot(axis)
+	)
+	return _ordered_connection({"from": points[0], "to": points[points.size() - 1]})
+
+
+static func _ordered_connection(value: Dictionary) -> Dictionary:
+	var from: Vector2 = value["from"]
+	var to: Vector2 = value["to"]
+	if _point_less(to, from):
+		return {"from": to, "to": from}
+	return {"from": from, "to": to}
+
+
+static func _connection_less(first: Dictionary, second: Dictionary) -> bool:
+	if first["from"] != second["from"]:
+		return _point_less(first["from"], second["from"])
+	return _point_less(first["to"], second["to"])
+
+
+static func _point_less(first: Vector2, second: Vector2) -> bool:
+	return first.x < second.x or (is_equal_approx(first.x, second.x) and first.y < second.y)
+
+
+static func _cross(first: Vector2, second: Vector2) -> float:
+	return first.x * second.y - first.y * second.x
 
 
 static func _canonical_child_less(first, second) -> bool:

@@ -3,6 +3,7 @@ extends Control
 
 const SigilGraphModel := preload("res://experiments/sigil_lab/sigil_graph.gd")
 const SigilPreviewModel := preload("res://experiments/sigil_lab/sigil_preview.gd")
+const GlyphModel := preload("res://src/domain/glyph.gd")
 
 const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
 
@@ -153,7 +154,7 @@ func _build_palette() -> Control:
 		["↻", SigilGraphModel.ROTATE, {"degrees": 45}, "中心を基準に1°単位で回転"],
 		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "上下左右へ移動"],
 		["●", SigilGraphModel.COLOR, {"color_id": &"blue"}, "白・青・赤へ着色"],
-		["⊕", SigilGraphModel.COMBINE, {}, "2〜8個のGlyphを中央で合成"],
+		["⊕", SigilGraphModel.COMBINE, {}, "2〜8個のGlyphを中心結合・相互結合"],
 	]:
 		var button := Button.new()
 		button.text = definition[0]
@@ -270,6 +271,9 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 				0,
 				PORT_COLOR
 			)
+			var combine_option := _combine_option(node_id)
+			node.get_titlebar_hbox().add_child(combine_option)
+			option_controls[node_id] = combine_option
 		SigilGraphModel.OUTPUT:
 			node.add_child(preview)
 			node.set_slot(0, true, 0, PORT_COLOR, false, 0, PORT_COLOR)
@@ -337,6 +341,30 @@ func _setting_option(node_id: StringName, kind: StringName) -> Control:
 				graph.set_node_config(node_id, {"color_id": [&"white", &"blue", &"red"][index]})
 				_refresh_all()
 			)
+	return option
+
+
+func _combine_option(node_id: StringName) -> OptionButton:
+	var option := OptionButton.new()
+	option.add_item("中心結合")
+	option.add_item("相互結合")
+	option.custom_minimum_size = Vector2(92, 24)
+	option.tooltip_text = "合成線 // 中心結合または重複を除いた相互結合"
+	var mode := StringName(graph.node_config(node_id).get(
+		"connection_mode",
+		GlyphModel.CONNECTION_RADIAL
+	))
+	option.select(1 if mode == GlyphModel.CONNECTION_PAIRWISE else 0)
+	option.item_selected.connect(func(index: int) -> void:
+		graph.set_node_config(node_id, {
+			"connection_mode": (
+				GlyphModel.CONNECTION_PAIRWISE
+				if index == 1
+				else GlyphModel.CONNECTION_RADIAL
+			),
+		})
+		_refresh_all()
+	)
 	return option
 
 

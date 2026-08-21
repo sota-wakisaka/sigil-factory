@@ -6,19 +6,25 @@ const GlyphProductionContextModel := preload("res://src/domain/glyph_production_
 var components: Array[GlyphComponentModel] = []
 var combine_children: Array = []
 var combine_origin := Vector2.ZERO
+var combine_connection_mode: StringName
 var production_context: GlyphProductionContextModel
 
 const MIN_COMBINE_CHILDREN := 2
 const MAX_COMBINE_CHILDREN := 8
+const CONNECTION_RADIAL := &"radial"
+const CONNECTION_PAIRWISE := &"pairwise"
+const COMBINE_CONNECTION_MODES := [CONNECTION_RADIAL, CONNECTION_PAIRWISE]
 
 
 func _init(
 	initial_components: Array[GlyphComponentModel] = [],
 	initial_production_context: GlyphProductionContextModel = null,
 	initial_combine_children: Array = [],
-	initial_combine_origin = Vector2.ZERO
+	initial_combine_origin = Vector2.ZERO,
+	initial_combine_connection_mode: StringName = CONNECTION_RADIAL
 ) -> void:
 	combine_origin = GlyphComponentModel.normalized_position(Vector2(initial_combine_origin))
+	combine_connection_mode = initial_combine_connection_mode
 	production_context = (
 		initial_production_context.copy()
 		if initial_production_context != null
@@ -32,11 +38,18 @@ func _init(
 		_rebuild_components_from_children()
 
 
-static func combine(first: GlyphModel, second: GlyphModel) -> GlyphModel:
-	return combine_many([first, second])
+static func combine(
+	first: GlyphModel,
+	second: GlyphModel,
+	connection_mode: StringName = CONNECTION_RADIAL
+) -> GlyphModel:
+	return combine_many([first, second], connection_mode)
 
 
-static func combine_many(glyphs: Array) -> GlyphModel:
+static func combine_many(
+	glyphs: Array,
+	connection_mode: StringName = CONNECTION_RADIAL
+) -> GlyphModel:
 	var children: Array = []
 	var contexts: Array = []
 	for glyph_value in glyphs:
@@ -55,7 +68,9 @@ static func combine_many(glyphs: Array) -> GlyphModel:
 	return GlyphModel.new(
 		[],
 		GlyphProductionContextModel.merge(contexts),
-		children
+		children,
+		Vector2.ZERO,
+		connection_mode
 	)
 
 
@@ -86,7 +101,12 @@ func canonical_serialization() -> String:
 		GlyphComponentModel.coordinate_key(combine_origin.x),
 		GlyphComponentModel.coordinate_key(combine_origin.y),
 	]
-	return "C(%s;%s)" % [_frame(origin_serialization), _frame_sequence(child_serializations)]
+	var combine_prefix := "C" if combine_connection_mode == CONNECTION_RADIAL else "M"
+	return "%s(%s;%s)" % [
+		combine_prefix,
+		_frame(origin_serialization),
+		_frame_sequence(child_serializations),
+	]
 
 
 func canonical_hash() -> String:
@@ -121,6 +141,8 @@ func _structure_validation_errors(path: String, active_ancestors: Dictionary) ->
 			if component.scale_step < 1:
 				errors.append("invalid_scale:%s:%d" % [path, component.scale_step])
 	else:
+		if not combine_connection_mode in COMBINE_CONNECTION_MODES:
+			errors.append("invalid_combine_connection_mode:%s:%s" % [path, combine_connection_mode])
 		if (
 			combine_children.size() < MIN_COMBINE_CHILDREN
 			or combine_children.size() > MAX_COMBINE_CHILDREN
@@ -252,7 +274,13 @@ func recolor(color_id: StringName) -> void:
 
 
 func copy() -> GlyphModel:
-	return GlyphModel.new(components, production_context, combine_children, combine_origin)
+	return GlyphModel.new(
+		components,
+		production_context,
+		combine_children,
+		combine_origin,
+		combine_connection_mode
+	)
 
 
 func _rebuild_components_from_children() -> void:
