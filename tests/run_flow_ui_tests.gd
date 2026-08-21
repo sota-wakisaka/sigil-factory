@@ -41,6 +41,11 @@ func _initialize() -> void:
 	_expect("混成の道" in main.phase_body.text, "stage information should retain the selected encounter")
 	_expect("制限 3:00" in main.phase_body.text, "stage information should disclose the battle duration")
 	_expect("1:00 群体 → 1:54 装甲" in main.stage_timeline.tooltip_text, "stage timeline hover should disclose the selected enemy sequence without prescribing an answer")
+	var first_major_threat = MvpContent.major_threat_events(MvpContent.ROUTE_MIXED)[1]
+	var first_major_position: Vector2 = main.stage_timeline.event_position(first_major_threat)
+	var hit_major_threat = main.stage_timeline.event_at(first_major_position)
+	_expect(hit_major_threat != null and hit_major_threat.tick == first_major_threat.tick and hit_major_threat.unit_id == first_major_threat.unit_id, "each visible threat pulse should preserve its exact scheduled event hit target")
+	_expect("1:00 // 群体兵 ×4 // ◇ 構成変化" == main.stage_timeline._get_tooltip(first_major_position), "threat pulse hover should expose time, enemy, count, and major composition change without prescribing a factory answer")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "stage OK should open factory build")
 	_expect(main.battle_board.route_id == MvpContent.ROUTE_MIXED, "selected route should configure the real battle schedule")
