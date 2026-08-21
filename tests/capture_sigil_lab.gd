@@ -143,9 +143,8 @@ func _build_registered_fixture(lab) -> void:
 		Vector2(20, 80),
 		Vector2(220, 80),
 		Vector2(420, 80),
-		Vector2(20, 310),
-		Vector2(220, 310),
-		Vector2(420, 310),
+		Vector2(120, 310),
+		Vector2(360, 310),
 	]
 	for index in RegisteredGlyphsModel.IDS.size():
 		lab.add_lab_node(

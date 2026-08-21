@@ -243,7 +243,7 @@ func _build_palette() -> Control:
 		["○", SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, "丸 // 基本図形"],
 		["△", SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}, "三角 // 基本図形"],
 		["□", SigilGraphModel.SOURCE, {"primitive_id": &"square"}, "四角 // 基本図形"],
-		["印", SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.EYE}, "登録グリフ // 目・十字・的・星・方位・翼"],
+		["印", SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.EYE}, "登録グリフ // 目・十字・的・星・方位"],
 		["↻", SigilGraphModel.ROTATE, {"degrees": 45}, "中心を基準に1°単位で回転"],
 		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -1)}, "上下左右へ1単位ずつ移動"],
 		["↔↕", SigilGraphModel.SCALE, {"x_percent": 150, "y_percent": 100}, "横・縦を別々に拡大縮小"],
