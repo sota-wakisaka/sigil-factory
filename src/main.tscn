@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://src/ui/factory_setting_option.gd" id="8_setting_option"]
 [ext_resource type="Script" path="res://src/ui/factory_state_indicator.gd" id="9_factory_state"]
 [ext_resource type="Script" path="res://src/ui/factory_selection_indicator.gd" id="7_selection_indicator"]
+[ext_resource type="Script" path="res://src/ui/meaning_reward_button.gd" id="10_reward_button"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -389,7 +390,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Panel" type="PanelContainer" parent="PhaseOverlay/Center"]
-custom_minimum_size = Vector2(720, 390)
+custom_minimum_size = Vector2(720, 450)
 layout_mode = 2
 
 [node name="Content" type="VBoxContainer" parent="PhaseOverlay/Center/Panel"]
@@ -426,11 +427,41 @@ layout_mode = 2
 visible = false
 theme_override_font_sizes/font_size = 16
 
-[node name="RewardOption" type="OptionButton" parent="PhaseOverlay/Center/Panel/Content"]
-custom_minimum_size = Vector2(0, 48)
+[node name="RewardChoices" type="HBoxContainer" parent="PhaseOverlay/Center/Panel/Content"]
+custom_minimum_size = Vector2(0, 92)
 layout_mode = 2
 visible = false
-theme_override_font_sizes/font_size = 16
+theme_override_constants/separation = 10
+
+[node name="Foresight" type="Button" parent="PhaseOverlay/Center/Panel/Content/RewardChoices"]
+custom_minimum_size = Vector2(220, 92)
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("10_reward_button")
+reward_id = &"ring_speed"
+glyph_id = &"target"
+caption = "集束"
+effect_caption = "素材 -20%"
+
+[node name="Crossing" type="Button" parent="PhaseOverlay/Center/Panel/Content/RewardChoices"]
+custom_minimum_size = Vector2(220, 92)
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("10_reward_button")
+reward_id = &"processing_speed"
+glyph_id = &"cross"
+caption = "交差"
+effect_caption = "加工 -1 tick"
+
+[node name="Focus" type="Button" parent="PhaseOverlay/Center/Panel/Content/RewardChoices"]
+custom_minimum_size = Vector2(220, 92)
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("10_reward_button")
+reward_id = &"line_speed"
+glyph_id = &"eye"
+caption = "先見"
+effect_caption = "輸送 -1 tick"
 
 [node name="AdvanceButton" type="Button" parent="PhaseOverlay/Center/Panel/Content"]
 custom_minimum_size = Vector2(0, 58)

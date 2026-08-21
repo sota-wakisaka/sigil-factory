@@ -5,6 +5,7 @@ const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const RunFlow := preload("res://src/game/run_flow.gd")
 const SigilGhostControl := preload("res://src/ui/sigil_ghost.gd")
 const FactorySelectionIndicatorControl := preload("res://src/ui/factory_selection_indicator.gd")
+const MeaningRewardButtonControl := preload("res://src/ui/meaning_reward_button.gd")
 
 const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
 
@@ -43,7 +44,7 @@ enum WorkspaceView {
 @onready var phase_title: Label = $PhaseOverlay/Center/Panel/Content/Title
 @onready var phase_body: Label = $PhaseOverlay/Center/Panel/Content/Body
 @onready var phase_button: Button = $PhaseOverlay/Center/Panel/Content/AdvanceButton
-@onready var reward_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RewardOption
+@onready var reward_choices: HBoxContainer = $PhaseOverlay/Center/Panel/Content/RewardChoices
 @onready var route_option: OptionButton = $PhaseOverlay/Center/Panel/Content/RouteOption
 @onready var inspector_label: FactorySelectionIndicatorControl = $FactoryInspector/SelectionLabel
 @onready var inspector_option: FactorySettingOption = $FactoryInspector/SettingOption
@@ -88,6 +89,8 @@ func _ready() -> void:
 	speed_button.pressed.connect(_cycle_battle_speed)
 	cancel_button.pressed.connect(_cancel_edit)
 	debug_victory_button.pressed.connect(_complete_battle_placeholder)
+	for button in reward_choices.get_children():
+		button.pressed.connect(_select_reward.bind(button))
 	phase_button.pressed.connect(_advance_overlay)
 	factory_board.summon_produced.connect(_on_summon_produced)
 	factory_board.selection_changed.connect(_refresh_factory_inspector)
@@ -569,7 +572,7 @@ func _reset_stage() -> void:
 func _apply_phase() -> void:
 	_update_progress()
 	phase_overlay.visible = false
-	reward_option.visible = false
+	reward_choices.visible = false
 	route_option.visible = false
 	debug_victory_button.visible = false
 	speed_button.disabled = true
@@ -642,14 +645,15 @@ func _show_overlay(kicker: String, title: String, body: String, button_text: Str
 
 
 func _prepare_reward_options() -> void:
-	reward_option.clear()
-	reward_option.add_item("迅速な環 // 環素材の生成間隔 -20%")
-	reward_option.set_item_metadata(0, &"ring_speed")
-	reward_option.add_item("高速加工 // 加工器の処理時間 -1 tick")
-	reward_option.set_item_metadata(1, &"processing_speed")
-	reward_option.add_item("高速ライン // 輸送時間 -1 tick")
-	reward_option.set_item_metadata(2, &"line_speed")
-	reward_option.visible = true
+	var buttons := reward_choices.get_children()
+	for index in buttons.size():
+		buttons[index].set_reward_selected(index == 0)
+	reward_choices.visible = true
+
+
+func _select_reward(selected_button: MeaningRewardButtonControl) -> void:
+	for button in reward_choices.get_children():
+		button.set_reward_selected(button == selected_button)
 
 
 func _prepare_route_options() -> void:
@@ -662,10 +666,10 @@ func _prepare_route_options() -> void:
 
 
 func _acquire_selected_reward() -> void:
-	if reward_option.item_count == 0:
-		return
-	var reward_id: StringName = reward_option.get_item_metadata(reward_option.selected)
-	acquired_rewards.append(reward_id)
+	for button in reward_choices.get_children():
+		if button.button_pressed:
+			acquired_rewards.append(button.reward_id)
+			return
 
 
 func _reward_summary() -> String:
@@ -674,9 +678,9 @@ func _reward_summary() -> String:
 	var names := PackedStringArray()
 	for reward_id in acquired_rewards:
 		match reward_id:
-			&"ring_speed": names.append("迅速な環")
-			&"processing_speed": names.append("高速加工")
-			&"line_speed": names.append("高速ライン")
+			&"ring_speed": names.append("集束")
+			&"processing_speed": names.append("交差")
+			&"line_speed": names.append("先見")
 	return " / ".join(names)
 
 
