@@ -428,6 +428,8 @@ func _initialize() -> void:
 	_expect(upgraded_source.config["interval_ticks"] < 18, "selected reward should modify the next route factory")
 
 	main.phase_button.pressed.emit()
+	_expect(main.flow.phase == RunFlow.Phase.STAGE_INFO and "敵部隊耐久 +4%" in main.phase_body.text, "the next route should disclose its durability increase before factory construction")
+	_expect(main.battle_board.route_number == 2 and is_equal_approx(main.battle_board.simulation.enemy_durability_multiplier, 1.04), "the selected route number should reach the battle simulation")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "next route should reach factory build again")
 	main.get_node("Toolbar/ScoutButton").pressed.emit()

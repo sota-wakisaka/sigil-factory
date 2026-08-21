@@ -641,7 +641,7 @@ func _enter_victory() -> void:
 
 
 func _reset_stage() -> void:
-	battle_board.reset_battle(selected_route_id)
+	battle_board.reset_battle(selected_route_id, flow.route_number)
 	factory_board.set_run_upgrades(acquired_rewards)
 	factory_board.configure(MvpContent.PLAN_EMPTY)
 	produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
@@ -679,10 +679,12 @@ func _apply_phase() -> void:
 				"OK：このルートを選択"
 			)
 		RunFlow.Phase.STAGE_INFO:
+			var durability_percent := roundi((MvpContent.route_durability_multiplier(flow.route_number) - 1.0) * 100.0)
+			var durability_text := "標準耐久" if durability_percent == 0 else "敵部隊耐久 +%d%%" % durability_percent
 			_show_overlay(
 				"STAGE PREVIEW",
 				"ステージ情報を確認",
-				"%s // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n%s" % [selected_route_name, MvpContent.route_description(selected_route_id)],
+				"%s // %s // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n%s" % [selected_route_name, durability_text, MvpContent.route_description(selected_route_id)],
 				"OK：工場構築へ"
 			)
 		RunFlow.Phase.FACTORY_BUILD:

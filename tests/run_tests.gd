@@ -1867,6 +1867,15 @@ func _test_mvp_routes_have_distinct_valid_schedules() -> void:
 		signatures[signature] = route_id
 		var battle := MvpContent.build_battle(route_id)
 		_expect(battle.schedule.size() == schedule.size(), "%s should reach the battle simulation unchanged" % route_id)
+		_expect(is_equal_approx(battle.enemy_durability_multiplier, 1.0), "the first route should preserve the validated battle balance")
+	var later_battle := MvpContent.build_battle(MvpContent.ROUTE_MIXED, 3)
+	var first_battle := MvpContent.build_battle(MvpContent.ROUTE_MIXED, 1)
+	_expect(
+		is_equal_approx(later_battle.enemy_durability_multiplier, 1.08)
+		and later_battle.specs[&"brute"].max_health > first_battle.specs[&"brute"].max_health
+		and later_battle.specs[&"scout"].max_health == first_battle.specs[&"scout"].max_health,
+		"later routes should raise enemy durability without silently changing allied sigils"
+	)
 	_expect(
 		MvpContent.threat_schedule(&"unknown").size() == MvpContent.threat_schedule(MvpContent.ROUTE_MIXED).size(),
 		"unknown routes should fail safely to the mixed encounter"

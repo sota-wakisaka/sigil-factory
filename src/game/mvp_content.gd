@@ -25,12 +25,20 @@ const ROUTE_ARMORED := &"armored_route"
 const ROUTE_IDS := [ROUTE_SWARM, ROUTE_MIXED, ROUTE_ARMORED]
 
 
-static func build_battle(route_id: StringName = ROUTE_MIXED) -> BattleSimulation:
+static func build_battle(route_id: StringName = ROUTE_MIXED, route_number: int = 1) -> BattleSimulation:
 	var battle := BattleSimulation.new()
+	var durability_multiplier := route_durability_multiplier(route_number)
+	battle.enemy_durability_multiplier = durability_multiplier
 	for spec in unit_specs():
+		if spec.id in [&"raider", &"swarm", &"brute"]:
+			spec.max_health *= durability_multiplier
 		battle.add_spec(spec)
 	battle.set_schedule(threat_schedule(route_id))
 	return battle
+
+
+static func route_durability_multiplier(route_number: int) -> float:
+	return minf(1.0 + float(maxi(route_number, 1) - 1) * 0.04, 2.0)
 
 
 static func unit_specs() -> Array[UnitSpecModel]:

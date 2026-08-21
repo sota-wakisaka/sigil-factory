@@ -14,15 +14,17 @@ const ENEMY_COLOR := Color(1.0, 0.34, 0.42, 1.0)
 var simulation: BattleSimulation
 var finish_emitted := false
 var route_id: StringName = MvpContent.ROUTE_MIXED
+var route_number := 1
 
 
 func _ready() -> void:
 	reset_battle()
 
 
-func reset_battle(next_route_id: StringName = MvpContent.ROUTE_MIXED) -> void:
+func reset_battle(next_route_id: StringName = MvpContent.ROUTE_MIXED, next_route_number: int = 1) -> void:
 	route_id = next_route_id if next_route_id in MvpContent.ROUTE_IDS else MvpContent.ROUTE_MIXED
-	simulation = MvpContent.build_battle(route_id)
+	route_number = maxi(next_route_number, 1)
+	simulation = MvpContent.build_battle(route_id, route_number)
 	finish_emitted = false
 	queue_redraw()
 

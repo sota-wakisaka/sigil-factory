@@ -36,6 +36,7 @@ var spawn_budget_tick_index := -1
 var successful_spawns_this_tick: Dictionary = {Side.PLAYER: 0, Side.ENEMY: 0}
 var last_enemy_shield_damage := 0.0
 var enemy_shield_flash_ticks := 0
+var enemy_durability_multiplier := 1.0
 
 
 func add_spec(spec: UnitSpecModel) -> void:
