@@ -871,6 +871,8 @@ func _test_factory_meaning_glyph_source_summons_registered_recipe() -> void:
 	_expect(int(star_preview["counts"][&"sentinel"]) > 0, "Star should be an acquired Sentinel recipe instead of guaranteed discard")
 	_expect(star_board.production_recipe_id(&"sentinel") == &"stellar_sentinel", "production summary should retain which acquired recipe creates the predicted Sentinel")
 	_expect(star_board.production_summary_glyph(&"sentinel").canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR).canonical_serialization(), "production summary should draw Star instead of the standard Vigil Cross for this alternate route")
+	star_board.plan_id = MvpContent.PLAN_VIGIL
+	_expect(not star_board.production_summary_is_goal(&"sentinel"), "an alternate acquired Sentinel recipe should not borrow the selected Vigil goal ring")
 	_expect(star_board.production_operation_entries() == [{"unit_id": &"sentinel", "recipe_id": &"stellar_sentinel", "count": int(star_preview["counts"][&"sentinel"])}], "battle handoff should describe the actual Star recipe instead of the workshop template name")
 	_expect(int(star_preview["counts"][&"sentinel"]) < int(vigil_board.production_snapshot()["counts"][&"sentinel"]), "single-source Star Sentinel should trade lower throughput for its cheaper graph")
 	_expect(star_board.mana_used() < vigil_board.mana_used(), "Star Sentinel should require less factory mana than Eye plus Cross")

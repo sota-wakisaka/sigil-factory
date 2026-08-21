@@ -3182,6 +3182,8 @@ func production_summary_center(index: int) -> Vector2:
 
 func production_summary_is_goal(unit_id: StringName) -> bool:
 	var target_recipe_id := MvpContent.recipe_id_for_plan(display_plan_id())
+	if int(cached_production_counts.get(unit_id, 0)) > 0:
+		return production_recipe_id(unit_id) == target_recipe_id
 	for recipe in MvpContent.recipes():
 		if recipe.id == target_recipe_id:
 			return recipe.unit_id == unit_id
