@@ -505,9 +505,10 @@ func _source_option_index(node: FactoryNodeModel) -> int:
 func selected_node_details() -> Dictionary:
 	var display_simulation := _display_simulation()
 	if selected_node_id == &"" or display_simulation == null or not display_simulation.nodes.has(selected_node_id):
-		return {"selected": false, "kind": -1, "title": "設備を選択", "options": PackedStringArray(), "selected_index": -1}
+		return {"selected": false, "kind": -1, "title": "設備を選択", "options": PackedStringArray(), "option_enabled": [], "selected_index": -1}
 	var node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
 	var options := PackedStringArray()
+	var option_enabled: Array[bool] = []
 	var selected_index := -1
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
@@ -527,13 +528,60 @@ func selected_node_details() -> Dictionary:
 				node.config.get("connection_mode", GlyphModel.CONNECTION_RADIAL)
 			)
 			selected_index = COMBINE_OPTION_IDS.find(connection_mode)
+			var availability := combine_mode_availability(selected_node_id)
+			for mode in COMBINE_OPTION_IDS:
+				option_enabled.append(
+					not bool(availability.get("complete", false))
+					or bool(availability.get("modes", {}).get(mode, false))
+					or mode == connection_mode
+				)
+	if option_enabled.is_empty():
+		for _option in options:
+			option_enabled.append(true)
 	return {
 		"selected": true,
 		"kind": node.kind,
 		"title": _node_label(node),
 		"options": options,
+		"option_enabled": option_enabled,
 		"selected_index": selected_index,
 	}
+
+
+func combine_mode_availability(node_id: StringName) -> Dictionary:
+	var modes := {
+		GlyphModel.CONNECTION_RADIAL: true,
+		GlyphModel.CONNECTION_PAIRWISE: true,
+		GlyphModel.CONNECTION_SIMPLE: true,
+	}
+	var display_simulation := _display_simulation()
+	if (
+		display_simulation == null
+		or not display_simulation.nodes.has(node_id)
+		or display_simulation.nodes[node_id].kind != FactoryNodeModel.NodeKind.COMBINER
+	):
+		return {"complete": false, "modes": modes}
+	var produced: GlyphModel = cached_node_output_glyphs.get(node_id)
+	if not GlyphPainterModel.can_draw(produced) or produced.combine_children.is_empty():
+		return {"complete": false, "modes": modes}
+	for mode in [GlyphModel.CONNECTION_RADIAL, GlyphModel.CONNECTION_PAIRWISE]:
+		var candidate := GlyphModel.combine_many(produced.combine_children, mode)
+		modes[mode] = not GlyphPainterModel.top_level_connection_visuals(
+			candidate,
+			1.0,
+			false
+		).is_empty()
+	return {"complete": true, "modes": modes}
+
+
+func _combine_mode_is_available(node_id: StringName, option_index: int) -> bool:
+	if option_index < 0 or option_index >= COMBINE_OPTION_IDS.size():
+		return false
+	var availability := combine_mode_availability(node_id)
+	return (
+		not bool(availability.get("complete", false))
+		or bool(availability.get("modes", {}).get(COMBINE_OPTION_IDS[option_index], false))
+	)
 
 
 func configure_selected_node(option_index: int) -> bool:
@@ -542,6 +590,13 @@ func configure_selected_node(option_index: int) -> bool:
 		return false
 	var node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
 	if not _setting_option_changes_node(node, option_index):
+		return false
+	if (
+		node.kind == FactoryNodeModel.NodeKind.COMBINER
+		and not _combine_mode_is_available(selected_node_id, option_index)
+	):
+		connection_message = "結合線が見えない配置です // 単純結合を使用してください"
+		queue_redraw()
 		return false
 	if not _push_undo_snapshot():
 		return false
@@ -640,6 +695,11 @@ func setting_option_candidate(option_index: int) -> Dictionary:
 	var selected_node: FactoryNodeModel = display_simulation.nodes[selected_node_id]
 	if not _setting_option_changes_node(selected_node, option_index):
 		return {"active": false, "glyph": null, "validity": &"inactive", "output_state": &"no_output", "errors": []}
+	if (
+		selected_node.kind == FactoryNodeModel.NodeKind.COMBINER
+		and not _combine_mode_is_available(selected_node_id, option_index)
+	):
+		return {"active": false, "glyph": null, "validity": &"inactive", "output_state": &"no_output", "errors": ["connection_mode_requires_visible_lines"]}
 	var cache_key := "%d:%s:%d" % [factory_revision, selected_node_id, option_index]
 	if setting_option_preview_cache.has(cache_key):
 		return _copy_setting_option_candidate(setting_option_preview_cache[cache_key])

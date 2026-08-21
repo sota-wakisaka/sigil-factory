@@ -2541,6 +2541,18 @@ func _test_factory_setting_preview_is_non_destructive() -> void:
 		_expect(board.setting_option_preview_cache.is_empty(), "committed graph revision should clear hypothetical setting cache")
 		board.cancel_edit()
 		board.free()
+	var simple_combine_board := FactoryBoard.new()
+	simple_combine_board.configure(MvpContent.PLAN_VIGIL)
+	simple_combine_board.set_interaction_enabled(true)
+	simple_combine_board.selected_node_id = &"combiner"
+	var combine_details := simple_combine_board.selected_node_details()
+	_expect(combine_details["option_enabled"] == [false, false, true], "line-free meaning inputs should expose only Simple Combine as a meaningful setting")
+	var combine_undo_before := simple_combine_board.undo_history.size()
+	_expect(not simple_combine_board.configure_selected_node(0), "factory should reject an invisible radial combine before creating an edit")
+	_expect(simple_combine_board.undo_history.size() == combine_undo_before, "rejected invisible combine should not add an Undo step")
+	_expect("単純結合" in simple_combine_board.connection_message, "rejected invisible combine should explain the available visual grammar")
+	_expect(not simple_combine_board.setting_option_candidate(1)["active"], "disabled pairwise mode should not expose a misleading hypothetical result")
+	simple_combine_board.free()
 	var invalid_board := FactoryBoard.new()
 	invalid_board.configure(MvpContent.PLAN_SCOUT)
 	_expect(invalid_board.begin_edit(), "invalid setting preview fixture should enter a transaction")
@@ -3140,8 +3152,20 @@ func _test_factory_processor_role_marks_follow_settings() -> void:
 	_expect(combine_state["valid"] and combine_state["connection_mode"] == GlyphModel.CONNECTION_SIMPLE, "meaning Sentinel should show its line-free combine rule on the board")
 	combiner_board.set_interaction_enabled(true)
 	combiner_board.selected_node_id = &"combiner"
+	var separated_children := [
+		GlyphModel.new([GlyphComponentModel.new(&"circle")]).translated(Vector2i(-2, 0)),
+		GlyphModel.new([GlyphComponentModel.new(&"square")]).translated(Vector2i(2, 0)),
+	]
+	combiner_board.cached_node_output_glyphs[&"combiner"] = GlyphModel.combine_many(
+		separated_children,
+		GlyphModel.CONNECTION_SIMPLE
+	)
 	_expect(combiner_board.configure_selected_node(0), "combine role mark fixture should accept radial mode")
 	_expect(combiner_board.node_role_mark_state(&"combiner")["connection_mode"] == GlyphModel.CONNECTION_RADIAL, "combiner role mark should follow a radial setting immediately")
+	combiner_board.cached_node_output_glyphs[&"combiner"] = GlyphModel.combine_many(
+		separated_children,
+		GlyphModel.CONNECTION_RADIAL
+	)
 	_expect(combiner_board.configure_selected_node(1), "combine role mark fixture should accept pairwise mode")
 	_expect(combiner_board.node_role_mark_state(&"combiner")["connection_mode"] == GlyphModel.CONNECTION_PAIRWISE, "combiner role mark should follow a pairwise setting")
 	_expect(combiner_board.undo(), "combine role mark configuration should remain undoable")

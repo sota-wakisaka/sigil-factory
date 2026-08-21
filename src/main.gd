@@ -100,6 +100,7 @@ func _ready() -> void:
 	factory_board.factory_changed.connect(_refresh_factory_validation_state)
 	factory_board.factory_changed.connect(_refresh_factory_goal_candidate)
 	factory_board.factory_changed.connect(_refresh_factory_palette_state)
+	factory_board.factory_changed.connect(_refresh_factory_inspector)
 	factory_board.factory_changed.connect(inspector_option._clear_option_preview)
 	factory_board.selection_changed.connect(_refresh_factory_palette_state)
 	factory_board.selection_changed.connect(inspector_option._clear_option_preview)
@@ -315,8 +316,12 @@ func _refresh_factory_inspector() -> void:
 	inspector_label.visible = details["selected"]
 	inspector_label.configure(details["selected"], details["kind"], details["title"])
 	inspector_option.clear()
-	for option in details["options"]:
+	var option_enabled: Array = details.get("option_enabled", [])
+	for option_index in details["options"].size():
+		var option: String = details["options"][option_index]
 		inspector_option.add_item(option)
+		if option_index < option_enabled.size():
+			inspector_option.set_item_disabled(option_index, not bool(option_enabled[option_index]))
 	inspector_option.visible = details["selected"] and not details["options"].is_empty()
 	inspector_option.disabled = details["options"].is_empty() or not factory_board.interaction_enabled
 	inspector_option.select(details["selected_index"])
