@@ -69,7 +69,9 @@ The intended strategy is to start with scouts, switch to sentinels for the swarm
 phase, and finish with golems against armored enemies. Balance validation ensures
 that adaptive production wins while scout-only and golem-only production do not,
 and also runs the second and third route with persistent factory rewards and rising
-enemy durability so the playable loop is checked beyond one encounter.
+enemy durability so the playable loop is checked beyond one encounter. The Star
+Sentinel is validated as the faster mixed-route option, while the three-target
+Vigil Sentinel retains the advantage on the swarm-heavy route.
 
 ## Requirements
 

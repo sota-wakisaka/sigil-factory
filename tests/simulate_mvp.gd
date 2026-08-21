@@ -25,6 +25,11 @@ func _initialize() -> void:
 		{"tick": 250, "plan": MvpContent.PLAN_STELLAR},
 		{"tick": 530, "plan": MvpContent.PLAN_FORTRESS},
 	], MvpContent.ROUTE_MIXED)
+	var swarm_star := _run_strategy("swarm_star", [
+		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
+		{"tick": 235, "plan": MvpContent.PLAN_STELLAR},
+		{"tick": 690, "plan": MvpContent.PLAN_FORTRESS},
+	], MvpContent.ROUTE_SWARM)
 	var scout_only := _run_strategy("scout_only", [
 		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
 	], MvpContent.ROUTE_MIXED)
@@ -51,6 +56,11 @@ func _initialize() -> void:
 		and swarm_adaptive["winner"] == BattleSimulation.Side.PLAYER
 		and armored_adaptive["winner"] == BattleSimulation.Side.PLAYER
 		and star_adaptive["winner"] == BattleSimulation.Side.PLAYER
+		and star_adaptive["ticks"] < adaptive["ticks"]
+		and (
+			swarm_star["winner"] != BattleSimulation.Side.PLAYER
+			or swarm_adaptive["ticks"] < swarm_star["ticks"]
+		)
 		and scout_only["winner"] != BattleSimulation.Side.PLAYER
 		and golem_only["winner"] != BattleSimulation.Side.PLAYER
 		and route_two_rewarded["winner"] == BattleSimulation.Side.PLAYER
