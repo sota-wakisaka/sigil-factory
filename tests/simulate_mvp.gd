@@ -55,7 +55,13 @@ func _run_strategy(
 			change_index += 1
 		factory.tick()
 		while event_index < factory.summon_events.size():
-			battle.spawn_player(factory.summon_events[event_index]["unit_id"])
+			var summon_event: Dictionary = factory.summon_events[event_index]
+			var recipe_id := StringName(summon_event.get("recipe_id", ""))
+			battle.spawn_player_from_recipe(
+				summon_event["unit_id"],
+				recipe_id,
+				MvpContent.recipe_combat_modifiers(recipe_id)
+			)
 			event_index += 1
 		battle.tick()
 		if battle.is_finished():
