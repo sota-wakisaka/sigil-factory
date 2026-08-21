@@ -356,7 +356,7 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "second time stop should open another transactional preview")
 	_expect(main.factory_board.production_comparison_active, "each time stop should capture a fresh production baseline")
 	main.get_node("Toolbar/GolemButton").pressed.emit()
-	_expect(main.sigil_ghost.recipe_id == &"bound_colossus" and main.get_node("Toolbar/GolemButton").button_pressed, "preview should move goal visuals to the proposed plan")
+	_expect(main.sigil_ghost.recipe_id == &"fortress_compass" and main.get_node("Toolbar/GolemButton").button_pressed, "preview should move goal visuals to the proposed meaning plan")
 	_expect(main.factory_board.production_difference_state(&"sentinel")["count_state"] == &"decrease" and main.factory_board.production_difference_state(&"golem")["count_state"] == &"increase", "second comparison should use the newly committed sentinel factory as its baseline")
 	main.cancel_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE and main.factory_board.plan_id == MvpContent.PLAN_VIGIL, "discard should resume with the committed factory plan")

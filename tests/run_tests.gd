@@ -1013,7 +1013,7 @@ func _test_factory_rejects_ambiguous_recipes() -> void:
 		simulation.recipes[0].id == &"b_spike" and simulation.recipes[1].id == &"z_ring",
 		"accepted recipes should use stable ID order instead of acquisition order"
 	)
-	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 4, "all MVP recipes should have unique IDs and structures")
+	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 5, "all MVP recipes should have unique IDs and structures")
 
 
 func _test_recipe_registration_reports_stable_errors() -> void:
@@ -1111,7 +1111,7 @@ func _test_mvp_recipe_set_validation_reports_content_location() -> void:
 		"recipe set diagnostics should identify content index, ID, and stable rejection reasons"
 	)
 	var mvp_result := MvpContent.validate_recipe_set(MvpContent.recipes())
-	_expect(mvp_result["ok"] and mvp_result["accepted_count"] == 4, "shipped MVP recipes should pass aggregate validation")
+	_expect(mvp_result["ok"] and mvp_result["accepted_count"] == 5, "shipped MVP recipes should pass aggregate validation")
 
 
 func _test_factory_rejects_invalid_recipe_structures() -> void:
@@ -1794,6 +1794,7 @@ func _test_mvp_plans_produce_expected_units() -> void:
 		MvpContent.PLAN_SENTINEL: &"sentinel",
 		MvpContent.PLAN_VIGIL: &"sentinel",
 		MvpContent.PLAN_GOLEM: &"golem",
+		MvpContent.PLAN_FORTRESS: &"golem",
 	}
 	for plan_id in expectations:
 		var simulation := MvpContent.build_factory(plan_id)

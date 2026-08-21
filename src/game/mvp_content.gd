@@ -16,6 +16,7 @@ const PLAN_SCOUT := &"scout"
 const PLAN_SENTINEL := &"sentinel"
 const PLAN_VIGIL := &"vigil"
 const PLAN_GOLEM := &"golem"
+const PLAN_FORTRESS := &"fortress"
 const PLAN_EMPTY := &"empty"
 const FACTORY_MANA_MAX := 100
 const ROUTE_SWARM := &"swarm_route"
@@ -129,6 +130,8 @@ static func build_factory(plan_id: StringName) -> FactorySimulation:
 			_build_vigil_factory(simulation)
 		PLAN_GOLEM:
 			_build_golem_factory(simulation)
+		PLAN_FORTRESS:
+			_build_fortress_factory(simulation)
 		_:
 			_build_scout_factory(simulation)
 	return simulation
@@ -190,6 +193,15 @@ static func recipes() -> Array[SigilRecipeModel]:
 			),
 			&"golem"
 		),
+		SigilRecipeModel.new(
+			&"fortress_compass",
+			GlyphModel.combine(
+				MeaningGlyphsModel.glyph(MeaningGlyphsModel.TARGET),
+				MeaningGlyphsModel.glyph(MeaningGlyphsModel.COMPASS),
+				GlyphModel.CONNECTION_SIMPLE
+			),
+			&"golem"
+		),
 	]
 
 
@@ -222,6 +234,13 @@ static func layout_for_plan(plan_id: StringName) -> Dictionary:
 				&"colorizer": Vector2(325, 195),
 				&"summoner": Vector2(410, 195),
 			}
+		PLAN_FORTRESS:
+			return {
+				&"target_source": Vector2(85, 90),
+				&"compass_source": Vector2(85, 300),
+				&"combiner": Vector2(260, 195),
+				&"summoner": Vector2(410, 195),
+			}
 		_:
 			return {
 				&"ring_source": Vector2(105, 195),
@@ -239,6 +258,8 @@ static func plan_name(plan_id: StringName) -> String:
 			return "VIGIL-CROSS SENTINEL"
 		PLAN_GOLEM:
 			return "BOUND GOLEM"
+		PLAN_FORTRESS:
+			return "FORTRESS-COMPASS GOLEM"
 		_:
 			return "WATCHFUL-EYE SCOUT"
 
@@ -253,6 +274,8 @@ static func plan_description(plan_id: StringName) -> String:
 			return "目＋十字 // 単純結合で対群体衛兵を生産"
 		PLAN_GOLEM:
 			return "対装甲 // 高耐久・低速・長工程"
+		PLAN_FORTRESS:
+			return "的＋方位 // 単純結合で対装甲巨像を生産"
 		_:
 			return "目印 // 高速生産・短寿命"
 
@@ -267,6 +290,8 @@ static func sigil_name(recipe_id: StringName) -> String:
 			return "警戒十字シジル"
 		&"bound_colossus":
 			return "巨像シジル"
+		&"fortress_compass":
+			return "要塞方位シジル"
 		_:
 			return String(recipe_id)
 
@@ -279,6 +304,8 @@ static func recipe_id_for_plan(plan_id: StringName) -> StringName:
 			return &"vigil_cross"
 		PLAN_GOLEM:
 			return &"bound_colossus"
+		PLAN_FORTRESS:
+			return &"fortress_compass"
 		_:
 			return &"watchful_eye"
 
@@ -376,6 +403,23 @@ static func _build_golem_factory(simulation: FactorySimulation) -> void:
 	simulation.connect_nodes(FactoryLineModel.new(&"line_spike", &"spike_source", &"combiner", 1, 2))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_color", &"combiner", &"colorizer", 0, 2))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_summon", &"colorizer", &"summoner", 0, 2))
+
+
+static func _build_fortress_factory(simulation: FactorySimulation) -> void:
+	simulation.add_node(_meaning_source(&"target_source", MeaningGlyphsModel.TARGET, 54))
+	simulation.add_node(_meaning_source(&"compass_source", MeaningGlyphsModel.COMPASS, 54))
+	simulation.add_node(FactoryNodeModel.new(
+		&"combiner",
+		FactoryNodeModel.NodeKind.COMBINER,
+		{
+			"processing_ticks": 4,
+			"connection_mode": GlyphModel.CONNECTION_SIMPLE,
+		}
+	))
+	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
+	simulation.connect_nodes(FactoryLineModel.new(&"line_target", &"target_source", &"combiner", 0, 2))
+	simulation.connect_nodes(FactoryLineModel.new(&"line_compass", &"compass_source", &"combiner", 1, 2))
+	simulation.connect_nodes(FactoryLineModel.new(&"line_summon", &"combiner", &"summoner", 0, 2))
 
 
 static func _source(id: StringName, primitive_id: StringName, interval: int) -> FactoryNodeModel:

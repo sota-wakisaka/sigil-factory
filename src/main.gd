@@ -78,7 +78,7 @@ func _ready() -> void:
 	$Toolbar/ScoutButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SCOUT))
 	$Toolbar/EmptyButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_EMPTY))
 	$Toolbar/SentinelButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_VIGIL))
-	$Toolbar/GolemButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_GOLEM))
+	$Toolbar/GolemButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_FORTRESS))
 	$FactoryPalette/RingButton.pressed.connect(func() -> void: _add_factory_node(&"ring_source"))
 	$FactoryPalette/SpikeButton.pressed.connect(func() -> void: _add_factory_node(&"spike_source"))
 	$FactoryPalette/MeaningButton.pressed.connect(func() -> void: _add_factory_node(&"meaning_source"))
@@ -172,8 +172,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		match event.keycode:
 			KEY_0: _select_plan(MvpContent.PLAN_EMPTY)
 			KEY_1: _select_plan(MvpContent.PLAN_SCOUT)
-			KEY_2: _select_plan(MvpContent.PLAN_SENTINEL)
-			KEY_3: _select_plan(MvpContent.PLAN_GOLEM)
+			KEY_2: _select_plan(MvpContent.PLAN_VIGIL)
+			KEY_3: _select_plan(MvpContent.PLAN_FORTRESS)
 
 
 func _draw() -> void:

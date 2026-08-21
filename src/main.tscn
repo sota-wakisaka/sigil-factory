@@ -335,10 +335,10 @@ caption = "衛兵"
 [node name="GolemButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(128, 50)
 layout_mode = 2
-tooltip_text = "環と棘を合成・青着色し、装甲兵に強い巨像を生産するテンプレート"
+tooltip_text = "的と方位を単純結合し、装甲兵に強い巨像を生産するテンプレート"
 script = ExtResource("5_plan_button")
-plan_id = &"golem"
-recipe_id = &"bound_colossus"
+plan_id = &"fortress"
+recipe_id = &"fortress_compass"
 caption = "巨像"
 
 [node name="SpeedButton" type="Button" parent="Toolbar"]
