@@ -343,47 +343,6 @@ func _initialize() -> void:
 	_expect(main.factory_board.production_comparison_active, "successful time stop should expose a pre-commit production comparison")
 	var initial_difference: Dictionary = main.factory_board.production_difference_state(&"scout")
 	_expect(initial_difference["count_state"] == &"unchanged" and initial_difference["timing_state"] == &"unchanged", "time stop should begin from the committed production baseline")
-	var live_edit_snapshot: Dictionary = main.pre_edit_production_snapshot.duplicate(true)
-	var prior_change_summary: String = main.last_factory_change_summary
-	var summary_before := {
-		"ok": true,
-		"horizon_ticks": 160,
-		"counts": {&"scout": 2},
-		"event_offsets": {&"scout": PackedInt32Array([20, 60])},
-		"discarded": 0,
-	}
-	var summary_after := summary_before.duplicate(true)
-	summary_after["event_offsets"][&"scout"] = PackedInt32Array([20, 50])
-	var timing_only_comparison: Dictionary = main.factory_board.compare_production_snapshots(summary_before, summary_after)
-	main.pre_edit_production_snapshot = summary_before.duplicate(true)
-	main._update_factory_change_summary(timing_only_comparison)
-	_expect("召喚時刻変更" in main.last_factory_change_summary and not "変化なし" in main.last_factory_change_summary, "post-commit status should not contradict a same-count schedule change")
-	summary_after["discarded"] = 2
-	timing_only_comparison = main.factory_board.compare_production_snapshots(summary_before, summary_after)
-	main.pre_edit_production_snapshot = summary_before.duplicate(true)
-	main._update_factory_change_summary(timing_only_comparison)
-	_expect("召喚時刻・不一致変更" in main.last_factory_change_summary, "compound schedule and discard change should remain one compact factual status")
-	summary_after["counts"][&"scout"] = 3
-	summary_after["event_offsets"][&"scout"] = PackedInt32Array([20, 50, 80])
-	timing_only_comparison = main.factory_board.compare_production_snapshots(summary_before, summary_after)
-	main.pre_edit_production_snapshot = summary_before.duplicate(true)
-	main._update_factory_change_summary(timing_only_comparison)
-	_expect("斥候 2→3" in main.last_factory_change_summary and "不一致変更" in main.last_factory_change_summary, "quantity and discard changes should both survive the compact post-commit status")
-	var recipe_before := {
-		"ok": true,
-		"horizon_ticks": 160,
-		"counts": {&"sentinel": 2},
-		"event_offsets": {&"sentinel": PackedInt32Array([30, 60])},
-		"recipe_ids": {&"sentinel": &"vigil_cross"},
-		"discarded": 0,
-	}
-	var recipe_after := recipe_before.duplicate(true)
-	recipe_after["recipe_ids"][&"sentinel"] = &"stellar_sentinel"
-	main.pre_edit_production_snapshot = recipe_before.duplicate(true)
-	main._update_factory_change_summary(main.factory_board.compare_production_snapshots(recipe_before, recipe_after))
-	_expect("使用シジル変更" in main.last_factory_change_summary and not "変化なし" in main.last_factory_change_summary, "post-commit status should preserve a recipe-only production change")
-	main.pre_edit_production_snapshot = live_edit_snapshot
-	main.last_factory_change_summary = prior_change_summary
 	_expect(main.factory_board.visible and not main.battle_board.visible, "time stop should return to the full-width factory tab")
 	_expect(main.factory_board.interaction_enabled, "time stop should enable node placement")
 	_expect(main.factory_state.state == &"paused", "time stop should use a pause badge while work-in-progress stays in the factory visual summary")

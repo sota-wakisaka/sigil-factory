@@ -19,7 +19,6 @@ const GRID_SPACING := 32
 const TICK_SECONDS := 0.2
 const FORECAST_TICKS := 120
 const MAJOR_FORECAST_TICKS := 300
-const FACTORY_CHANGE_TRACKING_TICKS := 75
 const ACTION_ERROR_HOLD_TICKS := 15
 const BATTLE_SPEEDS := [1.0, 2.0, 4.0]
 const FLOW_STEPS := [
@@ -71,9 +70,6 @@ var selected_route_name := MvpContent.route_name(MvpContent.ROUTE_MIXED)
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 var produced_recipes: Dictionary = {}
 var pre_edit_production_snapshot: Dictionary = {}
-var last_factory_change_summary := ""
-var factory_change_battle_baseline: Dictionary = {}
-var last_factory_change_battle_impact := ""
 var workspace_view := WorkspaceView.FACTORY
 var action_error_message := ""
 var action_error_hold_ticks := 0
@@ -531,143 +527,6 @@ func _capture_pre_edit_production() -> void:
 		else {}
 	)
 	factory_board.set_production_comparison_baseline(preview)
-
-
-func _update_factory_change_summary(comparison: Dictionary) -> void:
-	if pre_edit_production_snapshot.is_empty() or comparison.get("validity", &"invalid") != &"valid":
-		last_factory_change_summary = ""
-		pre_edit_production_snapshot.clear()
-		return
-	var labels := {
-		&"scout": "斥候",
-		&"sentinel": "衛兵",
-		&"golem": "巨像",
-	}
-	var changes := PackedStringArray()
-	var timing_changed := false
-	var recipe_changed := false
-	for unit_id in [&"scout", &"sentinel", &"golem"]:
-		var unit_difference: Dictionary = comparison["units"].get(unit_id, {})
-		if unit_difference.is_empty():
-			continue
-		var before := int(unit_difference.get("before", 0))
-		var after := int(unit_difference.get("after", 0))
-		var count_state: StringName = unit_difference.get("count_state", &"unchanged")
-		var timing_state: StringName = unit_difference.get("timing_state", &"unchanged")
-		var recipe_state: StringName = unit_difference.get("recipe_state", &"unchanged")
-		if count_state != &"unchanged":
-			changes.append("%s %d→%d" % [labels[unit_id], before, after])
-		if timing_state != &"unchanged":
-			timing_changed = true
-		if recipe_state != &"unchanged":
-			recipe_changed = true
-	var discarded: Dictionary = comparison.get("discarded", {})
-	var discarded_changed: bool = discarded.get("state", &"unchanged") != &"unchanged"
-	if changes.is_empty():
-		if recipe_changed and timing_changed and discarded_changed:
-			changes.append("シジル・召喚時刻・不一致変更")
-		elif recipe_changed and timing_changed:
-			changes.append("シジル・召喚時刻変更")
-		elif recipe_changed and discarded_changed:
-			changes.append("シジル・不一致変更")
-		elif recipe_changed:
-			changes.append("使用シジル変更")
-		elif timing_changed and discarded_changed:
-			changes.append("召喚時刻・不一致変更")
-		elif timing_changed:
-			changes.append("召喚時刻変更")
-		elif discarded_changed:
-			changes.append("不一致 %d→%d" % [
-				int(discarded.get("before", 0)),
-				int(discarded.get("after", 0)),
-			])
-	else:
-		if recipe_changed:
-			changes.append("シジル変更")
-		if discarded_changed:
-			changes.append("不一致変更")
-	if not bool(comparison.get("changed", false)):
-		last_factory_change_summary = "変更効果 // 次の32秒の生産予測は変化なし"
-	elif changes.is_empty():
-		last_factory_change_summary = "変更効果 // 32秒予測を更新"
-	else:
-		last_factory_change_summary = "変更効果 // 次の32秒: %s" % " / ".join(changes)
-	pre_edit_production_snapshot.clear()
-
-
-func _begin_factory_change_tracking() -> void:
-	var battle := battle_board.simulation
-	factory_change_battle_baseline = {
-		"tick": battle.tick_index,
-		"player_kills": battle.player_kills,
-		"enemy_kills": battle.enemy_kills,
-		"objective_health": battle.enemy_shield_health + battle.enemy_leader_health,
-		"recipe_damage": battle.player_damage_by_recipe.duplicate(true),
-	}
-	last_factory_change_battle_impact = ""
-
-
-func _refresh_factory_change_tracking() -> void:
-	if factory_change_battle_baseline.is_empty():
-		return
-	var battle := battle_board.simulation
-	var elapsed_ticks: int = maxi(
-		battle.tick_index - int(factory_change_battle_baseline["tick"]),
-		0
-	)
-	var impact := _factory_change_impact_text(
-		battle.player_kills - int(factory_change_battle_baseline["player_kills"]),
-		battle.enemy_kills - int(factory_change_battle_baseline["enemy_kills"]),
-		float(factory_change_battle_baseline["objective_health"])
-			- battle.enemy_shield_health
-			- battle.enemy_leader_health,
-		_recipe_damage_delta(factory_change_battle_baseline.get("recipe_damage", {}))
-	)
-	if elapsed_ticks >= FACTORY_CHANGE_TRACKING_TICKS:
-		last_factory_change_battle_impact = "変更後15秒 // %s" % impact
-		factory_change_battle_baseline.clear()
-	else:
-		last_factory_change_battle_impact = "変更追跡 %d/15秒 // %s" % [
-			int(float(elapsed_ticks) * TICK_SECONDS),
-			impact,
-		]
-
-
-func _factory_change_impact_text(
-	enemy_defeated: int,
-	allies_lost: int,
-	objective_damage: float,
-	recipe_damage: Dictionary = {}
-) -> String:
-	var impact := "敵撃破 +%d / 味方損失 +%d / 目標ダメージ %.0f" % [
-		maxi(enemy_defeated, 0),
-		maxi(allies_lost, 0),
-		maxf(objective_damage, 0.0),
-	]
-	var recipe_labels := PackedStringArray()
-	for recipe in MvpContent.recipes():
-		var damage := float(recipe_damage.get(recipe.id, 0.0))
-		if damage <= 0.0:
-			continue
-		recipe_labels.append("%s +%.0f" % [
-			String(MvpContent.sigil_name(recipe.id)).trim_suffix("シジル"),
-			damage,
-		])
-	if not recipe_labels.is_empty():
-		impact += " / シジル打撃 " + "・".join(recipe_labels)
-	return impact
-
-
-func _recipe_damage_delta(before: Dictionary) -> Dictionary:
-	var result := {}
-	for recipe in MvpContent.recipes():
-		var damage := (
-			float(battle_board.simulation.player_damage_by_recipe.get(recipe.id, 0.0))
-			- float(before.get(recipe.id, 0.0))
-		)
-		if damage > 0.0:
-			result[recipe.id] = damage
-	return result
 
 
 func _refresh_battle_plan_label() -> void:
