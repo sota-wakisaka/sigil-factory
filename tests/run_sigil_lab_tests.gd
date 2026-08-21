@@ -446,6 +446,7 @@ func _drag_graph_connection(
 	var to_position := (
 		to_node.global_position
 		+ to_node.get_input_port_position(to_port) * to_node.scale
+		+ Vector2(18.0, 6.0)
 	)
 	_send_mouse_motion(from_position, Vector2.ZERO, false)
 	_send_mouse_button(from_position, true)
