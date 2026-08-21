@@ -342,12 +342,15 @@ func _refresh_factory_validation_state() -> void:
 		var result := factory_board.validation_result()
 		pause_button.disabled = not bool(result["ok"])
 		if result["ok"]:
+			status_label.text = ""
 			_set_factory_feedback("✓ 構築可能")
 		else:
 			_set_factory_feedback("◇ 未接続 // %s" % result["message"])
 	elif flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE:
 		var result := factory_board.validation_result()
 		pause_button.disabled = not bool(result["ok"])
+		if result["ok"]:
+			status_label.text = ""
 		var feedback := "Ⅱ // 未確定"
 		var discard_notice := factory_board.pending_discard_notice()
 		if discard_notice != "":
