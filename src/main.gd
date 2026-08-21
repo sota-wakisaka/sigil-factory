@@ -665,6 +665,9 @@ func _on_battle_finished(winner: int) -> void:
 		var reason := _defeat_reason()
 		status_label.text = "DEFEAT // %s" % reason
 		plan_label.text = "敗因分析 // %s // %s" % [reason, _defeat_advice()]
+		var damage_summary := _sigil_damage_summary()
+		if damage_summary != "":
+			plan_label.text += "\nシジル与ダメージ: " + damage_summary
 		debug_victory_button.text = "再挑戦"
 		debug_victory_button.visible = true
 

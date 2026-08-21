@@ -472,9 +472,11 @@ func _initialize() -> void:
 	main.get_node("Toolbar/ScoutButton").pressed.emit()
 	main.pause_button.pressed.emit()
 	main.produced_units = {&"scout": 30, &"sentinel": 0, &"golem": 0}
+	main.battle_board.simulation.player_damage_by_recipe = {&"watchful_eye": 321.0}
 	main.battle_board.simulation.tick_index = main.battle_board.simulation.battle_duration_ticks - 1
 	main.battle_board.advance_tick()
 	_expect("DEFEAT" in main.status_label.text, "time limit should display defeat analysis")
+	_expect("シジル与ダメージ: 目 321" in main.plan_label.text, "defeat analysis should preserve which produced sigil contributed damage")
 	_expect("再構成0回" in main.plan_label.text, "defeat analysis should identify a missed reconfiguration decision")
 	_expect("群体兵で衛兵、装甲兵で巨像" in main.plan_label.text, "defeat analysis should recommend concrete counter production")
 	main.factory_change_count = 1
