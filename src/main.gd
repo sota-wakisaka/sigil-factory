@@ -742,7 +742,8 @@ func _on_battle_finished(winner: int) -> void:
 		debug_victory_button.visible = false
 		battle_result_sigil_strip.configure(
 			produced_recipes,
-			battle_board.simulation.player_damage_by_recipe
+			battle_board.simulation.player_damage_by_recipe,
+			_battle_result_metrics()
 		)
 		_show_overlay("RUN %02d // DEFEAT" % flow.route_number, reason, _defeat_advice(), "工場を再構築")
 
@@ -843,9 +844,10 @@ func _apply_phase() -> void:
 			pause_button.disabled = true
 			battle_result_sigil_strip.configure(
 				produced_recipes,
-				battle_board.simulation.player_damage_by_recipe
+				battle_board.simulation.player_damage_by_recipe,
+				_battle_result_metrics()
 			)
-			_show_overlay("RUN %02d // CLEAR" % flow.route_number, "敵リーダーを撃破", _battle_result_summary(), "OK：報酬を確認")
+			_show_overlay("RUN %02d // CLEAR" % flow.route_number, "敵リーダーを撃破", "", "OK：報酬を確認")
 		RunFlow.Phase.REWARD:
 			pause_button.disabled = true
 			if _prepare_reward_options():
@@ -1044,6 +1046,17 @@ func _battle_result_summary() -> String:
 		factory_board.simulation.discarded_glyphs,
 	]
 	return summary
+
+
+func _battle_result_metrics() -> Dictionary:
+	var elapsed_seconds := int(float(battle_board.simulation.tick_index) * TICK_SECONDS)
+	return {
+		&"time": "%02d:%02d" % [elapsed_seconds / 60, elapsed_seconds % 60],
+		&"kills": battle_board.simulation.player_kills,
+		&"pauses": time_stop_count,
+		&"rebuilds": factory_change_count,
+		&"discarded": factory_board.simulation.discarded_glyphs,
+	}
 
 
 func _produced_sigil_summary() -> String:

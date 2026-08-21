@@ -6,8 +6,11 @@ const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 
 const SLOT_SIZE := Vector2(104, 72)
+const METRIC_SLOT_SIZE := Vector2(82, 34)
+const METRIC_KEYS: Array[StringName] = [&"time", &"kills", &"pauses", &"rebuilds", &"discarded"]
 
 var entries: Array[Dictionary] = []
+var metrics: Dictionary = {}
 var tooltip_entry: Dictionary = {}
 
 
@@ -16,8 +19,9 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func configure(produced_by_recipe: Dictionary, damage_by_recipe: Dictionary) -> void:
+func configure(produced_by_recipe: Dictionary, damage_by_recipe: Dictionary, next_metrics: Dictionary = {}) -> void:
 	entries.clear()
+	metrics = next_metrics.duplicate(true)
 	for recipe in MvpContent.recipes():
 		var produced := int(produced_by_recipe.get(recipe.id, 0))
 		var damage := float(damage_by_recipe.get(recipe.id, 0.0))
@@ -29,8 +33,8 @@ func configure(produced_by_recipe: Dictionary, damage_by_recipe: Dictionary) -> 
 			&"produced": produced,
 			&"damage": damage,
 		})
-	visible = not entries.is_empty()
-	custom_minimum_size.y = SLOT_SIZE.y if visible else 0.0
+	visible = not entries.is_empty() or not metrics.is_empty()
+	custom_minimum_size.y = SLOT_SIZE.y + (METRIC_SLOT_SIZE.y if not metrics.is_empty() else 0.0) if visible else 0.0
 	tooltip_entry.clear()
 	queue_redraw()
 
@@ -49,6 +53,23 @@ func entry_at(at_position: Vector2) -> Dictionary:
 	return {}
 
 
+func metric_rect(index: int) -> Rect2:
+	if index < 0 or index >= METRIC_KEYS.size() or metrics.is_empty():
+		return Rect2()
+	var total_width := METRIC_SLOT_SIZE.x * float(METRIC_KEYS.size())
+	return Rect2(
+		Vector2((size.x - total_width) * 0.5 + METRIC_SLOT_SIZE.x * index, SLOT_SIZE.y),
+		METRIC_SLOT_SIZE
+	)
+
+
+func metric_key_at(at_position: Vector2) -> StringName:
+	for index in METRIC_KEYS.size():
+		if metric_rect(index).has_point(at_position):
+			return METRIC_KEYS[index]
+	return &""
+
+
 func _draw() -> void:
 	for index in entries.size():
 		var entry: Dictionary = entries[index]
@@ -64,6 +85,52 @@ func _draw() -> void:
 		)
 		_draw_production_mark(rect.position + Vector2(66.0, 24.0), int(entry[&"produced"]))
 		_draw_damage_mark(rect.position + Vector2(66.0, 50.0), roundi(float(entry[&"damage"])))
+	_draw_metrics()
+
+
+func _draw_metrics() -> void:
+	for index in METRIC_KEYS.size():
+		var key := METRIC_KEYS[index]
+		if not metrics.has(key):
+			continue
+		var rect := metric_rect(index)
+		var icon_center := rect.position + Vector2(18.0, 17.0)
+		var color := Color(0.52, 0.72, 0.86, 0.88)
+		_draw_metric_icon(key, icon_center, color)
+		draw_string(
+			ThemeDB.fallback_font,
+			rect.position + Vector2(31.0, 22.0),
+			str(metrics[key]),
+			HORIZONTAL_ALIGNMENT_LEFT,
+			45.0,
+			12,
+			Color(0.76, 0.84, 0.92)
+		)
+
+
+func _draw_metric_icon(key: StringName, center: Vector2, color: Color) -> void:
+	match key:
+		&"time":
+			draw_arc(center, 7.0, 0.0, TAU, 18, color, 1.4, true)
+			draw_line(center, center + Vector2(0, -4), color, 1.4, true)
+			draw_line(center, center + Vector2(3, 2), color, 1.4, true)
+		&"kills":
+			draw_line(center + Vector2(-5, -5), center + Vector2(5, 5), color, 1.6, true)
+			draw_line(center + Vector2(-5, 5), center + Vector2(5, -5), color, 1.6, true)
+		&"pauses":
+			draw_arc(center, 7.0, 0.0, TAU, 18, color, 1.2, true)
+			draw_line(center + Vector2(-2.5, -4), center + Vector2(-2.5, 4), color, 1.8, true)
+			draw_line(center + Vector2(2.5, -4), center + Vector2(2.5, 4), color, 1.8, true)
+		&"rebuilds":
+			var diamond := PackedVector2Array([
+				center + Vector2(0, -7), center + Vector2(7, 0),
+				center + Vector2(0, 7), center + Vector2(-7, 0), center + Vector2(0, -7),
+			])
+			draw_polyline(diamond, color, 1.4, true)
+		_:
+			draw_line(center + Vector2(-5, -5), center + Vector2(5, 5), color, 1.6, true)
+			draw_line(center + Vector2(-5, 5), center + Vector2(5, -5), color, 1.6, true)
+			draw_circle(center + Vector2(0, 7), 1.8, color)
 
 
 func _draw_production_mark(center: Vector2, count: int) -> void:
@@ -97,7 +164,21 @@ func _draw_damage_mark(center: Vector2, damage: int) -> void:
 
 func _get_tooltip(at_position: Vector2) -> String:
 	tooltip_entry = entry_at(at_position)
-	return "battle_result_sigil" if not tooltip_entry.is_empty() else ""
+	if not tooltip_entry.is_empty():
+		return "battle_result_sigil"
+	var metric_key := metric_key_at(at_position)
+	match metric_key:
+		&"time":
+			return "戦闘時間 // %s" % metrics.get(metric_key, "--:--")
+		&"kills":
+			return "敵撃破 // %s体" % metrics.get(metric_key, 0)
+		&"pauses":
+			return "時間停止 // %s回" % metrics.get(metric_key, 0)
+		&"rebuilds":
+			return "工場再構成 // %s回" % metrics.get(metric_key, 0)
+		&"discarded":
+			return "廃棄・不一致 // %s" % metrics.get(metric_key, 0)
+	return ""
 
 
 func _make_custom_tooltip(for_text: String):
