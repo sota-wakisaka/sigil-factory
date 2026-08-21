@@ -509,14 +509,26 @@ func _factory_change_impact_text(enemy_defeated: int, allies_lost: int, objectiv
 
 
 func _refresh_battle_plan_label() -> void:
-	plan_label.text = "稼働術式: %s // %s" % [
-		MvpContent.plan_name(factory_board.plan_id),
-		MvpContent.plan_description(factory_board.plan_id),
-	]
+	plan_label.text = "稼働術式: %s" % _active_factory_operation_text()
 	if last_factory_change_summary != "":
 		plan_label.text += "\n" + last_factory_change_summary
 	if last_factory_change_battle_impact != "":
 		plan_label.text += "\n" + last_factory_change_battle_impact
+
+
+func _active_factory_operation_text() -> String:
+	var entries := factory_board.production_operation_entries()
+	if entries.is_empty():
+		return "%s // 生産なし" % MvpContent.plan_name(factory_board.plan_id)
+	var labels := PackedStringArray()
+	for entry in entries:
+		var sigil_label := MvpContent.sigil_name(entry["recipe_id"]).trim_suffix("シジル")
+		labels.append("%s → %s %d/32秒" % [
+			sigil_label,
+			MvpContent.unit_name(entry["unit_id"]),
+			entry["count"],
+		])
+	return " / ".join(labels)
 
 
 func current_battle_speed() -> float:

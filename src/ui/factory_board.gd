@@ -1957,6 +1957,23 @@ func production_summary_glyph(unit_id: StringName) -> GlyphModel:
 	return null
 
 
+func production_operation_entries() -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	for unit_id: StringName in [&"scout", &"sentinel", &"golem"]:
+		var count := int(cached_production_counts.get(unit_id, 0))
+		if count <= 0:
+			continue
+		var recipe_id := StringName(cached_production_recipe_ids.get(unit_id, ""))
+		if recipe_id == &"":
+			continue
+		entries.append({
+			"unit_id": unit_id,
+			"recipe_id": recipe_id,
+			"count": count,
+		})
+	return entries
+
+
 func _should_draw_production_discard_badge() -> bool:
 	if production_comparison_active:
 		var difference := production_discard_difference_state()

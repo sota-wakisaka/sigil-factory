@@ -288,7 +288,7 @@ static func plan_description(plan_id: StringName) -> String:
 static func sigil_name(recipe_id: StringName) -> String:
 	match recipe_id:
 		&"watchful_eye":
-			return "斥候シジル"
+			return "目シジル"
 		&"azure_guard":
 			return "衛兵シジル"
 		&"stellar_sentinel":
@@ -311,6 +311,16 @@ static func default_recipe_id_for_unit(unit_id: StringName) -> StringName:
 			return &"fortress_compass"
 		_:
 			return &"watchful_eye"
+
+
+static func unit_name(unit_id: StringName) -> String:
+	match unit_id:
+		&"sentinel":
+			return "衛兵"
+		&"golem":
+			return "巨像"
+		_:
+			return "斥候"
 
 
 static func recipe_id_for_plan(plan_id: StringName) -> StringName:

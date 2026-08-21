@@ -238,6 +238,7 @@ func _initialize() -> void:
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.BATTLE, "build confirmation should start battle")
 	_expect(main.battle_board.visible and not main.factory_board.visible, "battle phase should open the battle tab")
+	_expect("目" in main.plan_label.text and "斥候" in main.plan_label.text and "32秒" in main.plan_label.text, "battle should name the actual predicted recipe and output instead of only its source template")
 	_expect(main.threat_label.visible and main.status_label.visible, "running battle should expose battle-only information")
 	_expect(not main.factory_board.interaction_enabled, "running battle should lock node placement")
 	_expect(main.get_node("FactoryPalette/RingButton").disabled, "running battle should lock the equipment palette")
