@@ -1873,8 +1873,8 @@ func _test_major_change_forecast_uses_long_horizon() -> void:
 	var board := BattleBoard.new()
 	board.simulation = battle
 	_expect(
-		board.major_change_text(300, 120, 0.2) == "編成警告 60s: 群体兵→衛兵",
-		"long-horizon warning should name timing, wave, and recommended counter"
+		board.major_change_text(300, 120, 0.2) == "編成警告 60s: 群体兵",
+		"long-horizon warning should disclose timing and wave without prescribing a counter"
 	)
 	battle.tick_index = 180
 	_expect(
@@ -1883,7 +1883,7 @@ func _test_major_change_forecast_uses_long_horizon() -> void:
 	)
 	battle.tick_index = 270
 	_expect(
-		board.major_change_text(300, 120, 0.2) == "編成警告 60s: 装甲兵→巨像",
+		board.major_change_text(300, 120, 0.2) == "編成警告 60s: 装甲兵",
 		"warning should look past the near swarm change to the next major armor phase"
 	)
 	board.free()
