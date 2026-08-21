@@ -9,6 +9,7 @@ const GlyphComparisonTooltipModel := preload("res://src/ui/glyph_comparison_tool
 const PANEL_COLOR := Color(0.035, 0.055, 0.085, 0.96)
 const BORDER_COLOR := Color(0.32, 0.56, 0.76, 0.9)
 const MATCH_COLOR := Color(0.36, 1.0, 0.58, 1.0)
+const OWNED_OTHER_COLOR := Color(0.42, 0.82, 1.0, 1.0)
 const MISMATCH_COLOR := Color(1.0, 0.38, 0.28, 1.0)
 
 var recipe_id: StringName = &""
@@ -120,6 +121,11 @@ func _refresh_candidate_state() -> void:
 		candidate_state = &"match"
 	else:
 		candidate_state = &"mismatch"
+		var candidate_serialization := candidate_glyph.canonical_serialization()
+		for recipe in MvpContent.recipes():
+			if recipe.glyph.canonical_serialization() == candidate_serialization:
+				candidate_state = &"owned_other"
+				break
 
 
 func _draw() -> void:
@@ -166,6 +172,9 @@ func _draw() -> void:
 	elif candidate_state == &"match":
 		_draw_candidate_marker(candidate_center + Vector2(30, -22))
 		_draw_candidate_state_ring(candidate_center, Color(MATCH_COLOR, 0.72))
+	elif candidate_state == &"owned_other":
+		_draw_candidate_marker(candidate_center + Vector2(30, -22))
+		_draw_candidate_state_ring(candidate_center, Color(OWNED_OTHER_COLOR, 0.72))
 	elif candidate_state == &"mismatch":
 		_draw_candidate_marker(candidate_center + Vector2(30, -22))
 		draw_arc(target_center, 29.0, 0.0, TAU, 28, Color(1.0, 0.74, 0.28, 0.72), 1.5, true)
@@ -226,7 +235,20 @@ func candidate_draw_scale() -> float:
 func _draw_candidate_marker(center: Vector2) -> void:
 	if candidate_state == &"missing":
 		return
-	var color := MATCH_COLOR if candidate_state == &"match" else MISMATCH_COLOR
+	var color: Color = {
+		&"match": MATCH_COLOR,
+		&"owned_other": OWNED_OTHER_COLOR,
+	}.get(candidate_state, MISMATCH_COLOR)
+	if candidate_state == &"owned_other":
+		var diamond := PackedVector2Array([
+			center + Vector2(0, -6),
+			center + Vector2(6, 0),
+			center + Vector2(0, 6),
+			center + Vector2(-6, 0),
+		])
+		draw_colored_polygon(diamond, color)
+		draw_circle(center, 2.0, PANEL_COLOR)
+		return
 	draw_circle(center, 6.0, color)
 	if candidate_state == &"match":
 		draw_line(center + Vector2(-3, 0), center + Vector2(-1, 2), Color.WHITE, 1.5, true)
@@ -249,11 +271,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 			return "工場出力 // 候補なし"
 		tooltip_glyph = candidate_glyph
 		tooltip_title = "工場出力候補"
-		tooltip_context = {
-			&"actual": "実仕掛品",
-			&"predicted": "32秒予測",
-			&"hypothetical": "設定候補 // 未確定",
-		}.get(candidate_origin, "候補なし")
+		tooltip_context = candidate_context()
 		return "candidate"
 	if slot != &"target":
 		return ""
@@ -272,11 +290,7 @@ func _make_custom_tooltip(for_text: String):
 			glyph,
 			candidate_glyph,
 			display_name,
-			{
-				&"actual": "実仕掛品",
-				&"predicted": "予測出力",
-				&"hypothetical": "設定候補",
-			}.get(candidate_origin, "工場出力")
+			candidate_context()
 		)
 		return comparison
 	if tooltip_glyph == null:
@@ -288,3 +302,17 @@ func _make_custom_tooltip(for_text: String):
 		tooltip_context
 	)
 	return preview
+
+
+func candidate_context() -> String:
+	var origin_context: String = {
+		&"actual": "実仕掛品",
+		&"predicted": "32秒予測",
+		&"hypothetical": "設定候補 // 未確定",
+	}.get(candidate_origin, "候補なし")
+	match candidate_state:
+		&"owned_other":
+			return "%s // 取得済みの別シジル" % origin_context
+		&"mismatch":
+			return "%s // 未登録" % origin_context
+	return origin_context
