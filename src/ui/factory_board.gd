@@ -12,6 +12,7 @@ const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 const GlyphComparisonTooltipModel := preload("res://src/ui/glyph_comparison_tooltip.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
+const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 
 const PANEL_COLOR := Color(0.035, 0.055, 0.085, 0.96)
 const NODE_COLOR := Color(0.08, 0.12, 0.18, 1.0)
@@ -2805,6 +2806,9 @@ func source_glyph_for_node(node_id: StringName) -> GlyphModel:
 	var node: FactoryNodeModel = display_simulation.nodes[node_id]
 	if node.kind != FactoryNodeModel.NodeKind.SOURCE:
 		return null
+	var meaning_glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
+	if meaning_glyph_id != &"":
+		return MeaningGlyphsModel.glyph(meaning_glyph_id)
 	var primitive_id := StringName(node.config.get("primitive_id", ""))
 	if primitive_id == &"":
 		return null
@@ -3487,6 +3491,9 @@ func _path_reaches_node(current_id: StringName, sought_id: StringName, visited: 
 func _node_label(node: FactoryNodeModel) -> String:
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
+			var meaning_glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
+			if meaning_glyph_id != &"":
+				return "%s印" % MeaningGlyphsModel.label(meaning_glyph_id) if MeaningGlyphsModel.has(meaning_glyph_id) else "印未設定"
 			var primitive := String(node.config.get("primitive_id", ""))
 			if primitive not in ["ring", "spike"]:
 				return "素材未設定"

@@ -3,6 +3,7 @@ extends RefCounted
 
 const FactoryNodeModel := preload("res://src/factory/factory_node.gd")
 const SigilMatcher := preload("res://src/domain/sigil_matcher.gd")
+const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 
 var nodes: Dictionary = {}
 var lines: Dictionary = {}
@@ -268,8 +269,14 @@ func _node_configuration_errors(node_key: StringName, node: FactoryNodeModel) ->
 		errors.append("invalid_node_kind:%s" % node_key)
 		return errors
 	if node.kind == FactoryNodeModel.NodeKind.SOURCE:
-		if StringName(node.config.get("primitive_id", "")) == &"":
+		var primitive_id := StringName(node.config.get("primitive_id", ""))
+		var meaning_glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
+		if primitive_id == &"" and meaning_glyph_id == &"":
 			errors.append("missing_source_primitive:%s" % node_key)
+		elif primitive_id != &"" and meaning_glyph_id != &"":
+			errors.append("ambiguous_source_glyph:%s" % node_key)
+		elif meaning_glyph_id != &"" and not MeaningGlyphsModel.has(meaning_glyph_id):
+			errors.append("unknown_meaning_glyph:%s:%s" % [node_key, meaning_glyph_id])
 		if int(node.config.get("interval_ticks", 0)) < 1:
 			errors.append("invalid_source_interval:%s" % node_key)
 		return errors
@@ -542,14 +549,17 @@ func _tick_source(node: FactoryNodeModel) -> void:
 	if node.source_timer < interval or node.output_buffer != null:
 		return
 	node.source_timer = 0
-	var component := GlyphComponentModel.new(
-		StringName(node.config.get("primitive_id", "ring")),
-		Vector2i.ZERO,
-		0,
-		1,
-		StringName(node.config.get("color_id", "white"))
-	)
-	var glyph := GlyphModel.new([component])
+	var meaning_glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
+	var glyph: GlyphModel = MeaningGlyphsModel.glyph(meaning_glyph_id) if meaning_glyph_id != &"" else null
+	if glyph == null:
+		var component := GlyphComponentModel.new(
+			StringName(node.config.get("primitive_id", "ring")),
+			Vector2i.ZERO,
+			0,
+			1,
+			StringName(node.config.get("color_id", "white"))
+		)
+		glyph = GlyphModel.new([component])
 	glyph.production_context.record_node(&"source", false)
 	glyph.production_context.record_source(node.id)
 	node.output_buffer = glyph

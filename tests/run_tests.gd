@@ -49,6 +49,7 @@ func _initialize() -> void:
 	_test_factory_tick_does_not_refill_freed_line()
 	_test_factory_replay_is_independent_of_insertion_order()
 	_test_factory_pipeline_summons_matching_unit()
+	_test_factory_meaning_glyph_source_summons_registered_recipe()
 	_test_factory_recipe_match_preview_is_non_destructive()
 	_test_factory_records_closest_summon_failure()
 	_test_factory_closest_recipe_is_order_independent()
@@ -819,6 +820,43 @@ func _test_factory_pipeline_summons_matching_unit() -> void:
 		_expect(context["visited_node_kinds"].has(&"source"), "production context should retain source traversal")
 		_expect(context["visited_node_kinds"].has(&"summoner"), "production context should retain summoner traversal")
 		_expect(context["source_ids"].has(&"source"), "production context should retain source identity")
+
+
+func _test_factory_meaning_glyph_source_summons_registered_recipe() -> void:
+	var simulation := FactorySimulation.new()
+	var source := FactoryNodeModel.new(
+		&"meaning_source",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"meaning_glyph_id": MeaningGlyphsModel.CROSS, "interval_ticks": 1}
+	)
+	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
+	_expect(simulation.add_node(source), "a registered meaning Glyph should be accepted as a factory source")
+	_expect(simulation.add_node(summoner), "meaning Glyph pipeline should accept a summoner")
+	_expect(
+		simulation.connect_nodes(FactoryLineModel.new(&"meaning_line", &"meaning_source", &"summoner"))["ok"],
+		"meaning Glyph source should connect through ordinary factory lines"
+	)
+	simulation.add_recipe(SigilRecipeModel.new(&"cross_mark", MeaningGlyphsModel.glyph(MeaningGlyphsModel.CROSS), &"sentinel"))
+	for _tick in 8:
+		simulation.tick()
+	_expect(not simulation.summon_events.is_empty(), "registered meaning Glyph should reach exact recipe matching")
+	if not simulation.summon_events.is_empty():
+		_expect(simulation.summon_events[0]["recipe_id"] == &"cross_mark", "meaning source should preserve canonical identity")
+	var ambiguous := FactoryNodeModel.new(
+		&"ambiguous",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"primitive_id": "ring", "meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": 1}
+	)
+	_expect(simulation.add_node(ambiguous), "restored source configuration should be retained for diagnostics")
+	var unknown := FactoryNodeModel.new(
+		&"unknown",
+		FactoryNodeModel.NodeKind.SOURCE,
+		{"meaning_glyph_id": "missing", "interval_ticks": 1}
+	)
+	_expect(simulation.add_node(unknown), "unknown restored meaning Glyph should be retained for diagnostics")
+	var validation_errors: PackedStringArray = simulation.validate_graph()["errors"]
+	_expect(validation_errors.has("ambiguous_source_glyph:ambiguous"), "a source should not hide two competing Glyph definitions")
+	_expect(validation_errors.has("unknown_meaning_glyph:unknown:missing"), "unknown meaning Glyph IDs should fail closed before simulation")
 
 
 func _test_factory_recipe_match_preview_is_non_destructive() -> void:
