@@ -326,10 +326,10 @@ caption = "斥候"
 [node name="SentinelButton" type="Button" parent="Toolbar"]
 custom_minimum_size = Vector2(128, 50)
 layout_mode = 2
-tooltip_text = "環を回転・青着色し、群体兵に強い衛兵を生産するテンプレート"
+tooltip_text = "目と十字を単純結合し、群体兵に強い衛兵を生産するテンプレート"
 script = ExtResource("5_plan_button")
-plan_id = &"sentinel"
-recipe_id = &"azure_guard"
+plan_id = &"vigil"
+recipe_id = &"vigil_cross"
 caption = "衛兵"
 
 [node name="GolemButton" type="Button" parent="Toolbar"]

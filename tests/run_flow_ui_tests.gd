@@ -328,7 +328,7 @@ func _initialize() -> void:
 	_expect(main.sigil_ghost.recipe_id == &"watchful_eye" and main.get_node("Toolbar/ScoutButton").button_pressed, "failed preset snapshot should not switch the goal UI ahead of factory state")
 	main.factory_board.preview_simulation.recipes[0] = preserved_preview_recipe
 	main.get_node("Toolbar/SentinelButton").pressed.emit()
-	_expect(main.sigil_ghost.recipe_id == &"azure_guard", "sentinel selection should update the completed sigil ghost")
+	_expect(main.sigil_ghost.recipe_id == &"vigil_cross", "sentinel selection should update the completed meaning-sigil ghost")
 	_expect(main.factory_board.production_difference_state(&"scout")["count_state"] == &"decrease", "sentinel preview should show scout loss before confirmation")
 	_expect(main.factory_board.production_difference_state(&"sentinel")["count_state"] == &"increase", "sentinel preview should show sentinel gain before confirmation")
 	main.get_node("FactoryPalette/UndoButton").pressed.emit()
@@ -359,9 +359,9 @@ func _initialize() -> void:
 	_expect(main.sigil_ghost.recipe_id == &"bound_colossus" and main.get_node("Toolbar/GolemButton").button_pressed, "preview should move goal visuals to the proposed plan")
 	_expect(main.factory_board.production_difference_state(&"sentinel")["count_state"] == &"decrease" and main.factory_board.production_difference_state(&"golem")["count_state"] == &"increase", "second comparison should use the newly committed sentinel factory as its baseline")
 	main.cancel_button.pressed.emit()
-	_expect(main.flow.phase == RunFlow.Phase.BATTLE and main.factory_board.plan_id == MvpContent.PLAN_SENTINEL, "discard should resume with the committed factory plan")
+	_expect(main.flow.phase == RunFlow.Phase.BATTLE and main.factory_board.plan_id == MvpContent.PLAN_VIGIL, "discard should resume with the committed factory plan")
 	_expect(not main.factory_board.production_comparison_active, "discard should clear the production comparison session")
-	_expect(main.sigil_ghost.recipe_id == &"azure_guard", "discard should restore the committed goal Glyph")
+	_expect(main.sigil_ghost.recipe_id == &"vigil_cross", "discard should restore the committed goal Glyph")
 	_expect(main.get_node("Toolbar/SentinelButton").button_pressed and not main.get_node("Toolbar/GolemButton").button_pressed, "discard should restore the committed plan highlight")
 
 	main.debug_victory_button.pressed.emit()

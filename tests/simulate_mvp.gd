@@ -6,17 +6,17 @@ const MvpContent := preload("res://src/game/mvp_content.gd")
 func _initialize() -> void:
 	var adaptive := _run_strategy("mixed_adaptive", [
 		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
-		{"tick": 250, "plan": MvpContent.PLAN_SENTINEL},
+		{"tick": 250, "plan": MvpContent.PLAN_VIGIL},
 		{"tick": 530, "plan": MvpContent.PLAN_GOLEM},
 	], MvpContent.ROUTE_MIXED)
 	var swarm_adaptive := _run_strategy("swarm_adaptive", [
 		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
-		{"tick": 235, "plan": MvpContent.PLAN_SENTINEL},
+		{"tick": 235, "plan": MvpContent.PLAN_VIGIL},
 		{"tick": 690, "plan": MvpContent.PLAN_GOLEM},
 	], MvpContent.ROUTE_SWARM)
 	var armored_adaptive := _run_strategy("armored_adaptive", [
 		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
-		{"tick": 235, "plan": MvpContent.PLAN_SENTINEL},
+		{"tick": 235, "plan": MvpContent.PLAN_VIGIL},
 		{"tick": 430, "plan": MvpContent.PLAN_GOLEM},
 	], MvpContent.ROUTE_ARMORED)
 	var scout_only := _run_strategy("scout_only", [

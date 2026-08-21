@@ -77,7 +77,7 @@ func _ready() -> void:
 	battle_tab.pressed.connect(func() -> void: _show_workspace(WorkspaceView.BATTLE))
 	$Toolbar/ScoutButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SCOUT))
 	$Toolbar/EmptyButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_EMPTY))
-	$Toolbar/SentinelButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SENTINEL))
+	$Toolbar/SentinelButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_VIGIL))
 	$Toolbar/GolemButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_GOLEM))
 	$FactoryPalette/RingButton.pressed.connect(func() -> void: _add_factory_node(&"ring_source"))
 	$FactoryPalette/SpikeButton.pressed.connect(func() -> void: _add_factory_node(&"spike_source"))

@@ -1792,6 +1792,7 @@ func _test_mvp_plans_produce_expected_units() -> void:
 	var expectations := {
 		MvpContent.PLAN_SCOUT: &"scout",
 		MvpContent.PLAN_SENTINEL: &"sentinel",
+		MvpContent.PLAN_VIGIL: &"sentinel",
 		MvpContent.PLAN_GOLEM: &"golem",
 	}
 	for plan_id in expectations:

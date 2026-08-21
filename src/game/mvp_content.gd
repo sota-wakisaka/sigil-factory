@@ -14,6 +14,7 @@ const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 
 const PLAN_SCOUT := &"scout"
 const PLAN_SENTINEL := &"sentinel"
+const PLAN_VIGIL := &"vigil"
 const PLAN_GOLEM := &"golem"
 const PLAN_EMPTY := &"empty"
 const FACTORY_MANA_MAX := 100
@@ -124,6 +125,8 @@ static func build_factory(plan_id: StringName) -> FactorySimulation:
 			_build_empty_factory(simulation)
 		PLAN_SENTINEL:
 			_build_sentinel_factory(simulation)
+		PLAN_VIGIL:
+			_build_vigil_factory(simulation)
 		PLAN_GOLEM:
 			_build_golem_factory(simulation)
 		_:
@@ -204,6 +207,13 @@ static func layout_for_plan(plan_id: StringName) -> Dictionary:
 				&"colorizer": Vector2(325, 145),
 				&"summoner": Vector2(410, 195),
 			}
+		PLAN_VIGIL:
+			return {
+				&"eye_source": Vector2(85, 90),
+				&"cross_source": Vector2(85, 300),
+				&"combiner": Vector2(260, 195),
+				&"summoner": Vector2(410, 195),
+			}
 		PLAN_GOLEM:
 			return {
 				&"ring_source": Vector2(70, 70),
@@ -225,6 +235,8 @@ static func plan_name(plan_id: StringName) -> String:
 			return "EMPTY WORKSHOP"
 		PLAN_SENTINEL:
 			return "AZURE SENTINEL"
+		PLAN_VIGIL:
+			return "VIGIL-CROSS SENTINEL"
 		PLAN_GOLEM:
 			return "BOUND GOLEM"
 		_:
@@ -237,6 +249,8 @@ static func plan_description(plan_id: StringName) -> String:
 			return "構築練習 // 環素材の出力を召喚器へ接続"
 		PLAN_SENTINEL:
 			return "対群体 // 3体同時攻撃・中速"
+		PLAN_VIGIL:
+			return "目＋十字 // 単純結合で対群体衛兵を生産"
 		PLAN_GOLEM:
 			return "対装甲 // 高耐久・低速・長工程"
 		_:
@@ -261,6 +275,8 @@ static func recipe_id_for_plan(plan_id: StringName) -> StringName:
 	match plan_id:
 		PLAN_SENTINEL:
 			return &"azure_guard"
+		PLAN_VIGIL:
+			return &"vigil_cross"
 		PLAN_GOLEM:
 			return &"bound_colossus"
 		_:
@@ -323,6 +339,23 @@ static func _build_sentinel_factory(simulation: FactorySimulation) -> void:
 	simulation.connect_nodes(FactoryLineModel.new(&"line_1", &"ring_source", &"rotator", 0, 2))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_2", &"rotator", &"colorizer", 0, 2))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_3", &"colorizer", &"summoner", 0, 2))
+
+
+static func _build_vigil_factory(simulation: FactorySimulation) -> void:
+	simulation.add_node(_meaning_source(&"eye_source", MeaningGlyphsModel.EYE, 22))
+	simulation.add_node(_meaning_source(&"cross_source", MeaningGlyphsModel.CROSS, 22))
+	simulation.add_node(FactoryNodeModel.new(
+		&"combiner",
+		FactoryNodeModel.NodeKind.COMBINER,
+		{
+			"processing_ticks": 3,
+			"connection_mode": GlyphModel.CONNECTION_SIMPLE,
+		}
+	))
+	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
+	simulation.connect_nodes(FactoryLineModel.new(&"line_eye", &"eye_source", &"combiner", 0, 2))
+	simulation.connect_nodes(FactoryLineModel.new(&"line_cross", &"cross_source", &"combiner", 1, 2))
+	simulation.connect_nodes(FactoryLineModel.new(&"line_summon", &"combiner", &"summoner", 0, 2))
 
 
 static func _build_golem_factory(simulation: FactorySimulation) -> void:
