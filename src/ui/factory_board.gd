@@ -3069,7 +3069,11 @@ func _get_tooltip(at_position: Vector2) -> String:
 		var node_context: String = {
 			&"actual": "設備内の現在出力Glyph",
 			&"predicted": "32秒予測の出力Glyph",
-			&"source": "素材Primitive",
+			&"source": (
+				"登録済み意味Glyph"
+				if node.config.has("meaning_glyph_id")
+				else "素材Primitive"
+			),
 		}.get(node_state, "")
 		if node_glyph != null:
 			_set_comparison_tooltip(node_glyph, _node_label(node), node_context, "設備出力")

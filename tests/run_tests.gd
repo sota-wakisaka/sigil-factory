@@ -2955,8 +2955,8 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	_expect(board.input_validation_state(&"summoner", 0) == &"valid", "connecting the missing input should clear its port fault marker")
 	board.disconnect_input(&"summoner", 0)
 	var source_center := board.node_local_position(&"ring_source")
-	_expect(board._get_tooltip(source_center) == "glyph_comparison", "source equipment should compare its Primitive with the selected target")
-	_expect(board.tooltip_context == "素材Primitive", "unconnected source tooltip should identify its material Primitive")
+	_expect(board._get_tooltip(source_center) == "glyph_comparison", "source equipment should compare its registered Glyph with the selected target")
+	_expect(board.tooltip_context == "登録済み意味Glyph", "meaning source tooltip should distinguish a reusable Glyph from one Primitive")
 	_expect(
 		board.source_glyph_for_node(&"ring_source").canonical_serialization() == board.tooltip_glyph.canonical_serialization(),
 		"source tooltip should use the same CanonicalGlyph as the persistent node symbol"
@@ -2965,6 +2965,12 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	_expect(source_tooltip.get_script() == GlyphComparisonTooltipModel, "factory equipment hover should reuse the large target comparison")
 	_expect(source_tooltip.custom_minimum_size.x >= 300.0, "factory Glyph tooltip should provide a readable large preview")
 	source_tooltip.free()
+	board.configure(MvpContent.PLAN_EMPTY)
+	board.set_interaction_enabled(true)
+	board.selected_node_id = &"ring_source"
+	_expect(board.configure_selected_node(0), "tooltip fixture should switch the unwired source to one Primitive")
+	var primitive_source_center := board.node_local_position(&"ring_source")
+	_expect(board._get_tooltip(primitive_source_center) == "glyph_comparison" and board.tooltip_context == "素材Primitive", "legacy primitive sources should retain their distinct material context")
 	board.configure(MvpContent.PLAN_SCOUT)
 	var predicted_candidate := board.final_summoner_candidate_glyph()
 	_expect(board.final_summoner_candidate()["state"] == &"predicted", "non-destructive final output should retain its predicted origin")
