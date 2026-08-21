@@ -336,7 +336,8 @@ func _refresh_factory_goal_candidate() -> void:
 
 func _refresh_factory_goal_tools() -> void:
 	var relevant := {}
-	_collect_goal_equipment(sigil_ghost.glyph, relevant)
+	var required_meaning_ids: Array[StringName] = []
+	_collect_goal_equipment(sigil_ghost.glyph, relevant, required_meaning_ids)
 	relevant[&"summoner"] = true
 	for button in $FactoryPalette.get_children():
 		if button.equipment_kind in [&"delete", &"undo"]:
@@ -344,7 +345,11 @@ func _refresh_factory_goal_tools() -> void:
 		else:
 			var goal_state: StringName = &"irrelevant"
 			if relevant.has(button.equipment_kind):
-				if factory_board.goal_equipment_present(button.equipment_kind):
+				if button.equipment_kind == &"meaning_source":
+					goal_state = factory_board.meaning_source_presence(required_meaning_ids)
+					if goal_state == &"missing" and button.availability_reason in [&"mana", &"summoner_limit"]:
+						goal_state = &"blocked"
+				elif factory_board.goal_equipment_present(button.equipment_kind):
 					goal_state = &"present"
 				elif button.availability_reason in [&"mana", &"summoner_limit"]:
 					goal_state = &"blocked"
@@ -353,13 +358,19 @@ func _refresh_factory_goal_tools() -> void:
 			button.set_goal_state(goal_state)
 
 
-func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
+func _collect_goal_equipment(
+	glyph: GlyphModel,
+	relevant: Dictionary,
+	required_meaning_ids: Array[StringName]
+) -> void:
 	if glyph == null:
 		return
 	var canonical := glyph.canonical_serialization()
 	for meaning_glyph_id in MeaningGlyphsModel.IDS:
 		if MeaningGlyphsModel.glyph(meaning_glyph_id).canonical_serialization() == canonical:
 			relevant[&"meaning_source"] = true
+			if meaning_glyph_id not in required_meaning_ids:
+				required_meaning_ids.append(meaning_glyph_id)
 			return
 	if not glyph.combine_children.is_empty():
 		relevant[&"combiner"] = true
@@ -372,7 +383,7 @@ func _collect_goal_equipment(glyph: GlyphModel, relevant: Dictionary) -> void:
 		if component.color_id != &"white":
 			relevant[&"colorizer"] = true
 	for child in glyph.combine_children:
-		_collect_goal_equipment(child, relevant)
+		_collect_goal_equipment(child, relevant, required_meaning_ids)
 
 
 func _on_inspector_option_selected(index: int) -> void:

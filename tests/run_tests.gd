@@ -2250,6 +2250,17 @@ func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 	_expect(sentinel_board.undo() and sentinel_board.goal_equipment_present(&"rotator"), "Undo should restore a removed equipment category")
 	sentinel_board.free()
 
+	var meaning_board := FactoryBoard.new()
+	meaning_board.configure(MvpContent.PLAN_VIGIL)
+	var required_meaning: Array[StringName] = [MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS]
+	_expect(meaning_board.meaning_source_presence(required_meaning) == &"present", "meaning inventory should recognize every distinct target Glyph source")
+	meaning_board.set_interaction_enabled(true)
+	meaning_board.selected_node_id = &"cross_source"
+	_expect(meaning_board.remove_selected_node(), "meaning inventory fixture should remove one source")
+	_expect(meaning_board.meaning_source_presence(required_meaning) == &"partial", "one remaining target Glyph should be partial instead of falsely complete")
+	_expect(meaning_board.undo() and meaning_board.meaning_source_presence(required_meaning) == &"present", "Undo should restore complete meaning-source inventory")
+	meaning_board.free()
+
 
 func _test_factory_mutations_fail_closed_without_undo_snapshot() -> void:
 	var board := FactoryBoard.new()

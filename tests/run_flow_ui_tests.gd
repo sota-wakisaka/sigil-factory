@@ -188,6 +188,12 @@ func _initialize() -> void:
 	_expect(main.get_node("FactoryPalette/SpikeButton").goal_state == &"missing" and main.get_node("FactoryPalette/CombineButton").goal_state == &"missing", "combined target vocabulary should identify absent categories without revealing order or count")
 	main.sigil_ghost.show_recipe(&"watchful_eye")
 	main._refresh_factory_goal_tools()
+	main.sigil_ghost.show_recipe(&"vigil_cross")
+	main._refresh_factory_goal_tools()
+	_expect(main.get_node("FactoryPalette/MeaningButton").goal_state == &"partial", "a multi-Glyph target should distinguish one present meaning source from its complete source vocabulary")
+	_expect("一部" in main.get_node("FactoryPalette/MeaningButton").tooltip_text, "partial meaning-source inventory should remain explainable on demand")
+	main.sigil_ghost.show_recipe(&"watchful_eye")
+	main._refresh_factory_goal_tools()
 	_expect(main.get_node("FactoryPalette/RotateButton").custom_minimum_size.y >= 50.0, "palette icon should reserve readable vertical space")
 	_expect(
 		"90°・180°・270°" in main.get_node("FactoryPalette/RotateButton").tooltip_text,

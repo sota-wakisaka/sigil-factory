@@ -460,6 +460,23 @@ func goal_equipment_present(template_id: StringName) -> bool:
 	return false
 
 
+func meaning_source_presence(required_ids: Array[StringName]) -> StringName:
+	if required_ids.is_empty():
+		return &"missing"
+	var present := {}
+	var display_simulation := _display_simulation()
+	if display_simulation != null:
+		for node: FactoryNodeModel in display_simulation.nodes.values():
+			if node.kind != FactoryNodeModel.NodeKind.SOURCE:
+				continue
+			var glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
+			if glyph_id in required_ids:
+				present[glyph_id] = true
+	if present.is_empty():
+		return &"missing"
+	return &"present" if present.size() == required_ids.size() else &"partial"
+
+
 func can_undo() -> bool:
 	return interaction_enabled and not undo_history.is_empty()
 

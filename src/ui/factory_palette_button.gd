@@ -78,7 +78,7 @@ func set_goal_relevant(relevant: bool) -> void:
 func set_goal_state(next_state: StringName) -> void:
 	goal_state = (
 		next_state
-		if next_state in [&"irrelevant", &"present", &"missing", &"blocked"]
+		if next_state in [&"irrelevant", &"present", &"partial", &"missing", &"blocked"]
 		else &"irrelevant"
 	)
 	goal_relevant = goal_state != &"irrelevant"
@@ -113,6 +113,7 @@ func _refresh_tooltip_text() -> void:
 func _goal_state_text() -> String:
 	return {
 		&"present": "目標に関係 // 盤上に存在",
+		&"partial": "目標に関係 // 一部が盤上に存在",
 		&"missing": "目標に関係 // 盤上に不在",
 		&"blocked": "目標に関係 // 現在は追加不可",
 	}.get(goal_state, "")
@@ -138,6 +139,11 @@ func _draw_goal_marker() -> void:
 			var present_color := Color(0.3, 0.64, 0.8, 0.72)
 			draw_line(start, finish, present_color, 1.4, true)
 			draw_circle(center, 2.6, present_color)
+		&"partial":
+			var partial_color := Color(0.32, 0.76, 0.94, 0.9)
+			draw_line(start, center, partial_color, 1.4, true)
+			draw_dashed_line(center, finish, partial_color, 1.5, 4.0)
+			_draw_goal_diamond(center, partial_color)
 		&"missing":
 			var missing_color := Color(0.32, 0.82, 1.0, 0.98)
 			draw_dashed_line(start, finish, missing_color, 1.8, 4.0)
