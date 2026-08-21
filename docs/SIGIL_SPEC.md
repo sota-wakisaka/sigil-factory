@@ -175,7 +175,7 @@ Primitiveのデザイン変更はパス定義の変更だけで反映できる�
 
 初期案:
 
-- 移動: 離散ステップ
+- 移動: Sigil Labは上下左右を1単位刻みで、距離1〜6から選択
 - 回転: 現MVP工場は90°単位。Sigil Labでは中心原点を基準に1°単位
 - 拡縮: 有限段階
 - 色: 定義済みの色ID
@@ -330,6 +330,7 @@ Combine
 | 的 | 大小の同心円 | 目標・焦点 |
 | 星 | 正向き三角 + 反転三角 | 星・天体 |
 | 方位 | 十字 + 45°回転した十字 | 方角・全周 |
+| 翼 | 細い横長円 + さらに細い長方形の羽軸 | 飛翔・羽根 |
 
 ```text
 Eye     = SimpleCombine(Scale(Circle, 50%, 50%), Scale(Circle, 100%, 50%))
@@ -337,6 +338,7 @@ Cross   = SimpleCombine(Scale(Square, 100%, 25%), Scale(Square, 25%, 100%))
 Target  = SimpleCombine(Circle, Scale(Circle, 50%, 50%))
 Star    = SimpleCombine(Triangle, Rotate(Triangle, 180°))
 Compass = SimpleCombine(Cross, Rotate(Cross, 45°))
+Wing    = Rotate(SimpleCombine(Scale(Circle, 100%, 40%), Scale(Square, 100%, 25%)), -30°)
 ```
 
 - 登録グリフの外形基準は基本Primitiveの100%とし、下流で部品として並べても実寸が揃うようにする

@@ -75,9 +75,10 @@ func _test_registered_meaning_glyphs() -> void:
 		RegisteredGlyphsModel.TARGET: "S(3:0,0;39:P(33:p6:circle|0,0|0|1|c5:white|a50,50),32:P(26:p6:circle|0,0|0|1|c5:white))",
 		RegisteredGlyphsModel.STAR: "S(3:0,0;34:P(28:p8:triangle|0,0|0|1|c5:white),35:P(29:p8:triangle|0,0|60|1|c5:white))",
 		RegisteredGlyphsModel.COMPASS: "S(3:0,0;96:S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a100,25),40:P(34:p6:square|0,0|0|1|c5:white|a25,100)),98:S(3:0,0;41:P(35:p6:square|0,0|45|1|c5:white|a100,25),41:P(35:p6:square|0,0|45|1|c5:white|a25,100)))",
+		RegisteredGlyphsModel.WING: "S(3:0,0;42:P(36:p6:circle|0,0|150|1|c5:white|a100,40),42:P(36:p6:square|0,0|150|1|c5:white|a100,25))",
 	}
 	var seen_canonicals: Dictionary = {}
-	_expect(RegisteredGlyphsModel.IDS.size() == 5, "the initial meaning-Glyph set should stay intentionally small")
+	_expect(RegisteredGlyphsModel.IDS.size() == 6, "the meaning-Glyph set should stay intentionally small")
 	for glyph_id in RegisteredGlyphsModel.IDS:
 		var glyph := RegisteredGlyphsModel.glyph(glyph_id)
 		_expect(glyph != null, "%s should be available as a registered meaning Glyph" % glyph_id)
@@ -413,16 +414,31 @@ func _test_lab_scene() -> void:
 	if lab.option_controls[free_rotate] is SpinBox:
 		var angle_control: SpinBox = lab.option_controls[free_rotate]
 		_expect(angle_control.min_value == 0.0 and angle_control.max_value == 359.0 and angle_control.step == 1.0, "free-angle control should cover 0–359° in one-degree steps")
+	var fine_move: StringName = lab.add_lab_node(SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, Vector2(40, 40))
+	var move_control: Control = lab.option_controls[fine_move]
+	var move_directions := move_control.find_children("*", "OptionButton", true, false)
+	var move_distances := move_control.find_children("*", "SpinBox", true, false)
+	_expect(move_directions.size() == 1 and move_distances.size() == 1, "Lab Move should separate cardinal direction from exact distance")
+	if move_directions.size() == 1 and move_distances.size() == 1:
+		var direction_control: OptionButton = move_directions[0]
+		var distance_control: SpinBox = move_distances[0]
+		_expect(distance_control.min_value == 1.0 and distance_control.max_value == 6.0 and distance_control.step == 1.0, "Move distance should cover 1–6 in one-unit steps")
+		distance_control.value = 1.0
+		distance_control.value_changed.emit(1.0)
+		_expect(lab.graph.node_config(fine_move)["offset"] == Vector2i(0, -1), "Move distance should accept a one-unit offset")
+		direction_control.select(1)
+		direction_control.item_selected.emit(1)
+		_expect(lab.graph.node_config(fine_move)["offset"] == Vector2i(1, 0), "Move direction should preserve the selected fine distance")
 	var free_scale: StringName = lab.add_lab_node(SigilGraphModel.SCALE, {"x_percent": 200, "y_percent": 75}, Vector2(40, 40))
 	var scale_control: Control = lab.option_controls[free_scale]
 	_expect(scale_control.find_children("*", "SpinBox", true, false).size() == 2, "Lab stretch should expose independent horizontal and vertical controls")
 	var free_repeat: StringName = lab.add_lab_node(SigilGraphModel.REPEAT, {"count": 6}, Vector2(40, 40))
 	_expect(lab.option_controls[free_repeat] is OptionButton and lab.option_controls[free_repeat].item_count == 6, "Lab repeat should expose all exact equal-angle counts")
 	var registered_cross: StringName = lab.add_lab_node(SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.CROSS}, Vector2(40, 40))
-	_expect(lab.option_controls[registered_cross] is OptionButton and lab.option_controls[registered_cross].item_count == 5, "all authored meaning Glyphs should be reusable from one compact palette node")
+	_expect(lab.option_controls[registered_cross] is OptionButton and lab.option_controls[registered_cross].item_count == 6, "all authored meaning Glyphs should be reusable from one compact palette node")
 	if lab.option_controls[registered_cross] is OptionButton:
 		var registered_option: OptionButton = lab.option_controls[registered_cross]
-		_expect(registered_option.get_item_text(0) == "目" and registered_option.get_item_text(4) == "方位", "meaning-Glyph choices should follow the documented learning order")
+		_expect(registered_option.get_item_text(0) == "目" and registered_option.get_item_text(5) == "翼", "meaning-Glyph choices should follow the documented learning order")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"distribute"), "Distributor should be removed from the Lab grammar")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"color"), "color processing should be omitted from the Lab grammar")
 	var output: Dictionary = lab.graph.evaluate_output()
@@ -440,7 +456,7 @@ func _test_lab_scene() -> void:
 	if export_data is Dictionary:
 		_expect(export_data["format"] == "sigil_lab_graph" and int(export_data["version"]) == 1, "export should identify its stable graph format version")
 		_expect(export_data["canonical_glyph"] == output["glyph"].canonical_serialization(), "export should include the exact completed Glyph identity")
-		_expect(export_data["nodes"].size() == 9 and export_data["connections"].size() == 4, "export should preserve every node on the canvas, including registered Glyph work")
+		_expect(export_data["nodes"].size() == lab.graph.nodes.size() and export_data["connections"].size() == 4, "export should preserve every node on the canvas, including registered Glyph work")
 		var exported_source_found := false
 		for exported_node in export_data["nodes"]:
 			_expect(exported_node["position"] is Array and exported_node["position"].size() == 2, "exported nodes should preserve their editor positions")

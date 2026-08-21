@@ -10,13 +10,15 @@ const CROSS := &"cross"
 const TARGET := &"target"
 const STAR := &"star"
 const COMPASS := &"compass"
-const IDS := [EYE, CROSS, TARGET, STAR, COMPASS]
+const WING := &"wing"
+const IDS := [EYE, CROSS, TARGET, STAR, COMPASS, WING]
 const LABELS := {
 	EYE: "目",
 	CROSS: "十字",
 	TARGET: "的",
 	STAR: "星",
 	COMPASS: "方位",
+	WING: "翼",
 }
 const SOURCE_GRAPH_PATHS := {
 	EYE: "res://experiments/sigil_lab/registered/eye.json",
@@ -24,6 +26,7 @@ const SOURCE_GRAPH_PATHS := {
 	TARGET: "res://experiments/sigil_lab/registered/target.json",
 	STAR: "res://experiments/sigil_lab/registered/star.json",
 	COMPASS: "res://experiments/sigil_lab/registered/compass.json",
+	WING: "res://experiments/sigil_lab/registered/wing.json",
 }
 
 
@@ -51,6 +54,8 @@ static func glyph(glyph_id: StringName) -> GlyphModel:
 			return _star()
 		COMPASS:
 			return _compass()
+		WING:
+			return _wing()
 	return null
 
 
@@ -98,3 +103,15 @@ static func _compass() -> GlyphModel:
 		[cross, cross.rotated_degrees(45)],
 		GlyphModel.CONNECTION_SIMPLE
 	)
+
+
+static func _wing() -> GlyphModel:
+	var circle := GlyphModel.new([GlyphComponentModel.new(&"circle")])
+	var square := GlyphModel.new([GlyphComponentModel.new(&"square")])
+	return GlyphModel.combine_many(
+		[
+			circle.stretched_percent(NOMINAL_SIZE_PERCENT, 40),
+			square.stretched_percent(NOMINAL_SIZE_PERCENT, 25),
+		],
+		GlyphModel.CONNECTION_SIMPLE
+	).rotated_degrees(-30)

@@ -20,11 +20,11 @@ const NODE_NAMES := {
 	&"combine": "合成",
 	&"output": "完成",
 }
-const MOVE_OPTIONS := [
-	Vector2i(0, -4),
-	Vector2i(4, 0),
-	Vector2i(0, 4),
-	Vector2i(-4, 0),
+const MOVE_DIRECTIONS := [
+	Vector2i.UP,
+	Vector2i.RIGHT,
+	Vector2i.DOWN,
+	Vector2i.LEFT,
 ]
 
 var graph = SigilGraphModel.new()
@@ -243,9 +243,9 @@ func _build_palette() -> Control:
 		["○", SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, "丸 // 基本図形"],
 		["△", SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}, "三角 // 基本図形"],
 		["□", SigilGraphModel.SOURCE, {"primitive_id": &"square"}, "四角 // 基本図形"],
-		["印", SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.EYE}, "登録グリフ // 目・十字・的・星・方位"],
+		["印", SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.EYE}, "登録グリフ // 目・十字・的・星・方位・翼"],
 		["↻", SigilGraphModel.ROTATE, {"degrees": 45}, "中心を基準に1°単位で回転"],
-		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "上下左右へ移動"],
+		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -1)}, "上下左右へ1単位ずつ移動"],
 		["↔↕", SigilGraphModel.SCALE, {"x_percent": 150, "y_percent": 100}, "横・縦を別々に拡大縮小"],
 		["×N", SigilGraphModel.REPEAT, {"count": 6}, "中心のまわりへ等角度で放射反復"],
 		["⊕", SigilGraphModel.COMBINE, {}, "2〜8個のGlyphを中心結合・相互結合"],
@@ -556,18 +556,57 @@ func _setting_option(node_id: StringName, kind: StringName) -> Control:
 			_refresh_all()
 		)
 		return repeat_option
-	var option := OptionButton.new()
-	match kind:
-		SigilGraphModel.MOVE:
-			for label in ["↑4", "→4", "↓4", "←4"]:
-				option.add_item(label)
-			var current_offset: Vector2i = graph.node_config(node_id).get("offset", MOVE_OPTIONS[0])
-			option.select(maxi(MOVE_OPTIONS.find(current_offset), 0))
-			option.item_selected.connect(func(index: int) -> void:
-				graph.set_node_config(node_id, {"offset": MOVE_OPTIONS[index]})
-				_refresh_all()
+	if kind == SigilGraphModel.MOVE:
+		var row := HBoxContainer.new()
+		row.custom_minimum_size = Vector2(144, 34)
+		row.tooltip_text = "方向 / 距離 // 上下左右へ1単位ずつ"
+		var current_offset: Vector2i = graph.node_config(node_id).get(
+			"offset",
+			Vector2i.UP
+		)
+		var direction := OptionButton.new()
+		for label in ["↑", "→", "↓", "←"]:
+			direction.add_item(label)
+		direction.custom_minimum_size = Vector2(58, 34)
+		direction.select(_move_direction_index(current_offset))
+		var distance := SpinBox.new()
+		distance.min_value = 1.0
+		distance.max_value = 6.0
+		distance.step = 1.0
+		distance.allow_greater = false
+		distance.allow_lesser = false
+		distance.custom_minimum_size = Vector2(78, 34)
+		distance.value = float(maxi(absi(current_offset.x), absi(current_offset.y)))
+		direction.item_selected.connect(func(index: int) -> void:
+			graph.set_node_config(node_id, {
+				"offset": MOVE_DIRECTIONS[index] * roundi(distance.value),
+			})
+			_refresh_all()
+		)
+		distance.value_changed.connect(func(value: float) -> void:
+			var active_offset: Vector2i = graph.node_config(node_id).get(
+				"offset",
+				Vector2i.UP
 			)
-	return option
+			graph.set_node_config(node_id, {
+				"offset": MOVE_DIRECTIONS[_move_direction_index(active_offset)] * roundi(value),
+			})
+			_refresh_all()
+		)
+		row.add_child(direction)
+		row.add_child(distance)
+		return row
+	return Control.new()
+
+
+static func _move_direction_index(offset: Vector2i) -> int:
+	if offset.x > 0:
+		return 1
+	if offset.y > 0:
+		return 2
+	if offset.x < 0:
+		return 3
+	return 0
 
 
 func _on_scale_value_changed(value: float, node_id: StringName, axis: StringName) -> void:
