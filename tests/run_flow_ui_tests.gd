@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_expect(main.phase_overlay.visible, "placeholder phases should use the overlay")
 	_expect(main.route_option.visible and main.route_option.item_count == 3, "route selection should offer three branches")
 	_expect(main.route_option.get_item_metadata(0) == MvpContent.ROUTE_SWARM and main.route_option.get_item_metadata(2) == MvpContent.ROUTE_ARMORED, "route cards should carry distinct encounter identities")
+	_expect("敵編成が異なる" in main.phase_body.text and not "現在共通" in main.phase_body.text, "route introduction should agree with the distinct encounter schedules")
 
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.STAGE_INFO, "route OK should show stage information")

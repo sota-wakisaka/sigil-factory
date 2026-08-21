@@ -597,7 +597,7 @@ func _apply_phase() -> void:
 			_show_overlay(
 				"RUN %02d" % flow.route_number,
 				"ルートを選択",
-				"進みたいルートを選択します。戦闘内容は現在共通です。\n所持強化: %s" % _reward_summary(),
+				"敵編成が異なるルートを選択します。\n所持強化: %s" % _reward_summary(),
 				"OK：このルートを選択"
 			)
 		RunFlow.Phase.STAGE_INFO:
