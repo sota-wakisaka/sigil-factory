@@ -9,11 +9,10 @@ const ROTATE := &"rotate"
 const MOVE := &"move"
 const SCALE := &"scale"
 const REPEAT := &"repeat"
-const DISTRIBUTE := &"distribute"
 const COMBINE := &"combine"
 const OUTPUT := &"output"
 
-const NODE_KINDS := [SOURCE, ROTATE, MOVE, SCALE, REPEAT, DISTRIBUTE, COMBINE, OUTPUT]
+const NODE_KINDS := [SOURCE, ROTATE, MOVE, SCALE, REPEAT, COMBINE, OUTPUT]
 const PRIMITIVES := [&"circle", &"triangle", &"square"]
 const REPEAT_COUNTS := [2, 3, 4, 5, 6, 8]
 const MAX_COMBINE_INPUTS := GlyphModel.MAX_COMBINE_CHILDREN
@@ -118,9 +117,6 @@ func connection_result(
 	for connection in connections:
 		if connection["to"] == to_node_id and int(connection["to_port"]) == to_port:
 			return _connection_error(&"input_occupied")
-	for connection in connections:
-		if connection["from"] == from_node_id and int(connection["from_port"]) == from_port:
-			return _connection_error(&"output_occupied")
 	if _would_create_cycle(from_node_id, to_node_id):
 		return _connection_error(&"cycle")
 	return {"ok": true, "error": &""}
@@ -174,7 +170,7 @@ func input_count(node_id: StringName) -> int:
 			return 0
 		COMBINE:
 			return GlyphModel.MAX_COMBINE_CHILDREN
-		ROTATE, MOVE, SCALE, REPEAT, DISTRIBUTE, OUTPUT:
+		ROTATE, MOVE, SCALE, REPEAT, OUTPUT:
 			return 1
 	return 0
 
@@ -183,8 +179,6 @@ func output_count(node_id: StringName) -> int:
 	match node_kind(node_id):
 		OUTPUT:
 			return 0
-		DISTRIBUTE:
-			return GlyphModel.MAX_COMBINE_CHILDREN
 		SOURCE, ROTATE, MOVE, SCALE, REPEAT, COMBINE:
 			return 1
 	return 0
@@ -287,8 +281,6 @@ func _apply_node(kind: StringName, config: Dictionary, inputs: Array) -> Diction
 			glyph = GlyphModel.radial_repeat(inputs[0], int(config["count"]))
 			if glyph == null:
 				return {"ok": false, "glyph": null, "error": &"invalid_repeat"}
-		DISTRIBUTE:
-			glyph = inputs[0].copy()
 		COMBINE:
 			glyph = GlyphModel.combine_many(
 				inputs,
@@ -379,8 +371,6 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 			if not count in REPEAT_COUNTS:
 				return {"ok": false, "error": &"invalid_repeat", "config": {}}
 			return {"ok": true, "error": &"", "config": {"count": count}}
-		DISTRIBUTE:
-			return {"ok": true, "error": &"", "config": {}}
 		COMBINE:
 			var connection_mode := StringName(config.get(
 				"connection_mode",

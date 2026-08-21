@@ -14,7 +14,6 @@ const NODE_NAMES := {
 	&"move": "移動",
 	&"scale": "変形",
 	&"repeat": "反復",
-	&"distribute": "分配",
 	&"combine": "合成",
 	&"output": "完成",
 }
@@ -192,7 +191,7 @@ func _build_header() -> Control:
 
 	var distribution_button := Button.new()
 	distribution_button.text = "分岐"
-	distribution_button.tooltip_text = "1つの四角を4方向へ分配して加工するテンプレート"
+	distribution_button.tooltip_text = "1つの出力から4本の配線を直接伸ばすテンプレート"
 	distribution_button.custom_minimum_size = Vector2(76, 34)
 	distribution_button.pressed.connect(_load_distribution_template)
 	toolbar.add_child(distribution_button)
@@ -240,7 +239,6 @@ func _build_palette() -> Control:
 		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "上下左右へ移動"],
 		["↔↕", SigilGraphModel.SCALE, {"x_percent": 150, "y_percent": 100}, "横・縦を別々に拡大縮小"],
 		["×N", SigilGraphModel.REPEAT, {"count": 6}, "中心のまわりへ等角度で放射反復"],
-		["⇶", SigilGraphModel.DISTRIBUTE, {}, "1つのシジルを最大8本の枝へ分配"],
 		["⊕", SigilGraphModel.COMBINE, {}, "2〜8個のGlyphを中心結合・相互結合"],
 	]:
 		var button := Button.new()
@@ -420,16 +418,6 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 			var option := _setting_option(node_id, kind)
 			node.add_child(option)
 			option_controls[node_id] = option
-		SigilGraphModel.DISTRIBUTE:
-			node.add_child(preview)
-			node.set_slot(0, true, 0, PORT_COLOR, true, 0, PORT_COLOR)
-			for output_index in range(1, graph.output_count(node_id)):
-				var output_label := Label.new()
-				output_label.text = str(output_index + 1)
-				output_label.custom_minimum_size = Vector2(108, 26)
-				output_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-				node.add_child(output_label)
-				node.set_slot(output_index, false, 0, PORT_COLOR, true, 0, PORT_COLOR)
 		SigilGraphModel.COMBINE:
 			for input_index in SigilGraphModel.MAX_COMBINE_INPUTS:
 				var input_label := Label.new()
@@ -580,7 +568,7 @@ func _connect_nodes(from_node: StringName, from_port: int, to_node: StringName, 
 	if not graph.connect_nodes(from_node, from_port, to_node, to_port):
 		_set_status(_error_text(graph.last_error), true)
 		return false
-	graph_edit.connect_node(from_node, from_port, to_node, to_port)
+	graph_edit.connect_node(from_node, from_port, to_node, to_port, true)
 	_refresh_all()
 	return true
 
@@ -604,7 +592,13 @@ func _remove_node(node_id: StringName) -> void:
 	option_controls.erase(node_id)
 	graph_edit.clear_connections()
 	for connection in graph.connections:
-		graph_edit.connect_node(connection["from"], connection["from_port"], connection["to"], connection["to_port"])
+		graph_edit.connect_node(
+			connection["from"],
+			connection["from_port"],
+			connection["to"],
+			connection["to_port"],
+			true
+		)
 	_refresh_all()
 
 
@@ -680,7 +674,6 @@ func _load_distribution_template() -> void:
 		{"primitive_id": &"square"},
 		Vector2(20, 285)
 	)
-	var distributor := _add_node(SigilGraphModel.DISTRIBUTE, {}, Vector2(180, 205))
 	var offsets := [
 		Vector2i(0, -4),
 		Vector2i(4, 0),
@@ -701,9 +694,8 @@ func _load_distribution_template() -> void:
 		Vector2(610, 230)
 	)
 	var output_id := graph.output_node_id()
-	_connect_nodes(source, 0, distributor, 0)
 	for index in branches.size():
-		_connect_nodes(distributor, index, branches[index], 0)
+		_connect_nodes(source, 0, branches[index], 0)
 		_connect_nodes(branches[index], 0, combine, index)
 	_connect_nodes(combine, 0, output_id, 0)
 	_refresh_all()
@@ -781,7 +773,6 @@ static func _error_text(error: StringName) -> String:
 		&"missing_input": "配線待ち // 入力が不足しています",
 		&"missing_output": "完成ノードがありません",
 		&"input_occupied": "入力は接続済み // 右クリックで切断",
-		&"output_occupied": "出力は使用中 // 分岐には分配ノードを使用",
 		&"cycle": "循環する配線は作れません",
 		&"invalid_direction": "出力から入力へ接続してください",
 		&"invalid_glyph": "完全重複する素材は合成できません",
