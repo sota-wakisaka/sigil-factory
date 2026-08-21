@@ -2,7 +2,7 @@
 
 Godot 4とGDScriptで開発している、シジル生産工場を中心としたゲームプロジェクトです。
 
-現在はゲーム全体の進行を先に完成させるのではなく、遊びの核となる工場とシジル編集を優先して作り込んでいます。旧来のルート選択、戦闘、報酬を含む進行実装は削除し、検証対象を工場へ絞っています。
+現在の開発対象は、遊びの核となる工場とシジル編集です。旧来のルート選択、戦闘、報酬を含む進行実装は削除しています。
 
 ## 現在の開発対象
 
@@ -15,7 +15,7 @@ Godot 4とGDScriptで開発している、シジル生産工場を中心とし�
 
 ## 仕様書
 
-- [`docs/FACTORY_PROTOTYPE.md`](docs/FACTORY_PROTOTYPE.md) — 現在のSigil Labを基礎にした次の工場プロトタイプ
+- [`docs/FACTORY_PROTOTYPE.md`](docs/FACTORY_PROTOTYPE.md) — 現在のSigil Labを基礎にした工場プロトタイプ
 - [`docs/FACTORY_SPEC.md`](docs/FACTORY_SPEC.md) — 工場設備、配線、物流、編集
 - [`docs/SIGIL_SPEC.md`](docs/SIGIL_SPEC.md) — Glyph構造、変形、合成、正規化、一致判定
 - [`docs/SIGIL_VISUAL_SPEC.md`](docs/SIGIL_VISUAL_SPEC.md) — シジルと工場の視覚仕様
@@ -44,4 +44,4 @@ Glyph・工場ドメイン:
 
 ## 開発方針
 
-工場でGlyphを作る操作自体が十分に理解でき、予測でき、見ていて満足できる状態を先に目指します。戦闘やローグライト進行との再接続は、工場の遊びが成立した後に改めて設計します。
+工場でGlyphを作る操作自体が、理解でき、予測でき、見ていて満足できることを開発方針とします。戦闘やローグライト進行は現在の仕様範囲に含めません。
