@@ -412,11 +412,11 @@ static func _draw_component(
 	var stroke := primitive_stroke_width(scale)
 	match component.primitive_id:
 		&"circle":
-			_draw_basic_outline(canvas, center, radius_x, radius_y, angle, 40, color, stroke)
+			_draw_basic_outline(canvas, center, radius_x, radius_y, 0.0, angle, 40, color, stroke)
 		&"triangle":
-			_draw_basic_outline(canvas, center, radius_x, radius_y, angle - PI * 0.5, 3, color, stroke)
+			_draw_basic_outline(canvas, center, radius_x, radius_y, -PI * 0.5, angle, 3, color, stroke)
 		&"square":
-			_draw_basic_outline(canvas, center, radius_x, radius_y, angle + PI * 0.25, 4, color, stroke)
+			_draw_basic_outline(canvas, center, radius_x, radius_y, PI * 0.25, angle, 4, color, stroke)
 		&"ring":
 			canvas.draw_arc(center, radius, angle + 0.38, angle + TAU - 0.38, 20, color, stroke, true)
 		&"spike":
@@ -454,18 +454,20 @@ static func _draw_basic_outline(
 	center: Vector2,
 	radius_x: float,
 	radius_y: float,
-	angle: float,
+	base_angle: float,
+	rotation_angle: float,
 	point_count: int,
 	color: Color,
 	stroke: float
 ) -> void:
 	var points := PackedVector2Array()
 	for index in point_count:
-		var point_angle := angle + TAU * float(index) / float(point_count)
-		points.append(center + Vector2(
+		var point_angle := base_angle + TAU * float(index) / float(point_count)
+		var local_point := Vector2(
 			cos(point_angle) * radius_x,
 			sin(point_angle) * radius_y
-		))
+		)
+		points.append(center + local_point.rotated(rotation_angle))
 	if not points.is_empty():
 		points.append(points[0])
 	canvas.draw_polyline(points, color, stroke, true)

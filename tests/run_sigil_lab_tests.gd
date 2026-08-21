@@ -255,12 +255,15 @@ func _test_lab_scene() -> void:
 			combine_id = node_id
 			break
 	_expect(combine_id != &"" and lab.graph.input_count(combine_id) == 8, "Lab Combine nodes should expose eight inputs")
-	_expect(lab.option_controls[combine_id] is OptionButton and lab.option_controls[combine_id].item_count == 2, "Lab Combine should expose radial and pairwise modes")
+	_expect(lab.option_controls[combine_id] is OptionButton and lab.option_controls[combine_id].item_count == 3, "Lab Combine should expose radial, pairwise, and line-less modes")
 	if lab.option_controls[combine_id] is OptionButton:
 		var combine_option: OptionButton = lab.option_controls[combine_id]
 		combine_option.select(1)
 		combine_option.item_selected.emit(1)
 		_expect(lab.graph.node_config(combine_id)["connection_mode"] == GlyphModel.CONNECTION_PAIRWISE, "changing the Combine option should update the graph output mode")
+		combine_option.select(2)
+		combine_option.item_selected.emit(2)
+		_expect(lab.graph.node_config(combine_id)["connection_mode"] == GlyphModel.CONNECTION_NONE, "line-less Combine should preserve reusable part geometry without connector strokes")
 	var free_rotate: StringName = lab.add_lab_node(SigilGraphModel.ROTATE, {"degrees": 120}, Vector2(40, 40))
 	_expect(lab.option_controls[free_rotate] is SpinBox, "Lab rotation should use a free-angle numeric control")
 	if lab.option_controls[free_rotate] is SpinBox:
@@ -277,12 +280,32 @@ func _test_lab_scene() -> void:
 	var output: Dictionary = lab.graph.evaluate_output()
 	_expect(output["ok"] and output["glyph"].components.size() == 2, "default eye template should combine two basic circles")
 	_expect(output["glyph"].combine_children.size() == 2, "default eye template should preserve its reusable two-part group")
+	_expect(output["glyph"].combine_connection_mode == GlyphModel.CONNECTION_NONE, "default eye part should not add automatic connector strokes")
 	var has_ellipse := false
 	for component in output["glyph"].components:
 		if component.scale_x_percent == 250 and component.scale_y_percent == 100:
 			has_ellipse = true
 	_expect(has_ellipse, "default eye template should derive its outer ellipse from a stretched circle")
 	_expect(lab.output_preview.glyph.canonical_serialization() == output["glyph"].canonical_serialization(), "large preview should show the actual graph output")
+	for part_definition in [
+		[&"eye", 2],
+		[&"wing", 3],
+		[&"fang", 1],
+		[&"claw", 3],
+	]:
+		lab.clear_workspace()
+		var part_output: StringName = lab.add_part_template(part_definition[0], Vector2(20, 80))
+		_expect(part_output != &"", "%s part should build from the current grammar" % part_definition[0])
+		_expect(lab.connect_lab_nodes(part_output, lab.graph.output_node_id()), "%s part should connect as one reusable graph output" % part_definition[0])
+		var part_result: Dictionary = lab.graph.evaluate_output()
+		_expect(part_result["ok"], "%s part should evaluate as a valid intermediate Glyph" % part_definition[0])
+		if part_result["ok"]:
+			_expect(part_result["glyph"].components.size() == part_definition[1], "%s part should contain its intended number of basic shapes" % part_definition[0])
+			for component in part_result["glyph"].components:
+				_expect(SigilGraphModel.PRIMITIVES.has(component.primitive_id), "%s part should only use circle, triangle, or square sources" % part_definition[0])
+			if part_definition[0] in [&"eye", &"wing", &"claw"]:
+				_expect(part_result["glyph"].combine_connection_mode == GlyphModel.CONNECTION_NONE, "%s part should combine without forced connector lines" % part_definition[0])
+	_expect(lab.add_part_template(&"unknown") == &"", "unknown semantic parts should be rejected without mutating the graph")
 	lab.clear_workspace()
 	await process_frame
 	_expect(lab.graph.nodes.size() == 1 and not lab.graph.evaluate_output()["ok"], "clear should retain only an empty completion node")
