@@ -842,11 +842,21 @@ func _prepare_reward_options() -> bool:
 	var baseline := factory_board.production_snapshot()
 	for button in buttons:
 		button.set_level(acquired_rewards.count(button.reward_id))
+		var prospective: Dictionary = (
+			{}
+			if button.disabled
+			else factory_board.prospective_upgrade_snapshot(button.reward_id)
+		)
 		button.set_forecast_context(
 			"" if button.disabled else _reward_forecast_summary(
 				baseline,
-				factory_board.prospective_upgrade_snapshot(button.reward_id)
+				prospective
 			)
+		)
+		button.set_forecast_visual(
+			{"valid": false}
+			if button.disabled
+			else _reward_forecast_visual(baseline, prospective)
 		)
 		var should_select: bool = not selected_available and not bool(button.disabled)
 		button.set_reward_selected(should_select)
@@ -898,6 +908,42 @@ func _reward_forecast_summary(before: Dictionary, after: Dictionary) -> String:
 	return "現在工場32秒 // " + " / ".join(entries)
 
 
+func _reward_forecast_visual(before: Dictionary, after: Dictionary) -> Dictionary:
+	var comparison := factory_board.compare_production_snapshots(before, after)
+	if comparison.get("validity", &"invalid") != &"valid":
+		return {"valid": false}
+	var fallback := {}
+	for unit_id: StringName in [&"scout", &"sentinel", &"golem"]:
+		var difference: Dictionary = comparison.get("units", {}).get(unit_id, {})
+		var recipe_id := StringName(difference.get("after_recipe_id", ""))
+		if recipe_id == &"":
+			recipe_id = StringName(difference.get("before_recipe_id", ""))
+		var glyph := _recipe_glyph(recipe_id)
+		var state := {
+			"valid": true,
+			"glyph": glyph,
+			"before": int(difference.get("before", 0)),
+			"after": int(difference.get("after", 0)),
+			"timing_changed": difference.get("timing_state", &"unchanged") != &"unchanged",
+		}
+		if int(state["before"]) > 0 or int(state["after"]) > 0:
+			fallback = state
+		if (
+			difference.get("count_state", &"unchanged") != &"unchanged"
+			or difference.get("timing_state", &"unchanged") != &"unchanged"
+			or difference.get("recipe_state", &"unchanged") != &"unchanged"
+		):
+			return state
+	return fallback if not fallback.is_empty() else {"valid": true, "before": 0, "after": 0}
+
+
+func _recipe_glyph(recipe_id: StringName) -> GlyphModel:
+	for recipe in MvpContent.recipes():
+		if recipe.id == recipe_id:
+			return recipe.glyph.copy()
+	return null
+
+
 func _select_reward(selected_button: MeaningRewardButtonControl) -> void:
 	if selected_button.disabled:
 		return
@@ -909,7 +955,7 @@ func _select_reward(selected_button: MeaningRewardButtonControl) -> void:
 func _refresh_reward_selection_context() -> void:
 	for button in reward_choices.get_children():
 		if button.button_pressed and not button.disabled:
-			phase_body.text = "次ルート以降の工場へ適用\n%s" % button.forecast_context
+			phase_body.text = "次ルート以降の工場へ適用"
 			return
 	phase_body.text = "獲得できる強化がありません"
 

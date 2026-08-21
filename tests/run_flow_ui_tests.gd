@@ -439,7 +439,9 @@ func _initialize() -> void:
 	_expect(reward_tooltip is GlyphTooltip and reward_tooltip.custom_minimum_size.x >= 300.0, "meaning reward hover should enlarge its exact Glyph instead of relying on the card thumbnail")
 	_expect("現在工場32秒" in reward_tooltip.context, "large reward Glyph tooltip should retain the current-factory forecast")
 	reward_tooltip.free()
-	_expect("現在工場32秒" in main.phase_body.text, "selected reward should expose its current-factory forecast without requiring hover")
+	_expect(main.reward_choices.get_child(0).forecast_valid and main.reward_choices.get_child(0).forecast_glyph != null, "each reward card should show the current factory output it will affect")
+	_expect(main.reward_choices.get_child(0).forecast_after >= main.reward_choices.get_child(0).forecast_before, "reward card should expose its 32-second before/after production without requiring prose")
+	_expect("現在工場32秒" not in main.phase_body.text, "reward result numbers should move from permanent prose onto each meaning card")
 	var reward_summary_before := {
 		"ok": true, "horizon_ticks": 160,
 		"counts": {&"scout": 2},
@@ -454,7 +456,7 @@ func _initialize() -> void:
 	_expect("不一致 0→2" in main._reward_forecast_summary(reward_summary_before, reward_summary_after), "reward forecast should disclose discard-only changes")
 	_expect(main.reward_choices.get_child(0).button_pressed, "reward phase should begin with one explicit selection")
 	main.reward_choices.get_child(1).pressed.emit()
-	_expect(main.reward_choices.get_child(1).button_pressed and main.phase_body.text.ends_with(main.reward_choices.get_child(1).forecast_context), "changing reward selection should update the visible forecast")
+	_expect(main.reward_choices.get_child(1).button_pressed and main.phase_body.text == "次ルート以降の工場へ適用", "changing reward selection should keep the permanent instruction compact")
 	main.reward_choices.get_child(0).pressed.emit()
 	_expect(main.reward_choices.get_child(0).level == 0 and not main.reward_choices.get_child(0).disabled, "an unowned meaning reward should show an empty three-step register")
 	var first_reward = main.reward_choices.get_child(0)
