@@ -2,6 +2,7 @@ extends SceneTree
 
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
+const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 const GlyphProductionContextModel := preload("res://src/domain/glyph_production_context.gd")
 const SigilMatcher := preload("res://src/domain/sigil_matcher.gd")
 const SigilRecipeModel := preload("res://src/domain/sigil_recipe.gd")
@@ -42,6 +43,7 @@ func _initialize() -> void:
 	_test_combined_move_transforms_structure_center()
 	_test_transform_history_folds_into_final_state()
 	_test_complete_overlap_is_rejected()
+	_test_meaning_glyph_library_is_owned_and_valid()
 	_test_factory_tick_prevents_same_tick_multistage_processing()
 	_test_factory_tick_uses_starting_input_availability()
 	_test_factory_tick_does_not_refill_freed_line()
@@ -557,6 +559,32 @@ func _test_complete_overlap_is_rejected() -> void:
 		"完全重複" in result["diagnostics"][0],
 		"fully overlapping primitives should report a direct diagnostic"
 	)
+
+
+func _test_meaning_glyph_library_is_owned_and_valid() -> void:
+	_expect(MeaningGlyphsModel.IDS.size() == 5, "shared meaning Glyphs should expose the five accepted marks")
+	var first_eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
+	var second_eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
+	_expect(first_eye != null and second_eye != null, "shared meaning Glyph lookup should return authored copies")
+	if first_eye != null and second_eye != null:
+		var untouched := second_eye.canonical_serialization()
+		first_eye.components[0].position = Vector2(9, 9)
+		_expect(
+			second_eye.canonical_serialization() == untouched,
+			"meaning Glyph callers should not share mutable component state"
+		)
+	var seen: Dictionary = {}
+	for glyph_id in MeaningGlyphsModel.IDS:
+		var glyph := MeaningGlyphsModel.glyph(glyph_id)
+		_expect(glyph != null, "%s should be available to product content" % glyph_id)
+		if glyph == null:
+			continue
+		_expect(glyph.structure_validation_errors().is_empty(), "%s should be structurally valid" % glyph_id)
+		_expect(glyph.combine_connection_mode == GlyphModel.CONNECTION_SIMPLE, "%s should keep line-free grouping" % glyph_id)
+		var serialization := glyph.canonical_serialization()
+		_expect(not seen.has(serialization), "%s should remain canonically distinct" % glyph_id)
+		seen[serialization] = true
+	_expect(MeaningGlyphsModel.glyph(&"unknown") == null, "unknown meaning Glyph IDs should fail closed")
 
 
 func _test_factory_tick_prevents_same_tick_multistage_processing() -> void:
