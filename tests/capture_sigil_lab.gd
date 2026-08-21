@@ -24,6 +24,8 @@ func _initialize() -> void:
 		_build_coincident_child_fixture(lab)
 	elif fixture == "triangle":
 		_build_triangle_fixture(lab)
+	elif fixture == "transform_order":
+		_build_transform_order_fixture(lab)
 	elif fixture == "repeat":
 		lab.load_repeat_template()
 	elif fixture == "distribution":
@@ -101,6 +103,29 @@ func _build_triangle_fixture(lab) -> void:
 		lab.connect_lab_nodes(move, rotate)
 		lab.connect_lab_nodes(rotate, combine, input_index)
 	lab.connect_lab_nodes(combine, output_id)
+
+
+func _build_transform_order_fixture(lab) -> void:
+	lab.clear_workspace()
+	var square: StringName = lab.add_lab_node(
+		SigilGraphModel.SOURCE,
+		{"primitive_id": &"square"},
+		Vector2(90, 250)
+	)
+	var stretch: StringName = lab.add_lab_node(
+		SigilGraphModel.SCALE,
+		{"x_percent": 200, "y_percent": 100},
+		Vector2(300, 250)
+	)
+	var rotate: StringName = lab.add_lab_node(
+		SigilGraphModel.ROTATE,
+		{"degrees": 45},
+		Vector2(540, 250)
+	)
+	var output_id: StringName = lab.graph.output_node_id()
+	lab.connect_lab_nodes(square, stretch)
+	lab.connect_lab_nodes(stretch, rotate)
+	lab.connect_lab_nodes(rotate, output_id)
 
 
 func _user_options() -> Dictionary:

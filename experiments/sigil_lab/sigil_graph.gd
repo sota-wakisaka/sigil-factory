@@ -269,14 +269,14 @@ func _apply_node(kind: StringName, config: Dictionary, inputs: Array) -> Diction
 	var glyph: GlyphModel
 	match kind:
 		ROTATE:
-			glyph = inputs[0].copy()
-			glyph.rotate_degrees(int(config["degrees"]))
+			glyph = inputs[0].rotated_degrees(int(config["degrees"]))
 		MOVE:
-			glyph = inputs[0].copy()
-			glyph.translate(config["offset"])
+			glyph = inputs[0].translated(config["offset"])
 		SCALE:
-			glyph = inputs[0].copy()
-			glyph.stretch_percent(int(config["x_percent"]), int(config["y_percent"]))
+			glyph = inputs[0].stretched_percent(
+				int(config["x_percent"]),
+				int(config["y_percent"])
+			)
 		REPEAT:
 			glyph = GlyphModel.radial_repeat(inputs[0], int(config["count"]))
 			if glyph == null:

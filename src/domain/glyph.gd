@@ -80,13 +80,21 @@ static func radial_repeat(glyph: GlyphModel, count: int) -> GlyphModel:
 		return null
 	if 360 % count != 0:
 		return null
-	var copies: Array = []
+	var unique_copies: Array = []
+	var seen_serializations: Dictionary = {}
 	var angle_step := int(360 / count)
 	for index in count:
-		var copy := glyph.copy()
-		copy.rotate_degrees(index * angle_step)
-		copies.append(copy)
-	return combine_many(copies, CONNECTION_NONE)
+		var repeated := glyph.rotated_degrees(index * angle_step)
+		var serialization := repeated.canonical_serialization()
+		if seen_serializations.has(serialization):
+			continue
+		seen_serializations[serialization] = true
+		unique_copies.append(repeated)
+	# A rotationally symmetric Glyph is a valid no-op repeat. Keep one canonical
+	# copy instead of manufacturing an invalid group of identical components.
+	if unique_copies.size() == 1:
+		return unique_copies[0]
+	return combine_many(unique_copies, CONNECTION_NONE)
 
 
 func canonical_keys() -> Array[String]:
@@ -270,6 +278,12 @@ func rotate_degrees(degrees: int) -> void:
 		child.rotate_degrees(normalized_degrees)
 
 
+func rotated_degrees(degrees: int) -> GlyphModel:
+	var result := copy()
+	result.rotate_degrees(degrees)
+	return result
+
+
 func _rotate_position(position: Vector2, steps: int) -> Vector2:
 	match posmod(steps, 4):
 		1:
@@ -296,6 +310,12 @@ func translate(offset: Vector2i) -> void:
 		child.translate(offset)
 
 
+func translated(offset: Vector2i) -> GlyphModel:
+	var result := copy()
+	result.translate(offset)
+	return result
+
+
 func stretch_percent(x_percent: int, y_percent: int) -> void:
 	var factors := Vector2(float(x_percent) / 100.0, float(y_percent) / 100.0)
 	if not combine_children.is_empty():
@@ -305,6 +325,12 @@ func stretch_percent(x_percent: int, y_percent: int) -> void:
 		component.stretch_percent(x_percent, y_percent)
 	for child in combine_children:
 		child.stretch_percent(x_percent, y_percent)
+
+
+func stretched_percent(x_percent: int, y_percent: int) -> GlyphModel:
+	var result := copy()
+	result.stretch_percent(x_percent, y_percent)
+	return result
 
 
 func recolor(color_id: StringName) -> void:

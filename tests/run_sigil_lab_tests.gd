@@ -11,6 +11,7 @@ var failures := 0
 func _initialize() -> void:
 	_test_graph_evaluation()
 	_test_basic_primitives_and_stretch()
+	_test_pure_transform_composition()
 	_test_radial_repeat()
 	_test_direct_output_distribution()
 	_test_eight_way_combine()
@@ -63,6 +64,52 @@ func _test_basic_primitives_and_stretch() -> void:
 		_expect("|a250,75" in component.canonical_key(), "anisotropic scale should be part of matching identity")
 
 
+func _test_pure_transform_composition() -> void:
+	var source := GlyphModel.new([GlyphComponentModel.new(&"square")])
+	var stretched := source.stretched_percent(200, 100)
+	var rotated := stretched.rotated_degrees(45)
+	var source_component: GlyphComponentModel = source.components[0]
+	var stretched_component: GlyphComponentModel = stretched.components[0]
+	var rotated_component: GlyphComponentModel = rotated.components[0]
+	_expect(
+		source_component.scale_x_percent == 100
+		and source_component.scale_y_percent == 100
+		and source_component.rotation_degrees == 0,
+		"a transform should not mutate its input Glyph"
+	)
+	_expect(
+		stretched_component.scale_x_percent == 200
+		and stretched_component.scale_y_percent == 100
+		and stretched_component.rotation_degrees == 0,
+		"stretch should return a new anisotropic Glyph before rotation"
+	)
+	_expect(
+		rotated_component.scale_x_percent == 200
+		and rotated_component.scale_y_percent == 100
+		and rotated_component.rotation_degrees == 45,
+		"rotation should preserve the stretched rectangle and rotate it as a whole"
+	)
+	_expect(
+		source.canonical_serialization() != stretched.canonical_serialization()
+		and stretched.canonical_serialization() != rotated.canonical_serialization(),
+		"each pure transform stage should produce its own canonical Glyph data"
+	)
+	var rectangle_points := GlyphPainterModel.basic_outline_points(
+		Vector2.ZERO,
+		10.0,
+		5.0,
+		PI * 0.25,
+		PI * 0.25,
+		4
+	)
+	var long_edge := rectangle_points[0].distance_to(rectangle_points[1])
+	var short_edge := rectangle_points[1].distance_to(rectangle_points[2])
+	_expect(
+		long_edge > short_edge * 1.9,
+		"drawing should stretch the square into a rectangle before rotating the complete outline"
+	)
+
+
 func _test_radial_repeat() -> void:
 	var graph = SigilGraphModel.new()
 	graph.add_node(&"triangle", SigilGraphModel.SOURCE, {"primitive_id": &"triangle"})
@@ -92,7 +139,27 @@ func _test_radial_repeat() -> void:
 	centered.add_node(&"output", SigilGraphModel.OUTPUT)
 	centered.connect_nodes(&"circle", 0, &"repeat", 0)
 	centered.connect_nodes(&"repeat", 0, &"output", 0)
-	_expect(not centered.evaluate_output()["ok"], "rotationally identical copies at the center should be rejected instead of overdrawn")
+	var centered_result := centered.evaluate_output()
+	_expect(centered_result["ok"], "rotationally identical centered copies should normalize to a valid no-op")
+	if centered_result["ok"]:
+		_expect(centered_result["glyph"].components.size() == 1, "a no-op repeat should keep one visible component")
+		_expect(centered_result["glyph"].combine_children.is_empty(), "a no-op repeat should not invent an invisible Combine layer")
+
+	var rectangle := GlyphModel.new([GlyphComponentModel.new(
+		&"square",
+		Vector2.ZERO,
+		0,
+		1,
+		&"white",
+		0,
+		200,
+		100
+	)])
+	var repeated_rectangle := GlyphModel.radial_repeat(rectangle, 4)
+	_expect(repeated_rectangle != null, "a centered anisotropic rectangle should support rotational repeat")
+	if repeated_rectangle != null:
+		_expect(repeated_rectangle.components.size() == 2, "repeat should retain only the two distinct crossed rectangle orientations")
+		_expect(repeated_rectangle.structure_validation_errors().is_empty(), "normalized repeated orientations should remain structurally valid")
 
 
 func _test_direct_output_distribution() -> void:
