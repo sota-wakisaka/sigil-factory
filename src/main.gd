@@ -177,6 +177,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		factory_board.cancel_pending_connection()
 	elif event.keycode == KEY_DELETE:
 		_delete_factory_node()
+	elif event.keycode == KEY_SPACE and defeat_active:
+		_advance_overlay()
 	elif event.keycode == KEY_SPACE and flow.phase in [RunFlow.Phase.FACTORY_BUILD, RunFlow.Phase.BATTLE, RunFlow.Phase.FACTORY_RECONFIGURE]:
 		_on_main_action()
 	elif event.keycode == KEY_F:
@@ -215,6 +217,8 @@ func _advance_overlay() -> void:
 
 
 func _on_main_action() -> void:
+	if defeat_active:
+		return
 	if flow.phase == RunFlow.Phase.FACTORY_BUILD:
 		if not _factory_is_valid("戦闘を開始できません"):
 			return
@@ -690,7 +694,7 @@ func current_battle_speed() -> float:
 
 
 func _cycle_battle_speed() -> void:
-	if flow.phase != RunFlow.Phase.BATTLE:
+	if flow.phase != RunFlow.Phase.BATTLE or defeat_active:
 		return
 	battle_speed_index = (battle_speed_index + 1) % BATTLE_SPEEDS.size()
 	_update_speed_button()

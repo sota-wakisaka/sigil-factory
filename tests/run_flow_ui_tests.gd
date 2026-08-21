@@ -522,6 +522,10 @@ func _initialize() -> void:
 	main.produced_units = {&"scout": 20, &"sentinel": 5, &"golem": 0}
 	_expect("巨像0" in main._defeat_advice(), "missing armor counter should be identified explicitly")
 	_expect(main.phase_button.text == "工場を再構築", "defeat summary should expose one central retry action")
+	var defeated_speed: float = main.current_battle_speed()
+	main._cycle_battle_speed()
+	main._on_main_action()
+	_expect(main.current_battle_speed() == defeated_speed and main.defeat_active, "defeat overlay should block stale battle speed and time-stop actions")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "retry should return to factory build")
 
