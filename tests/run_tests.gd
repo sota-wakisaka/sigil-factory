@@ -80,6 +80,7 @@ func _initialize() -> void:
 	_test_factory_validation_order_is_stable()
 	_test_factory_flow_diagnostics_distinguish_blockages()
 	_test_mvp_plans_produce_expected_units()
+	_test_mvp_routes_have_distinct_valid_schedules()
 	_test_empty_factory_requires_player_wiring()
 	_test_battle_units_fight_and_die()
 	_test_preferred_attack_marks_weakness_feedback()
@@ -1720,6 +1721,29 @@ func _test_mvp_plans_produce_expected_units() -> void:
 			produced_expected_unit,
 			"MVP plan %s should produce %s" % [plan_id, expected_unit]
 		)
+
+
+func _test_mvp_routes_have_distinct_valid_schedules() -> void:
+	var signatures: Dictionary = {}
+	for route_id in MvpContent.ROUTE_IDS:
+		var schedule := MvpContent.threat_schedule(route_id)
+		_expect(not schedule.is_empty(), "%s should provide a battle schedule" % route_id)
+		var previous_tick := -1
+		var unit_counts: Dictionary = {}
+		for event in schedule:
+			_expect(event.tick >= previous_tick, "%s threats should stay ordered" % route_id)
+			_expect(event.tick <= 900, "%s threats should fit the three-minute encounter" % route_id)
+			previous_tick = event.tick
+			unit_counts[event.unit_id] = int(unit_counts.get(event.unit_id, 0)) + event.count
+		var signature := JSON.stringify(unit_counts)
+		_expect(not signatures.has(signature), "%s should change the encountered enemy mix" % route_id)
+		signatures[signature] = route_id
+		var battle := MvpContent.build_battle(route_id)
+		_expect(battle.schedule.size() == schedule.size(), "%s should reach the battle simulation unchanged" % route_id)
+	_expect(
+		MvpContent.threat_schedule(&"unknown").size() == MvpContent.threat_schedule(MvpContent.ROUTE_MIXED).size(),
+		"unknown routes should fail safely to the mixed encounter"
+	)
 
 
 func _test_empty_factory_requires_player_wiring() -> void:

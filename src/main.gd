@@ -58,7 +58,8 @@ var battle_speed_index := 0
 var time_stop_count := 0
 var factory_change_count := 0
 var acquired_rewards: Array[StringName] = []
-var selected_route_name := "中央ルート"
+var selected_route_id: StringName = MvpContent.ROUTE_MIXED
+var selected_route_name := MvpContent.route_name(MvpContent.ROUTE_MIXED)
 var produced_units: Dictionary = {&"scout": 0, &"sentinel": 0, &"golem": 0}
 var pre_edit_production_snapshot: Dictionary = {}
 var last_factory_change_summary := ""
@@ -183,7 +184,8 @@ func _draw() -> void:
 
 func _advance_overlay() -> void:
 	if flow.phase == RunFlow.Phase.ROUTE_SELECTION:
-		selected_route_name = route_option.get_item_text(route_option.selected)
+		selected_route_id = route_option.get_item_metadata(route_option.selected)
+		selected_route_name = MvpContent.route_name(selected_route_id)
 	if flow.phase == RunFlow.Phase.REWARD:
 		_acquire_selected_reward()
 	if not flow.advance():
@@ -555,7 +557,7 @@ func _enter_victory() -> void:
 
 
 func _reset_stage() -> void:
-	battle_board.reset_battle()
+	battle_board.reset_battle(selected_route_id)
 	factory_board.set_run_upgrades(acquired_rewards)
 	factory_board.configure(MvpContent.PLAN_EMPTY)
 	produced_units = {&"scout": 0, &"sentinel": 0, &"golem": 0}
@@ -595,7 +597,7 @@ func _apply_phase() -> void:
 			_show_overlay(
 				"STAGE PREVIEW",
 				"ステージ情報を確認",
-				"%s // 通常戦闘 // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n0:20 襲撃兵 → 斥候  |  1:00 群体兵 → 衛兵  |  1:54 装甲兵 → 巨像" % selected_route_name,
+				"%s // 制限時間 3:00 // 目標: 敵防壁と敵リーダーを撃破\n%s" % [selected_route_name, MvpContent.route_description(selected_route_id)],
 				"OK：工場構築へ"
 			)
 		RunFlow.Phase.FACTORY_BUILD:
@@ -664,9 +666,12 @@ func _select_reward(selected_button: MeaningRewardButtonControl) -> void:
 
 func _prepare_route_options() -> void:
 	route_option.clear()
-	route_option.add_item("左ルート // シジル報酬傾向（仮）")
-	route_option.add_item("中央ルート // リリック報酬傾向（仮）")
-	route_option.add_item("右ルート // 能力報酬傾向（仮）")
+	route_option.add_item("群体の道 // 数で押す敵編成")
+	route_option.set_item_metadata(0, MvpContent.ROUTE_SWARM)
+	route_option.add_item("混成の道 // 3兵種が順に出現")
+	route_option.set_item_metadata(1, MvpContent.ROUTE_MIXED)
+	route_option.add_item("装甲の道 // 高耐久中心の敵編成")
+	route_option.set_item_metadata(2, MvpContent.ROUTE_ARMORED)
 	route_option.select(1)
 	route_option.visible = true
 

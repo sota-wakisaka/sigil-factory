@@ -16,13 +16,17 @@ const PLAN_SENTINEL := &"sentinel"
 const PLAN_GOLEM := &"golem"
 const PLAN_EMPTY := &"empty"
 const FACTORY_MANA_MAX := 100
+const ROUTE_SWARM := &"swarm_route"
+const ROUTE_MIXED := &"mixed_route"
+const ROUTE_ARMORED := &"armored_route"
+const ROUTE_IDS := [ROUTE_SWARM, ROUTE_MIXED, ROUTE_ARMORED]
 
 
-static func build_battle() -> BattleSimulation:
+static func build_battle(route_id: StringName = ROUTE_MIXED) -> BattleSimulation:
 	var battle := BattleSimulation.new()
 	for spec in unit_specs():
 		battle.add_spec(spec)
-	battle.set_schedule(threat_schedule())
+	battle.set_schedule(threat_schedule(route_id))
 	return battle
 
 
@@ -37,7 +41,16 @@ static func unit_specs() -> Array[UnitSpecModel]:
 	]
 
 
-static func threat_schedule() -> Array[ThreatEventModel]:
+static func threat_schedule(route_id: StringName = ROUTE_MIXED) -> Array[ThreatEventModel]:
+	match route_id:
+		ROUTE_SWARM:
+			return _swarm_route_schedule()
+		ROUTE_ARMORED:
+			return _armored_route_schedule()
+	return _mixed_route_schedule()
+
+
+static func _mixed_route_schedule() -> Array[ThreatEventModel]:
 	var events: Array[ThreatEventModel] = []
 	# One battle tick represents 0.2 seconds. A standard encounter lasts three minutes.
 	for tick in range(100, 300, 30):
@@ -46,10 +59,52 @@ static func threat_schedule() -> Array[ThreatEventModel]:
 		events.append(ThreatEventModel.new(tick, &"swarm", 4, "群体兵", &"center", tick == 300))
 	for tick in range(570, 780, 42):
 		events.append(ThreatEventModel.new(tick, &"brute", 1, "装甲兵", &"center", tick == 570))
-	for tick in range(780, 901, 30):
+	for tick in range(780, 893, 30):
 		events.append(ThreatEventModel.new(tick, &"brute", 1, "最終装甲兵", &"center", tick == 780))
 		events.append(ThreatEventModel.new(tick + 8, &"swarm", 5, "最終群体兵"))
 	return events
+
+
+static func _swarm_route_schedule() -> Array[ThreatEventModel]:
+	var events: Array[ThreatEventModel] = []
+	for tick in range(100, 280, 30):
+		events.append(ThreatEventModel.new(tick, &"raider", 1, "襲撃兵"))
+	for tick in range(280, 700, 30):
+		events.append(ThreatEventModel.new(tick, &"swarm", 4, "群体兵", &"center", tick == 280))
+	for tick in range(700, 901, 30):
+		events.append(ThreatEventModel.new(tick, &"swarm", 5, "最終群体兵", &"center", tick == 700))
+		if tick % 60 == 40:
+			events.append(ThreatEventModel.new(tick + 8, &"brute", 1, "護衛装甲兵"))
+	return events
+
+
+static func _armored_route_schedule() -> Array[ThreatEventModel]:
+	var events: Array[ThreatEventModel] = []
+	for tick in range(100, 280, 30):
+		events.append(ThreatEventModel.new(tick, &"raider", 1, "襲撃兵"))
+	for tick in range(280, 460, 45):
+		events.append(ThreatEventModel.new(tick, &"swarm", 3, "群体兵", &"center", tick == 280))
+	for tick in range(460, 901, 34):
+		events.append(ThreatEventModel.new(tick, &"brute", 1, "装甲兵", &"center", tick == 460))
+	return events
+
+
+static func route_name(route_id: StringName) -> String:
+	match route_id:
+		ROUTE_SWARM:
+			return "群体の道"
+		ROUTE_ARMORED:
+			return "装甲の道"
+	return "混成の道"
+
+
+static func route_description(route_id: StringName) -> String:
+	match route_id:
+		ROUTE_SWARM:
+			return "群体中心 // 0:56から長い群体波"
+		ROUTE_ARMORED:
+			return "装甲中心 // 1:32から装甲波"
+	return "混成 // 0:20 襲撃 → 1:00 群体 → 1:54 装甲"
 
 
 static func build_factory(plan_id: StringName) -> FactorySimulation:

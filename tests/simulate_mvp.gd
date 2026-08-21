@@ -4,19 +4,31 @@ const MvpContent := preload("res://src/game/mvp_content.gd")
 
 
 func _initialize() -> void:
-	var adaptive := _run_strategy("adaptive", [
+	var adaptive := _run_strategy("mixed_adaptive", [
 		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
 		{"tick": 250, "plan": MvpContent.PLAN_SENTINEL},
 		{"tick": 530, "plan": MvpContent.PLAN_GOLEM},
-	])
+	], MvpContent.ROUTE_MIXED)
+	var swarm_adaptive := _run_strategy("swarm_adaptive", [
+		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
+		{"tick": 235, "plan": MvpContent.PLAN_SENTINEL},
+		{"tick": 690, "plan": MvpContent.PLAN_GOLEM},
+	], MvpContent.ROUTE_SWARM)
+	var armored_adaptive := _run_strategy("armored_adaptive", [
+		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
+		{"tick": 235, "plan": MvpContent.PLAN_SENTINEL},
+		{"tick": 430, "plan": MvpContent.PLAN_GOLEM},
+	], MvpContent.ROUTE_ARMORED)
 	var scout_only := _run_strategy("scout_only", [
 		{"tick": 0, "plan": MvpContent.PLAN_SCOUT},
-	])
+	], MvpContent.ROUTE_MIXED)
 	var golem_only := _run_strategy("golem_only", [
 		{"tick": 0, "plan": MvpContent.PLAN_GOLEM},
-	])
+	], MvpContent.ROUTE_MIXED)
 	var passed: bool = (
 		adaptive["winner"] == BattleSimulation.Side.PLAYER
+		and swarm_adaptive["winner"] == BattleSimulation.Side.PLAYER
+		and armored_adaptive["winner"] == BattleSimulation.Side.PLAYER
 		and scout_only["winner"] != BattleSimulation.Side.PLAYER
 		and golem_only["winner"] != BattleSimulation.Side.PLAYER
 	)
@@ -27,8 +39,12 @@ func _initialize() -> void:
 	quit(0 if passed else 1)
 
 
-func _run_strategy(label: String, changes: Array[Dictionary]) -> Dictionary:
-	var battle := MvpContent.build_battle()
+func _run_strategy(
+	label: String,
+	changes: Array[Dictionary],
+	route_id: StringName
+) -> Dictionary:
+	var battle := MvpContent.build_battle(route_id)
 	var factory: FactorySimulation
 	var event_index := 0
 	var change_index := 0

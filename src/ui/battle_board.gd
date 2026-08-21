@@ -13,14 +13,16 @@ const ENEMY_COLOR := Color(1.0, 0.34, 0.42, 1.0)
 
 var simulation: BattleSimulation
 var finish_emitted := false
+var route_id: StringName = MvpContent.ROUTE_MIXED
 
 
 func _ready() -> void:
 	reset_battle()
 
 
-func reset_battle() -> void:
-	simulation = MvpContent.build_battle()
+func reset_battle(next_route_id: StringName = MvpContent.ROUTE_MIXED) -> void:
+	route_id = next_route_id if next_route_id in MvpContent.ROUTE_IDS else MvpContent.ROUTE_MIXED
+	simulation = MvpContent.build_battle(route_id)
 	finish_emitted = false
 	queue_redraw()
 
@@ -86,15 +88,10 @@ func major_change_text(
 func wave_status_text() -> String:
 	if simulation == null:
 		return "待機中"
-	if simulation.tick_index < 100:
-		return "前線形成"
-	if simulation.tick_index < 300:
-		return "第1波 // 襲撃兵"
-	if simulation.tick_index < 570:
-		return "第2波 // 群体兵"
-	if simulation.tick_index < 780:
-		return "第3波 // 装甲兵"
-	return "最終攻勢 // 防壁・敵リーダー"
+	var upcoming := simulation.upcoming_threats(120)
+	if upcoming.is_empty():
+		return "%s // 前線整理" % MvpContent.route_name(route_id)
+	return "%s // %s" % [MvpContent.route_name(route_id), upcoming[0].label]
 
 
 func capacity_status_text() -> String:
