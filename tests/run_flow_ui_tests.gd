@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_expect(main.get_node("Toolbar/EmptyButton").glyph != null, "manual plan button should show its target CanonicalGlyph")
 	_expect(main.get_node("Toolbar/EmptyButton").mode_badge_kind() == &"manual_wiring", "manual workshop should carry a wiring badge in addition to its shared target Glyph")
 	_expect(main.get_node("Toolbar/ScoutButton").mode_badge_kind() == &"template", "completed factory choice should remain visually distinct from manual wiring")
+	_expect(main.get_node("Toolbar/StarButton").glyph.canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR).canonical_serialization(), "alternate Star Sentinel should be available as a visible meaning-sigil template")
 	var manual_plan_tooltip = main.get_node("Toolbar/EmptyButton")._make_custom_tooltip("")
 	_expect("自分で最初の配線" in manual_plan_tooltip.context, "manual plan Glyph tooltip should retain its wiring purpose")
 	_expect(manual_plan_tooltip.context_lines().size() >= 2, "long plan purpose should wrap instead of clipping at the tooltip edge")

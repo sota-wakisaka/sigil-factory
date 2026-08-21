@@ -81,6 +81,7 @@ func _ready() -> void:
 	$Toolbar/ScoutButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_SCOUT))
 	$Toolbar/EmptyButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_EMPTY))
 	$Toolbar/SentinelButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_VIGIL))
+	$Toolbar/StarButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_STELLAR))
 	$Toolbar/GolemButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_FORTRESS))
 	$FactoryPalette/RingButton.pressed.connect(func() -> void: _add_factory_node(&"ring_source"))
 	$FactoryPalette/SpikeButton.pressed.connect(func() -> void: _add_factory_node(&"spike_source"))
@@ -179,7 +180,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			KEY_0: _select_plan(MvpContent.PLAN_EMPTY)
 			KEY_1: _select_plan(MvpContent.PLAN_SCOUT)
 			KEY_2: _select_plan(MvpContent.PLAN_VIGIL)
-			KEY_3: _select_plan(MvpContent.PLAN_FORTRESS)
+			KEY_3: _select_plan(MvpContent.PLAN_STELLAR)
+			KEY_4: _select_plan(MvpContent.PLAN_FORTRESS)
 
 
 func _draw() -> void:
@@ -272,7 +274,7 @@ func _select_plan(plan_id: StringName) -> void:
 func _sync_plan_ui(plan_id: StringName) -> void:
 	sigil_ghost.show_recipe(MvpContent.recipe_id_for_plan(plan_id))
 	_refresh_factory_goal_tools()
-	for button in [$Toolbar/EmptyButton, $Toolbar/ScoutButton, $Toolbar/SentinelButton, $Toolbar/GolemButton]:
+	for button in [$Toolbar/EmptyButton, $Toolbar/ScoutButton, $Toolbar/SentinelButton, $Toolbar/StarButton, $Toolbar/GolemButton]:
 		button.set_plan_selected(button.plan_id == plan_id)
 	_refresh_factory_goal_candidate()
 

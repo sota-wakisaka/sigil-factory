@@ -1822,6 +1822,7 @@ func _test_mvp_plans_produce_expected_units() -> void:
 		MvpContent.PLAN_SCOUT: "目の斥候",
 		MvpContent.PLAN_SENTINEL: "蒼環の衛兵",
 		MvpContent.PLAN_VIGIL: "警戒十字の衛兵",
+		MvpContent.PLAN_STELLAR: "星印の衛兵",
 		MvpContent.PLAN_GOLEM: "結合の巨像",
 		MvpContent.PLAN_FORTRESS: "要塞方位の巨像",
 	}
@@ -1829,6 +1830,7 @@ func _test_mvp_plans_produce_expected_units() -> void:
 		MvpContent.PLAN_SCOUT: &"scout",
 		MvpContent.PLAN_SENTINEL: &"sentinel",
 		MvpContent.PLAN_VIGIL: &"sentinel",
+		MvpContent.PLAN_STELLAR: &"sentinel",
 		MvpContent.PLAN_GOLEM: &"golem",
 		MvpContent.PLAN_FORTRESS: &"golem",
 	}

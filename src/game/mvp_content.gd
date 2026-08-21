@@ -15,6 +15,7 @@ const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
 const PLAN_SCOUT := &"scout"
 const PLAN_SENTINEL := &"sentinel"
 const PLAN_VIGIL := &"vigil"
+const PLAN_STELLAR := &"stellar"
 const PLAN_GOLEM := &"golem"
 const PLAN_FORTRESS := &"fortress"
 const PLAN_EMPTY := &"empty"
@@ -144,6 +145,8 @@ static func build_factory(plan_id: StringName) -> FactorySimulation:
 			_build_sentinel_factory(simulation)
 		PLAN_VIGIL:
 			_build_vigil_factory(simulation)
+		PLAN_STELLAR:
+			_build_stellar_factory(simulation)
 		PLAN_GOLEM:
 			_build_golem_factory(simulation)
 		PLAN_FORTRESS:
@@ -247,6 +250,11 @@ static func layout_for_plan(plan_id: StringName) -> Dictionary:
 				&"combiner": Vector2(260, 195),
 				&"summoner": Vector2(410, 195),
 			}
+		PLAN_STELLAR:
+			return {
+				&"star_source": Vector2(105, 195),
+				&"summoner": Vector2(410, 195),
+			}
 		PLAN_GOLEM:
 			return {
 				&"ring_source": Vector2(70, 70),
@@ -277,6 +285,8 @@ static func plan_name(plan_id: StringName) -> String:
 			return "蒼環の衛兵"
 		PLAN_VIGIL:
 			return "警戒十字の衛兵"
+		PLAN_STELLAR:
+			return "星印の衛兵"
 		PLAN_GOLEM:
 			return "結合の巨像"
 		PLAN_FORTRESS:
@@ -293,6 +303,8 @@ static func plan_description(plan_id: StringName) -> String:
 			return "対群体 // 3体同時攻撃・中速"
 		PLAN_VIGIL:
 			return "目＋十字 // 単純結合で対群体衛兵を生産"
+		PLAN_STELLAR:
+			return "星 // 少ない魔力で対群体衛兵を生産"
 		PLAN_GOLEM:
 			return "対装甲 // 高耐久・低速・長工程"
 		PLAN_FORTRESS:
@@ -345,6 +357,8 @@ static func recipe_id_for_plan(plan_id: StringName) -> StringName:
 			return &"azure_guard"
 		PLAN_VIGIL:
 			return &"vigil_cross"
+		PLAN_STELLAR:
+			return &"stellar_sentinel"
 		PLAN_GOLEM:
 			return &"bound_colossus"
 		PLAN_FORTRESS:
@@ -440,6 +454,12 @@ static func _build_vigil_factory(simulation: FactorySimulation) -> void:
 	simulation.connect_nodes(FactoryLineModel.new(&"line_eye", &"eye_source", &"combiner", 0, 2))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_cross", &"cross_source", &"combiner", 1, 2))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_summon", &"combiner", &"summoner", 0, 2))
+
+
+static func _build_stellar_factory(simulation: FactorySimulation) -> void:
+	simulation.add_node(_meaning_source(&"star_source", MeaningGlyphsModel.STAR, source_interval_for_glyph(MeaningGlyphsModel.STAR)))
+	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
+	simulation.connect_nodes(FactoryLineModel.new(&"line_1", &"star_source", &"summoner", 0, 3))
 
 
 static func _build_golem_factory(simulation: FactorySimulation) -> void:
