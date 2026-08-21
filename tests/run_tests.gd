@@ -87,6 +87,7 @@ func _initialize() -> void:
 	_test_battle_units_fight_and_die()
 	_test_recipe_combat_variant_preserves_sigil_identity()
 	_test_battle_attributes_damage_to_sigil_recipe()
+	_test_battle_units_expose_their_sigil_origin()
 	_test_preferred_attack_marks_weakness_feedback()
 	_test_enemy_shield_takes_damage_and_opens()
 	_test_battle_ends_at_time_limit()
@@ -1964,6 +1965,26 @@ func _test_battle_attributes_damage_to_sigil_recipe() -> void:
 		not battle.player_damage_by_recipe.has(&""),
 		"unattributed enemy attacks should not create a blank recipe bucket"
 	)
+
+
+func _test_battle_units_expose_their_sigil_origin() -> void:
+	var board := BattleBoard.new()
+	board.size = Vector2(1196, 401)
+	board.reset_battle()
+	board.spawn_player(&"sentinel", &"stellar_sentinel")
+	var stellar_unit: BattleUnitModel = board.simulation.units[0]
+	var center := board.unit_center(stellar_unit)
+	_expect(board.unit_at(center) == stellar_unit, "battle units should expose a stable hover target")
+	_expect(board._get_tooltip(center) == "battle_unit_glyph", "player units should open a visual producing-sigil tooltip")
+	_expect(
+		board.tooltip_glyph.canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR).canonical_serialization()
+		and "高速・強打・2体攻撃" in board.tooltip_context,
+		"battle unit inspection should preserve the exact source sigil and combat role"
+	)
+	var tooltip = board._make_custom_tooltip("battle_unit_glyph")
+	_expect(tooltip is GlyphTooltipModel, "battle unit origin should reuse the readable large Glyph tooltip")
+	tooltip.free()
+	board.free()
 
 
 func _test_preferred_attack_marks_weakness_feedback() -> void:

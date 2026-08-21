@@ -5,6 +5,7 @@ signal battle_finished(winner: int)
 
 const MvpContent := preload("res://src/game/mvp_content.gd")
 const BattleSimulation := preload("res://src/battle/battle_simulation.gd")
+const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 
 const PANEL_COLOR := Color(0.055, 0.035, 0.06, 0.96)
 const LANE_COLOR := Color(0.34, 0.22, 0.38, 0.8)
@@ -15,6 +16,9 @@ var simulation: BattleSimulation
 var finish_emitted := false
 var route_id: StringName = MvpContent.ROUTE_MIXED
 var route_number := 1
+var tooltip_glyph: GlyphModel
+var tooltip_title := ""
+var tooltip_context := ""
 
 
 func _ready() -> void:
@@ -107,6 +111,54 @@ func capacity_status_text() -> String:
 	if player_rejected + enemy_rejected > 0:
 		text += " // 上限拒否 青%d 赤%d" % [player_rejected, enemy_rejected]
 	return text
+
+
+func unit_center(unit: BattleUnitModel) -> Vector2:
+	var x := remap(unit.position, 0.0, 1000.0, 35.0, size.x - 35.0)
+	var lane_y := size.y * 0.55
+	var vertical_offset := float(posmod(unit.instance_id, 5) - 2) * 5.0
+	return Vector2(x, lane_y + vertical_offset)
+
+
+func unit_at(at_position: Vector2) -> BattleUnitModel:
+	if simulation == null:
+		return null
+	for index in range(simulation.units.size() - 1, -1, -1):
+		var unit: BattleUnitModel = simulation.units[index]
+		if at_position.distance_to(unit_center(unit)) <= _unit_radius(unit) + 7.0:
+			return unit
+	return null
+
+
+func _get_tooltip(at_position: Vector2) -> String:
+	tooltip_glyph = null
+	tooltip_title = ""
+	tooltip_context = ""
+	var unit := unit_at(at_position)
+	if unit == null:
+		return ""
+	var health_text := "HP %.0f/%.0f" % [maxf(unit.health, 0.0), unit.spec.max_health]
+	if unit.side != BattleSimulation.Side.PLAYER or unit.recipe_id == &"":
+		return "%s // %s" % [MvpContent.unit_name(unit.spec.id), health_text]
+	for recipe in MvpContent.recipes():
+		if recipe.id != unit.recipe_id:
+			continue
+		tooltip_glyph = recipe.glyph.copy()
+		tooltip_title = "%s → %s" % [
+			String(MvpContent.sigil_name(unit.recipe_id)).trim_suffix("シジル"),
+			MvpContent.unit_name(unit.spec.id),
+		]
+		tooltip_context = "%s\n%s" % [MvpContent.recipe_combat_trait(unit.recipe_id), health_text]
+		return "battle_unit_glyph"
+	return "%s // %s" % [MvpContent.unit_name(unit.spec.id), health_text]
+
+
+func _make_custom_tooltip(for_text: String):
+	if for_text != "battle_unit_glyph" or tooltip_glyph == null:
+		return null
+	var preview := GlyphTooltipModel.new()
+	preview.configure(tooltip_glyph, tooltip_title, tooltip_context)
+	return preview
 
 
 func _draw() -> void:
@@ -206,16 +258,9 @@ func _draw_enemy_shield(lane_y: float) -> void:
 
 
 func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
-	var x := remap(unit.position, 0.0, 1000.0, 35.0, size.x - 35.0)
 	var color := PLAYER_COLOR if unit.side == BattleSimulation.Side.PLAYER else ENEMY_COLOR
-	var radius := 7.0
-	match unit.spec.id:
-		&"sentinel", &"brute":
-			radius = 10.0
-		&"golem":
-			radius = 14.0
-	var vertical_offset := float(posmod(unit.instance_id, 5) - 2) * 5.0
-	var center := Vector2(x, lane_y + vertical_offset)
+	var radius := _unit_radius(unit)
+	var center := unit_center(unit)
 	var display_color := Color.WHITE if unit.hit_flash_ticks > 0 else color
 	_draw_unit_shape(unit.spec.id, center, radius, display_color)
 	if unit.side == BattleSimulation.Side.PLAYER and unit.summon_flash_ticks > 0:
@@ -247,6 +292,15 @@ func _draw_unit(unit: BattleUnitModel, lane_y: float) -> void:
 			10,
 			Color(1.0, 0.78, 0.25)
 		)
+
+
+func _unit_radius(unit: BattleUnitModel) -> float:
+	match unit.spec.id:
+		&"sentinel", &"brute":
+			return 10.0
+		&"golem":
+			return 14.0
+	return 7.0
 
 
 func _draw_unit_shape(unit_id: StringName, center: Vector2, radius: float, color: Color) -> void:
