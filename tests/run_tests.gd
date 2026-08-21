@@ -859,6 +859,20 @@ func _test_factory_meaning_glyph_source_summons_registered_recipe() -> void:
 	var validation_errors: PackedStringArray = simulation.validate_graph()["errors"]
 	_expect(validation_errors.has("ambiguous_source_glyph:ambiguous"), "a source should not hide two competing Glyph definitions")
 	_expect(validation_errors.has("unknown_meaning_glyph:unknown:missing"), "unknown meaning Glyph IDs should fail closed before simulation")
+	var star_board := FactoryBoard.new()
+	star_board.configure(MvpContent.PLAN_EMPTY)
+	star_board.set_interaction_enabled(true)
+	star_board.selected_node_id = &"ring_source"
+	_expect(star_board.configure_selected_node(5), "the registered Star should be selectable as one source")
+	_expect(star_board.connect_nodes_interactive(&"ring_source", &"summoner", 0)["ok"], "the low-mana Star route should connect directly to the summoner")
+	var star_preview := star_board.production_snapshot()
+	var vigil_board := FactoryBoard.new()
+	vigil_board.configure(MvpContent.PLAN_VIGIL)
+	_expect(int(star_preview["counts"][&"sentinel"]) > 0, "Star should be an acquired Sentinel recipe instead of guaranteed discard")
+	_expect(int(star_preview["counts"][&"sentinel"]) < int(vigil_board.production_snapshot()["counts"][&"sentinel"]), "single-source Star Sentinel should trade lower throughput for its cheaper graph")
+	_expect(star_board.mana_used() < vigil_board.mana_used(), "Star Sentinel should require less factory mana than Eye plus Cross")
+	star_board.free()
+	vigil_board.free()
 
 
 func _test_factory_combines_meaning_glyphs_into_alternate_recipe() -> void:
@@ -1013,7 +1027,7 @@ func _test_factory_rejects_ambiguous_recipes() -> void:
 		simulation.recipes[0].id == &"b_spike" and simulation.recipes[1].id == &"z_ring",
 		"accepted recipes should use stable ID order instead of acquisition order"
 	)
-	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 5, "all MVP recipes should have unique IDs and structures")
+	_expect(MvpContent.build_factory(MvpContent.PLAN_SCOUT).recipes.size() == 6, "all MVP recipes should have unique IDs and structures")
 
 
 func _test_recipe_registration_reports_stable_errors() -> void:
@@ -1111,7 +1125,7 @@ func _test_mvp_recipe_set_validation_reports_content_location() -> void:
 		"recipe set diagnostics should identify content index, ID, and stable rejection reasons"
 	)
 	var mvp_result := MvpContent.validate_recipe_set(MvpContent.recipes())
-	_expect(mvp_result["ok"] and mvp_result["accepted_count"] == 5, "shipped MVP recipes should pass aggregate validation")
+	_expect(mvp_result["ok"] and mvp_result["accepted_count"] == 6, "shipped MVP recipes should pass aggregate validation")
 
 
 func _test_factory_rejects_invalid_recipe_structures() -> void:

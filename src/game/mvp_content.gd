@@ -173,6 +173,11 @@ static func recipes() -> Array[SigilRecipeModel]:
 			&"sentinel"
 		),
 		SigilRecipeModel.new(
+			&"stellar_sentinel",
+			MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR),
+			&"sentinel"
+		),
+		SigilRecipeModel.new(
 			&"vigil_cross",
 			GlyphModel.combine(
 				MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE),
@@ -286,6 +291,8 @@ static func sigil_name(recipe_id: StringName) -> String:
 			return "斥候シジル"
 		&"azure_guard":
 			return "衛兵シジル"
+		&"stellar_sentinel":
+			return "星衛兵シジル"
 		&"vigil_cross":
 			return "警戒十字シジル"
 		&"bound_colossus":
