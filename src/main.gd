@@ -735,7 +735,7 @@ func _on_battle_finished(winner: int) -> void:
 			produced_recipes,
 			battle_board.simulation.player_damage_by_recipe
 		)
-		_show_overlay("DEFEAT", reason, _defeat_advice(), "工場を再構築")
+		_show_overlay("RUN %02d // DEFEAT" % flow.route_number, reason, _defeat_advice(), "工場を再構築")
 
 
 func _enter_victory() -> void:
@@ -795,7 +795,7 @@ func _apply_phase() -> void:
 			stage_timeline.configure(selected_route_id, flow.route_number)
 			stage_timeline.visible = true
 			_show_overlay(
-				"STAGE PREVIEW",
+				"RUN %02d // STAGE" % flow.route_number,
 				"ステージ情報を確認",
 				"%s // %s // 制限 3:00 // 敵防壁とリーダーを撃破" % [selected_route_name, durability_text],
 				"OK：工場構築へ"
@@ -836,14 +836,14 @@ func _apply_phase() -> void:
 				produced_recipes,
 				battle_board.simulation.player_damage_by_recipe
 			)
-			_show_overlay("STAGE CLEAR", "敵リーダーを撃破", _battle_result_summary(), "OK：報酬を確認")
+			_show_overlay("RUN %02d // CLEAR" % flow.route_number, "敵リーダーを撃破", _battle_result_summary(), "OK：報酬を確認")
 		RunFlow.Phase.REWARD:
 			pause_button.disabled = true
 			if _prepare_reward_options():
-				_show_overlay("REWARD", "ラン強化を1つ獲得", "", "獲得して次のルートへ")
+				_show_overlay("RUN %02d // REWARD" % flow.route_number, "ラン強化を1つ獲得", "", "獲得して次のルートへ")
 				_refresh_reward_selection_context()
 			else:
-				_show_overlay("REWARD", "ラン強化は完成", "3種類の工場強化が最大になりました。", "次のルートへ")
+				_show_overlay("RUN %02d // REWARD" % flow.route_number, "ラン強化は完成", "3種類の工場強化が最大になりました。", "次のルートへ")
 
 
 func _show_overlay(kicker: String, title: String, body: String, button_text: String) -> void:

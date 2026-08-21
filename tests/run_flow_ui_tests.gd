@@ -32,6 +32,7 @@ func _initialize() -> void:
 
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.STAGE_INFO, "route OK should show stage information")
+	_expect(main.phase_kicker.text == "RUN 01 // STAGE", "stage preview should retain the current run number")
 	_expect(main.stage_timeline.visible and main.stage_timeline.route_id == MvpContent.ROUTE_MIXED and main.stage_timeline.marker_count() == 4, "stage preview should visualize the selected route's major waves")
 	_expect("混成の道" in main.phase_body.text, "stage information should retain the selected encounter")
 	_expect("制限 3:00" in main.phase_body.text, "stage information should disclose the battle duration")
@@ -422,6 +423,7 @@ func _initialize() -> void:
 	main.battle_board.simulation.player_damage_by_recipe = {&"watchful_eye": 123.0, &"vigil_cross": 456.0}
 	main.debug_victory_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.VICTORY, "placeholder completion should defeat the leader")
+	_expect(main.phase_kicker.text == "RUN 01 // CLEAR", "victory summary should retain the completed run number")
 	_expect("生産: 斥候" in main.phase_body.text, "victory screen should summarize factory production")
 	_expect("時間停止 2回" in main.phase_body.text, "victory screen should summarize committed and discarded time stops")
 	_expect(main.battle_result_sigil_strip.visible and main.battle_result_sigil_strip.entries.size() == 2, "victory should replace meaning-sigil result sentences with a visual result strip")
@@ -437,6 +439,7 @@ func _initialize() -> void:
 	_expect(main._sigil_damage_summary() == "目 123 / 星衛兵 456", "battle results should attribute combat impact to the producing meaning sigils")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.REWARD, "victory OK should open rewards")
+	_expect(main.phase_kicker.text == "RUN 01 // REWARD", "reward selection should retain the completed run number")
 	_expect(main.reward_choices.visible and main.reward_choices.get_child_count() == 3, "reward phase should offer three meaning-Glyph upgrades")
 	_expect("現在工場32秒" in main.reward_choices.get_child(0).tooltip_text, "reward hover should forecast the current factory effect before selection")
 	var reward_tooltip = main.reward_choices.get_child(0)._make_custom_tooltip("")
@@ -508,7 +511,7 @@ func _initialize() -> void:
 	main.battle_board.simulation.player_damage_by_recipe = {&"watchful_eye": 321.0}
 	main.battle_board.simulation.tick_index = main.battle_board.simulation.battle_duration_ticks - 1
 	main.battle_board.advance_tick()
-	_expect(main.defeat_active and main.phase_overlay.visible and main.phase_kicker.text == "DEFEAT", "time limit should open a dedicated defeat summary")
+	_expect(main.defeat_active and main.phase_overlay.visible and main.phase_kicker.text == "RUN 02 // DEFEAT", "time limit should open a defeat summary with the current run number")
 	_expect(main.battle_result_sigil_strip.visible and main.battle_result_sigil_strip.entries.size() == 1, "defeat should preserve the producing sigil and its damage as a visual result")
 	_expect("再構成 0回" in main.phase_body.text, "defeat analysis should state the missed reconfiguration without prescribing an answer")
 	_expect("群体兵で衛兵" not in main.phase_body.text and "改善:" not in main.phase_body.text, "defeat summary should leave the next factory judgment to the player")
