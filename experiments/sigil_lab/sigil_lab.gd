@@ -591,6 +591,8 @@ func _remove_node(node_id: StringName) -> void:
 		return
 	var node = node_controls.get(node_id)
 	if node != null:
+		if node.get_parent() == graph_edit:
+			graph_edit.remove_child(node)
 		node.queue_free()
 	node_controls.erase(node_id)
 	node_previews.erase(node_id)
@@ -608,12 +610,14 @@ func _remove_node(node_id: StringName) -> void:
 
 
 func _clear_workspace() -> void:
+	graph_edit.clear_connections()
 	for node in node_controls.values():
+		if node.get_parent() == graph_edit:
+			graph_edit.remove_child(node)
 		node.queue_free()
 	node_controls.clear()
 	node_previews.clear()
 	option_controls.clear()
-	graph_edit.clear_connections()
 	graph = SigilGraphModel.new()
 	node_serial = 0
 	var output_id := _add_node(SigilGraphModel.OUTPUT, {}, Vector2(810, 280))

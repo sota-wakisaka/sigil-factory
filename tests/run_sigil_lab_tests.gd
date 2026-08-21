@@ -418,16 +418,57 @@ func _test_lab_scene() -> void:
 	var cross_result: Dictionary = lab.graph.evaluate(cross_combine)
 	_expect(cross_result["ok"] and cross_result["glyph"].components.size() == 2, "two stretched squares should form a valid Cross intermediate Glyph")
 	var output_node: GraphNode = lab.node_controls[cross_output]
+	_expect(
+		StringName(output_node.name) == cross_output,
+		"workspace reset should preserve the model ID as the GraphNode name"
+	)
 	var body_drop_position := output_node.position + output_node.size * output_node.scale * 0.5
 	_expect(
 		lab.graph_edit.completion_hotzone_contains(output_node, body_drop_position),
 		"the entire completion node body should be a connection hotzone"
 	)
-	lab.graph_edit.connection_request.emit(cross_combine, 0, cross_output, 0)
-	await process_frame
+	await _drag_graph_connection(lab, cross_combine, cross_output)
 	_expect(lab.graph.evaluate_output()["ok"], "dropping the Cross output on completion should finish the Sigil")
 	_expect(not lab.export_graph_text().is_empty() and not lab.export_button.disabled, "a completed Cross should be available for text export")
 	lab.free()
+
+
+func _drag_graph_connection(lab, from_node_id: StringName, to_node_id: StringName) -> void:
+	var from_node: GraphNode = lab.node_controls[from_node_id]
+	var to_node: GraphNode = lab.node_controls[to_node_id]
+	var from_position := (
+		from_node.global_position
+		+ from_node.get_output_port_position(0) * from_node.scale
+	)
+	var to_position := (
+		to_node.global_position
+		+ to_node.get_input_port_position(0) * to_node.scale
+	)
+	_send_mouse_motion(from_position, Vector2.ZERO, false)
+	_send_mouse_button(from_position, true)
+	await process_frame
+	_send_mouse_motion(to_position, to_position - from_position, true)
+	await process_frame
+	_send_mouse_button(to_position, false)
+	await process_frame
+
+
+func _send_mouse_motion(position: Vector2, relative: Vector2, dragging: bool) -> void:
+	var event := InputEventMouseMotion.new()
+	event.position = position
+	event.global_position = position
+	event.relative = relative
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if dragging else 0
+	root.push_input(event, true)
+
+
+func _send_mouse_button(position: Vector2, pressed: bool) -> void:
+	var event := InputEventMouseButton.new()
+	event.position = position
+	event.global_position = position
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = pressed
+	root.push_input(event, true)
 
 
 func _expect(condition: bool, message: String) -> void:
