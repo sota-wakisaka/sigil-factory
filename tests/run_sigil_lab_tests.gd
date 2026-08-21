@@ -10,6 +10,7 @@ var failures := 0
 
 func _initialize() -> void:
 	_test_graph_evaluation()
+	_test_basic_primitives_and_stretch()
 	_test_eight_way_combine()
 	_test_free_angle_triangle()
 	_test_post_combine_move()
@@ -23,14 +24,14 @@ func _initialize() -> void:
 
 func _test_graph_evaluation() -> void:
 	var graph = SigilGraphModel.new()
-	_expect(graph.add_node(&"ring", SigilGraphModel.SOURCE, {"primitive_id": &"ring"}), "ring source should be accepted")
-	_expect(graph.add_node(&"spike", SigilGraphModel.SOURCE, {"primitive_id": &"spike"}), "spike source should be accepted")
+	_expect(graph.add_node(&"circle", SigilGraphModel.SOURCE, {"primitive_id": &"circle"}), "circle source should be accepted")
+	_expect(graph.add_node(&"triangle", SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}), "triangle source should be accepted")
 	_expect(graph.add_node(&"move", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}), "move node should be accepted")
 	_expect(graph.add_node(&"rotate", SigilGraphModel.ROTATE, {"steps": 1}), "rotate node should be accepted")
 	_expect(graph.add_node(&"combine", SigilGraphModel.COMBINE), "combine node should be accepted")
 	_expect(graph.add_node(&"output", SigilGraphModel.OUTPUT), "output node should be accepted")
-	_expect(graph.connect_nodes(&"ring", 0, &"move", 0), "ring should connect to move")
-	_expect(graph.connect_nodes(&"spike", 0, &"rotate", 0), "spike should connect to rotate")
+	_expect(graph.connect_nodes(&"circle", 0, &"move", 0), "circle should connect to move")
+	_expect(graph.connect_nodes(&"triangle", 0, &"rotate", 0), "triangle should connect to rotate")
 	_expect(graph.connect_nodes(&"move", 0, &"combine", 0), "move should connect to combine A")
 	_expect(graph.connect_nodes(&"rotate", 0, &"combine", 1), "rotate should connect to combine B")
 	_expect(graph.connect_nodes(&"combine", 0, &"output", 0), "combine should connect to output")
@@ -39,6 +40,24 @@ func _test_graph_evaluation() -> void:
 	_expect(result["glyph"].components.size() == 2, "output should contain both source materials")
 	_expect(result["glyph"].components[0].position == Vector2(0, -4) or result["glyph"].components[1].position == Vector2(0, -4), "move should be folded into the output Glyph")
 	_expect(result["glyph"].components[0].rotation_step == 1 or result["glyph"].components[1].rotation_step == 1, "rotation should be folded into the output Glyph")
+
+
+func _test_basic_primitives_and_stretch() -> void:
+	var graph = SigilGraphModel.new()
+	_expect(SigilGraphModel.PRIMITIVES == [&"circle", &"triangle", &"square"], "Lab sources should expose only basic geometry")
+	_expect(not graph.add_node(&"legacy", SigilGraphModel.SOURCE, {"primitive_id": &"ring"}), "Lab should not expose legacy semantic primitives")
+	graph.add_node(&"circle", SigilGraphModel.SOURCE, {"primitive_id": &"circle"})
+	graph.add_node(&"stretch", SigilGraphModel.SCALE, {"x_percent": 250, "y_percent": 75})
+	graph.add_node(&"output", SigilGraphModel.OUTPUT)
+	graph.connect_nodes(&"circle", 0, &"stretch", 0)
+	graph.connect_nodes(&"stretch", 0, &"output", 0)
+	var result := graph.evaluate_output()
+	_expect(result["ok"], "a basic circle should support independent horizontal and vertical scaling")
+	if result["ok"]:
+		var component = result["glyph"].components[0]
+		_expect(component.primitive_id == &"circle", "stretch should preserve the source primitive")
+		_expect(component.scale_x_percent == 250 and component.scale_y_percent == 75, "stretch should fold both axes into the canonical component")
+		_expect("|a250,75" in component.canonical_key(), "anisotropic scale should be part of matching identity")
 
 
 func _test_eight_way_combine() -> void:
@@ -50,7 +69,7 @@ func _test_eight_way_combine() -> void:
 		var move_id := StringName("move_%d" % input_index)
 		var rotate_id := StringName("rotate_%d" % input_index)
 		graph.add_node(source_id, SigilGraphModel.SOURCE, {
-			"primitive_id": [&"ring", &"spike", &"branch"][input_index % 3],
+			"primitive_id": [&"circle", &"triangle", &"square"][input_index % 3],
 		})
 		graph.add_node(move_id, SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)})
 		graph.add_node(rotate_id, SigilGraphModel.ROTATE, {"degrees": input_index * 45})
@@ -71,7 +90,7 @@ func _test_free_angle_triangle() -> void:
 		var source_id := StringName("triangle_source_%d" % input_index)
 		var move_id := StringName("triangle_move_%d" % input_index)
 		var rotate_id := StringName("triangle_rotate_%d" % input_index)
-		graph.add_node(source_id, SigilGraphModel.SOURCE, {"primitive_id": &"spike"})
+		graph.add_node(source_id, SigilGraphModel.SOURCE, {"primitive_id": &"triangle"})
 		graph.add_node(move_id, SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)})
 		graph.add_node(rotate_id, SigilGraphModel.ROTATE, {"degrees": input_index * 120})
 		graph.connect_nodes(source_id, 0, move_id, 0)
@@ -96,15 +115,15 @@ func _test_free_angle_triangle() -> void:
 
 func _test_post_combine_move() -> void:
 	var graph = SigilGraphModel.new()
-	graph.add_node(&"ring", SigilGraphModel.SOURCE, {"primitive_id": &"ring"})
-	graph.add_node(&"spike", SigilGraphModel.SOURCE, {"primitive_id": &"spike"})
+	graph.add_node(&"circle", SigilGraphModel.SOURCE, {"primitive_id": &"circle"})
+	graph.add_node(&"triangle", SigilGraphModel.SOURCE, {"primitive_id": &"triangle"})
 	graph.add_node(&"left", SigilGraphModel.MOVE, {"offset": Vector2i(-2, 0)})
 	graph.add_node(&"right", SigilGraphModel.MOVE, {"offset": Vector2i(2, 0)})
 	graph.add_node(&"combine", SigilGraphModel.COMBINE)
 	graph.add_node(&"group_move", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)})
 	graph.add_node(&"output", SigilGraphModel.OUTPUT)
-	graph.connect_nodes(&"ring", 0, &"left", 0)
-	graph.connect_nodes(&"spike", 0, &"right", 0)
+	graph.connect_nodes(&"circle", 0, &"left", 0)
+	graph.connect_nodes(&"triangle", 0, &"right", 0)
 	graph.connect_nodes(&"left", 0, &"combine", 0)
 	graph.connect_nodes(&"right", 0, &"combine", 1)
 	graph.connect_nodes(&"combine", 0, &"group_move", 0)
@@ -131,7 +150,7 @@ func _test_connection_guards() -> void:
 
 func _test_owned_results() -> void:
 	var graph = SigilGraphModel.new()
-	graph.add_node(&"source", SigilGraphModel.SOURCE, {"primitive_id": &"ring"})
+	graph.add_node(&"source", SigilGraphModel.SOURCE, {"primitive_id": &"circle"})
 	graph.add_node(&"color", SigilGraphModel.COLOR, {"color_id": &"blue"})
 	graph.add_node(&"output", SigilGraphModel.OUTPUT)
 	graph.connect_nodes(&"source", 0, &"color", 0)
@@ -152,7 +171,7 @@ func _test_lab_scene() -> void:
 	await process_frame
 	_expect(lab.name == "SigilLab", "Sigil Lab scene should use the consistent product term")
 	_expect(lab.graph_edit != null and lab.graph_edit.visible, "Sigil Lab should expose a connectable GraphEdit")
-	_expect(lab.node_controls.size() >= 10, "default four-direction template should expose editable nodes")
+	_expect(lab.node_controls.size() == 5, "default eye template should stay readable and editable")
 	var combine_id: StringName = &""
 	for node_id in lab.graph.nodes:
 		if lab.graph.node_kind(node_id) == SigilGraphModel.COMBINE:
@@ -170,16 +189,24 @@ func _test_lab_scene() -> void:
 	if lab.option_controls[free_rotate] is SpinBox:
 		var angle_control: SpinBox = lab.option_controls[free_rotate]
 		_expect(angle_control.min_value == 0.0 and angle_control.max_value == 359.0 and angle_control.step == 1.0, "free-angle control should cover 0–359° in one-degree steps")
+	var free_scale: StringName = lab.add_lab_node(SigilGraphModel.SCALE, {"x_percent": 200, "y_percent": 75}, Vector2(40, 40))
+	var scale_control: Control = lab.option_controls[free_scale]
+	_expect(scale_control.find_children("*", "SpinBox", true, false).size() == 2, "Lab stretch should expose independent horizontal and vertical controls")
 	var output: Dictionary = lab.graph.evaluate_output()
-	_expect(output["ok"] and output["glyph"].components.size() == 4, "default template should produce a four-material sigil")
-	_expect(output["glyph"].combine_children.size() == 4, "default template should use one four-way Combine instead of a binary tree")
+	_expect(output["ok"] and output["glyph"].components.size() == 2, "default eye template should combine two basic circles")
+	_expect(output["glyph"].combine_children.size() == 2, "default eye template should preserve its reusable two-part group")
+	var has_ellipse := false
+	for component in output["glyph"].components:
+		if component.scale_x_percent == 250 and component.scale_y_percent == 100:
+			has_ellipse = true
+	_expect(has_ellipse, "default eye template should derive its outer ellipse from a stretched circle")
 	_expect(lab.output_preview.glyph.canonical_serialization() == output["glyph"].canonical_serialization(), "large preview should show the actual graph output")
 	lab.clear_workspace()
 	await process_frame
 	_expect(lab.graph.nodes.size() == 1 and not lab.graph.evaluate_output()["ok"], "clear should retain only an empty completion node")
 	lab.load_cardinal_template()
 	await process_frame
-	_expect(lab.graph.evaluate_output()["ok"], "template should be reloadable after clearing")
+	_expect(lab.graph.evaluate_output()["ok"], "eye template should be reloadable after clearing")
 	lab.free()
 
 

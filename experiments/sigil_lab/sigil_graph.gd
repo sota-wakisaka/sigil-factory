@@ -7,12 +7,13 @@ const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const SOURCE := &"source"
 const ROTATE := &"rotate"
 const MOVE := &"move"
+const SCALE := &"scale"
 const COLOR := &"color"
 const COMBINE := &"combine"
 const OUTPUT := &"output"
 
-const NODE_KINDS := [SOURCE, ROTATE, MOVE, COLOR, COMBINE, OUTPUT]
-const PRIMITIVES := [&"ring", &"spike", &"branch"]
+const NODE_KINDS := [SOURCE, ROTATE, MOVE, SCALE, COLOR, COMBINE, OUTPUT]
+const PRIMITIVES := [&"circle", &"triangle", &"square"]
 const COLORS := [&"white", &"blue", &"red"]
 const MAX_COMBINE_INPUTS := GlyphModel.MAX_COMBINE_CHILDREN
 
@@ -164,7 +165,7 @@ func input_count(node_id: StringName) -> int:
 			return 0
 		COMBINE:
 			return GlyphModel.MAX_COMBINE_CHILDREN
-		ROTATE, MOVE, COLOR, OUTPUT:
+		ROTATE, MOVE, SCALE, COLOR, OUTPUT:
 			return 1
 	return 0
 
@@ -259,6 +260,9 @@ func _apply_node(kind: StringName, config: Dictionary, inputs: Array) -> Diction
 		MOVE:
 			glyph = inputs[0].copy()
 			glyph.translate(config["offset"])
+		SCALE:
+			glyph = inputs[0].copy()
+			glyph.stretch_percent(int(config["x_percent"]), int(config["y_percent"]))
 		COLOR:
 			glyph = inputs[0].copy()
 			glyph.recolor(StringName(config["color_id"]))
@@ -308,7 +312,7 @@ func _would_create_cycle(from_node_id: StringName, to_node_id: StringName) -> bo
 func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 	match kind:
 		SOURCE:
-			var primitive_id := StringName(config.get("primitive_id", &"ring"))
+			var primitive_id := StringName(config.get("primitive_id", &"circle"))
 			if not primitive_id in PRIMITIVES:
 				return {"ok": false, "error": &"invalid_primitive", "config": {}}
 			return {"ok": true, "error": &"", "config": {"primitive_id": primitive_id}}
@@ -332,6 +336,21 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 			):
 				return {"ok": false, "error": &"invalid_offset", "config": {}}
 			return {"ok": true, "error": &"", "config": {"offset": offset}}
+		SCALE:
+			var x_percent := int(config.get("x_percent", 150))
+			var y_percent := int(config.get("y_percent", 100))
+			if (
+				x_percent < 25
+				or x_percent > 400
+				or y_percent < 25
+				or y_percent > 400
+			):
+				return {"ok": false, "error": &"invalid_scale", "config": {}}
+			return {
+				"ok": true,
+				"error": &"",
+				"config": {"x_percent": x_percent, "y_percent": y_percent},
+			}
 		COLOR:
 			var color_id := StringName(config.get("color_id", &"blue"))
 			if not color_id in COLORS:

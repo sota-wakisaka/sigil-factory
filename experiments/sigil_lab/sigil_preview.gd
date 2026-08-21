@@ -45,6 +45,7 @@ static func _glyph_extent(value) -> float:
 	for component in value.components:
 		var center := Vector2(component.position) * 6.0
 		var radius := 5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0
+		radius *= float(maxi(component.scale_x_percent, component.scale_y_percent)) / 100.0
 		extent = maxf(extent, maxf(absf(center.x) + radius, absf(center.y) + radius))
 	var visuals := GlyphPainterModel.combine_visuals(value, 1.0)
 	for circle in visuals["circles"]:

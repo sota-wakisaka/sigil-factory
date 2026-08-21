@@ -8,6 +8,8 @@ var position: Vector2
 var rotation_step: int
 var rotation_degrees: int
 var scale_step: int
+var scale_x_percent: int
+var scale_y_percent: int
 var color_id: StringName
 
 
@@ -17,7 +19,9 @@ func _init(
 	initial_rotation_step: int = 0,
 	initial_scale_step: int = 1,
 	initial_color_id: StringName = &"white",
-	initial_rotation_degrees = null
+	initial_rotation_degrees = null,
+	initial_scale_x_percent: int = 100,
+	initial_scale_y_percent: int = 100
 ) -> void:
 	primitive_id = initial_primitive_id
 	position = normalized_position(Vector2(initial_position))
@@ -27,11 +31,13 @@ func _init(
 		else int(initial_rotation_degrees)
 	)
 	scale_step = initial_scale_step
+	scale_x_percent = initial_scale_x_percent
+	scale_y_percent = initial_scale_y_percent
 	color_id = initial_color_id
 
 
 func canonical_key() -> String:
-	return "p%s|%s,%s|%d|%d|c%s" % [
+	var result := "p%s|%s,%s|%d|%d|c%s" % [
 		_frame(String(primitive_id)),
 		coordinate_key(position.x),
 		coordinate_key(position.y),
@@ -39,6 +45,15 @@ func canonical_key() -> String:
 		scale_step,
 		_frame(String(color_id)),
 	]
+	# Keep legacy Glyph bytes stable when no anisotropic Lab transform exists.
+	if scale_x_percent != 100 or scale_y_percent != 100:
+		result += "|a%d,%d" % [scale_x_percent, scale_y_percent]
+	return result
+
+
+func stretch_percent(x_percent: int, y_percent: int) -> void:
+	scale_x_percent = roundi(float(scale_x_percent * x_percent) / 100.0)
+	scale_y_percent = roundi(float(scale_y_percent * y_percent) / 100.0)
 
 
 func set_rotation_degrees(value: int) -> void:
@@ -89,5 +104,7 @@ func copy() -> GlyphComponentModel:
 		rotation_step,
 		scale_step,
 		color_id,
-		rotation_degrees
+		rotation_degrees,
+		scale_x_percent,
+		scale_y_percent
 	)

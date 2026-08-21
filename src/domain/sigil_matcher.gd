@@ -143,6 +143,8 @@ static func _difference_score(
 	score += int(actual.position != target.position)
 	score += int(actual.rotation_degrees != target.rotation_degrees)
 	score += int(actual.scale_step != target.scale_step)
+	score += int(actual.scale_x_percent != target.scale_x_percent)
+	score += int(actual.scale_y_percent != target.scale_y_percent)
 	score += int(actual.color_id != target.color_id)
 	return score
 
@@ -156,7 +158,11 @@ static func _append_component_differences(
 		_add_unique(diagnostics, "色が違います")
 	if actual.rotation_degrees != target.rotation_degrees:
 		_add_unique(diagnostics, "回転が違います")
-	if actual.scale_step != target.scale_step:
+	if (
+		actual.scale_step != target.scale_step
+		or actual.scale_x_percent != target.scale_x_percent
+		or actual.scale_y_percent != target.scale_y_percent
+	):
 		_add_unique(diagnostics, "倍率が違います")
 	if actual.position != target.position:
 		_add_unique(diagnostics, "位置が違います")

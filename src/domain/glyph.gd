@@ -140,6 +140,17 @@ func _structure_validation_errors(path: String, active_ancestors: Dictionary) ->
 				errors.append("missing_color_id:%s" % path)
 			if component.scale_step < 1:
 				errors.append("invalid_scale:%s:%d" % [path, component.scale_step])
+			if (
+				component.scale_x_percent < 1
+				or component.scale_y_percent < 1
+				or component.scale_x_percent > 1600
+				or component.scale_y_percent > 1600
+			):
+				errors.append("invalid_stretch:%s:%d,%d" % [
+					path,
+					component.scale_x_percent,
+					component.scale_y_percent,
+				])
 	else:
 		if not combine_connection_mode in COMBINE_CONNECTION_MODES:
 			errors.append("invalid_combine_connection_mode:%s:%s" % [path, combine_connection_mode])
@@ -264,6 +275,17 @@ func translate(offset: Vector2i) -> void:
 		component.position = GlyphComponentModel.normalized_position(component.position + Vector2(offset))
 	for child in combine_children:
 		child.translate(offset)
+
+
+func stretch_percent(x_percent: int, y_percent: int) -> void:
+	var factors := Vector2(float(x_percent) / 100.0, float(y_percent) / 100.0)
+	if not combine_children.is_empty():
+		combine_origin = GlyphComponentModel.normalized_position(combine_origin * factors)
+	for component in components:
+		component.position = GlyphComponentModel.normalized_position(component.position * factors)
+		component.stretch_percent(x_percent, y_percent)
+	for child in combine_children:
+		child.stretch_percent(x_percent, y_percent)
 
 
 func recolor(color_id: StringName) -> void:

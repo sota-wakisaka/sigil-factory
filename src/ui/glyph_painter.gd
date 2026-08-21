@@ -181,7 +181,7 @@ static func _glyph_connection_radius(glyph: GlyphModel, center: Vector2, scale: 
 	var radius := 0.0
 	for component in glyph.components:
 		var component_center := Vector2(component.position) * 6.0 * scale
-		var component_radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
+		var component_radius := _component_max_radius(component, scale)
 		var visible_radius := component_radius
 		match component.primitive_id:
 			&"spike":
@@ -306,7 +306,7 @@ static func _glyph_content_radius(glyph: GlyphModel, center: Vector2, scale: flo
 	var radius := 0.0
 	for component in glyph.components:
 		var component_center := Vector2(component.position) * 6.0 * scale
-		var component_radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
+		var component_radius := _component_max_radius(component, scale)
 		radius = maxf(radius, center.distance_to(component_center) + component_radius)
 	return maxf(12.0 * scale, radius + 11.0 * scale)
 
@@ -351,8 +351,16 @@ static func _draw_component(
 	var color := _with_opacity(component_color(component.color_id), opacity)
 	var angle := deg_to_rad(float(component.rotation_degrees))
 	var radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
+	var radius_x := radius * float(component.scale_x_percent) / 100.0
+	var radius_y := radius * float(component.scale_y_percent) / 100.0
 	var stroke := primitive_stroke_width(scale)
 	match component.primitive_id:
+		&"circle":
+			_draw_basic_outline(canvas, center, radius_x, radius_y, angle, 40, color, stroke)
+		&"triangle":
+			_draw_basic_outline(canvas, center, radius_x, radius_y, angle - PI * 0.5, 3, color, stroke)
+		&"square":
+			_draw_basic_outline(canvas, center, radius_x, radius_y, angle + PI * 0.25, 4, color, stroke)
 		&"ring":
 			canvas.draw_arc(center, radius, angle + 0.38, angle + TAU - 0.38, 20, color, stroke, true)
 		&"spike":
@@ -383,6 +391,33 @@ static func _draw_component(
 			)
 		_:
 			canvas.draw_circle(center, radius, color, false, stroke, true)
+
+
+static func _draw_basic_outline(
+	canvas: CanvasItem,
+	center: Vector2,
+	radius_x: float,
+	radius_y: float,
+	angle: float,
+	point_count: int,
+	color: Color,
+	stroke: float
+) -> void:
+	var points := PackedVector2Array()
+	for index in point_count:
+		var point_angle := angle + TAU * float(index) / float(point_count)
+		points.append(center + Vector2(
+			cos(point_angle) * radius_x,
+			sin(point_angle) * radius_y
+		))
+	if not points.is_empty():
+		points.append(points[0])
+	canvas.draw_polyline(points, color, stroke, true)
+
+
+static func _component_max_radius(component: GlyphComponentModel, scale: float) -> float:
+	var radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
+	return radius * float(maxi(component.scale_x_percent, component.scale_y_percent)) / 100.0
 
 
 static func _with_opacity(color: Color, opacity: float) -> Color:

@@ -12,6 +12,7 @@ const NODE_NAMES := {
 	&"source": "素材",
 	&"rotate": "回転",
 	&"move": "移動",
+	&"scale": "変形",
 	&"color": "着色",
 	&"combine": "合成",
 	&"output": "完成",
@@ -40,7 +41,7 @@ var menu_button: Button
 
 func _ready() -> void:
 	_build_ui()
-	_load_cardinal_template()
+	_load_eye_template()
 	queue_redraw()
 
 
@@ -64,7 +65,11 @@ func clear_workspace() -> void:
 
 
 func load_cardinal_template() -> void:
-	_load_cardinal_template()
+	_load_eye_template()
+
+
+func load_eye_template() -> void:
+	_load_eye_template()
 
 
 func _build_ui() -> void:
@@ -113,10 +118,10 @@ func _build_header() -> Control:
 	toolbar.add_child(title)
 
 	var template_button := Button.new()
-	template_button.text = "四方陣"
-	template_button.tooltip_text = "MVP方式の4素材テンプレートを読み込む"
+	template_button.text = "目の印"
+	template_button.tooltip_text = "丸を横へ変形して作る基本テンプレート"
 	template_button.custom_minimum_size = Vector2(86, 34)
-	template_button.pressed.connect(_load_cardinal_template)
+	template_button.pressed.connect(_load_eye_template)
 	toolbar.add_child(template_button)
 
 	var clear_button := Button.new()
@@ -148,11 +153,12 @@ func _build_palette() -> Control:
 	label.add_theme_color_override("font_color", Color(0.52, 0.72, 0.88))
 	bar.add_child(label)
 	for definition in [
-		["環", SigilGraphModel.SOURCE, {"primitive_id": &"ring"}, "環素材"],
-		["棘", SigilGraphModel.SOURCE, {"primitive_id": &"spike"}, "棘素材"],
-		["枝", SigilGraphModel.SOURCE, {"primitive_id": &"branch"}, "枝素材"],
+		["○", SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, "丸 // 基本図形"],
+		["△", SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}, "三角 // 基本図形"],
+		["□", SigilGraphModel.SOURCE, {"primitive_id": &"square"}, "四角 // 基本図形"],
 		["↻", SigilGraphModel.ROTATE, {"degrees": 45}, "中心を基準に1°単位で回転"],
 		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "上下左右へ移動"],
+		["↔↕", SigilGraphModel.SCALE, {"x_percent": 150, "y_percent": 100}, "横・縦を別々に拡大縮小"],
 		["●", SigilGraphModel.COLOR, {"color_id": &"blue"}, "白・青・赤へ着色"],
 		["⊕", SigilGraphModel.COMBINE, {}, "2〜8個のGlyphを中心結合・相互結合"],
 	]:
@@ -247,7 +253,7 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 			var option := _source_option(node_id)
 			node.add_child(option)
 			option_controls[node_id] = option
-		SigilGraphModel.ROTATE, SigilGraphModel.MOVE, SigilGraphModel.COLOR:
+		SigilGraphModel.ROTATE, SigilGraphModel.MOVE, SigilGraphModel.SCALE, SigilGraphModel.COLOR:
 			node.add_child(preview)
 			node.set_slot(0, true, 0, PORT_COLOR, true, 0, PORT_COLOR)
 			var option := _setting_option(node_id, kind)
@@ -293,12 +299,12 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 
 func _source_option(node_id: StringName) -> OptionButton:
 	var option := OptionButton.new()
-	for label in ["環", "棘", "枝"]:
+	for label in ["丸", "三角", "四角"]:
 		option.add_item(label)
-	var primitive := StringName(graph.node_config(node_id).get("primitive_id", &"ring"))
-	option.select([&"ring", &"spike", &"branch"].find(primitive))
+	var primitive := StringName(graph.node_config(node_id).get("primitive_id", &"circle"))
+	option.select([&"circle", &"triangle", &"square"].find(primitive))
 	option.item_selected.connect(func(index: int) -> void:
-		graph.set_node_config(node_id, {"primitive_id": [&"ring", &"spike", &"branch"][index]})
+		graph.set_node_config(node_id, {"primitive_id": [&"circle", &"triangle", &"square"][index]})
 		_refresh_all()
 	)
 	return option
@@ -321,6 +327,22 @@ func _setting_option(node_id: StringName, kind: StringName) -> Control:
 			_refresh_all()
 		)
 		return angle
+	if kind == SigilGraphModel.SCALE:
+		var row := HBoxContainer.new()
+		row.custom_minimum_size = Vector2(144, 34)
+		row.tooltip_text = "横 / 縦 // 25〜400%"
+		var config := graph.node_config(node_id)
+		for axis in ["x_percent", "y_percent"]:
+			var value := SpinBox.new()
+			value.min_value = 25.0
+			value.max_value = 400.0
+			value.step = 25.0
+			value.suffix = "%"
+			value.custom_minimum_size = Vector2(70, 34)
+			value.value = float(config.get(axis, 100))
+			value.value_changed.connect(_on_scale_value_changed.bind(node_id, StringName(axis)))
+			row.add_child(value)
+		return row
 	var option := OptionButton.new()
 	match kind:
 		SigilGraphModel.MOVE:
@@ -342,6 +364,13 @@ func _setting_option(node_id: StringName, kind: StringName) -> Control:
 				_refresh_all()
 			)
 	return option
+
+
+func _on_scale_value_changed(value: float, node_id: StringName, axis: StringName) -> void:
+	var next_config := graph.node_config(node_id)
+	next_config[axis] = roundi(value)
+	if graph.set_node_config(node_id, next_config):
+		_refresh_all()
 
 
 func _combine_option(node_id: StringName) -> OptionButton:
@@ -418,31 +447,21 @@ func _clear_workspace() -> void:
 	_refresh_all()
 
 
-func _load_cardinal_template() -> void:
+func _load_eye_template() -> void:
 	_clear_workspace()
-	var ring_top := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"ring"}, Vector2(20, 80))
-	var spike_right := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"spike"}, Vector2(20, 240))
-	var ring_bottom := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"ring"}, Vector2(20, 400))
-	var spike_left := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"spike"}, Vector2(20, 560))
-
-	var move_top := _add_node(SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, Vector2(190, 80))
-	var move_right := _add_node(SigilGraphModel.MOVE, {"offset": Vector2i(4, 0)}, Vector2(190, 240))
-	var move_bottom := _add_node(SigilGraphModel.MOVE, {"offset": Vector2i(0, 4)}, Vector2(190, 400))
-	var rotate_left := _add_node(SigilGraphModel.ROTATE, {"degrees": 180}, Vector2(190, 560))
-	var move_left := _add_node(SigilGraphModel.MOVE, {"offset": Vector2i(-4, 0)}, Vector2(360, 560))
-
-	var combine_root := _add_node(SigilGraphModel.COMBINE, {}, Vector2(540, 215))
+	var pupil := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, Vector2(30, 180))
+	var outline := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, Vector2(30, 390))
+	var stretch := _add_node(
+		SigilGraphModel.SCALE,
+		{"x_percent": 250, "y_percent": 100},
+		Vector2(230, 390)
+	)
+	var combine_root := _add_node(SigilGraphModel.COMBINE, {}, Vector2(480, 250))
 	var output_id := graph.output_node_id()
 
-	_connect_nodes(ring_top, 0, move_top, 0)
-	_connect_nodes(spike_right, 0, move_right, 0)
-	_connect_nodes(ring_bottom, 0, move_bottom, 0)
-	_connect_nodes(spike_left, 0, rotate_left, 0)
-	_connect_nodes(rotate_left, 0, move_left, 0)
-	_connect_nodes(move_top, 0, combine_root, 0)
-	_connect_nodes(move_right, 0, combine_root, 1)
-	_connect_nodes(move_bottom, 0, combine_root, 2)
-	_connect_nodes(move_left, 0, combine_root, 3)
+	_connect_nodes(outline, 0, stretch, 0)
+	_connect_nodes(pupil, 0, combine_root, 0)
+	_connect_nodes(stretch, 0, combine_root, 1)
 	_connect_nodes(combine_root, 0, output_id, 0)
 	_refresh_all()
 
