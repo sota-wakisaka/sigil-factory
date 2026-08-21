@@ -20,6 +20,7 @@ var candidate_recipe_id: StringName = &""
 var candidate_unit_id: StringName = &""
 var candidate_origin: StringName = &"missing"
 var candidate_forecast_state: StringName = &"valid"
+var candidate_forecast_context := ""
 var display_name := ""
 var tooltip_glyph: GlyphModel
 var tooltip_title := ""
@@ -99,7 +100,8 @@ func show_recipe(next_recipe_id: StringName) -> bool:
 func show_candidate(
 	next_candidate: GlyphModel,
 	next_origin: StringName = &"actual",
-	next_forecast_state: StringName = &"valid"
+	next_forecast_state: StringName = &"valid",
+	next_forecast_context: String = ""
 ) -> void:
 	candidate_glyph = next_candidate.copy() if GlyphPainterModel.can_draw(next_candidate) else null
 	candidate_origin = (
@@ -112,6 +114,7 @@ func show_candidate(
 		if candidate_origin == &"hypothetical" and next_forecast_state in [&"glyph", &"no_output", &"invalid"]
 		else &"valid"
 	)
+	candidate_forecast_context = next_forecast_context if candidate_origin == &"hypothetical" else ""
 	_refresh_candidate_state()
 	queue_redraw()
 
@@ -316,6 +319,8 @@ func candidate_context() -> String:
 		&"predicted": "32秒予測",
 		&"hypothetical": "設定候補 // 未確定",
 	}.get(candidate_origin, "候補なし")
+	if candidate_forecast_context != "":
+		origin_context += " // " + candidate_forecast_context
 	match candidate_state:
 		&"owned_other":
 			return "%s // 取得済み: %s → %s" % [

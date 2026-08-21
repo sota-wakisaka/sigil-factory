@@ -2541,6 +2541,7 @@ func _test_factory_setting_preview_is_non_destructive() -> void:
 		var committed_candidate := board.final_summoner_candidate_glyph()
 		var hypothetical := board.setting_option_candidate(case["option"])
 		_expect(hypothetical["active"] and GlyphPainterModel.can_draw(hypothetical["glyph"]), "hovered setting should expose a predicted final Glyph")
+		_expect(hypothetical.has("counts") and hypothetical.has("event_offsets") and hypothetical.has("recipe_ids"), "hovered setting should expose its isolated 32-second production result")
 		_expect(
 			committed_candidate == null
 			or committed_candidate.canonical_serialization() != hypothetical["glyph"].canonical_serialization(),
@@ -3618,6 +3619,8 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	_expect(ghost.candidate_state == &"owned_other", "a registered non-goal recipe should not look like a summon failure")
 	_expect(ghost.candidate_recipe_id == &"stellar_sentinel" and ghost.candidate_unit_id == &"sentinel", "alternate output should retain the exact acquired recipe result")
 	_expect("星衛兵 → 衛兵" in ghost.candidate_context(), "alternate registered output should identify its result only on demand")
+	ghost.show_candidate(MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR), &"hypothetical", &"glyph", "32秒: 星衛兵→衛兵 4体・初回3.0秒")
+	_expect("32秒: 星衛兵→衛兵 4体" in ghost.candidate_context(), "hypothetical comparison tooltip should retain its production quantity and first arrival")
 	var mismatching_candidate := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	ghost.show_candidate(mismatching_candidate)
 	_expect(ghost.candidate_state == &"mismatch", "different factory candidate should show a negative comparison state")

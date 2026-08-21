@@ -389,7 +389,39 @@ func _on_inspector_option_preview_requested(index: int) -> void:
 		if candidate.get("validity", &"invalid") == &"invalid"
 		else candidate.get("output_state", &"no_output")
 	)
-	sigil_ghost.show_candidate(candidate.get("glyph"), &"hypothetical", forecast_state)
+	sigil_ghost.show_candidate(
+		candidate.get("glyph"),
+		&"hypothetical",
+		forecast_state,
+		_setting_option_forecast_context(candidate)
+	)
+
+
+func _setting_option_forecast_context(candidate: Dictionary) -> String:
+	var parts := PackedStringArray()
+	var counts: Dictionary = candidate.get("counts", {})
+	var recipe_ids: Dictionary = candidate.get("recipe_ids", {})
+	var event_offsets: Dictionary = candidate.get("event_offsets", {})
+	for unit_id: StringName in [&"scout", &"sentinel", &"golem"]:
+		var count := int(counts.get(unit_id, 0))
+		if count <= 0:
+			continue
+		var recipe_id := StringName(recipe_ids.get(unit_id, ""))
+		var recipe_label := String(MvpContent.sigil_name(recipe_id)).trim_suffix("シジル")
+		var timing: PackedInt32Array = event_offsets.get(unit_id, PackedInt32Array())
+		var first_label := ""
+		if not timing.is_empty():
+			first_label = "・初回%.1f秒" % (float(timing[0]) * TICK_SECONDS)
+		parts.append("%s→%s %d体%s" % [
+			recipe_label,
+			MvpContent.unit_name(unit_id),
+			count,
+			first_label,
+		])
+	var discarded := int(candidate.get("discarded", 0))
+	if discarded > 0:
+		parts.append("不一致%d" % discarded)
+	return "32秒: %s" % ("召喚なし" if parts.is_empty() else " / ".join(parts))
 
 
 func _on_inspector_option_preview_cleared() -> void:

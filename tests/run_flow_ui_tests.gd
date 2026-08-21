@@ -157,6 +157,7 @@ func _initialize() -> void:
 	setting_popup.window_input.emit(option_mouse_motion)
 	_expect(main.inspector_option.preview_index == 1, "moving the mouse over a popup row should select one temporary setting preview")
 	_expect(main.sigil_ghost.candidate_origin == &"hypothetical" and main.sigil_ghost.candidate_glyph != null, "focused source alternative should replace only the final candidate with a hypothetical Glyph")
+	_expect("32秒:" in main.sigil_ghost.candidate_forecast_context, "setting hover should disclose its isolated production result without committing the option")
 	_expect(main.sigil_ghost.candidate_ring_style() == &"dotted", "hypothetical setting should use a neutral dotted marker instead of the predicted result ring")
 	_expect(main.factory_board.production_snapshot() == factory_snapshot_before_hover and main.factory_board.undo_history.size() == undo_count_before_hover, "popup focus should not mutate production forecast or undo history")
 	var preview_cache_size: int = main.factory_board.setting_option_preview_cache.size()

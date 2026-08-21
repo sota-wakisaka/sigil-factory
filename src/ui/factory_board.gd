@@ -732,6 +732,10 @@ func setting_option_candidate(option_index: int) -> Dictionary:
 		"glyph": candidate["glyph"].copy() if GlyphPainterModel.can_draw(candidate.get("glyph")) else null,
 		"validity": &"valid" if preview.get("ok", false) else &"invalid",
 		"output_state": &"glyph" if GlyphPainterModel.can_draw(candidate.get("glyph")) else &"no_output",
+		"counts": preview.get("counts", {}).duplicate(true),
+		"event_offsets": preview.get("event_offsets", {}).duplicate(true),
+		"recipe_ids": preview.get("recipe_ids", {}).duplicate(true),
+		"discarded": int(preview.get("discarded", 0)),
 		"errors": preview.get("errors", []).duplicate(),
 	}
 	setting_option_preview_cache[cache_key] = result
@@ -745,6 +749,10 @@ func _copy_setting_option_candidate(candidate: Dictionary) -> Dictionary:
 		"glyph": glyph.copy() if GlyphPainterModel.can_draw(glyph) else null,
 		"validity": candidate.get("validity", &"invalid"),
 		"output_state": candidate.get("output_state", &"no_output"),
+		"counts": candidate.get("counts", {}).duplicate(true),
+		"event_offsets": candidate.get("event_offsets", {}).duplicate(true),
+		"recipe_ids": candidate.get("recipe_ids", {}).duplicate(true),
+		"discarded": int(candidate.get("discarded", 0)),
 		"errors": candidate.get("errors", []).duplicate(),
 	}
 
