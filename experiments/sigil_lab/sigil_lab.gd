@@ -24,12 +24,6 @@ const MOVE_OPTIONS := [
 	Vector2i(0, 4),
 	Vector2i(-4, 0),
 ]
-const PART_NAMES := {
-	&"eye": "目",
-	&"wing": "翼",
-	&"fang": "牙",
-	&"claw": "爪",
-}
 
 var graph = SigilGraphModel.new()
 var node_serial := 0
@@ -93,19 +87,6 @@ func load_distribution_template() -> void:
 	_load_distribution_template()
 
 
-func add_part_template(part_id: StringName, position: Vector2 = Vector2.ZERO) -> StringName:
-	match part_id:
-		&"eye":
-			return _build_eye_part(position)
-		&"wing":
-			return _build_wing_part(position)
-		&"fang":
-			return _build_fang_part(position)
-		&"claw":
-			return _build_claw_part(position)
-	return &""
-
-
 func _build_ui() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -120,7 +101,6 @@ func _build_ui() -> void:
 	margin.add_child(page)
 	page.add_child(_build_header())
 	page.add_child(_build_palette())
-	page.add_child(_build_part_palette())
 
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -228,38 +208,6 @@ func _build_palette() -> Control:
 	return bar
 
 
-func _build_part_palette() -> Control:
-	var bar := HBoxContainer.new()
-	bar.custom_minimum_size.y = 38.0
-	bar.add_theme_constant_override("separation", 6)
-	var label := Label.new()
-	label.text = "部品"
-	label.custom_minimum_size.x = 42.0
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_color_override("font_color", Color(0.68, 0.78, 0.94))
-	bar.add_child(label)
-	for definition in [
-		[&"eye", "目", "丸と横長の丸で作る中心部品"],
-		[&"wing", "翼", "横長の丸を分配して扇状に重ねる部品"],
-		[&"fang", "牙", "三角を細長く変形して反転する部品"],
-		[&"claw", "爪", "細長い三角を分配して3本に開く部品"],
-	]:
-		var button := Button.new()
-		button.text = definition[1]
-		button.tooltip_text = "%s // 基本図形から作る再利用部品" % definition[2]
-		button.custom_minimum_size = Vector2(64, 32)
-		button.pressed.connect(_add_part_from_palette.bind(definition[0]))
-		bar.add_child(button)
-	var instruction := Label.new()
-	instruction.text = "部品も移動・回転・反復・分配できます"
-	instruction.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	instruction.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	instruction.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	instruction.add_theme_color_override("font_color", Color(0.44, 0.62, 0.78))
-	bar.add_child(instruction)
-	return bar
-
-
 func _build_output_panel() -> Control:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size.x = 330.0
@@ -319,17 +267,6 @@ func _add_from_palette(kind: StringName, config: Dictionary) -> void:
 	var column := node_serial % 3
 	var row := int(node_serial / 3) % 4
 	_add_node(kind, config, Vector2(40 + column * 210, 100 + row * 170))
-
-
-func _add_part_from_palette(part_id: StringName) -> void:
-	var column := node_serial % 2
-	var row := int(node_serial / 2) % 2
-	var part_output := add_part_template(
-		part_id,
-		Vector2(30 + column * 460, 100 + row * 320)
-	)
-	if part_output != &"":
-		_set_status("%sを追加 // ◆から次の加工へ接続" % PART_NAMES[part_id], false)
 
 
 func _add_node(kind: StringName, config: Dictionary, position: Vector2) -> StringName:
@@ -498,22 +435,23 @@ func _on_scale_value_changed(value: float, node_id: StringName, axis: StringName
 
 func _combine_option(node_id: StringName) -> OptionButton:
 	var option := OptionButton.new()
-	for label in ["中心結合", "相互結合", "線なし"]:
-		option.add_item(label)
+	option.add_item("中心結合")
+	option.add_item("相互結合")
 	option.custom_minimum_size = Vector2(92, 24)
-	option.tooltip_text = "合成線 // 中心・相互・図形だけを重ねる線なし"
+	option.tooltip_text = "合成線 // 中心結合または重複を除いた相互結合"
 	var mode := StringName(graph.node_config(node_id).get(
 		"connection_mode",
 		GlyphModel.CONNECTION_RADIAL
 	))
-	var modes := [
-		GlyphModel.CONNECTION_RADIAL,
-		GlyphModel.CONNECTION_PAIRWISE,
-		GlyphModel.CONNECTION_NONE,
-	]
-	option.select(maxi(modes.find(mode), 0))
+	option.select(1 if mode == GlyphModel.CONNECTION_PAIRWISE else 0)
 	option.item_selected.connect(func(index: int) -> void:
-		graph.set_node_config(node_id, {"connection_mode": modes[index]})
+		graph.set_node_config(node_id, {
+			"connection_mode": (
+				GlyphModel.CONNECTION_PAIRWISE
+				if index == 1
+				else GlyphModel.CONNECTION_RADIAL
+			),
+		})
 		_refresh_all()
 	)
 	return option
@@ -571,121 +509,21 @@ func _clear_workspace() -> void:
 
 func _load_eye_template() -> void:
 	_clear_workspace()
-	var eye := _build_eye_part(Vector2(30, 180))
-	_connect_nodes(eye, 0, graph.output_node_id(), 0)
-	_refresh_all()
-
-
-func _build_eye_part(base: Vector2) -> StringName:
-	var pupil := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, base)
-	var outline := _add_node(
-		SigilGraphModel.SOURCE,
-		{"primitive_id": &"circle"},
-		base + Vector2(0, 190)
-	)
+	var pupil := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, Vector2(30, 180))
+	var outline := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, Vector2(30, 390))
 	var stretch := _add_node(
 		SigilGraphModel.SCALE,
 		{"x_percent": 250, "y_percent": 100},
-		base + Vector2(200, 190)
+		Vector2(230, 390)
 	)
-	var combine := _add_node(
-		SigilGraphModel.COMBINE,
-		{"connection_mode": GlyphModel.CONNECTION_NONE},
-		base + Vector2(440, 70)
-	)
+	var combine_root := _add_node(SigilGraphModel.COMBINE, {}, Vector2(480, 250))
+	var output_id := graph.output_node_id()
+
 	_connect_nodes(outline, 0, stretch, 0)
-	_connect_nodes(pupil, 0, combine, 0)
-	_connect_nodes(stretch, 0, combine, 1)
-	return combine
-
-
-func _build_fang_part(base: Vector2) -> StringName:
-	var source := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}, base)
-	var stretch := _add_node(
-		SigilGraphModel.SCALE,
-		{"x_percent": 75, "y_percent": 225},
-		base + Vector2(190, 0)
-	)
-	var rotate := _add_node(
-		SigilGraphModel.ROTATE,
-		{"degrees": 180},
-		base + Vector2(390, 0)
-	)
-	_connect_nodes(source, 0, stretch, 0)
-	_connect_nodes(stretch, 0, rotate, 0)
-	return rotate
-
-
-func _build_wing_part(base: Vector2) -> StringName:
-	var source := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, base + Vector2(0, 170))
-	var stretch := _add_node(
-		SigilGraphModel.SCALE,
-		{"x_percent": 300, "y_percent": 75},
-		base + Vector2(170, 170)
-	)
-	var move := _add_node(
-		SigilGraphModel.MOVE,
-		{"offset": Vector2i(4, 0)},
-		base + Vector2(350, 170)
-	)
-	var distributor := _add_node(SigilGraphModel.DISTRIBUTE, {}, base + Vector2(530, 40))
-	var rotations := [300, 330, 0]
-	var feathers: Array[StringName] = []
-	for index in rotations.size():
-		var feather := _add_node(
-			SigilGraphModel.ROTATE,
-			{"degrees": rotations[index]},
-			base + Vector2(730, index * 155)
-		)
-		feathers.append(feather)
-	var combine := _add_node(
-		SigilGraphModel.COMBINE,
-		{"connection_mode": GlyphModel.CONNECTION_NONE},
-		base + Vector2(930, 75)
-	)
-	_connect_nodes(source, 0, stretch, 0)
-	_connect_nodes(stretch, 0, move, 0)
-	_connect_nodes(move, 0, distributor, 0)
-	for index in feathers.size():
-		_connect_nodes(distributor, index, feathers[index], 0)
-		_connect_nodes(feathers[index], 0, combine, index)
-	return combine
-
-
-func _build_claw_part(base: Vector2) -> StringName:
-	var source := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}, base + Vector2(0, 170))
-	var stretch := _add_node(
-		SigilGraphModel.SCALE,
-		{"x_percent": 75, "y_percent": 250},
-		base + Vector2(170, 170)
-	)
-	var move := _add_node(
-		SigilGraphModel.MOVE,
-		{"offset": Vector2i(0, -4)},
-		base + Vector2(350, 170)
-	)
-	var distributor := _add_node(SigilGraphModel.DISTRIBUTE, {}, base + Vector2(530, 40))
-	var rotations := [345, 0, 15]
-	var talons: Array[StringName] = []
-	for index in rotations.size():
-		var talon := _add_node(
-			SigilGraphModel.ROTATE,
-			{"degrees": rotations[index]},
-			base + Vector2(730, index * 155)
-		)
-		talons.append(talon)
-	var combine := _add_node(
-		SigilGraphModel.COMBINE,
-		{"connection_mode": GlyphModel.CONNECTION_NONE},
-		base + Vector2(930, 75)
-	)
-	_connect_nodes(source, 0, stretch, 0)
-	_connect_nodes(stretch, 0, move, 0)
-	_connect_nodes(move, 0, distributor, 0)
-	for index in talons.size():
-		_connect_nodes(distributor, index, talons[index], 0)
-		_connect_nodes(talons[index], 0, combine, index)
-	return combine
+	_connect_nodes(pupil, 0, combine_root, 0)
+	_connect_nodes(stretch, 0, combine_root, 1)
+	_connect_nodes(combine_root, 0, output_id, 0)
+	_refresh_all()
 
 
 func _load_repeat_template() -> void:

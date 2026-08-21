@@ -28,8 +28,6 @@ func _initialize() -> void:
 		lab.load_repeat_template()
 	elif fixture == "distribution":
 		lab.load_distribution_template()
-	elif fixture.begins_with("part_"):
-		_build_part_fixture(lab, StringName(fixture.trim_prefix("part_")))
 	await process_frame
 	await process_frame
 	await RenderingServer.frame_post_draw
@@ -101,13 +99,6 @@ func _build_triangle_fixture(lab) -> void:
 		lab.connect_lab_nodes(move, rotate)
 		lab.connect_lab_nodes(rotate, combine, input_index)
 	lab.connect_lab_nodes(combine, output_id)
-
-
-func _build_part_fixture(lab, part_id: StringName) -> void:
-	lab.clear_workspace()
-	var part_output: StringName = lab.add_part_template(part_id, Vector2(20, 70))
-	if part_output != &"":
-		lab.connect_lab_nodes(part_output, lab.graph.output_node_id())
 
 
 func _user_options() -> Dictionary:
