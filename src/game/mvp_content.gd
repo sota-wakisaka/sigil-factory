@@ -267,7 +267,7 @@ static func plan_name(plan_id: StringName) -> String:
 static func plan_description(plan_id: StringName) -> String:
 	match plan_id:
 		PLAN_EMPTY:
-			return "構築練習 // 環素材の出力を召喚器へ接続"
+			return "構築練習 // 目印の出力を召喚器へ接続"
 		PLAN_SENTINEL:
 			return "対群体 // 3体同時攻撃・中速"
 		PLAN_VIGIL:

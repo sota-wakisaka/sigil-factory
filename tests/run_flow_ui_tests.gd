@@ -101,6 +101,7 @@ func _initialize() -> void:
 	main.factory_board.connection_message = ""
 	_expect(main.factory_board.interaction_enabled, "factory build should enable node placement")
 	_expect(not main.get_node("FactoryPalette/RingButton").disabled, "factory build should enable the equipment palette")
+	_expect(not main.get_node("FactoryPalette/ColorButton").visible, "color processing should stay omitted from the standard MVP palette")
 	_expect(main.get_node("FactoryPalette/SummonButton").disabled, "palette should visually block the one-summoner limit before click")
 	_expect(main.get_node("FactoryPalette/SummonButton").availability_reason == &"summoner_limit", "summoner palette badge should distinguish its one-node limit")
 	_expect("1基まで" in main.get_node("FactoryPalette/SummonButton").tooltip_text, "disabled summoner should explain its actual limit on hover")
