@@ -738,13 +738,47 @@ func _show_overlay(kicker: String, title: String, body: String, button_text: Str
 func _prepare_reward_options() -> bool:
 	var buttons := reward_choices.get_children()
 	var selected_available := false
+	var baseline := factory_board.production_snapshot()
 	for button in buttons:
 		button.set_level(acquired_rewards.count(button.reward_id))
+		button.set_forecast_context(
+			"" if button.disabled else _reward_forecast_summary(
+				baseline,
+				factory_board.prospective_upgrade_snapshot(button.reward_id)
+			)
+		)
 		var should_select: bool = not selected_available and not bool(button.disabled)
 		button.set_reward_selected(should_select)
 		selected_available = selected_available or should_select
 	reward_choices.visible = true
 	return selected_available
+
+
+func _reward_forecast_summary(before: Dictionary, after: Dictionary) -> String:
+	var comparison := factory_board.compare_production_snapshots(before, after)
+	if comparison.get("validity", &"invalid") != &"valid":
+		return "現在工場32秒 // 予測できません"
+	var entries := PackedStringArray()
+	for unit_id: StringName in [&"scout", &"sentinel", &"golem"]:
+		var difference: Dictionary = comparison.get("units", {}).get(unit_id, {})
+		if difference.get("count_state", &"unchanged") != &"unchanged":
+			entries.append("%s %d→%d" % [
+				MvpContent.unit_name(unit_id),
+				int(difference.get("before", 0)),
+				int(difference.get("after", 0)),
+			])
+		elif difference.get("timing_state", &"unchanged") != &"unchanged":
+			var before_offsets: PackedInt32Array = difference.get("before_offsets", PackedInt32Array())
+			var after_offsets: PackedInt32Array = difference.get("after_offsets", PackedInt32Array())
+			if not before_offsets.is_empty() and not after_offsets.is_empty():
+				entries.append("%s 初着%.1f→%.1f秒" % [
+					MvpContent.unit_name(unit_id),
+					float(before_offsets[0]) * TICK_SECONDS,
+					float(after_offsets[0]) * TICK_SECONDS,
+				])
+	if entries.is_empty():
+		return "現在工場32秒 // 変化なし"
+	return "現在工場32秒 // " + " / ".join(entries)
 
 
 func _select_reward(selected_button: MeaningRewardButtonControl) -> void:

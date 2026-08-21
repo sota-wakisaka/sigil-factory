@@ -3764,6 +3764,11 @@ func _test_run_upgrade_accelerates_ring_source() -> void:
 	board.set_run_upgrades([&"ring_speed"])
 	board.configure(MvpContent.PLAN_SCOUT)
 	var source: FactoryNodeModel = board.simulation.nodes[&"ring_source"]
+	var runtime_before := _factory_runtime_signature(board.simulation)
+	var preview_before := board.production_snapshot()
+	var prospective := board.prospective_upgrade_snapshot(&"ring_speed")
+	_expect(prospective["ok"] and board.compare_production_snapshots(preview_before, prospective)["changed"], "reward choice should forecast its production effect before acquisition")
+	_expect(_factory_runtime_signature(board.simulation) == runtime_before and board.production_snapshot() == preview_before and board.run_upgrades == [&"ring_speed"], "prospective reward forecast should not mutate factory state or acquired upgrades")
 	_expect(source.config["interval_ticks"] < 18, "ring speed reward should accelerate future factories")
 	_expect(board.node_upgrade_state_for(source) == {"upgrade_id": &"ring_speed", "level": 1}, "source equipment should expose its visible reward level")
 	_expect("集束 1/3" in board.node_upgrade_tooltip(source), "source hover should disclose the applied reward only on demand")

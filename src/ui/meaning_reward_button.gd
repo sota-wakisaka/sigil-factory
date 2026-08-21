@@ -12,6 +12,7 @@ const MAX_LEVEL := 3
 
 var glyph: GlyphModel
 var level := 0
+var forecast_context := ""
 
 
 func _ready() -> void:
@@ -37,8 +38,15 @@ func set_level(next_level: int) -> void:
 	queue_redraw()
 
 
+func set_forecast_context(next_context: String) -> void:
+	forecast_context = next_context
+	_refresh_tooltip()
+
+
 func _refresh_tooltip() -> void:
 	tooltip_text = "%s // %s // %d/%d" % [caption, effect_caption, level, MAX_LEVEL]
+	if forecast_context != "":
+		tooltip_text += "\n" + forecast_context
 
 
 func _draw() -> void:

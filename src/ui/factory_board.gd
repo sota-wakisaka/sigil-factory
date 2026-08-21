@@ -863,6 +863,30 @@ func production_snapshot() -> Dictionary:
 	}
 
 
+func prospective_upgrade_snapshot(upgrade_id: StringName) -> Dictionary:
+	var display_simulation := _display_simulation()
+	if display_simulation == null or upgrade_id not in [&"ring_speed", &"processing_speed", &"line_speed"]:
+		return {"ok": false, "horizon_ticks": PRODUCTION_PREVIEW_TICKS, "counts": {}, "event_offsets": {}, "recipe_ids": {}, "discarded": 0, "errors": ["invalid_upgrade"]}
+	var duplication := display_simulation.duplicate_state_result()
+	if not duplication["ok"]:
+		return {"ok": false, "horizon_ticks": PRODUCTION_PREVIEW_TICKS, "counts": {}, "event_offsets": {}, "recipe_ids": {}, "discarded": 0, "errors": duplication["errors"].duplicate()}
+	var hypothetical: FactorySimulation = duplication["state"]
+	for node in hypothetical.nodes.values():
+		_apply_node_upgrade(node, upgrade_id)
+	for line in hypothetical.lines.values():
+		_apply_line_upgrade(line, upgrade_id)
+	var result := _production_preview_for_simulation(hypothetical, PRODUCTION_PREVIEW_TICKS)
+	return {
+		"ok": bool(result.get("ok", false)),
+		"horizon_ticks": PRODUCTION_PREVIEW_TICKS,
+		"counts": result.get("counts", {}).duplicate(true),
+		"event_offsets": result.get("event_offsets", {}).duplicate(true),
+		"recipe_ids": result.get("recipe_ids", {}).duplicate(true),
+		"discarded": int(result.get("discarded", 0)),
+		"errors": result.get("errors", []).duplicate(),
+	}
+
+
 func set_production_comparison_baseline(snapshot: Dictionary) -> bool:
 	clear_production_comparison_baseline()
 	if (
@@ -4157,16 +4181,24 @@ func node_upgrade_tooltip(node: FactoryNodeModel) -> String:
 
 func _apply_node_upgrades(node: FactoryNodeModel) -> void:
 	for upgrade_id in run_upgrades:
-		if upgrade_id == &"ring_speed" and node.kind == FactoryNodeModel.NodeKind.SOURCE:
-			node.config["interval_ticks"] = maxi(int(round(float(node.config.get("interval_ticks", 18)) * 0.8)), 1)
-		elif upgrade_id == &"processing_speed" and node.kind not in [FactoryNodeModel.NodeKind.SOURCE, FactoryNodeModel.NodeKind.SUMMONER]:
-			node.config["processing_ticks"] = maxi(int(node.config.get("processing_ticks", 1)) - 1, 1)
+		_apply_node_upgrade(node, upgrade_id)
+
+
+func _apply_node_upgrade(node: FactoryNodeModel, upgrade_id: StringName) -> void:
+	if upgrade_id == &"ring_speed" and node.kind == FactoryNodeModel.NodeKind.SOURCE:
+		node.config["interval_ticks"] = maxi(int(round(float(node.config.get("interval_ticks", 18)) * 0.8)), 1)
+	elif upgrade_id == &"processing_speed" and node.kind not in [FactoryNodeModel.NodeKind.SOURCE, FactoryNodeModel.NodeKind.SUMMONER]:
+		node.config["processing_ticks"] = maxi(int(node.config.get("processing_ticks", 1)) - 1, 1)
 
 
 func _apply_line_upgrades(line: FactoryLineModel) -> void:
 	for upgrade_id in run_upgrades:
-		if upgrade_id == &"line_speed":
-			line.travel_ticks = maxi(line.travel_ticks - 1, 1)
+		_apply_line_upgrade(line, upgrade_id)
+
+
+func _apply_line_upgrade(line: FactoryLineModel, upgrade_id: StringName) -> void:
+	if upgrade_id == &"line_speed":
+		line.travel_ticks = maxi(line.travel_ticks - 1, 1)
 
 
 func _panel_style() -> StyleBoxFlat:

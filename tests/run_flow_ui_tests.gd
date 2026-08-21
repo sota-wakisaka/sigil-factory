@@ -400,6 +400,7 @@ func _initialize() -> void:
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.REWARD, "victory OK should open rewards")
 	_expect(main.reward_choices.visible and main.reward_choices.get_child_count() == 3, "reward phase should offer three meaning-Glyph upgrades")
+	_expect("現在工場32秒" in main.reward_choices.get_child(0).tooltip_text, "reward hover should forecast the current factory effect before selection")
 	_expect(main.reward_choices.get_child(0).button_pressed, "reward phase should begin with one explicit selection")
 	_expect(main.reward_choices.get_child(0).level == 0 and not main.reward_choices.get_child(0).disabled, "an unowned meaning reward should show an empty three-step register")
 	var first_reward = main.reward_choices.get_child(0)
