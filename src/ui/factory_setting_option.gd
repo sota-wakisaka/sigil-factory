@@ -94,11 +94,23 @@ func _setting_icon(kind: int, index: int) -> Texture2D:
 	var body := ""
 	match kind:
 		FactoryNodeModel.NodeKind.SOURCE:
-			body = (
-				"<path d='M17.5 17.5 A8 8 0 1 1 17.5 6.5' fill='none' stroke='#66d6ff' stroke-width='2.4' stroke-linecap='round'/>"
-				if index == 0
-				else "<path d='M12 3 L20 20 L12 15 L4 20 Z' fill='none' stroke='#66d6ff' stroke-width='2' stroke-linejoin='round'/>"
-			)
+			match index:
+				0:
+					body = "<path d='M17.5 17.5 A8 8 0 1 1 17.5 6.5' fill='none' stroke='#66d6ff' stroke-width='2.4' stroke-linecap='round'/>"
+				1:
+					body = "<path d='M12 3 L20 20 L12 15 L4 20 Z' fill='none' stroke='#66d6ff' stroke-width='2' stroke-linejoin='round'/>"
+				2:
+					body = "<ellipse cx='12' cy='12' rx='9' ry='5' fill='none' stroke='#66d6ff' stroke-width='1.7'/><circle cx='12' cy='12' r='2.7' fill='none' stroke='#66d6ff' stroke-width='1.7'/>"
+				3:
+					body = "<path d='M4 10 H10 V4 H14 V10 H20 V14 H14 V20 H10 V14 H4 Z' fill='none' stroke='#66d6ff' stroke-width='1.7'/>"
+				4:
+					body = "<circle cx='12' cy='12' r='9' fill='none' stroke='#66d6ff' stroke-width='1.6'/><circle cx='12' cy='12' r='4' fill='none' stroke='#66d6ff' stroke-width='1.6'/>"
+				5:
+					body = "<path d='M12 2 L20 17 H4 Z M12 22 L4 7 H20 Z' fill='none' stroke='#66d6ff' stroke-width='1.5'/>"
+				6:
+					body = "<path d='M12 2 V22 M2 12 H22 M5 5 L19 19 M19 5 L5 19' fill='none' stroke='#66d6ff' stroke-width='1.5'/><circle cx='12' cy='12' r='2' fill='none' stroke='#66d6ff' stroke-width='1.3'/>"
+				_:
+					return null
 		FactoryNodeModel.NodeKind.ROTATOR:
 			var direction := rotation_direction_for_index(index)
 			var endpoint := Vector2(12, 12) + Vector2(direction) * 8.0

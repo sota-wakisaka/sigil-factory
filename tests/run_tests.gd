@@ -100,6 +100,7 @@ func _initialize() -> void:
 	_test_factory_goal_equipment_presence_tracks_inventory()
 	_test_factory_enforces_single_summoner()
 	_test_factory_node_configuration_is_undoable()
+	_test_factory_meaning_source_is_configurable()
 	_test_factory_configuration_discards_work_transactionally()
 	_test_factory_preset_preview_is_undoable()
 	_test_source_configuration_resets_generation_progress()
@@ -2305,6 +2306,35 @@ func _test_factory_node_configuration_is_undoable() -> void:
 	)
 	board.configure(MvpContent.PLAN_SCOUT)
 	_expect(board.selected_node_id == &"", "switching factory templates should clear stale inspector selection")
+	board.free()
+
+
+func _test_factory_meaning_source_is_configurable() -> void:
+	var board := FactoryBoard.new()
+	board.size = Vector2(1196, 401)
+	board.configure(MvpContent.PLAN_EMPTY)
+	board.set_interaction_enabled(true)
+	var source_id := board.add_node_from_palette(&"meaning_source")
+	_expect(source_id != &"", "factory palette should add a registered meaning Glyph source")
+	if source_id == &"":
+		board.free()
+		return
+	board.selected_node_id = source_id
+	var details := board.selected_node_details()
+	_expect(details["options"].size() == 7 and details["selected_index"] == 2, "source inspector should combine primitive and meaning options")
+	var eye := board.source_glyph_for_node(source_id)
+	_expect(
+		eye != null and eye.canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE).canonical_serialization(),
+		"new meaning source should visibly emit the Eye"
+	)
+	_expect(board.configure_selected_node(6), "meaning source should switch to the Compass through the shared inspector")
+	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.COMPASS, "meaning selection should be stored explicitly")
+	_expect(board.selected_node_details()["title"] == "方位印", "meaning source node should name its registered Glyph")
+	_expect(board.undo(), "meaning source selection should be undoable")
+	board.selected_node_id = source_id
+	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.EYE, "undo should restore the previous meaning Glyph")
+	_expect(board.configure_selected_node(0), "meaning source should also switch back to a primitive source")
+	_expect(board.simulation.nodes[source_id].config.get("primitive_id") == &"ring" and not board.simulation.nodes[source_id].config.has("meaning_glyph_id"), "source switch should not retain an ambiguous hidden definition")
 	board.free()
 
 

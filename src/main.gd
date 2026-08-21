@@ -80,6 +80,7 @@ func _ready() -> void:
 	$Toolbar/GolemButton.pressed.connect(func() -> void: _select_plan(MvpContent.PLAN_GOLEM))
 	$FactoryPalette/RingButton.pressed.connect(func() -> void: _add_factory_node(&"ring_source"))
 	$FactoryPalette/SpikeButton.pressed.connect(func() -> void: _add_factory_node(&"spike_source"))
+	$FactoryPalette/MeaningButton.pressed.connect(func() -> void: _add_factory_node(&"meaning_source"))
 	$FactoryPalette/RotateButton.pressed.connect(func() -> void: _add_factory_node(&"rotator"))
 	$FactoryPalette/ColorButton.pressed.connect(func() -> void: _add_factory_node(&"colorizer"))
 	$FactoryPalette/CombineButton.pressed.connect(func() -> void: _add_factory_node(&"combiner"))

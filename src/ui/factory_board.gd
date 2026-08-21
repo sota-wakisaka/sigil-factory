@@ -24,6 +24,13 @@ const WARNING_COLOR := Color(1.0, 0.38, 0.28, 1.0)
 const WAITING_COLOR := Color(1.0, 0.72, 0.24, 1.0)
 const MATCH_COLOR := Color(0.36, 1.0, 0.58, 1.0)
 const PRODUCTION_INCREASE_COLOR := Color(0.3, 0.86, 0.94, 1.0)
+const SOURCE_OPTION_LABELS := ["環", "棘", "目", "十字", "的", "星", "方位"]
+const SOURCE_OPTION_IDS := [
+	&"ring", &"spike",
+	MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS, MeaningGlyphsModel.TARGET,
+	MeaningGlyphsModel.STAR, MeaningGlyphsModel.COMPASS,
+]
+const SOURCE_OPTION_INTERVALS := [18, 54, 24, 30, 32, 36, 48]
 const PRODUCTION_DECREASE_COLOR := Color(1.0, 0.7, 0.28, 1.0)
 const PRODUCTION_COMPARISON_COLOR := Color(0.42, 0.58, 0.7, 0.88)
 const EDIT_ADDED_COLOR := Color(0.24, 0.9, 0.92, 0.96)
@@ -223,6 +230,9 @@ func add_node_from_palette(template_id: StringName) -> StringName:
 		&"spike_source":
 			prefix = "spike_source"
 			config = {"primitive_id": "spike", "interval_ticks": 54}
+		&"meaning_source":
+			prefix = "meaning_source"
+			config = {"meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": 24}
 		&"rotator":
 			prefix = "rotator"
 			kind = FactoryNodeModel.NodeKind.ROTATOR
@@ -391,7 +401,7 @@ func palette_availability(template_id: StringName) -> Dictionary:
 		return {"available": false, "reason": &"locked"}
 	var kind := FactoryNodeModel.NodeKind.SOURCE
 	match template_id:
-		&"ring_source", &"spike_source":
+		&"ring_source", &"spike_source", &"meaning_source":
 			kind = FactoryNodeModel.NodeKind.SOURCE
 		&"rotator":
 			kind = FactoryNodeModel.NodeKind.ROTATOR
@@ -422,6 +432,9 @@ func goal_equipment_present(template_id: StringName) -> bool:
 					return true
 			&"spike_source":
 				if node.kind == FactoryNodeModel.NodeKind.SOURCE and StringName(node.config.get("primitive_id", "")) == &"spike":
+					return true
+			&"meaning_source":
+				if node.kind == FactoryNodeModel.NodeKind.SOURCE and MeaningGlyphsModel.has(StringName(node.config.get("meaning_glyph_id", ""))):
 					return true
 			&"rotator":
 				if node.kind == FactoryNodeModel.NodeKind.ROTATOR:
@@ -473,6 +486,14 @@ func is_guided_connection_pending() -> bool:
 	)
 
 
+func _source_option_index(node: FactoryNodeModel) -> int:
+	var primitive_id := StringName(node.config.get("primitive_id", ""))
+	if primitive_id != &"":
+		return SOURCE_OPTION_IDS.find(primitive_id)
+	var meaning_glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
+	return SOURCE_OPTION_IDS.find(meaning_glyph_id)
+
+
 func selected_node_details() -> Dictionary:
 	var display_simulation := _display_simulation()
 	if selected_node_id == &"" or display_simulation == null or not display_simulation.nodes.has(selected_node_id):
@@ -482,8 +503,8 @@ func selected_node_details() -> Dictionary:
 	var selected_index := -1
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
-			options = PackedStringArray(["環", "棘"])
-			selected_index = ["ring", "spike"].find(String(node.config.get("primitive_id", "")))
+			options = PackedStringArray(SOURCE_OPTION_LABELS)
+			selected_index = _source_option_index(node)
 		FactoryNodeModel.NodeKind.ROTATOR:
 			options = PackedStringArray(["90°", "180°", "270°"])
 			var steps := int(node.config.get("steps", 0))
@@ -528,12 +549,9 @@ func configure_selected_node(option_index: int) -> bool:
 func _setting_option_changes_node(node: FactoryNodeModel, option_index: int) -> bool:
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
-			if option_index < 0 or option_index > 1:
+			if option_index < 0 or option_index >= SOURCE_OPTION_IDS.size():
 				return false
-			return (
-				String(node.config.get("primitive_id", "ring")) != ("spike" if option_index == 1 else "ring")
-				or int(node.config.get("interval_ticks", 0)) < 1
-			)
+			return _source_option_index(node) != option_index or int(node.config.get("interval_ticks", 0)) < 1
 		FactoryNodeModel.NodeKind.ROTATOR:
 			if option_index < 0 or option_index > 2:
 				return false
@@ -554,10 +572,15 @@ func _setting_option_changes_node(node: FactoryNodeModel, option_index: int) -> 
 func _apply_setting_option(node: FactoryNodeModel, option_index: int) -> bool:
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
-			if option_index < 0 or option_index > 1:
+			if option_index < 0 or option_index >= SOURCE_OPTION_IDS.size():
 				return false
-			node.config["primitive_id"] = "spike" if option_index == 1 else "ring"
-			node.config["interval_ticks"] = 54 if option_index == 1 else 18
+			node.config.erase("primitive_id")
+			node.config.erase("meaning_glyph_id")
+			if option_index <= 1:
+				node.config["primitive_id"] = SOURCE_OPTION_IDS[option_index]
+			else:
+				node.config["meaning_glyph_id"] = SOURCE_OPTION_IDS[option_index]
+			node.config["interval_ticks"] = SOURCE_OPTION_INTERVALS[option_index]
 			node.source_timer = 0
 			_apply_node_upgrades(node)
 		FactoryNodeModel.NodeKind.ROTATOR:

@@ -4,6 +4,7 @@ extends Button
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
+const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 
 @export var equipment_kind: StringName
 @export var caption := "設備"
@@ -23,6 +24,8 @@ func _ready() -> void:
 	if equipment_kind in [&"ring_source", &"spike_source"]:
 		var primitive_id := &"ring" if equipment_kind == &"ring_source" else &"spike"
 		preview_glyph = GlyphModel.new([GlyphComponentModel.new(primitive_id)])
+	elif equipment_kind == &"meaning_source":
+		preview_glyph = MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
 	queue_redraw()
 
 
@@ -62,7 +65,7 @@ func _make_custom_tooltip(_for_text: String):
 	var preview := GlyphTooltipModel.new()
 	preview.configure(
 		preview_glyph,
-		"素材Primitive // %s" % caption,
+		"素材 // %s" % caption,
 		context
 	)
 	return preview

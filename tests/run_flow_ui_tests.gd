@@ -112,6 +112,8 @@ func _initialize() -> void:
 	_expect(not main.inspector_label.visible, "empty inspector should remove its idle target instead of reserving a blank control")
 	_expect(not main.inspector_option.visible, "empty inspector should hide its unusable setting dropdown")
 	_expect(main.get_node("FactoryPalette/RingButton").preview_glyph != null, "source palette choice should use its Primitive as the main icon")
+	_expect(main.get_node("FactoryPalette/MeaningButton").preview_glyph != null, "meaning-source palette choice should show its default registered Glyph")
+	_expect(main.get_node("FactoryPalette/MeaningButton").custom_minimum_size.x == 60.0, "nine factory tools should remain inside the existing palette row")
 	_expect(main.get_node("FactoryPalette/RingButton").text == "", "palette choice should not rely on the native text label")
 	var source_palette_tooltip = main.get_node("FactoryPalette/RingButton")._make_custom_tooltip("")
 	_expect(source_palette_tooltip is GlyphTooltip, "source palette choice should enlarge its CanonicalGlyph on hover")
@@ -145,7 +147,7 @@ func _initialize() -> void:
 	var popup_content_height := float(setting_popup.size.y) - popup_top - popup_bottom
 	var second_item_position := Vector2(
 		float(setting_popup.size.x) * 0.5,
-		popup_top + popup_content_height * 0.75
+		popup_top + (popup_content_height / float(main.inspector_option.item_count)) * 1.5
 	)
 	_expect(main.inspector_option.popup_item_index_at(second_item_position) == 1, "mouse row hit testing should identify the second source setting")
 	var option_mouse_motion := InputEventMouseMotion.new()
