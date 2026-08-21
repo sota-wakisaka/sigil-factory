@@ -5,6 +5,7 @@ const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_g
 const GlyphModel := preload("res://src/domain/glyph.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
+const SigilPreviewModel := preload("res://experiments/sigil_lab/sigil_preview.gd")
 
 var failures := 0
 
@@ -381,6 +382,11 @@ func _test_lab_scene() -> void:
 	root.add_child(lab)
 	await process_frame
 	await process_frame
+	_expect(
+		SigilPreviewModel.preview_stroke_width(2.0)
+		< GlyphPainterModel.primitive_stroke_width(2.0),
+		"Lab previews should use thinner strokes without changing shared MVP rendering"
+	)
 	_expect(lab.name == "SigilLab", "Sigil Lab scene should use the consistent product term")
 	_expect(lab.graph_edit != null and lab.graph_edit.visible, "Sigil Lab should expose a connectable GraphEdit")
 	_expect(not lab.export_dialog.visible, "graph export dialog should stay hidden when the Lab opens")

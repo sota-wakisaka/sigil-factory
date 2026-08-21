@@ -18,18 +18,20 @@ static func draw_glyph(
 	center: Vector2,
 	scale: float = 1.0,
 	opacity: float = 1.0,
-	show_combine_structure: bool = true
+	show_combine_structure: bool = true,
+	stroke_weight: float = 1.0
 ) -> bool:
 	if canvas == null or not can_draw(glyph) or scale <= 0.0 or opacity <= 0.0:
 		return false
 	var normalized_opacity := clampf(opacity, 0.0, 1.0)
+	var normalized_stroke_weight := clampf(stroke_weight, 0.25, 2.0)
 	var structure := combine_visuals(glyph, scale, show_combine_structure)
 	for connection in structure["connections"]:
 		canvas.draw_line(
 			center + connection["from"],
 			center + connection["to"],
 			_with_opacity(CONNECTION_COLOR, normalized_opacity),
-			connection_stroke_width(scale),
+			connection_stroke_width(scale) * normalized_stroke_weight,
 			true
 		)
 	for circle in structure["circles"]:
@@ -38,7 +40,7 @@ static func draw_glyph(
 			center + circle["center"],
 			circle["radius"],
 			_with_opacity(COMBINE_COLOR, normalized_opacity * 0.7),
-			combine_stroke_width(scale)
+			combine_stroke_width(scale) * normalized_stroke_weight
 		)
 	for component in glyph.components:
 		_draw_component(
@@ -46,7 +48,8 @@ static func draw_glyph(
 			component,
 			center + Vector2(component.position) * 6.0 * scale,
 			scale,
-			normalized_opacity
+			normalized_opacity,
+			normalized_stroke_weight
 		)
 	return true
 
@@ -423,14 +426,15 @@ static func _draw_component(
 	component: GlyphComponentModel,
 	center: Vector2,
 	scale: float,
-	opacity: float
+	opacity: float,
+	stroke_weight: float
 ) -> void:
 	var color := _with_opacity(component_color(component.color_id), opacity)
 	var angle := deg_to_rad(float(component.rotation_degrees))
 	var radius := (5.0 + float(maxi(component.scale_step - 1, 0)) * 2.0) * scale
 	var radius_x := radius * float(component.scale_x_percent) / 100.0
 	var radius_y := radius * float(component.scale_y_percent) / 100.0
-	var stroke := primitive_stroke_width(scale)
+	var stroke := primitive_stroke_width(scale) * stroke_weight
 	match component.primitive_id:
 		&"circle":
 			_draw_basic_outline(canvas, center, radius_x, radius_y, 0.0, angle, 40, color, stroke)
@@ -456,14 +460,14 @@ static func _draw_component(
 				center,
 				center + direction * 2.0 * scale + normal * radius * 0.7,
 				color,
-				maxf(1.0, 1.5 * scale),
+				maxf(0.65, 1.5 * scale * stroke_weight),
 				true
 			)
 			canvas.draw_line(
 				center,
 				center + direction * 2.0 * scale - normal * radius * 0.7,
 				color,
-				maxf(1.0, 1.5 * scale),
+				maxf(0.65, 1.5 * scale * stroke_weight),
 				true
 			)
 		_:

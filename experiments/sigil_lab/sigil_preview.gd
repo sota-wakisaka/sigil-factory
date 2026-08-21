@@ -2,6 +2,7 @@ class_name SigilPreview
 extends Control
 
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
+const GLYPH_STROKE_WEIGHT := 0.5
 
 var glyph = null
 var emphasized := false
@@ -49,8 +50,13 @@ func _draw() -> void:
 			rect.get_center(),
 			draw_scale(),
 			1.0,
-			show_structure
+			show_structure,
+			GLYPH_STROKE_WEIGHT
 		)
+
+
+static func preview_stroke_width(scale: float) -> float:
+	return GlyphPainterModel.primitive_stroke_width(scale) * GLYPH_STROKE_WEIGHT
 
 
 static func _glyph_extent(value, include_structure: bool = false) -> float:
