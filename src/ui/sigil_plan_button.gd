@@ -13,6 +13,8 @@ const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 var glyph: GlyphModel
 var plan_description := ""
 var forecast_context := ""
+var forecast_mana := -1
+var forecast_count := -1
 
 
 func _ready() -> void:
@@ -42,8 +44,11 @@ func set_plan_selected(selected: bool) -> void:
 	queue_redraw()
 
 
-func set_forecast_context(next_context: String) -> void:
+func set_forecast_context(next_context: String, mana := -1, count := -1) -> void:
 	forecast_context = next_context
+	forecast_mana = mana
+	forecast_count = count
+	queue_redraw()
 
 
 func _draw() -> void:
@@ -64,6 +69,20 @@ func _draw() -> void:
 	)
 	if glyph != null:
 		GlyphPainterModel.draw_glyph(self, glyph, Vector2(size.x - 29.0, size.y * 0.5), glyph_draw_scale(), 1.0, false)
+	_draw_forecast_metrics(accent)
+
+
+func _draw_forecast_metrics(accent: Color) -> void:
+	if forecast_mana >= 0:
+		var bar := Rect2(Vector2(12, size.y - 5), Vector2(42, 2))
+		draw_rect(bar, Color(0.18, 0.25, 0.33, 0.9), true)
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(float(forecast_mana) / 100.0, 0.0, 1.0), bar.size.y)), Color(0.3, 0.67, 0.94, 0.95), true)
+	if forecast_count < 0:
+		return
+	var badge_center := Vector2(size.x - 10, 9)
+	draw_circle(badge_center, 8.0, Color(0.025, 0.045, 0.07, 0.98))
+	draw_arc(badge_center, 8.0, 0.0, TAU, 18, accent, 1.2, true)
+	draw_string(ThemeDB.fallback_font, badge_center + Vector2(-6, 4), str(forecast_count), HORIZONTAL_ALIGNMENT_CENTER, 12, 9, accent)
 
 
 func mode_badge_kind() -> StringName:

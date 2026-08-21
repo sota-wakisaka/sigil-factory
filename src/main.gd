@@ -286,11 +286,12 @@ func _refresh_plan_button_forecasts() -> void:
 		if bool(snapshot.get("ok", false)):
 			for unit_count in snapshot.get("counts", {}).values():
 				count += int(unit_count)
+		var mana := int(snapshot.get("mana", 0))
 		button.set_forecast_context("魔力 %d/%d // %s" % [
-			int(snapshot.get("mana", 0)),
+			mana,
 			MvpContent.FACTORY_MANA_MAX,
 			("配線後に生産予測" if button.manual_layout else "%d体/32秒" % count),
-		])
+		], mana, -1 if button.manual_layout else count)
 
 
 func _set_factory_feedback(message: String) -> void:
