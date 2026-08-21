@@ -4,6 +4,7 @@ extends RefCounted
 const GlyphModel := preload("res://src/domain/glyph.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 
+const NOMINAL_SIZE_PERCENT := 200
 const EYE := &"eye"
 const CROSS := &"cross"
 const TARGET := &"target"
@@ -56,7 +57,7 @@ static func glyph(glyph_id: StringName) -> GlyphModel:
 static func _eye() -> GlyphModel:
 	var circle := GlyphModel.new([GlyphComponentModel.new(&"circle")])
 	return GlyphModel.combine_many(
-		[circle, circle.stretched_percent(250, 100)],
+		[circle, circle.stretched_percent(NOMINAL_SIZE_PERCENT, 100)],
 		GlyphModel.CONNECTION_SIMPLE
 	)
 
@@ -65,8 +66,8 @@ static func _cross() -> GlyphModel:
 	var square := GlyphModel.new([GlyphComponentModel.new(&"square")])
 	return GlyphModel.combine_many(
 		[
-			square.stretched_percent(200, 50),
-			square.stretched_percent(50, 200),
+			square.stretched_percent(NOMINAL_SIZE_PERCENT, 50),
+			square.stretched_percent(50, NOMINAL_SIZE_PERCENT),
 		],
 		GlyphModel.CONNECTION_SIMPLE
 	)
@@ -75,13 +76,15 @@ static func _cross() -> GlyphModel:
 static func _target() -> GlyphModel:
 	var circle := GlyphModel.new([GlyphComponentModel.new(&"circle")])
 	return GlyphModel.combine_many(
-		[circle, circle.stretched_percent(250, 250)],
+		[circle, circle.stretched_percent(NOMINAL_SIZE_PERCENT, NOMINAL_SIZE_PERCENT)],
 		GlyphModel.CONNECTION_SIMPLE
 	)
 
 
 static func _star() -> GlyphModel:
-	var triangle := GlyphModel.new([GlyphComponentModel.new(&"triangle")])
+	var triangle := GlyphModel.new(
+		[GlyphComponentModel.new(&"triangle")]
+	).stretched_percent(NOMINAL_SIZE_PERCENT, NOMINAL_SIZE_PERCENT)
 	return GlyphModel.combine_many(
 		[triangle, triangle.rotated_degrees(180)],
 		GlyphModel.CONNECTION_SIMPLE

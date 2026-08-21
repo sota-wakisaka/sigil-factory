@@ -332,13 +332,14 @@ Combine
 | 方位 | 十字 + 45°回転した十字 | 方角・全周 |
 
 ```text
-Eye     = SimpleCombine(Circle, Scale(Circle, 250%, 100%))
+Eye     = SimpleCombine(Circle, Scale(Circle, 200%, 100%))
 Cross   = SimpleCombine(Scale(Square, 200%, 50%), Scale(Square, 50%, 200%))
-Target  = SimpleCombine(Circle, Scale(Circle, 250%, 250%))
-Star    = SimpleCombine(Triangle, Rotate(Triangle, 180°))
+Target  = SimpleCombine(Circle, Scale(Circle, 200%, 200%))
+Star    = SimpleCombine(Scale(Triangle, 200%, 200%), Rotate(Scale(Triangle, 200%, 200%), 180°))
 Compass = SimpleCombine(Cross, Rotate(Cross, 45°))
 ```
 
+- 登録グリフの外形基準は基本Primitiveの200%とし、下流で部品として並べても実寸が揃うようにする
 - 全登録グリフは結合線0本の単純結合を使用する
 - 登録時も内部の子Combine構造を保持する
 - 登録後は1つの意味グリフとして呼び出し、Move / Rotate / Scale / Repeat / Combineへ再入力できる

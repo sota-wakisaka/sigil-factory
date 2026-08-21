@@ -69,10 +69,10 @@ func _test_basic_primitives_and_stretch() -> void:
 
 func _test_registered_meaning_glyphs() -> void:
 	var expected_canonicals := {
-		RegisteredGlyphsModel.EYE: "S(3:0,0;32:P(26:p6:circle|0,0|0|1|c5:white),41:P(35:p6:circle|0,0|0|1|c5:white|a250,100))",
+		RegisteredGlyphsModel.EYE: "S(3:0,0;32:P(26:p6:circle|0,0|0|1|c5:white),41:P(35:p6:circle|0,0|0|1|c5:white|a200,100))",
 		RegisteredGlyphsModel.CROSS: "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50))",
-		RegisteredGlyphsModel.TARGET: "S(3:0,0;41:P(35:p6:circle|0,0|0|1|c5:white|a250,250),32:P(26:p6:circle|0,0|0|1|c5:white))",
-		RegisteredGlyphsModel.STAR: "S(3:0,0;34:P(28:p8:triangle|0,0|0|1|c5:white),35:P(29:p8:triangle|0,0|60|1|c5:white))",
+		RegisteredGlyphsModel.TARGET: "S(3:0,0;32:P(26:p6:circle|0,0|0|1|c5:white),41:P(35:p6:circle|0,0|0|1|c5:white|a200,200))",
+		RegisteredGlyphsModel.STAR: "S(3:0,0;43:P(37:p8:triangle|0,0|0|1|c5:white|a200,200),44:P(38:p8:triangle|0,0|60|1|c5:white|a200,200))",
 		RegisteredGlyphsModel.COMPASS: "S(3:0,0;96:S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50)),98:S(3:0,0;41:P(35:p6:square|0,0|45|1|c5:white|a50,200),41:P(35:p6:square|0,0|45|1|c5:white|a200,50)))",
 	}
 	var seen_canonicals: Dictionary = {}
@@ -86,6 +86,13 @@ func _test_registered_meaning_glyphs() -> void:
 		_expect(glyph.canonical_serialization() == expected_canonical, "%s should preserve its authored canonical structure" % glyph_id)
 		_expect(glyph.combine_connection_mode == GlyphModel.CONNECTION_SIMPLE, "%s should use line-free Simple Combine" % glyph_id)
 		_expect(GlyphPainterModel.combine_visuals(glyph, 1.0, false)["connections"].is_empty(), "%s should not invent connector lines" % glyph_id)
+		var maximum_size_percent := 0
+		for component in glyph.components:
+			maximum_size_percent = maxi(
+				maximum_size_percent,
+				maxi(component.scale_x_percent, component.scale_y_percent)
+			)
+		_expect(maximum_size_percent == RegisteredGlyphsModel.NOMINAL_SIZE_PERCENT, "%s should share the registered Glyph nominal size" % glyph_id)
 		_expect(not seen_canonicals.has(expected_canonical), "%s should remain visually and canonically distinct" % glyph_id)
 		seen_canonicals[expected_canonical] = true
 		var graph_text := FileAccess.get_file_as_string(
