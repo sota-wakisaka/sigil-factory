@@ -292,8 +292,9 @@ func _refresh_plan_button_forecasts() -> void:
 				count += int(unit_count)
 		var mana := int(snapshot.get("mana", 0))
 		var production_text := "配線後に生産予測" if button.manual_layout else "%d体/32秒" % count
+		var first_tick := -1
 		if not button.manual_layout:
-			var first_tick := _first_production_tick(snapshot)
+			first_tick = _first_production_tick(snapshot)
 			if first_tick >= 0:
 				production_text += " // 初着%.1f秒" % (float(first_tick) * TICK_SECONDS)
 		button.set_forecast_context("戦闘 %s\n魔力 %d/%d // %s" % [
@@ -301,7 +302,7 @@ func _refresh_plan_button_forecasts() -> void:
 			mana,
 			MvpContent.FACTORY_MANA_MAX,
 			production_text,
-		], mana, -1 if button.manual_layout else count)
+		], mana, -1 if button.manual_layout else count, first_tick, int(snapshot.get("horizon_ticks", 160)))
 
 
 func _first_production_tick(snapshot: Dictionary) -> int:
