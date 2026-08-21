@@ -86,6 +86,7 @@ func _initialize() -> void:
 	_test_empty_factory_requires_player_wiring()
 	_test_battle_units_fight_and_die()
 	_test_recipe_combat_variant_preserves_sigil_identity()
+	_test_battle_attributes_damage_to_sigil_recipe()
 	_test_preferred_attack_marks_weakness_feedback()
 	_test_enemy_shield_takes_damage_and_opens()
 	_test_battle_ends_at_time_limit()
@@ -1942,6 +1943,26 @@ func _test_recipe_combat_variant_preserves_sigil_identity() -> void:
 	_expect(
 		battle.battle_events[-1]["recipe_id"] == &"stellar_sentinel",
 		"spawn events should retain the producing sigil recipe"
+	)
+
+
+func _test_battle_attributes_damage_to_sigil_recipe() -> void:
+	var battle := BattleSimulation.new()
+	battle.add_spec(UnitSpecModel.new(&"ally", 50.0, 10.0, 1, 1.0, 1000.0))
+	battle.add_spec(UnitSpecModel.new(&"enemy", 50.0, 1.0, 10, 1.0, 10.0))
+	_expect(
+		battle.spawn_player_from_recipe(&"ally", &"test_sigil"),
+		"recipe-attributed player fixture should spawn"
+	)
+	battle.spawn_enemy(&"enemy")
+	battle.tick()
+	_expect(
+		is_equal_approx(float(battle.player_damage_by_recipe.get(&"test_sigil", 0.0)), 10.0),
+		"player damage should be attributed to the producing sigil recipe"
+	)
+	_expect(
+		not battle.player_damage_by_recipe.has(&""),
+		"unattributed enemy attacks should not create a blank recipe bucket"
 	)
 
 

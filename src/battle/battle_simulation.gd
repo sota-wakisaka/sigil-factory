@@ -30,6 +30,7 @@ var enemy_leader_vulnerable_tick := 650
 var battle_duration_ticks := 900
 var player_kills := 0
 var enemy_kills := 0
+var player_damage_by_recipe: Dictionary = {}
 var battle_events: Array[Dictionary] = []
 var rejected_spawns: Dictionary = {Side.PLAYER: 0, Side.ENEMY: 0}
 var spawn_budget_tick_index := -1
@@ -215,10 +216,12 @@ func _update_units() -> void:
 					target.hit_flash_ticks = 2
 					if unit.spec.preferred_target_id == target.spec.id:
 						target.weakness_flash_ticks = 4
+					var dealt_damage: float = unit.spec.damage_against(target.spec)
 					damage_by_instance[target.instance_id] = (
 						float(damage_by_instance.get(target.instance_id, 0.0))
-						+ unit.spec.damage_against(target.spec)
+						+ dealt_damage
 					)
+					_record_player_recipe_damage(unit, dealt_damage)
 				unit.attack_cooldown = unit.spec.attack_interval_ticks
 		elif _closest_enemy(unit) != null:
 			_move_toward_enemy(unit)
@@ -226,6 +229,7 @@ func _update_units() -> void:
 			if absf(ENEMY_SHIELD_POSITION - unit.position) <= unit.spec.attack_range:
 				if unit.attack_cooldown == 0:
 					enemy_shield_damage += unit.spec.attack_damage
+					_record_player_recipe_damage(unit, unit.spec.attack_damage)
 					unit.attack_cooldown = unit.spec.attack_interval_ticks
 			else:
 				_move_toward_enemy(unit)
@@ -237,6 +241,7 @@ func _update_units() -> void:
 				if unit.attack_cooldown == 0:
 					if unit.side == Side.PLAYER:
 						enemy_leader_damage += unit.spec.attack_damage
+						_record_player_recipe_damage(unit, unit.spec.attack_damage)
 					else:
 						player_leader_damage += unit.spec.attack_damage
 					unit.attack_cooldown = unit.spec.attack_interval_ticks
@@ -253,6 +258,14 @@ func _update_units() -> void:
 		battle_events.append({"type": "shield_destroyed", "tick": tick_index})
 	player_leader_health = maxf(player_leader_health - player_leader_damage, 0.0)
 	enemy_leader_health = maxf(enemy_leader_health - enemy_leader_damage, 0.0)
+
+
+func _record_player_recipe_damage(unit: BattleUnitModel, amount: float) -> void:
+	if unit.side != Side.PLAYER or unit.recipe_id == &"" or amount <= 0.0:
+		return
+	player_damage_by_recipe[unit.recipe_id] = (
+		float(player_damage_by_recipe.get(unit.recipe_id, 0.0)) + amount
+	)
 
 
 func _closest_enemy(unit: BattleUnitModel) -> BattleUnitModel:

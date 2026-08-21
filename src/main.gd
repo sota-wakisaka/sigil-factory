@@ -911,6 +911,9 @@ func _battle_result_summary() -> String:
 	var sigil_summary := _produced_sigil_summary()
 	if sigil_summary != "":
 		summary += "\n使用シジル: " + sigil_summary
+	var damage_summary := _sigil_damage_summary()
+	if damage_summary != "":
+		summary += "\nシジル与ダメージ: " + damage_summary
 	return summary
 
 
@@ -923,6 +926,19 @@ func _produced_sigil_summary() -> String:
 		labels.append("%s %d" % [
 			String(MvpContent.sigil_name(recipe.id)).trim_suffix("シジル"),
 			count,
+		])
+	return " / ".join(labels)
+
+
+func _sigil_damage_summary() -> String:
+	var labels := PackedStringArray()
+	for recipe in MvpContent.recipes():
+		var damage := float(battle_board.simulation.player_damage_by_recipe.get(recipe.id, 0.0))
+		if damage <= 0.0:
+			continue
+		labels.append("%s %.0f" % [
+			String(MvpContent.sigil_name(recipe.id)).trim_suffix("シジル"),
+			damage,
 		])
 	return " / ".join(labels)
 

@@ -412,6 +412,8 @@ func _initialize() -> void:
 	_expect("時間停止 2回" in main.phase_body.text, "victory screen should summarize committed and discarded time stops")
 	main.produced_recipes = {&"watchful_eye": 3, &"stellar_sentinel": 2}
 	_expect(main._produced_sigil_summary() == "目 3 / 星衛兵 2", "battle results should retain which acquired sigil recipes produced the units")
+	main.battle_board.simulation.player_damage_by_recipe = {&"watchful_eye": 123.0, &"stellar_sentinel": 456.0}
+	_expect(main._sigil_damage_summary() == "目 123 / 星衛兵 456", "battle results should attribute combat impact to the producing meaning sigils")
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.REWARD, "victory OK should open rewards")
 	_expect(main.reward_choices.visible and main.reward_choices.get_child_count() == 3, "reward phase should offer three meaning-Glyph upgrades")
