@@ -153,7 +153,7 @@ func _draw() -> void:
 		return
 	var target_center := Vector2(132, size.y * 0.5)
 	var candidate_center := Vector2(266, size.y * 0.5)
-	GlyphPainterModel.draw_glyph(self, glyph, target_center, glyph_draw_scale())
+	GlyphPainterModel.draw_glyph(self, glyph, target_center, glyph_draw_scale(), 1.0, false)
 	draw_line(Vector2(174, size.y * 0.5), Vector2(224, size.y * 0.5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
 	draw_line(Vector2(224, size.y * 0.5), Vector2(216, size.y * 0.5 - 5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
 	draw_line(Vector2(224, size.y * 0.5), Vector2(216, size.y * 0.5 + 5), Color(0.36, 0.56, 0.7, 0.75), 1.5, true)
@@ -168,7 +168,8 @@ func _draw() -> void:
 			candidate_glyph,
 			candidate_center,
 			candidate_draw_scale(),
-			candidate_opacity
+			candidate_opacity,
+			false
 		)
 	else:
 		var empty_color := MISMATCH_COLOR if candidate_forecast_state == &"invalid" else Color(0.32, 0.62, 0.78, 0.76)
@@ -230,15 +231,11 @@ func persistent_label() -> String:
 
 
 func glyph_draw_scale() -> float:
-	if glyph != null and glyph.combine_children.is_empty():
-		return 2.45
-	return 1.35
+	return GlyphPainterModel.fit_scale(glyph, 22.0, false, 0.7, 4.0)
 
 
 func candidate_draw_scale() -> float:
-	if candidate_glyph != null and candidate_glyph.combine_children.is_empty():
-		return 2.45
-	return 1.35
+	return GlyphPainterModel.fit_scale(candidate_glyph, 22.0, false, 0.7, 4.0)
 
 
 func _draw_candidate_marker(center: Vector2) -> void:

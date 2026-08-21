@@ -32,7 +32,7 @@ func _ready() -> void:
 func _draw() -> void:
 	var icon_center := Vector2(size.x * 0.5, 27)
 	if preview_glyph != null:
-		GlyphPainterModel.draw_glyph(self, preview_glyph, icon_center, 1.7)
+		GlyphPainterModel.draw_glyph(self, preview_glyph, icon_center, GlyphPainterModel.fit_scale(preview_glyph, 12.0, false, 0.7, 3.0), 1.0, false)
 	else:
 		_draw_equipment_icon(icon_center)
 	draw_string(

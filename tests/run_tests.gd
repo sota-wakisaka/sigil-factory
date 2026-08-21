@@ -1232,11 +1232,20 @@ func _test_shared_glyph_painter_rejects_invalid_structures() -> void:
 		and GlyphPainterModel.combine_stroke_width(2.0) > GlyphPainterModel.connection_stroke_width(2.0),
 		"shared Glyph painter should enforce Primitive > Combine circle > connection line hierarchy"
 	)
+	_expect(
+		GlyphPainterModel.DEFAULT_STROKE_WEIGHT < 0.7,
+		"finished Glyph strokes should stay thin enough to preserve overlapping meaning details"
+	)
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	var branch := GlyphModel.new([GlyphComponentModel.new(&"branch")])
 	var nested := GlyphModel.combine(GlyphModel.combine(valid, spike), branch)
 	var nested_visuals := GlyphPainterModel.combine_visuals(nested, 2.0)
 	_expect(nested_visuals["circles"].size() == 2, "each nested Combine should produce its own structural circle")
+	_expect(GlyphPainterModel.combine_visuals(nested, 2.0, false)["circles"].is_empty(), "finished Glyph views should be able to omit hierarchy rings without changing the Glyph")
+	_expect(
+		GlyphPainterModel.fit_scale(nested, 18.0, false) > GlyphPainterModel.fit_scale(nested, 18.0, true),
+		"visible-geometry fitting should reclaim space that editing-only hierarchy rings used"
+	)
 	_expect(nested_visuals["connections"].is_empty(), "coincident nested Combine children should not create artificial spokes")
 	_expect(
 		float(nested_visuals["circles"][0]["radius"]) > float(nested_visuals["circles"][1]["radius"]),
@@ -2812,12 +2821,9 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		"actual transported Glyph should replace the persistent line prediction"
 	)
 	_expect(FactoryBoard.FACTORY_LINE_WIDTH <= 2.0, "factory conduit should stay visually weaker than transported Glyph strokes")
-	_expect(board.transport_glyph_draw_scale(output_glyph) >= 1.5, "single-Primitive transport Glyph should be readable on the full-width board")
+	_expect(board.transport_glyph_draw_scale(output_glyph) >= 0.9, "single-Primitive transport Glyph should fill its halo without clipping")
 	var combined_transport := GlyphModel.combine(input_glyph, output_glyph)
-	_expect(
-		board.transport_glyph_draw_scale(combined_transport) < board.transport_glyph_draw_scale(output_glyph),
-		"combined transport Glyph should use a separate scale that keeps its circle inside the halo"
-	)
+	_expect(board.transport_glyph_draw_scale(combined_transport) >= 0.9, "combined transport Glyph should fit visible geometry instead of hidden hierarchy rings")
 	var invalid := GlyphModel.new([GlyphComponentModel.new(&"ring"), GlyphComponentModel.new(&"spike")])
 	line.payload = invalid
 	_expect(
@@ -3645,7 +3651,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	)
 	target_tooltip.free()
 	_expect(ghost.recipe_id == &"azure_guard", "sigil ghost should retain the displayed recipe ID")
-	_expect(ghost.glyph_draw_scale() == 2.45, "single-Primitive completion target should stay readable beside the factory candidate")
+	_expect(ghost.glyph_draw_scale() >= 2.0, "single-Primitive completion target should stay readable beside the factory candidate")
 	ghost.show_candidate(ghost.glyph, &"predicted")
 	_expect(ghost.candidate_state == &"match", "identical factory candidate should show a positive comparison state")
 	_expect(ghost.candidate_origin == &"predicted" and ghost.candidate_ring_style() == &"dashed", "predicted factory candidate should keep a dashed visual grammar")
@@ -3740,7 +3746,7 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	_expect(not ghost.show_recipe(&"missing_recipe"), "sigil ghost should reject an unknown recipe")
 	_expect(ghost.recipe_id == &"azure_guard", "unknown recipe should not erase the current ghost")
 	_expect(ghost.show_recipe(&"bound_colossus"), "sigil ghost should accept the combined recipe")
-	_expect(ghost.glyph_draw_scale() == 1.35, "combined completion target should keep its outer ring inside the comparison panel")
+	_expect(ghost.glyph_draw_scale() >= 2.0, "combined completion target should fit its visible geometry instead of reserving space for hidden hierarchy rings")
 	ghost.free()
 
 

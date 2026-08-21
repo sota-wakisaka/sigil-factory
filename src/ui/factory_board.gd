@@ -1774,7 +1774,7 @@ func _draw_predicted_line_glyph(glyph: GlyphModel, center: Vector2) -> void:
 			1.0,
 			true
 		)
-	var scale := 0.68 if not glyph.combine_children.is_empty() else 1.2
+	var scale := GlyphPainterModel.fit_scale(glyph, 6.5, false, 0.45, 1.5)
 	_draw_mini_glyph(glyph, center, scale, 0.64)
 
 
@@ -1783,9 +1783,7 @@ func line_has_preview_space(start: Vector2, finish: Vector2) -> bool:
 
 
 func transport_glyph_draw_scale(glyph: GlyphModel) -> float:
-	if glyph != null and not glyph.combine_children.is_empty():
-		return 0.85
-	return 1.5
+	return GlyphPainterModel.fit_scale(glyph, 7.0, false, 0.5, 1.7)
 
 
 func _draw_nodes(
@@ -1958,8 +1956,8 @@ func _draw_production_summary() -> void:
 			true
 		)
 		if GlyphPainterModel.can_draw(glyph):
-			var scale := 1.3 if glyph.combine_children.is_empty() else 1.15
-			GlyphPainterModel.draw_glyph(self, glyph, center, scale)
+			var scale := GlyphPainterModel.fit_scale(glyph, 12.0, false, 0.6, 2.8)
+			GlyphPainterModel.draw_glyph(self, glyph, center, scale, 1.0, false)
 		if production_comparison_active:
 			_draw_production_comparison(unit_id, center)
 		else:
@@ -2286,7 +2284,7 @@ func _draw_edit_summary() -> void:
 		var glyph: GlyphModel = entry["glyph"]
 		var center := Vector2(72.0 + index * 58.0, 28.0)
 		draw_circle(center, 16.0, Color(0.025, 0.055, 0.085, 0.92))
-		GlyphPainterModel.draw_glyph(self, glyph, center, 0.78 if not glyph.combine_children.is_empty() else 1.3)
+		GlyphPainterModel.draw_glyph(self, glyph, center, GlyphPainterModel.fit_scale(glyph, 12.0, false, 0.6, 2.8), 1.0, false)
 		draw_string(
 			ThemeDB.fallback_font,
 			center + Vector2(12, 12),
@@ -3295,9 +3293,7 @@ func _make_custom_tooltip(for_text: String):
 
 
 func node_glyph_draw_scale(glyph: GlyphModel) -> float:
-	if glyph != null and not glyph.combine_children.is_empty():
-		return 0.9
-	return 1.55
+	return GlyphPainterModel.fit_scale(glyph, 14.0, false, 0.6, 3.0)
 
 
 func visible_glyph_for_line(line_id: StringName) -> GlyphModel:
@@ -3588,7 +3584,7 @@ func _draw_mini_glyph(
 	scale: float,
 	opacity: float = 1.0
 ) -> void:
-	GlyphPainterModel.draw_glyph(self, glyph, center, scale, opacity)
+	GlyphPainterModel.draw_glyph(self, glyph, center, scale, opacity, false)
 
 
 func _draw_ports(node: FactoryNodeModel, center: Vector2) -> void:

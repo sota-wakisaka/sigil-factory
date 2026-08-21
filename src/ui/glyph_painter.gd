@@ -6,10 +6,50 @@ const BLUE_GLYPH := Color(0.28, 0.8, 1.0, 0.98)
 const RED_GLYPH := Color(1.0, 0.4, 0.42, 0.98)
 const COMBINE_COLOR := Color(0.55, 0.74, 0.9, 0.72)
 const CONNECTION_COLOR := Color(0.42, 0.6, 0.74, 0.42)
+const DEFAULT_STROKE_WEIGHT := 0.55
 
 
 static func can_draw(glyph: GlyphModel) -> bool:
 	return glyph != null and glyph.structure_validation_errors().is_empty()
+
+
+static func glyph_extent(glyph: GlyphModel, show_combine_structure: bool = false) -> float:
+	if not can_draw(glyph):
+		return 0.0
+	var extent := 0.0
+	for component in glyph.components:
+		var component_center := Vector2(component.position) * 6.0
+		var component_radius := _component_max_radius(component, 1.0)
+		extent = maxf(
+			extent,
+			maxf(absf(component_center.x) + component_radius, absf(component_center.y) + component_radius)
+		)
+	var visuals := combine_visuals(glyph, 1.0, show_combine_structure)
+	for circle in visuals["circles"]:
+		var circle_center: Vector2 = circle["center"]
+		var radius: float = circle["radius"]
+		extent = maxf(extent, maxf(absf(circle_center.x) + radius, absf(circle_center.y) + radius))
+	for connection in visuals["connections"]:
+		for point_key in ["from", "to"]:
+			var point: Vector2 = connection[point_key]
+			extent = maxf(extent, maxf(absf(point.x), absf(point.y)))
+	return maxf(extent + 2.0, 1.0)
+
+
+static func fit_scale(
+	glyph: GlyphModel,
+	available_radius: float,
+	show_combine_structure: bool = false,
+	minimum_scale: float = 0.16,
+	maximum_scale: float = 6.0
+) -> float:
+	if not can_draw(glyph) or available_radius <= 0.0:
+		return minimum_scale
+	return clampf(
+		available_radius / glyph_extent(glyph, show_combine_structure),
+		minimum_scale,
+		maximum_scale
+	)
 
 
 static func draw_glyph(
@@ -19,7 +59,7 @@ static func draw_glyph(
 	scale: float = 1.0,
 	opacity: float = 1.0,
 	show_combine_structure: bool = true,
-	stroke_weight: float = 1.0
+	stroke_weight: float = DEFAULT_STROKE_WEIGHT
 ) -> bool:
 	if canvas == null or not can_draw(glyph) or scale <= 0.0 or opacity <= 0.0:
 		return false

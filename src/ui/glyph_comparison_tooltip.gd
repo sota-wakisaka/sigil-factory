@@ -51,9 +51,9 @@ func _draw() -> void:
 	_draw_preview_backing(target_center, TARGET_COLOR)
 	_draw_preview_backing(candidate_center, MATCH_COLOR if comparison_state == &"match" else MISMATCH_COLOR)
 	if target_glyph != null:
-		GlyphPainterModel.draw_glyph(self, target_glyph, target_center, _preview_scale(target_glyph))
+		GlyphPainterModel.draw_glyph(self, target_glyph, target_center, _preview_scale(target_glyph), 1.0, false)
 	if candidate_glyph != null:
-		GlyphPainterModel.draw_glyph(self, candidate_glyph, candidate_center, _preview_scale(candidate_glyph))
+		GlyphPainterModel.draw_glyph(self, candidate_glyph, candidate_center, _preview_scale(candidate_glyph), 1.0, false)
 	draw_line(Vector2(228, 142), Vector2(292, 142), Color(0.4, 0.62, 0.76, 0.8), 2.0, true)
 	draw_line(Vector2(292, 142), Vector2(282, 136), Color(0.4, 0.62, 0.76, 0.8), 2.0, true)
 	draw_line(Vector2(292, 142), Vector2(282, 148), Color(0.4, 0.62, 0.76, 0.8), 2.0, true)
@@ -70,7 +70,7 @@ func _draw_preview_backing(center: Vector2, color: Color) -> void:
 
 
 func _preview_scale(value: GlyphModel) -> float:
-	return 3.6 if not value.combine_children.is_empty() else 6.0
+	return GlyphPainterModel.fit_scale(value, 60.0, false, 1.0, 7.0)
 
 
 func _draw_state_badge(center: Vector2) -> void:

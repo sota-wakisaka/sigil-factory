@@ -47,7 +47,7 @@ func _draw() -> void:
 	draw_rect(panel, Color(0.04, 0.065, 0.1, 0.96), true)
 	draw_rect(panel, accent, false, 2.0 if button_pressed else 1.0)
 	if glyph != null:
-		GlyphPainterModel.draw_glyph(self, glyph, Vector2(48, size.y * 0.5), 1.35, 1.0)
+		GlyphPainterModel.draw_glyph(self, glyph, Vector2(48, size.y * 0.5), GlyphPainterModel.fit_scale(glyph, 22.0, false, 0.7, 4.0), 1.0, false)
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(83, size.y * 0.5 - 3),

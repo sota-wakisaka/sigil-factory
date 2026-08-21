@@ -57,7 +57,7 @@ func _draw() -> void:
 	var glyph_center := Vector2(102, 154)
 	draw_circle(glyph_center, 66.0, Color(0.04, 0.075, 0.11, 0.9))
 	draw_arc(glyph_center, 66.0, 0.0, TAU, 40, Color(0.2, 0.38, 0.52, 0.72), 1.0, true)
-	GlyphPainterModel.draw_glyph(self, glyph, glyph_center, _preview_scale())
+	GlyphPainterModel.draw_glyph(self, glyph, glyph_center, _preview_scale(), 1.0, false)
 	var detail_lines := _detail_lines()
 	for index in detail_lines.size():
 		draw_string(
@@ -92,7 +92,7 @@ func context_lines() -> PackedStringArray:
 
 
 func _preview_scale() -> float:
-	return 3.5 if not glyph.combine_children.is_empty() else 5.6
+	return GlyphPainterModel.fit_scale(glyph, 54.0, false, 1.0, 7.0)
 
 
 func _detail_lines() -> PackedStringArray:
