@@ -390,11 +390,13 @@ func _initialize() -> void:
 	main.battle_board.simulation.player_kills += 3
 	main.battle_board.simulation.enemy_kills += 1
 	main.battle_board.simulation.enemy_shield_health -= 120.0
+	main.battle_board.simulation.player_damage_by_recipe[&"vigil_cross"] = 75.0
 	main._refresh_status()
 	_expect("変更後15秒" in main.plan_label.text, "impact observation should become a fixed result after fifteen seconds")
 	_expect("敵撃破 +3" in main.plan_label.text, "impact result should report enemies defeated after the change")
 	_expect("味方損失 +1" in main.plan_label.text, "impact result should report allied losses after the change")
 	_expect("目標ダメージ 120" in main.plan_label.text, "impact result should report objective damage after the change")
+	_expect("シジル打撃 警戒十字 +75" in main.plan_label.text, "impact result should attribute observed attacks to the active meaning sigil")
 	main.pause_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_RECONFIGURE, "second time stop should open another transactional preview")
 	_expect(main.factory_board.production_comparison_active, "each time stop should capture a fresh production baseline")

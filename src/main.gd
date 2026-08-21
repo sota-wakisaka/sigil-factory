@@ -581,6 +581,7 @@ func _begin_factory_change_tracking() -> void:
 		"player_kills": battle.player_kills,
 		"enemy_kills": battle.enemy_kills,
 		"objective_health": battle.enemy_shield_health + battle.enemy_leader_health,
+		"recipe_damage": battle.player_damage_by_recipe.duplicate(true),
 	}
 	last_factory_change_battle_impact = ""
 
@@ -598,7 +599,8 @@ func _refresh_factory_change_tracking() -> void:
 		battle.enemy_kills - int(factory_change_battle_baseline["enemy_kills"]),
 		float(factory_change_battle_baseline["objective_health"])
 			- battle.enemy_shield_health
-			- battle.enemy_leader_health
+			- battle.enemy_leader_health,
+		_recipe_damage_delta(factory_change_battle_baseline.get("recipe_damage", {}))
 	)
 	if elapsed_ticks >= FACTORY_CHANGE_TRACKING_TICKS:
 		last_factory_change_battle_impact = "変更後15秒 // %s" % impact
@@ -610,12 +612,41 @@ func _refresh_factory_change_tracking() -> void:
 		]
 
 
-func _factory_change_impact_text(enemy_defeated: int, allies_lost: int, objective_damage: float) -> String:
-	return "敵撃破 +%d / 味方損失 +%d / 目標ダメージ %.0f" % [
+func _factory_change_impact_text(
+	enemy_defeated: int,
+	allies_lost: int,
+	objective_damage: float,
+	recipe_damage: Dictionary = {}
+) -> String:
+	var impact := "敵撃破 +%d / 味方損失 +%d / 目標ダメージ %.0f" % [
 		maxi(enemy_defeated, 0),
 		maxi(allies_lost, 0),
 		maxf(objective_damage, 0.0),
 	]
+	var recipe_labels := PackedStringArray()
+	for recipe in MvpContent.recipes():
+		var damage := float(recipe_damage.get(recipe.id, 0.0))
+		if damage <= 0.0:
+			continue
+		recipe_labels.append("%s +%.0f" % [
+			String(MvpContent.sigil_name(recipe.id)).trim_suffix("シジル"),
+			damage,
+		])
+	if not recipe_labels.is_empty():
+		impact += " / シジル打撃 " + "・".join(recipe_labels)
+	return impact
+
+
+func _recipe_damage_delta(before: Dictionary) -> Dictionary:
+	var result := {}
+	for recipe in MvpContent.recipes():
+		var damage := (
+			float(battle_board.simulation.player_damage_by_recipe.get(recipe.id, 0.0))
+			- float(before.get(recipe.id, 0.0))
+		)
+		if damage > 0.0:
+			result[recipe.id] = damage
+	return result
 
 
 func _refresh_battle_plan_label() -> void:
