@@ -287,12 +287,28 @@ func _refresh_plan_button_forecasts() -> void:
 			for unit_count in snapshot.get("counts", {}).values():
 				count += int(unit_count)
 		var mana := int(snapshot.get("mana", 0))
+		var production_text := "配線後に生産予測" if button.manual_layout else "%d体/32秒" % count
+		if not button.manual_layout:
+			var first_tick := _first_production_tick(snapshot)
+			if first_tick >= 0:
+				production_text += " // 初着%.1f秒" % (float(first_tick) * TICK_SECONDS)
 		button.set_forecast_context("戦闘 %s\n魔力 %d/%d // %s" % [
 			MvpContent.recipe_combat_trait(button.recipe_id),
 			mana,
 			MvpContent.FACTORY_MANA_MAX,
-			("配線後に生産予測" if button.manual_layout else "%d体/32秒" % count),
+			production_text,
 		], mana, -1 if button.manual_layout else count)
+
+
+func _first_production_tick(snapshot: Dictionary) -> int:
+	var first_tick := -1
+	for offsets_value in snapshot.get("event_offsets", {}).values():
+		var offsets: PackedInt32Array = offsets_value
+		if offsets.is_empty():
+			continue
+		if first_tick < 0 or offsets[0] < first_tick:
+			first_tick = offsets[0]
+	return first_tick
 
 
 func _set_factory_feedback(message: String) -> void:
