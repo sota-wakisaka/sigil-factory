@@ -242,6 +242,7 @@ func _test_lab_scene() -> void:
 	await process_frame
 	_expect(lab.name == "SigilLab", "Sigil Lab scene should use the consistent product term")
 	_expect(lab.graph_edit != null and lab.graph_edit.visible, "Sigil Lab should expose a connectable GraphEdit")
+	_expect(not lab.export_dialog.visible, "graph export dialog should stay hidden when the Lab opens")
 	_expect(lab.node_controls.size() == 5, "default eye template should stay readable and editable")
 	_expect(not lab.structure_button.button_pressed and not lab.output_preview.show_structure, "finished preview should hide hierarchy by default")
 	lab.structure_button.button_pressed = true
@@ -289,7 +290,7 @@ func _test_lab_scene() -> void:
 	if export_data is Dictionary:
 		_expect(export_data["format"] == "sigil_lab_graph" and int(export_data["version"]) == 1, "export should identify its stable graph format version")
 		_expect(export_data["canonical_glyph"] == output["glyph"].canonical_serialization(), "export should include the exact completed Glyph identity")
-		_expect(export_data["nodes"].size() == 5 and export_data["connections"].size() == 4, "export should include only the five nodes and four connections that produce the eye")
+		_expect(export_data["nodes"].size() == 9 and export_data["connections"].size() == 4, "export should preserve every node on the canvas, including disconnected work")
 		var exported_source_found := false
 		for exported_node in export_data["nodes"]:
 			_expect(exported_node["position"] is Array and exported_node["position"].size() == 2, "exported nodes should preserve their editor positions")

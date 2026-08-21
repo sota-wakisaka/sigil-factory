@@ -94,8 +94,7 @@ func export_graph_text() -> String:
 	var output_result := graph.evaluate_output()
 	if not bool(output_result.get("ok", false)):
 		return ""
-	var included_nodes := _output_dependency_nodes()
-	var node_ids: Array = included_nodes.keys()
+	var node_ids: Array = graph.nodes.keys()
 	node_ids.sort_custom(func(first, second) -> bool: return String(first) < String(second))
 	var exported_nodes: Array[Dictionary] = []
 	for node_id_value in node_ids:
@@ -113,8 +112,6 @@ func export_graph_text() -> String:
 		})
 	var exported_connections: Array[Dictionary] = []
 	for connection in graph.connections:
-		if not included_nodes.has(connection["from"]) or not included_nodes.has(connection["to"]):
-			continue
 		exported_connections.append({
 			"from": String(connection["from"]),
 			"from_port": int(connection["from_port"]),
@@ -207,6 +204,13 @@ func _build_header() -> Control:
 	clear_button.pressed.connect(_clear_workspace)
 	toolbar.add_child(clear_button)
 
+	export_button = Button.new()
+	export_button.text = "グラフ出力"
+	export_button.tooltip_text = "現在の全ノード・設定・配置・配線をJSONで書き出す"
+	export_button.custom_minimum_size = Vector2(96, 34)
+	export_button.pressed.connect(_show_export_dialog)
+	toolbar.add_child(export_button)
+
 	menu_button = Button.new()
 	menu_button.text = "← MENU"
 	menu_button.tooltip_text = "メインメニューへ戻る"
@@ -269,21 +273,12 @@ func _build_output_panel() -> Control:
 	title.add_theme_color_override("font_color", Color(0.66, 0.86, 1.0))
 	column.add_child(title)
 
-	var tool_row := HBoxContainer.new()
-	tool_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	tool_row.add_theme_constant_override("separation", 6)
 	structure_button = Button.new()
 	structure_button.text = "階層"
 	structure_button.tooltip_text = "編集補助 // 合成グループの範囲だけを点線で表示"
 	structure_button.toggle_mode = true
 	structure_button.toggled.connect(set_structure_overlay)
-	tool_row.add_child(structure_button)
-	export_button = Button.new()
-	export_button.text = "文字出力"
-	export_button.tooltip_text = "完成シジルのノード・設定・配線をJSONで書き出す"
-	export_button.pressed.connect(_show_export_dialog)
-	tool_row.add_child(export_button)
-	column.add_child(tool_row)
+	column.add_child(structure_button)
 
 	output_preview = SigilPreviewModel.new()
 	output_preview.custom_minimum_size = Vector2(310, 310)
@@ -313,6 +308,7 @@ func _build_output_panel() -> Control:
 
 func _build_export_dialog() -> void:
 	export_dialog = Window.new()
+	export_dialog.visible = false
 	export_dialog.title = "完成シジル // JSON書き出し"
 	export_dialog.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
 	export_dialog.size = Vector2i(760, 560)
@@ -333,7 +329,7 @@ func _build_export_dialog() -> void:
 	column.add_theme_constant_override("separation", 8)
 	margin.add_child(column)
 	var note := Label.new()
-	note.text = "この文字列で完成形とノード構成を再現できます"
+	note.text = "この文字列で現在の全ノード・配置・配線と完成形を再現できます"
 	note.add_theme_color_override("font_color", Color(0.62, 0.8, 0.94))
 	column.add_child(note)
 	export_text = TextEdit.new()
@@ -737,23 +733,6 @@ func _refresh_all() -> void:
 		export_button.disabled = true
 		_set_status(_error_text(StringName(output_result.get("error", &"missing_input"))), true)
 		stats_label.text = "出力ノードまで接続してください"
-
-
-func _output_dependency_nodes() -> Dictionary:
-	var included: Dictionary = {}
-	var output_id := graph.output_node_id()
-	if output_id == &"":
-		return included
-	var pending: Array[StringName] = [output_id]
-	while not pending.is_empty():
-		var node_id: StringName = pending.pop_back()
-		if included.has(node_id):
-			continue
-		included[node_id] = true
-		for connection in graph.connections:
-			if connection["to"] == node_id:
-				pending.append(connection["from"])
-	return included
 
 
 static func _json_value(value):
