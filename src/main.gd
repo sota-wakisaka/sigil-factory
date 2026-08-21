@@ -753,6 +753,8 @@ func _reset_stage() -> void:
 	produced_recipes.clear()
 	elapsed_since_tick = 0.0
 	battle_speed_index = 0
+	action_error_message = ""
+	action_error_hold_ticks = 0
 	time_stop_count = 0
 	factory_change_count = 0
 	pre_edit_production_snapshot.clear()

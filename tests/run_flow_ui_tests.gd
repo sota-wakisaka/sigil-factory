@@ -526,8 +526,11 @@ func _initialize() -> void:
 	main._cycle_battle_speed()
 	main._on_main_action()
 	_expect(main.current_battle_speed() == defeated_speed and main.defeat_active, "defeat overlay should block stale battle speed and time-stop actions")
+	main.action_error_message = "前ステージの一時エラー"
+	main.action_error_hold_ticks = 5
 	main.phase_button.pressed.emit()
 	_expect(main.flow.phase == RunFlow.Phase.FACTORY_BUILD, "retry should return to factory build")
+	_expect(main.action_error_message == "" and main.action_error_hold_ticks == 0, "retry should not carry a stale factory operation error into the next attempt")
 
 	main.queue_free()
 	if failures == 0:
