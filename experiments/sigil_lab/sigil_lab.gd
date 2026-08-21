@@ -7,6 +7,7 @@ const SigilPreviewModel := preload("res://experiments/sigil_lab/sigil_preview.gd
 const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_glyphs.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
 
+const MENU_SCENE := "res://src/main_menu.tscn"
 const PORT_COLOR := Color(0.3, 0.82, 1.0, 1.0)
 const NODE_NAMES := {
 	&"source": "素材",
@@ -42,6 +43,7 @@ var structure_button: Button
 var export_button: Button
 var export_dialog: Window
 var export_text: TextEdit
+var menu_button: Button
 
 
 func _ready() -> void:
@@ -134,6 +136,10 @@ func export_graph_text() -> String:
 	return JSON.stringify(document, "\t", false)
 
 
+func return_to_menu() -> void:
+	get_tree().change_scene_to_file(MENU_SCENE)
+
+
 func _build_ui() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -172,6 +178,13 @@ func _build_header() -> Control:
 	var toolbar := HBoxContainer.new()
 	toolbar.custom_minimum_size.y = 42.0
 	toolbar.add_theme_constant_override("separation", 8)
+
+	menu_button = Button.new()
+	menu_button.name = "MenuButton"
+	menu_button.text = "← メニュー"
+	menu_button.custom_minimum_size = Vector2(104, 34)
+	menu_button.pressed.connect(return_to_menu)
+	toolbar.add_child(menu_button)
 
 	var title := Label.new()
 	title.text = "SIGIL LAB // Glyph Editor"

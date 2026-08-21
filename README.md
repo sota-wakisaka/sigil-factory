@@ -22,7 +22,7 @@ Godot 4とGDScriptで開発している、シジル生産工場を中心とし�
 
 ## 起動
 
-Godot 4.7.1でプロジェクトを実行すると、現在の主作業画面であるSigil Labが開きます。
+Godot 4.7.1でプロジェクトを実行するとメインメニューが開き、工場プロトタイプとSigil Labを選択できます。
 
 ```powershell
 & "C:\Program Files\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe" --path .
@@ -34,6 +34,13 @@ Godot 4.7.1でプロジェクトを実行すると、現在の主作業画面で
 
 ```powershell
 & "C:\Program Files\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe" --headless --path . --script res://tests/run_sigil_lab_tests.gd
+```
+
+工場プロトタイプとメニュー:
+
+```powershell
+& "C:\Program Files\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe" --headless --path . --script res://tests/run_factory_prototype_tests.gd
+& "C:\Program Files\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe" --headless --path . --script res://tests/run_main_menu_tests.gd
 ```
 
 Glyph・工場ドメイン:
