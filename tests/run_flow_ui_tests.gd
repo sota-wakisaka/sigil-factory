@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.ROUTE_SELECTION, "UI should open at route selection")
 	_expect(main.phase_overlay.visible, "placeholder phases should use the overlay")
 	_expect(main.route_choices.visible and main.route_choices.get_child_count() == 3, "route selection should offer three branches")
+	_expect(not main.run_upgrade_strip.visible, "first route should not reserve space for an empty upgrade inventory")
 	_expect(main.route_choices.get_child(0).route_id == MvpContent.ROUTE_SWARM and main.route_choices.get_child(2).route_id == MvpContent.ROUTE_ARMORED, "route cards should carry distinct encounter identities")
 	main.route_choices.get_child(0).pressed.emit()
 	_expect(main.selected_route_id == MvpContent.ROUTE_SWARM and main.route_choices.get_child(0).button_pressed, "route cards should select their encounter directly")
@@ -464,7 +465,12 @@ func _initialize() -> void:
 	_expect(main.flow.phase == RunFlow.Phase.ROUTE_SELECTION, "reward OK should return to route selection")
 	_expect(main.flow.route_number == 2, "UI should display the next route")
 	_expect(main.acquired_rewards.size() == 1, "selected reward should persist into the next route")
-	_expect("集束 1/3" in main.phase_body.text, "next route should display the acquired meaning-Glyph reward level")
+	_expect(main.run_upgrade_strip.visible and int(main.run_upgrade_strip.levels[&"ring_speed"]) == 1, "next route should display acquired upgrades as meaning Glyphs instead of a sentence")
+	var upgrade_center: Vector2 = main.run_upgrade_strip.slot_rect(0).get_center()
+	_expect(main.run_upgrade_strip._get_tooltip(upgrade_center) == "run_upgrade", "acquired upgrade Glyph should expose a stable inspection target")
+	var upgrade_tooltip = main.run_upgrade_strip._make_custom_tooltip("run_upgrade")
+	_expect(upgrade_tooltip is GlyphTooltip and "集束" in upgrade_tooltip.title and "1/3" in upgrade_tooltip.context, "upgrade inventory hover should enlarge the exact meaning Glyph and level")
+	upgrade_tooltip.free()
 	var upgraded_source: FactoryNodeModel = main.factory_board.simulation.nodes[&"ring_source"]
 	_expect(upgraded_source.config["interval_ticks"] < 18, "selected reward should modify the next route factory")
 

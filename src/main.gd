@@ -8,6 +8,7 @@ const FactorySelectionIndicatorControl := preload("res://src/ui/factory_selectio
 const MeaningRewardButtonControl := preload("res://src/ui/meaning_reward_button.gd")
 const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 const StageThreatTimelineControl := preload("res://src/ui/stage_threat_timeline.gd")
+const RunUpgradeStripControl := preload("res://src/ui/run_upgrade_strip.gd")
 
 const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
 
@@ -49,6 +50,7 @@ enum WorkspaceView {
 @onready var reward_choices: HBoxContainer = $PhaseOverlay/Center/Panel/Content/RewardChoices
 @onready var route_choices: HBoxContainer = $PhaseOverlay/Center/Panel/Content/RouteChoices
 @onready var stage_timeline: StageThreatTimelineControl = $PhaseOverlay/Center/Panel/Content/StageTimeline
+@onready var run_upgrade_strip: RunUpgradeStripControl = $PhaseOverlay/Center/Panel/Content/RunUpgradeStrip
 @onready var inspector_label: FactorySelectionIndicatorControl = $FactoryInspector/SelectionLabel
 @onready var inspector_option: FactorySettingOption = $FactoryInspector/SettingOption
 @onready var sigil_ghost: SigilGhostControl = $FactoryInspector/SigilGhost
@@ -747,6 +749,7 @@ func _apply_phase() -> void:
 	reward_choices.visible = false
 	route_choices.visible = false
 	stage_timeline.visible = false
+	run_upgrade_strip.visible = false
 	debug_victory_button.visible = false
 	speed_button.disabled = true
 	_update_speed_button()
@@ -758,10 +761,11 @@ func _apply_phase() -> void:
 	match flow.phase:
 		RunFlow.Phase.ROUTE_SELECTION:
 			_prepare_route_options()
+			run_upgrade_strip.configure(acquired_rewards)
 			_show_overlay(
 				"RUN %02d" % flow.route_number,
 				"ルートを選択",
-				"敵編成が異なるルートを選択します。\n所持強化: %s" % _reward_summary(),
+				"敵編成が異なるルートを選択します。",
 				"OK：このルートを選択"
 			)
 		RunFlow.Phase.STAGE_INFO:

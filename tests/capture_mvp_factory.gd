@@ -27,7 +27,9 @@ func _initialize() -> void:
 	viewport.add_child(main)
 	await process_frame
 	main.acquired_rewards = upgrades
-	if capture_phase == "stage":
+	if capture_phase == "route":
+		main._apply_phase()
+	elif capture_phase == "stage":
 		main.phase_button.pressed.emit()
 	elif capture_phase == "reward":
 		main.phase_button.pressed.emit()

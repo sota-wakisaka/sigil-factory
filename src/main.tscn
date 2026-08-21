@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/factory_board.gd" id="2_factory"]
@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://src/ui/meaning_reward_button.gd" id="10_reward_button"]
 [ext_resource type="Script" path="res://src/ui/route_choice_button.gd" id="11_route_button"]
 [ext_resource type="Script" path="res://src/ui/stage_threat_timeline.gd" id="12_stage_timeline"]
+[ext_resource type="Script" path="res://src/ui/run_upgrade_strip.gd" id="13_upgrade_strip"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -475,6 +476,13 @@ layout_mode = 2
 visible = false
 mouse_default_cursor_shape = 2
 script = ExtResource("12_stage_timeline")
+
+[node name="RunUpgradeStrip" type="Control" parent="PhaseOverlay/Center/Panel/Content"]
+visible = false
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+mouse_default_cursor_shape = 4
+script = ExtResource("13_upgrade_strip")
 
 [node name="RewardChoices" type="HBoxContainer" parent="PhaseOverlay/Center/Panel/Content"]
 custom_minimum_size = Vector2(0, 92)
