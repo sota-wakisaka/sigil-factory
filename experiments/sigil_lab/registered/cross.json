@@ -1,7 +1,7 @@
 {
 	"format": "sigil_lab_graph",
 	"version": 1,
-	"canonical_glyph": "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50))",
+	"canonical_glyph": "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a100,25),40:P(34:p6:square|0,0|0|1|c5:white|a25,100))",
 	"output_node": "output_1",
 	"nodes": [
 		{
@@ -28,8 +28,8 @@
 			"id": "scale_3",
 			"kind": "scale",
 			"config": {
-				"x_percent": 200,
-				"y_percent": 50
+				"x_percent": 100,
+				"y_percent": 25
 			},
 			"position": [
 				300.0,
@@ -40,8 +40,8 @@
 			"id": "scale_5",
 			"kind": "scale",
 			"config": {
-				"x_percent": 50,
-				"y_percent": 200
+				"x_percent": 25,
+				"y_percent": 100
 			},
 			"position": [
 				260.0,

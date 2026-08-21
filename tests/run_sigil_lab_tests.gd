@@ -69,11 +69,11 @@ func _test_basic_primitives_and_stretch() -> void:
 
 func _test_registered_meaning_glyphs() -> void:
 	var expected_canonicals := {
-		RegisteredGlyphsModel.EYE: "S(3:0,0;32:P(26:p6:circle|0,0|0|1|c5:white),41:P(35:p6:circle|0,0|0|1|c5:white|a200,100))",
-		RegisteredGlyphsModel.CROSS: "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50))",
-		RegisteredGlyphsModel.TARGET: "S(3:0,0;32:P(26:p6:circle|0,0|0|1|c5:white),41:P(35:p6:circle|0,0|0|1|c5:white|a200,200))",
-		RegisteredGlyphsModel.STAR: "S(3:0,0;43:P(37:p8:triangle|0,0|0|1|c5:white|a200,200),44:P(38:p8:triangle|0,0|60|1|c5:white|a200,200))",
-		RegisteredGlyphsModel.COMPASS: "S(3:0,0;96:S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50)),98:S(3:0,0;41:P(35:p6:square|0,0|45|1|c5:white|a50,200),41:P(35:p6:square|0,0|45|1|c5:white|a200,50)))",
+		RegisteredGlyphsModel.EYE: "S(3:0,0;39:P(33:p6:circle|0,0|0|1|c5:white|a50,50),40:P(34:p6:circle|0,0|0|1|c5:white|a100,50))",
+		RegisteredGlyphsModel.CROSS: "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a100,25),40:P(34:p6:square|0,0|0|1|c5:white|a25,100))",
+		RegisteredGlyphsModel.TARGET: "S(3:0,0;39:P(33:p6:circle|0,0|0|1|c5:white|a50,50),32:P(26:p6:circle|0,0|0|1|c5:white))",
+		RegisteredGlyphsModel.STAR: "S(3:0,0;34:P(28:p8:triangle|0,0|0|1|c5:white),35:P(29:p8:triangle|0,0|60|1|c5:white))",
+		RegisteredGlyphsModel.COMPASS: "S(3:0,0;96:S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a100,25),40:P(34:p6:square|0,0|0|1|c5:white|a25,100)),98:S(3:0,0;41:P(35:p6:square|0,0|45|1|c5:white|a100,25),41:P(35:p6:square|0,0|45|1|c5:white|a25,100)))",
 	}
 	var seen_canonicals: Dictionary = {}
 	_expect(RegisteredGlyphsModel.IDS.size() == 5, "the initial meaning-Glyph set should stay intentionally small")

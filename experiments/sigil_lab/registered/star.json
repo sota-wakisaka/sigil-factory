@@ -1,20 +1,18 @@
 {
 	"format": "sigil_lab_graph",
 	"version": 1,
-	"canonical_glyph": "S(3:0,0;43:P(37:p8:triangle|0,0|0|1|c5:white|a200,200),44:P(38:p8:triangle|0,0|60|1|c5:white|a200,200))",
+	"canonical_glyph": "S(3:0,0;34:P(28:p8:triangle|0,0|0|1|c5:white),35:P(29:p8:triangle|0,0|60|1|c5:white))",
 	"output_node": "output_1",
 	"nodes": [
 		{"id": "output_1", "kind": "output", "config": {}, "position": [700.0, 120.0]},
 		{"id": "source_2", "kind": "source", "config": {"primitive_id": "triangle"}, "position": [40.0, 180.0]},
-		{"id": "scale_3", "kind": "scale", "config": {"x_percent": 200, "y_percent": 200}, "position": [220.0, 180.0]},
-		{"id": "rotate_4", "kind": "rotate", "config": {"degrees": 180}, "position": [400.0, 300.0]},
-		{"id": "combine_5", "kind": "combine", "config": {"connection_mode": "simple"}, "position": [520.0, 120.0]}
+		{"id": "rotate_3", "kind": "rotate", "config": {"degrees": 180}, "position": [240.0, 300.0]},
+		{"id": "combine_4", "kind": "combine", "config": {"connection_mode": "simple"}, "position": [460.0, 150.0]}
 	],
 	"connections": [
-		{"from": "combine_5", "from_port": 0, "to": "output_1", "to_port": 0},
-		{"from": "rotate_4", "from_port": 0, "to": "combine_5", "to_port": 1},
-		{"from": "scale_3", "from_port": 0, "to": "combine_5", "to_port": 0},
-		{"from": "scale_3", "from_port": 0, "to": "rotate_4", "to_port": 0},
-		{"from": "source_2", "from_port": 0, "to": "scale_3", "to_port": 0}
+		{"from": "combine_4", "from_port": 0, "to": "output_1", "to_port": 0},
+		{"from": "rotate_3", "from_port": 0, "to": "combine_4", "to_port": 1},
+		{"from": "source_2", "from_port": 0, "to": "combine_4", "to_port": 0},
+		{"from": "source_2", "from_port": 0, "to": "rotate_3", "to_port": 0}
 	]
 }

@@ -1,7 +1,7 @@
 {
 	"format": "sigil_lab_graph",
 	"version": 1,
-	"canonical_glyph": "S(3:0,0;96:S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50)),98:S(3:0,0;41:P(35:p6:square|0,0|45|1|c5:white|a50,200),41:P(35:p6:square|0,0|45|1|c5:white|a200,50)))",
+	"canonical_glyph": "S(3:0,0;96:S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a100,25),40:P(34:p6:square|0,0|0|1|c5:white|a25,100)),98:S(3:0,0;41:P(35:p6:square|0,0|45|1|c5:white|a100,25),41:P(35:p6:square|0,0|45|1|c5:white|a25,100)))",
 	"output_node": "output_1",
 	"nodes": [
 		{"id": "output_1", "kind": "output", "config": {}, "position": [700.0, 120.0]},
