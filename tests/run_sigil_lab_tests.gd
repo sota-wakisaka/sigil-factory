@@ -385,6 +385,48 @@ func _test_lab_scene() -> void:
 	_expect(distribution_output["ok"] and distribution_output["glyph"].components.size() == 4, "branching template should send one square output directly into four independent moves")
 	_expect(lab.graph.connections.size() == 9, "direct fan-out should retain all four source lines in the model")
 	_expect(lab.graph_edit.get_connection_list().size() == 9, "direct fan-out should retain all four source lines in GraphEdit")
+
+	# Reproduce the reported Cross graph. Completion must accept a drop anywhere
+	# on its body, not only on the small input dot.
+	lab.clear_workspace()
+	var cross_source: StringName = lab.add_lab_node(
+		SigilGraphModel.SOURCE,
+		{"primitive_id": &"square"},
+		Vector2(40, 220)
+	)
+	var cross_horizontal: StringName = lab.add_lab_node(
+		SigilGraphModel.SCALE,
+		{"x_percent": 200, "y_percent": 50},
+		Vector2(220, 140)
+	)
+	var cross_vertical: StringName = lab.add_lab_node(
+		SigilGraphModel.SCALE,
+		{"x_percent": 50, "y_percent": 200},
+		Vector2(220, 330)
+	)
+	var cross_combine: StringName = lab.add_lab_node(
+		SigilGraphModel.COMBINE,
+		{},
+		Vector2(440, 200)
+	)
+	var cross_output: StringName = lab.graph.output_node_id()
+	lab.connect_lab_nodes(cross_source, cross_horizontal)
+	lab.connect_lab_nodes(cross_source, cross_vertical)
+	lab.connect_lab_nodes(cross_horizontal, cross_combine, 0)
+	lab.connect_lab_nodes(cross_vertical, cross_combine, 1)
+	await process_frame
+	var cross_result: Dictionary = lab.graph.evaluate(cross_combine)
+	_expect(cross_result["ok"] and cross_result["glyph"].components.size() == 2, "two stretched squares should form a valid Cross intermediate Glyph")
+	var output_node: GraphNode = lab.node_controls[cross_output]
+	var body_drop_position := output_node.position + output_node.size * output_node.scale * 0.5
+	_expect(
+		lab.graph_edit.completion_hotzone_contains(output_node, body_drop_position),
+		"the entire completion node body should be a connection hotzone"
+	)
+	lab.graph_edit.connection_request.emit(cross_combine, 0, cross_output, 0)
+	await process_frame
+	_expect(lab.graph.evaluate_output()["ok"], "dropping the Cross output on completion should finish the Sigil")
+	_expect(not lab.export_graph_text().is_empty() and not lab.export_button.disabled, "a completed Cross should be available for text export")
 	lab.free()
 
 
