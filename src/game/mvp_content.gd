@@ -234,7 +234,7 @@ static func recipe_combat_modifiers(recipe_id: StringName) -> Dictionary:
 		&"stellar_sentinel":
 			return {
 				&"max_health_multiplier": 0.8,
-				&"attack_damage_multiplier": 1.35,
+				&"attack_damage_multiplier": 1.45,
 				&"move_speed_multiplier": 1.35,
 				&"target_count": 2,
 			}
