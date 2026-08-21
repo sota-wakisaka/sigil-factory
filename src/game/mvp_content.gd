@@ -303,6 +303,16 @@ static func sigil_name(recipe_id: StringName) -> String:
 			return String(recipe_id)
 
 
+static func default_recipe_id_for_unit(unit_id: StringName) -> StringName:
+	match unit_id:
+		&"sentinel":
+			return &"vigil_cross"
+		&"golem":
+			return &"fortress_compass"
+		_:
+			return &"watchful_eye"
+
+
 static func recipe_id_for_plan(plan_id: StringName) -> StringName:
 	match plan_id:
 		PLAN_SENTINEL:

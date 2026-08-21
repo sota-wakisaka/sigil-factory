@@ -93,6 +93,7 @@ var undo_history: Array[Dictionary] = []
 var cached_production_preview := ""
 var cached_production_counts: Dictionary = {}
 var cached_production_event_offsets: Dictionary = {}
+var cached_production_recipe_ids: Dictionary = {}
 var cached_production_discarded := 0
 var cached_production_valid := false
 var cached_validation_errors: Array[String] = []
@@ -755,14 +756,16 @@ func production_preview(ticks: int = PRODUCTION_PREVIEW_TICKS) -> Dictionary:
 func _production_preview_for_simulation(display_simulation: FactorySimulation, ticks: int) -> Dictionary:
 	var counts := {&"scout": 0, &"sentinel": 0, &"golem": 0}
 	var event_offsets := _empty_production_event_offsets()
+	var recipe_ids := {}
 	if display_simulation == null:
-		return {"ok": false, "counts": counts, "event_offsets": event_offsets, "discarded": 0, "first_failure": {}, "node_outputs": {}, "errors": []}
+		return {"ok": false, "counts": counts, "event_offsets": event_offsets, "recipe_ids": recipe_ids, "discarded": 0, "first_failure": {}, "node_outputs": {}, "errors": []}
 	var validation := display_simulation.validate_graph()
 	if not validation["ok"]:
 		return {
 			"ok": false,
 			"counts": counts,
 			"event_offsets": event_offsets,
+			"recipe_ids": recipe_ids,
 			"discarded": 0,
 			"first_failure": {},
 			"node_outputs": {},
@@ -774,6 +777,7 @@ func _production_preview_for_simulation(display_simulation: FactorySimulation, t
 			"ok": false,
 			"counts": counts,
 			"event_offsets": event_offsets,
+			"recipe_ids": recipe_ids,
 			"discarded": 0,
 			"first_failure": {},
 			"node_outputs": {},
@@ -792,6 +796,8 @@ func _production_preview_for_simulation(display_simulation: FactorySimulation, t
 		var event: Dictionary = preview.summon_events[event_index]
 		var unit_id: StringName = event["unit_id"]
 		counts[unit_id] = int(counts.get(unit_id, 0)) + 1
+		if not recipe_ids.has(unit_id):
+			recipe_ids[unit_id] = StringName(event.get("recipe_id", ""))
 		if not event_offsets.has(unit_id):
 			event_offsets[unit_id] = PackedInt32Array()
 		var offsets: PackedInt32Array = event_offsets[unit_id]
@@ -804,6 +810,7 @@ func _production_preview_for_simulation(display_simulation: FactorySimulation, t
 		"ok": true,
 		"counts": counts,
 		"event_offsets": event_offsets,
+		"recipe_ids": recipe_ids,
 		"discarded": preview.discarded_glyphs - discarded_start,
 		"first_failure": first_failure,
 		"node_outputs": node_outputs,
@@ -825,6 +832,7 @@ func production_snapshot() -> Dictionary:
 		"horizon_ticks": PRODUCTION_PREVIEW_TICKS,
 		"counts": cached_production_counts.duplicate(true),
 		"event_offsets": cached_production_event_offsets.duplicate(true),
+		"recipe_ids": cached_production_recipe_ids.duplicate(true),
 		"discarded": cached_production_discarded,
 		"errors": cached_validation_errors.duplicate(),
 	}
@@ -1893,14 +1901,11 @@ func _draw_production_summary() -> void:
 	draw_arc(clock_center, 9.0, 0.0, TAU, 20, Color(0.4, 0.62, 0.76, 0.78), 1.5, true)
 	draw_line(clock_center, clock_center + Vector2(0, -5), Color(0.58, 0.78, 0.92), 1.5, true)
 	draw_line(clock_center, clock_center + Vector2(4, 2), Color(0.58, 0.78, 0.92), 1.5, true)
-	var recipe_by_unit := {}
-	for recipe in MvpContent.recipes():
-		recipe_by_unit[recipe.unit_id] = recipe.glyph
 	var unit_order: Array[StringName] = [&"scout", &"sentinel", &"golem"]
 	for index in unit_order.size():
 		var unit_id := unit_order[index]
 		var center := production_summary_center(index)
-		var glyph: GlyphModel = recipe_by_unit.get(unit_id)
+		var glyph: GlyphModel = production_summary_glyph(unit_id)
 		var is_goal := production_summary_is_goal(unit_id)
 		draw_circle(center, 18.0, Color(0.025, 0.055, 0.085, 0.94))
 		draw_arc(
@@ -1934,6 +1939,22 @@ func _draw_production_summary() -> void:
 			)
 	if _should_draw_production_discard_badge():
 		_draw_production_discard_badge()
+
+
+func production_recipe_id(unit_id: StringName) -> StringName:
+	if int(cached_production_counts.get(unit_id, 0)) > 0:
+		var predicted_recipe_id := StringName(cached_production_recipe_ids.get(unit_id, ""))
+		if predicted_recipe_id != &"":
+			return predicted_recipe_id
+	return MvpContent.default_recipe_id_for_unit(unit_id)
+
+
+func production_summary_glyph(unit_id: StringName) -> GlyphModel:
+	var recipe_id := production_recipe_id(unit_id)
+	for recipe in MvpContent.recipes():
+		if recipe.id == recipe_id:
+			return recipe.glyph
+	return null
 
 
 func _should_draw_production_discard_badge() -> bool:
@@ -3012,8 +3033,9 @@ func _get_tooltip(at_position: Vector2) -> String:
 		return "32秒予測 // 不一致Glyph %d個を廃棄" % cached_production_discarded
 	var summary_unit := production_summary_unit_at(at_position)
 	if summary_unit != &"":
+		var summary_recipe_id := production_recipe_id(summary_unit)
 		for recipe in MvpContent.recipes():
-			if recipe.unit_id != summary_unit:
+			if recipe.id != summary_recipe_id:
 				continue
 			var context := "生産見込み %d体 // %s" % [
 				cached_production_counts.get(summary_unit, 0),
@@ -3935,6 +3957,7 @@ func _refresh_production_preview() -> void:
 		cached_validation_errors.assign(result.get("errors", []))
 		cached_production_counts.clear()
 		cached_production_event_offsets = _empty_production_event_offsets()
+		cached_production_recipe_ids.clear()
 		cached_production_discarded = 0
 		cached_node_output_glyphs.clear()
 		cached_production_preview = "32秒予測 // %s" % _validation_message(result.get("errors", []))
@@ -3946,6 +3969,7 @@ func _refresh_production_preview() -> void:
 	cached_validation_errors.clear()
 	cached_production_counts = counts.duplicate()
 	cached_production_event_offsets = result["event_offsets"].duplicate(true)
+	cached_production_recipe_ids = result["recipe_ids"].duplicate(true)
 	cached_production_discarded = result["discarded"]
 	cached_node_output_glyphs = result["node_outputs"].duplicate()
 	if first_failure.is_empty():
