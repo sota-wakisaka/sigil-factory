@@ -3,6 +3,7 @@ extends Button
 
 const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
+const MAX_LEVEL := 3
 
 @export var reward_id: StringName
 @export var glyph_id: StringName
@@ -10,6 +11,7 @@ const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 @export var effect_caption := ""
 
 var glyph: GlyphModel
+var level := 0
 
 
 func _ready() -> void:
@@ -17,13 +19,26 @@ func _ready() -> void:
 	text = ""
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	glyph = MeaningGlyphsModel.glyph(glyph_id)
-	tooltip_text = "%s // %s" % [caption, effect_caption]
+	_refresh_tooltip()
 	queue_redraw()
 
 
 func set_reward_selected(selected: bool) -> void:
-	set_pressed_no_signal(selected)
+	set_pressed_no_signal(selected and not disabled)
 	queue_redraw()
+
+
+func set_level(next_level: int) -> void:
+	level = clampi(next_level, 0, MAX_LEVEL)
+	disabled = level >= MAX_LEVEL
+	if disabled:
+		set_pressed_no_signal(false)
+	_refresh_tooltip()
+	queue_redraw()
+
+
+func _refresh_tooltip() -> void:
+	tooltip_text = "%s // %s // %d/%d" % [caption, effect_caption, level, MAX_LEVEL]
 
 
 func _draw() -> void:
@@ -51,3 +66,9 @@ func _draw() -> void:
 		11,
 		Color(0.68, 0.76, 0.84)
 	)
+	for index in MAX_LEVEL:
+		var pip_center := Vector2(size.x - 15.0 - float((MAX_LEVEL - 1 - index) * 10), 14.0)
+		if index < level:
+			draw_circle(pip_center, 3.0, accent)
+		else:
+			draw_arc(pip_center, 3.0, 0.0, TAU, 12, Color(accent, 0.48), 1.0, true)

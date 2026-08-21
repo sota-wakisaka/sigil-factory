@@ -646,12 +646,18 @@ func _show_overlay(kicker: String, title: String, body: String, button_text: Str
 
 func _prepare_reward_options() -> void:
 	var buttons := reward_choices.get_children()
-	for index in buttons.size():
-		buttons[index].set_reward_selected(index == 0)
+	var selected_available := false
+	for button in buttons:
+		button.set_level(acquired_rewards.count(button.reward_id))
+		var should_select: bool = not selected_available and not bool(button.disabled)
+		button.set_reward_selected(should_select)
+		selected_available = selected_available or should_select
 	reward_choices.visible = true
 
 
 func _select_reward(selected_button: MeaningRewardButtonControl) -> void:
+	if selected_button.disabled:
+		return
 	for button in reward_choices.get_children():
 		button.set_reward_selected(button == selected_button)
 
@@ -667,7 +673,7 @@ func _prepare_route_options() -> void:
 
 func _acquire_selected_reward() -> void:
 	for button in reward_choices.get_children():
-		if button.button_pressed:
+		if button.button_pressed and not button.disabled:
 			acquired_rewards.append(button.reward_id)
 			return
 
