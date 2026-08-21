@@ -67,6 +67,36 @@ static func combine_visuals(
 	}
 
 
+static func top_level_connection_visuals(
+	glyph: GlyphModel,
+	scale: float = 1.0,
+	show_combine_structure: bool = false
+) -> Array[Dictionary]:
+	var connections: Array[Dictionary] = []
+	if not can_draw(glyph) or glyph.combine_children.is_empty() or scale <= 0.0:
+		return connections
+	var glyph_center := Vector2(glyph.combine_origin) * 6.0 * scale
+	var children := glyph.combine_children.duplicate()
+	children.sort_custom(_canonical_child_less)
+	if glyph.combine_connection_mode == GlyphModel.CONNECTION_PAIRWISE:
+		connections.append_array(_pairwise_visible_connections(
+			children,
+			scale,
+			show_combine_structure
+		))
+	elif glyph.combine_connection_mode == GlyphModel.CONNECTION_RADIAL:
+		for child_value in children:
+			var child: GlyphModel = child_value
+			var child_center := _glyph_center_offset(child, scale)
+			if glyph_center.distance_to(child_center) >= 2.0 * scale:
+				connections.append({
+					"from": glyph_center,
+					"to": child_center,
+					"merge_overlaps": false,
+				})
+	return _merge_overlapping_connections(connections, scale)
+
+
 static func _collect_combine_visuals(
 	glyph: GlyphModel,
 	scale: float,
@@ -85,22 +115,13 @@ static func _collect_combine_visuals(
 		circles.append({"center": glyph_center, "radius": radius})
 	var children := glyph.combine_children.duplicate()
 	children.sort_custom(_canonical_child_less)
-	if glyph.combine_connection_mode == GlyphModel.CONNECTION_PAIRWISE:
-		connections.append_array(_pairwise_visible_connections(
-			children,
-			scale,
-			show_combine_structure
-		))
+	connections.append_array(top_level_connection_visuals(
+		glyph,
+		scale,
+		show_combine_structure
+	))
 	for child_value in children:
 		var child: GlyphModel = child_value
-		if glyph.combine_connection_mode == GlyphModel.CONNECTION_RADIAL:
-			var child_center := _glyph_center_offset(child, scale)
-			if glyph_center.distance_to(child_center) >= 2.0 * scale:
-				connections.append({
-					"from": glyph_center,
-					"to": child_center,
-					"merge_overlaps": false,
-				})
 		_collect_combine_visuals(
 			child,
 			scale,

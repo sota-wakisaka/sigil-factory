@@ -11,10 +11,16 @@ var production_context: GlyphProductionContextModel
 
 const MIN_COMBINE_CHILDREN := 2
 const MAX_COMBINE_CHILDREN := 8
+const CONNECTION_SIMPLE := &"simple"
 const CONNECTION_RADIAL := &"radial"
 const CONNECTION_PAIRWISE := &"pairwise"
 const CONNECTION_NONE := &"none"
-const COMBINE_CONNECTION_MODES := [CONNECTION_RADIAL, CONNECTION_PAIRWISE, CONNECTION_NONE]
+const COMBINE_CONNECTION_MODES := [
+	CONNECTION_SIMPLE,
+	CONNECTION_RADIAL,
+	CONNECTION_PAIRWISE,
+	CONNECTION_NONE,
+]
 
 
 func _init(
@@ -125,6 +131,7 @@ func canonical_serialization() -> String:
 		GlyphComponentModel.coordinate_key(combine_origin.y),
 	]
 	var combine_prefix: String = {
+		CONNECTION_SIMPLE: "S",
 		CONNECTION_RADIAL: "C",
 		CONNECTION_PAIRWISE: "M",
 		CONNECTION_NONE: "R",

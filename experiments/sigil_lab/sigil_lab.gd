@@ -4,6 +4,7 @@ extends Control
 const SigilGraphModel := preload("res://experiments/sigil_lab/sigil_graph.gd")
 const SigilGraphEditModel := preload("res://experiments/sigil_lab/sigil_graph_edit.gd")
 const SigilPreviewModel := preload("res://experiments/sigil_lab/sigil_preview.gd")
+const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_glyphs.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
 
 const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
@@ -11,6 +12,7 @@ const MAIN_MENU_SCENE := "res://src/main_menu.tscn"
 const PORT_COLOR := Color(0.3, 0.82, 1.0, 1.0)
 const NODE_NAMES := {
 	&"source": "素材",
+	&"registered": "意味",
 	&"rotate": "回転",
 	&"move": "移動",
 	&"scale": "変形",
@@ -241,6 +243,7 @@ func _build_palette() -> Control:
 		["○", SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, "丸 // 基本図形"],
 		["△", SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}, "三角 // 基本図形"],
 		["□", SigilGraphModel.SOURCE, {"primitive_id": &"square"}, "四角 // 基本図形"],
+		["十", SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.CROSS}, "登録グリフ // 十字"],
 		["↻", SigilGraphModel.ROTATE, {"degrees": 45}, "中心を基準に1°単位で回転"],
 		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -4)}, "上下左右へ移動"],
 		["↔↕", SigilGraphModel.SCALE, {"x_percent": 150, "y_percent": 100}, "横・縦を別々に拡大縮小"],
@@ -418,6 +421,12 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 			var option := _source_option(node_id)
 			node.add_child(option)
 			option_controls[node_id] = option
+		SigilGraphModel.REGISTERED:
+			node.add_child(preview)
+			node.set_slot(0, false, 0, PORT_COLOR, true, 0, PORT_COLOR)
+			var option := _registered_option(node_id)
+			node.add_child(option)
+			option_controls[node_id] = option
 		SigilGraphModel.ROTATE, SigilGraphModel.MOVE, SigilGraphModel.SCALE, SigilGraphModel.REPEAT:
 			node.add_child(preview)
 			node.set_slot(0, true, 0, PORT_COLOR, true, 0, PORT_COLOR)
@@ -480,6 +489,22 @@ func _source_option(node_id: StringName) -> OptionButton:
 	option.select([&"circle", &"triangle", &"square"].find(primitive))
 	option.item_selected.connect(func(index: int) -> void:
 		graph.set_node_config(node_id, {"primitive_id": [&"circle", &"triangle", &"square"][index]})
+		_refresh_all()
+	)
+	return option
+
+
+func _registered_option(node_id: StringName) -> OptionButton:
+	var option := OptionButton.new()
+	for glyph_id in RegisteredGlyphsModel.IDS:
+		option.add_item(RegisteredGlyphsModel.label(glyph_id))
+	var glyph_id := StringName(graph.node_config(node_id).get(
+		"glyph_id",
+		RegisteredGlyphsModel.CROSS
+	))
+	option.select(maxi(RegisteredGlyphsModel.IDS.find(glyph_id), 0))
+	option.item_selected.connect(func(index: int) -> void:
+		graph.set_node_config(node_id, {"glyph_id": RegisteredGlyphsModel.IDS[index]})
 		_refresh_all()
 	)
 	return option
@@ -554,23 +579,21 @@ func _on_scale_value_changed(value: float, node_id: StringName, axis: StringName
 
 func _combine_option(node_id: StringName) -> OptionButton:
 	var option := OptionButton.new()
+	option.add_item("単純結合")
 	option.add_item("中心結合")
 	option.add_item("相互結合")
-	option.custom_minimum_size = Vector2(92, 24)
-	option.tooltip_text = "合成線 // 中心結合または重複を除いた相互結合"
+	option.custom_minimum_size = Vector2(100, 24)
+	option.tooltip_text = "単純結合は線なし // 線が見える配置だけ中心・相互結合を選択可能"
 	var mode := StringName(graph.node_config(node_id).get(
 		"connection_mode",
 		GlyphModel.CONNECTION_RADIAL
 	))
-	option.select(1 if mode == GlyphModel.CONNECTION_PAIRWISE else 0)
+	option.select(maxi(SigilGraphModel.SELECTABLE_COMBINE_MODES.find(mode), 0))
 	option.item_selected.connect(func(index: int) -> void:
-		graph.set_node_config(node_id, {
-			"connection_mode": (
-				GlyphModel.CONNECTION_PAIRWISE
-				if index == 1
-				else GlyphModel.CONNECTION_RADIAL
-			),
-		})
+		if not graph.set_node_config(node_id, {
+			"connection_mode": SigilGraphModel.SELECTABLE_COMBINE_MODES[index],
+		}):
+			_set_status(_error_text(graph.last_error), true)
 		_refresh_all()
 	)
 	return option
@@ -693,7 +716,11 @@ func _load_eye_template() -> void:
 		{"x_percent": 250, "y_percent": 100},
 		Vector2(230, 390)
 	)
-	var combine_root := _add_node(SigilGraphModel.COMBINE, {}, Vector2(480, 250))
+	var combine_root := _add_node(
+		SigilGraphModel.COMBINE,
+		{"connection_mode": GlyphModel.CONNECTION_SIMPLE},
+		Vector2(480, 250)
+	)
 	var output_id := graph.output_node_id()
 
 	_connect_nodes(outline, 0, stretch, 0)
@@ -725,7 +752,11 @@ func _load_repeat_template() -> void:
 		{"primitive_id": &"circle"},
 		Vector2(220, 470)
 	)
-	var combine := _add_node(SigilGraphModel.COMBINE, {}, Vector2(620, 285))
+	var combine := _add_node(
+		SigilGraphModel.COMBINE,
+		{"connection_mode": GlyphModel.CONNECTION_SIMPLE},
+		Vector2(620, 285)
+	)
 	var output_id := graph.output_node_id()
 	_connect_nodes(petal, 0, move, 0)
 	_connect_nodes(move, 0, repeat, 0)
@@ -770,6 +801,8 @@ func _load_distribution_template() -> void:
 
 
 func _refresh_all() -> void:
+	graph.enforce_combine_connection_modes()
+	_refresh_combine_options()
 	for node_id in node_controls:
 		var result := graph.evaluate(node_id)
 		var glyph = result.get("glyph") if bool(result.get("ok", false)) else null
@@ -793,6 +826,21 @@ func _refresh_all() -> void:
 		export_button.disabled = true
 		_set_status(_error_text(StringName(output_result.get("error", &"missing_input"))), true)
 		stats_label.text = "出力ノードまで接続してください"
+
+
+func _refresh_combine_options() -> void:
+	for node_id in option_controls:
+		if graph.node_kind(node_id) != SigilGraphModel.COMBINE:
+			continue
+		var option := option_controls[node_id] as OptionButton
+		if option == null:
+			continue
+		var availability := graph.combine_mode_availability(node_id)
+		for index in SigilGraphModel.SELECTABLE_COMBINE_MODES.size():
+			var mode: StringName = SigilGraphModel.SELECTABLE_COMBINE_MODES[index]
+			option.set_item_disabled(index, not bool(availability["modes"].get(mode, false)))
+		var current_mode := StringName(graph.node_config(node_id)["connection_mode"])
+		option.select(maxi(SigilGraphModel.SELECTABLE_COMBINE_MODES.find(current_mode), 0))
 
 
 static func _json_value(value):
@@ -845,4 +893,5 @@ static func _error_text(error: StringName) -> String:
 		&"invalid_direction": "出力から入力へ接続してください",
 		&"invalid_glyph": "完全重複する素材は合成できません",
 		&"invalid_repeat": "反復できません // 中心から離した図形を使ってください",
+		&"connection_mode_requires_visible_lines": "結合線が見えない配置です // 単純結合を使用してください",
 	}.get(error, "操作できません // %s" % error)

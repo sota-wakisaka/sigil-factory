@@ -1,6 +1,7 @@
 extends SceneTree
 
 const SigilGraphModel := preload("res://experiments/sigil_lab/sigil_graph.gd")
+const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_glyphs.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
@@ -11,6 +12,8 @@ var failures := 0
 func _initialize() -> void:
 	_test_graph_evaluation()
 	_test_basic_primitives_and_stretch()
+	_test_registered_cross_glyph()
+	_test_line_free_combine_requires_simple_mode()
 	_test_pure_transform_composition()
 	_test_radial_repeat()
 	_test_direct_output_distribution()
@@ -62,6 +65,59 @@ func _test_basic_primitives_and_stretch() -> void:
 		_expect(component.primitive_id == &"circle", "stretch should preserve the source primitive")
 		_expect(component.scale_x_percent == 250 and component.scale_y_percent == 75, "stretch should fold both axes into the canonical component")
 		_expect("|a250,75" in component.canonical_key(), "anisotropic scale should be part of matching identity")
+
+
+func _test_registered_cross_glyph() -> void:
+	var cross := RegisteredGlyphsModel.glyph(RegisteredGlyphsModel.CROSS)
+	var expected_canonical := "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a50,200),40:P(34:p6:square|0,0|0|1|c5:white|a200,50))"
+	_expect(cross != null, "the authored Cross should be available as a registered meaning Glyph")
+	if cross != null:
+		_expect(cross.canonical_serialization() == expected_canonical, "the registered Cross should preserve the authored canonical structure")
+		_expect(cross.combine_connection_mode == GlyphModel.CONNECTION_SIMPLE, "the centered Cross should use line-free Simple Combine")
+		_expect(GlyphPainterModel.combine_visuals(cross, 1.0, false)["connections"].is_empty(), "Simple Combine should not invent connector lines")
+	var graph_text := FileAccess.get_file_as_string(RegisteredGlyphsModel.source_graph_path(
+		RegisteredGlyphsModel.CROSS
+	))
+	var graph_document = JSON.parse_string(graph_text)
+	_expect(graph_document is Dictionary, "the registered Cross should retain its authored Lab graph")
+	if graph_document is Dictionary:
+		_expect(graph_document["canonical_glyph"] == expected_canonical, "the saved Cross graph and registered Glyph should share one canonical identity")
+		_expect(graph_document["nodes"].size() == 6 and graph_document["connections"].size() == 5, "the saved Cross graph should retain its complete construction")
+	var graph = SigilGraphModel.new()
+	_expect(graph.add_node(&"cross", SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.CROSS}), "a registered Cross source should be accepted")
+	_expect(graph.add_node(&"rotate", SigilGraphModel.ROTATE, {"degrees": 45}), "registered Glyphs should accept downstream transforms")
+	_expect(graph.add_node(&"output", SigilGraphModel.OUTPUT), "registered Glyphs should connect to completion")
+	graph.connect_nodes(&"cross", 0, &"rotate", 0)
+	graph.connect_nodes(&"rotate", 0, &"output", 0)
+	var rotated := graph.evaluate_output()
+	_expect(rotated["ok"] and rotated["glyph"].components.size() == 2, "the registered Cross should remain a reusable two-part Glyph")
+	_expect(not graph.add_node(&"unknown", SigilGraphModel.REGISTERED, {"glyph_id": &"unknown"}), "unknown registered Glyph IDs should fail closed")
+
+
+func _test_line_free_combine_requires_simple_mode() -> void:
+	var graph = SigilGraphModel.new()
+	graph.add_node(&"square_a", SigilGraphModel.SOURCE, {"primitive_id": &"square"})
+	graph.add_node(&"square_b", SigilGraphModel.SOURCE, {"primitive_id": &"square"})
+	graph.add_node(&"horizontal", SigilGraphModel.SCALE, {"x_percent": 200, "y_percent": 50})
+	graph.add_node(&"vertical", SigilGraphModel.SCALE, {"x_percent": 50, "y_percent": 200})
+	graph.add_node(&"combine", SigilGraphModel.COMBINE, {"connection_mode": GlyphModel.CONNECTION_RADIAL})
+	graph.add_node(&"output", SigilGraphModel.OUTPUT)
+	graph.connect_nodes(&"square_a", 0, &"horizontal", 0)
+	graph.connect_nodes(&"square_b", 0, &"vertical", 0)
+	graph.connect_nodes(&"horizontal", 0, &"combine", 0)
+	graph.connect_nodes(&"vertical", 0, &"combine", 1)
+	graph.connect_nodes(&"combine", 0, &"output", 0)
+	var availability := graph.combine_mode_availability(&"combine")
+	_expect(availability["complete"], "two centered Cross parts should make Combine mode availability decidable")
+	_expect(availability["modes"][GlyphModel.CONNECTION_SIMPLE], "Simple Combine should remain available for centered parts")
+	_expect(not availability["modes"][GlyphModel.CONNECTION_RADIAL], "Radial Combine should be disabled when it draws no line")
+	_expect(not availability["modes"][GlyphModel.CONNECTION_PAIRWISE], "Pairwise Combine should be disabled when it draws no line")
+	_expect(not graph.evaluate_output()["ok"], "a stale line mode should not silently produce a line-free Combine")
+	_expect(graph.enforce_combine_connection_modes() == [&"combine"], "line-free inputs should normalize the editor node to Simple Combine")
+	_expect(graph.node_config(&"combine")["connection_mode"] == GlyphModel.CONNECTION_SIMPLE, "the normalized Cross should explicitly retain Simple Combine")
+	_expect(graph.evaluate_output()["ok"], "the same Cross should evaluate after selecting Simple Combine")
+	_expect(not graph.set_node_config(&"combine", {"connection_mode": GlyphModel.CONNECTION_RADIAL}), "a user should not be able to reselect an invisible Radial Combine")
+	_expect(graph.last_error == &"connection_mode_requires_visible_lines", "the rejected line mode should explain why Simple Combine is required")
 
 
 func _test_pure_transform_composition() -> void:
@@ -321,12 +377,11 @@ func _test_lab_scene() -> void:
 			combine_id = node_id
 			break
 	_expect(combine_id != &"" and lab.graph.input_count(combine_id) == 8, "Lab Combine nodes should expose eight inputs")
-	_expect(lab.option_controls[combine_id] is OptionButton and lab.option_controls[combine_id].item_count == 2, "Lab Combine should expose radial and pairwise modes")
+	_expect(lab.option_controls[combine_id] is OptionButton and lab.option_controls[combine_id].item_count == 3, "Lab Combine should expose simple, radial, and pairwise modes")
 	if lab.option_controls[combine_id] is OptionButton:
 		var combine_option: OptionButton = lab.option_controls[combine_id]
-		combine_option.select(1)
-		combine_option.item_selected.emit(1)
-		_expect(lab.graph.node_config(combine_id)["connection_mode"] == GlyphModel.CONNECTION_PAIRWISE, "changing the Combine option should update the graph output mode")
+		_expect(combine_option.selected == 0, "the centered eye template should normalize to Simple Combine")
+		_expect(combine_option.is_item_disabled(1) and combine_option.is_item_disabled(2), "line-free inputs should disable radial and pairwise choices")
 	var free_rotate: StringName = lab.add_lab_node(SigilGraphModel.ROTATE, {"degrees": 120}, Vector2(40, 40))
 	_expect(lab.option_controls[free_rotate] is SpinBox, "Lab rotation should use a free-angle numeric control")
 	if lab.option_controls[free_rotate] is SpinBox:
@@ -337,6 +392,8 @@ func _test_lab_scene() -> void:
 	_expect(scale_control.find_children("*", "SpinBox", true, false).size() == 2, "Lab stretch should expose independent horizontal and vertical controls")
 	var free_repeat: StringName = lab.add_lab_node(SigilGraphModel.REPEAT, {"count": 6}, Vector2(40, 40))
 	_expect(lab.option_controls[free_repeat] is OptionButton and lab.option_controls[free_repeat].item_count == 6, "Lab repeat should expose all exact equal-angle counts")
+	var registered_cross: StringName = lab.add_lab_node(SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.CROSS}, Vector2(40, 40))
+	_expect(lab.option_controls[registered_cross] is OptionButton and lab.option_controls[registered_cross].get_item_text(0) == "十字", "the authored Cross should be reusable from the meaning-Glyph palette")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"distribute"), "Distributor should be removed from the Lab grammar")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"color"), "color processing should be omitted from the Lab grammar")
 	var output: Dictionary = lab.graph.evaluate_output()
@@ -354,7 +411,7 @@ func _test_lab_scene() -> void:
 	if export_data is Dictionary:
 		_expect(export_data["format"] == "sigil_lab_graph" and int(export_data["version"]) == 1, "export should identify its stable graph format version")
 		_expect(export_data["canonical_glyph"] == output["glyph"].canonical_serialization(), "export should include the exact completed Glyph identity")
-		_expect(export_data["nodes"].size() == 8 and export_data["connections"].size() == 4, "export should preserve every node on the canvas, including disconnected work")
+		_expect(export_data["nodes"].size() == 9 and export_data["connections"].size() == 4, "export should preserve every node on the canvas, including registered Glyph work")
 		var exported_source_found := false
 		for exported_node in export_data["nodes"]:
 			_expect(exported_node["position"] is Array and exported_node["position"].size() == 2, "exported nodes should preserve their editor positions")

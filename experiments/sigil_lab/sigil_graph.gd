@@ -3,8 +3,11 @@ extends RefCounted
 
 const GlyphModel := preload("res://src/domain/glyph.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
+const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_glyphs.gd")
+const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 
 const SOURCE := &"source"
+const REGISTERED := &"registered"
 const ROTATE := &"rotate"
 const MOVE := &"move"
 const SCALE := &"scale"
@@ -12,10 +15,15 @@ const REPEAT := &"repeat"
 const COMBINE := &"combine"
 const OUTPUT := &"output"
 
-const NODE_KINDS := [SOURCE, ROTATE, MOVE, SCALE, REPEAT, COMBINE, OUTPUT]
+const NODE_KINDS := [SOURCE, REGISTERED, ROTATE, MOVE, SCALE, REPEAT, COMBINE, OUTPUT]
 const PRIMITIVES := [&"circle", &"triangle", &"square"]
 const REPEAT_COUNTS := [2, 3, 4, 5, 6, 8]
 const MAX_COMBINE_INPUTS := GlyphModel.MAX_COMBINE_CHILDREN
+const SELECTABLE_COMBINE_MODES := [
+	GlyphModel.CONNECTION_SIMPLE,
+	GlyphModel.CONNECTION_RADIAL,
+	GlyphModel.CONNECTION_PAIRWISE,
+]
 
 var nodes: Dictionary = {}
 var connections: Array[Dictionary] = []
@@ -68,10 +76,59 @@ func set_node_config(node_id: StringName, config: Dictionary) -> bool:
 	if not bool(normalized["ok"]):
 		last_error = normalized["error"]
 		return false
+	if kind == COMBINE:
+		var next_mode := StringName(normalized["config"]["connection_mode"])
+		var availability := combine_mode_availability(node_id)
+		if availability["complete"] and not bool(availability["modes"].get(next_mode, false)):
+			last_error = &"connection_mode_requires_visible_lines"
+			return false
 	var entry: Dictionary = nodes[node_id]
 	entry["config"] = normalized["config"]
 	nodes[node_id] = entry
 	return true
+
+
+func combine_mode_availability(node_id: StringName) -> Dictionary:
+	var modes := {
+		GlyphModel.CONNECTION_SIMPLE: true,
+		GlyphModel.CONNECTION_RADIAL: true,
+		GlyphModel.CONNECTION_PAIRWISE: true,
+	}
+	if node_kind(node_id) != COMBINE:
+		return {"complete": false, "modes": modes}
+	var input_result := _evaluated_combine_inputs(node_id)
+	if not bool(input_result["complete"]):
+		return {"complete": false, "modes": modes}
+	var inputs: Array = input_result["inputs"]
+	for mode in [GlyphModel.CONNECTION_RADIAL, GlyphModel.CONNECTION_PAIRWISE]:
+		var candidate := GlyphModel.combine_many(inputs, mode)
+		modes[mode] = not GlyphPainterModel.top_level_connection_visuals(
+			candidate,
+			1.0,
+			false
+		).is_empty()
+	return {"complete": true, "modes": modes}
+
+
+func enforce_combine_connection_modes() -> Array[StringName]:
+	var changed: Array[StringName] = []
+	var node_ids: Array = nodes.keys()
+	node_ids.sort_custom(func(first, second) -> bool: return String(first) < String(second))
+	for node_id_value in node_ids:
+		var node_id := StringName(node_id_value)
+		if node_kind(node_id) != COMBINE:
+			continue
+		var availability := combine_mode_availability(node_id)
+		var current_mode := StringName(node_config(node_id)["connection_mode"])
+		if (
+			availability["complete"]
+			and not bool(availability["modes"].get(current_mode, false))
+		):
+			var entry: Dictionary = nodes[node_id]
+			entry["config"] = {"connection_mode": GlyphModel.CONNECTION_SIMPLE}
+			nodes[node_id] = entry
+			changed.append(node_id)
+	return changed
 
 
 func node_kind(node_id: StringName) -> StringName:
@@ -166,7 +223,7 @@ func disconnect_nodes(
 
 func input_count(node_id: StringName) -> int:
 	match node_kind(node_id):
-		SOURCE:
+		SOURCE, REGISTERED:
 			return 0
 		COMBINE:
 			return GlyphModel.MAX_COMBINE_CHILDREN
@@ -179,7 +236,7 @@ func output_count(node_id: StringName) -> int:
 	match node_kind(node_id):
 		OUTPUT:
 			return 0
-		SOURCE, ROTATE, MOVE, SCALE, REPEAT, COMBINE:
+		SOURCE, REGISTERED, ROTATE, MOVE, SCALE, REPEAT, COMBINE:
 			return 1
 	return 0
 
@@ -225,6 +282,15 @@ func _evaluate(node_id: StringName, cache: Dictionary, active: Dictionary) -> Di
 				GlyphComponentModel.new(StringName(config["primitive_id"])),
 			]),
 			"error": &"",
+		}
+	elif kind == REGISTERED:
+		var registered_glyph := RegisteredGlyphsModel.glyph(
+			StringName(node_config(node_id)["glyph_id"])
+		)
+		result = {
+			"ok": registered_glyph != null,
+			"glyph": registered_glyph,
+			"error": &"" if registered_glyph != null else &"missing_registered_glyph",
 		}
 	elif kind == COMBINE:
 		var inputs: Array = []
@@ -286,6 +352,19 @@ func _apply_node(kind: StringName, config: Dictionary, inputs: Array) -> Diction
 				inputs,
 				StringName(config.get("connection_mode", GlyphModel.CONNECTION_RADIAL))
 			)
+			if (
+				glyph.combine_connection_mode != GlyphModel.CONNECTION_SIMPLE
+				and GlyphPainterModel.top_level_connection_visuals(
+					glyph,
+					1.0,
+					false
+				).is_empty()
+			):
+				return {
+					"ok": false,
+					"glyph": null,
+					"error": &"connection_mode_requires_visible_lines",
+				}
 		OUTPUT:
 			glyph = inputs[0].copy()
 		_:
@@ -331,6 +410,11 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 			if not primitive_id in PRIMITIVES:
 				return {"ok": false, "error": &"invalid_primitive", "config": {}}
 			return {"ok": true, "error": &"", "config": {"primitive_id": primitive_id}}
+		REGISTERED:
+			var glyph_id := StringName(config.get("glyph_id", RegisteredGlyphsModel.CROSS))
+			if not RegisteredGlyphsModel.has(glyph_id):
+				return {"ok": false, "error": &"invalid_registered_glyph", "config": {}}
+			return {"ok": true, "error": &"", "config": {"glyph_id": glyph_id}}
 		ROTATE:
 			var degrees := (
 				int(config["degrees"])
@@ -376,7 +460,7 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 				"connection_mode",
 				GlyphModel.CONNECTION_RADIAL
 			))
-			if not connection_mode in GlyphModel.COMBINE_CONNECTION_MODES:
+			if not connection_mode in SELECTABLE_COMBINE_MODES:
 				return {"ok": false, "error": &"invalid_connection_mode", "config": {}}
 			return {
 				"ok": true,
@@ -386,6 +470,22 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 		OUTPUT:
 			return {"ok": true, "error": &"", "config": {}}
 	return {"ok": false, "error": &"invalid_kind", "config": {}}
+
+
+func _evaluated_combine_inputs(node_id: StringName) -> Dictionary:
+	var inputs: Array = []
+	for input_port in input_count(node_id):
+		var source_id := _incoming_node(node_id, input_port)
+		if source_id == &"":
+			continue
+		var input_result := _evaluate(source_id, {}, {})
+		if not bool(input_result.get("ok", false)):
+			return {"complete": false, "inputs": []}
+		inputs.append(input_result["glyph"])
+	return {
+		"complete": inputs.size() >= GlyphModel.MIN_COMBINE_CHILDREN,
+		"inputs": inputs,
+	}
 
 
 static func _connection_less(first: Dictionary, second: Dictionary) -> bool:
