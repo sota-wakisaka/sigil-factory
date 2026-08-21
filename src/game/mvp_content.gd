@@ -256,23 +256,23 @@ static func layout_for_plan(plan_id: StringName) -> Dictionary:
 static func plan_name(plan_id: StringName) -> String:
 	match plan_id:
 		PLAN_EMPTY:
-			return "EMPTY WORKSHOP"
+			return "手組み工場"
 		PLAN_SENTINEL:
-			return "AZURE SENTINEL"
+			return "蒼環の衛兵"
 		PLAN_VIGIL:
-			return "VIGIL-CROSS SENTINEL"
+			return "警戒十字の衛兵"
 		PLAN_GOLEM:
-			return "BOUND GOLEM"
+			return "結合の巨像"
 		PLAN_FORTRESS:
-			return "FORTRESS-COMPASS GOLEM"
+			return "要塞方位の巨像"
 		_:
-			return "WATCHFUL-EYE SCOUT"
+			return "目の斥候"
 
 
 static func plan_description(plan_id: StringName) -> String:
 	match plan_id:
 		PLAN_EMPTY:
-			return "構築練習 // 目印の出力を召喚器へ接続"
+			return "構築練習 // 目の出力を召喚器へ接続"
 		PLAN_SENTINEL:
 			return "対群体 // 3体同時攻撃・中速"
 		PLAN_VIGIL:
@@ -282,7 +282,7 @@ static func plan_description(plan_id: StringName) -> String:
 		PLAN_FORTRESS:
 			return "的＋方位 // 単純結合で対装甲巨像を生産"
 		_:
-			return "目印 // 高速生産・短寿命"
+			return "目 // 高速生産・短寿命"
 
 
 static func sigil_name(recipe_id: StringName) -> String:

@@ -1808,6 +1808,14 @@ func _test_factory_flow_diagnostics_distinguish_blockages() -> void:
 
 
 func _test_mvp_plans_produce_expected_units() -> void:
+	var expected_names := {
+		MvpContent.PLAN_EMPTY: "手組み工場",
+		MvpContent.PLAN_SCOUT: "目の斥候",
+		MvpContent.PLAN_SENTINEL: "蒼環の衛兵",
+		MvpContent.PLAN_VIGIL: "警戒十字の衛兵",
+		MvpContent.PLAN_GOLEM: "結合の巨像",
+		MvpContent.PLAN_FORTRESS: "要塞方位の巨像",
+	}
 	var expectations := {
 		MvpContent.PLAN_SCOUT: &"scout",
 		MvpContent.PLAN_SENTINEL: &"sentinel",
@@ -1815,6 +1823,8 @@ func _test_mvp_plans_produce_expected_units() -> void:
 		MvpContent.PLAN_GOLEM: &"golem",
 		MvpContent.PLAN_FORTRESS: &"golem",
 	}
+	for plan_id in expected_names:
+		_expect(MvpContent.plan_name(plan_id) == expected_names[plan_id], "MVP plan names should describe the visible meaning sigil in Japanese")
 	for plan_id in expectations:
 		var simulation := MvpContent.build_factory(plan_id)
 		for _tick in 160:
