@@ -31,6 +31,10 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 	if scene_id == "factory":
+		var requested_flow_time := -1.0
+		if options.has("flow_time"):
+			requested_flow_time = float(options["flow_time"])
+			view.flow_time_override = 0.0
 		var fixture := String(options.get("fixture", ""))
 		if fixture == "circle_summon":
 			view.connect_material_to_summoner(&"circle_01")
@@ -42,8 +46,8 @@ func _initialize() -> void:
 			var relay = view.place_relay_at(Vector2(3800.0, 2980.0))
 			view.connect_output_to_input(&"circle_01", StringName(relay.name), 0)
 			view.connect_output_to_input(StringName(relay.name), &"summoner_center", 0)
-		if options.has("flow_time"):
-			view.flow_time_override = float(options["flow_time"])
+		if requested_flow_time >= 0.0:
+			view.flow_time_override = requested_flow_time
 	await process_frame
 	RenderingServer.force_draw(false)
 

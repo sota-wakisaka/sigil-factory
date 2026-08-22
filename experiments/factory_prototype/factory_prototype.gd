@@ -90,6 +90,7 @@ var graph_menu_panel: PanelContainer
 var graph_minimap: Control
 var flow_audio
 var flow_arrival_cycles: Array[int] = [-1, -1, -1]
+var connection_flow_started_at: Dictionary = {}
 var flow_time_override := -1.0
 var status_label: Label
 var relay_button: Button
@@ -135,8 +136,12 @@ func _process(_delta: float) -> void:
 			flow_arrival_cycles[input_index] = -1
 			continue
 		var arrival_cycle := flow_arrival_cycle(input_index, now)
+		if arrival_cycle < 0:
+			flow_arrival_cycles[input_index] = -1
+			continue
 		if flow_arrival_cycles[input_index] < 0:
 			flow_arrival_cycles[input_index] = arrival_cycle
+			flow_audio.play_arrival(connected_material_kind(input_index))
 			continue
 		if arrival_cycle <= flow_arrival_cycles[input_index]:
 			continue
@@ -327,10 +332,13 @@ func connect_output_to_input(from_node_id: StringName, to_node_id: StringName, t
 	if error != OK:
 		_refresh_summon_state()
 		return false
+	connection_flow_started_at[_connection_flow_key(from_node_id, 0, to_node_id, to_port)] = (
+		flow_animation_time_seconds()
+	)
 	_clear_directional_connection_preview()
 	_refresh_summon_state()
 	if summoner_node != null and to_node_id == StringName(summoner_node.name):
-		flow_arrival_cycles[to_port] = flow_arrival_cycle(to_port, flow_animation_time_seconds())
+		flow_arrival_cycles[to_port] = -1
 	if flow_audio != null:
 		var matched := (
 			summoner_node == null
@@ -651,7 +659,11 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 		var start := directional_output_position(from_node_id, overlay)
 		var finish := directional_node_input_position(to_node_id, input_index, overlay)
 		var line_length := connection_world_length(from_node_id, to_node_id, input_index)
-		var path_start_delay := _upstream_transport_delay(from_node_id)
+		var flow_start_time := connection_flow_start_time(
+			from_node_id,
+			to_node_id,
+			input_index
+		)
 		var color := PORT_COLOR
 		if summoner_node != null and to_node_id == StringName(summoner_node.name):
 			match summon_state(input_index):
@@ -669,7 +681,7 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 				color,
 				now,
 				line_length,
-				path_start_delay
+				flow_start_time
 			)
 
 
@@ -770,14 +782,14 @@ func _draw_flowing_glyphs(
 	color: Color,
 	time_seconds: float,
 	line_length: float,
-	path_start_delay: float
+	flow_start_time: float
 ) -> void:
 	var screen_length := maxf(start.distance_to(finish), 1.0)
 	var trail_progress := FLOW_TRAIL_SCREEN_LENGTH / screen_length
 	for packet_index in flow_packet_slot_count(line_length):
 		var progress := flow_packet_progress(
 			line_length,
-			path_start_delay,
+			flow_start_time,
 			packet_index,
 			time_seconds
 		)
@@ -801,7 +813,7 @@ func _draw_flowing_glyphs(
 		_draw_transport_glyph(overlay, position, material_kind, color, direction)
 	var arrival := flow_connection_arrival_progress(
 		line_length,
-		path_start_delay,
+		flow_start_time,
 		time_seconds
 	)
 	if arrival >= 0.0:
@@ -874,24 +886,32 @@ func flow_packet_slot_count(line_length: float) -> int:
 
 
 func flow_packet_elapsed(
-	path_start_delay: float,
+	flow_start_time: float,
 	packet_index: int,
 	time_seconds: float,
 	grade: int = DEFAULT_CONVEYOR_GRADE
 ) -> float:
+	if is_inf(flow_start_time) or time_seconds < flow_start_time:
+		return -1.0
 	var interval := flow_packet_interval(grade)
-	var newest_packet_age := fposmod(time_seconds - path_start_delay, interval)
+	var active_duration := time_seconds - flow_start_time
+	var emitted_packet_count := floori(active_duration / interval) + 1
+	if packet_index < 0 or packet_index >= emitted_packet_count:
+		return -1.0
+	var newest_packet_age := fposmod(active_duration, interval)
 	return newest_packet_age + float(packet_index) * interval
 
 
 func flow_packet_progress(
 	line_length: float,
-	path_start_delay: float,
+	flow_start_time: float,
 	packet_index: int,
 	time_seconds: float,
 	grade: int = DEFAULT_CONVEYOR_GRADE
 ) -> float:
-	var elapsed := flow_packet_elapsed(path_start_delay, packet_index, time_seconds, grade)
+	var elapsed := flow_packet_elapsed(flow_start_time, packet_index, time_seconds, grade)
+	if elapsed < 0.0:
+		return -1.0
 	var travel_duration := flow_travel_duration(line_length, grade)
 	if elapsed > travel_duration:
 		return -1.0
@@ -901,11 +921,15 @@ func flow_packet_progress(
 
 func flow_connection_arrival_progress(
 	line_length: float,
-	path_start_delay: float,
+	flow_start_time: float,
 	time_seconds: float,
 	grade: int = DEFAULT_CONVEYOR_GRADE
 ) -> float:
-	var arrival_time := path_start_delay + flow_travel_duration(line_length, grade)
+	if is_inf(flow_start_time):
+		return -1.0
+	var arrival_time := flow_start_time + flow_travel_duration(line_length, grade)
+	if time_seconds < arrival_time:
+		return -1.0
 	var elapsed_since_arrival := fposmod(
 		time_seconds - arrival_time,
 		flow_packet_interval(grade)
@@ -923,19 +947,21 @@ func flow_arrival_cycle(
 	input_index: int,
 	time_seconds: float,
 	line_length: float = -1.0,
-	path_start_delay: float = -1.0
+	flow_start_time: float = -1.0
 ) -> int:
 	var resolved_length := line_length
-	var resolved_start_delay := maxf(path_start_delay, 0.0)
+	var resolved_start_time := maxf(flow_start_time, 0.0)
 	if resolved_length <= 0.0:
 		var timing := _summoner_input_transport_timing(input_index)
 		resolved_length = float(timing.get("line_length", 0.0))
-		resolved_start_delay = float(timing.get("path_start_delay", 0.0))
-	if resolved_length <= 0.0:
+		resolved_start_time = float(timing.get("flow_start_time", INF))
+	if resolved_length <= 0.0 or is_inf(resolved_start_time):
 		return -1
 	var travel_duration := flow_travel_duration(resolved_length)
+	if time_seconds < resolved_start_time + travel_duration:
+		return -1
 	return floori(
-		(time_seconds - resolved_start_delay - travel_duration)
+		(time_seconds - resolved_start_time - travel_duration)
 		/ flow_packet_interval()
 	)
 
@@ -949,39 +975,80 @@ func _summoner_input_transport_timing(input_index: int) -> Dictionary:
 			and int(connection["to_port"]) == input_index
 		):
 			var from_node_id := StringName(connection["from_node"])
+			var to_node_id := StringName(connection["to_node"])
 			return {
 				"line_length": connection_world_length(
 					from_node_id,
-					StringName(connection["to_node"]),
+					to_node_id,
 					input_index
 				),
-				"path_start_delay": _upstream_transport_delay(from_node_id),
+				"flow_start_time": connection_flow_start_time(
+					from_node_id,
+					to_node_id,
+					input_index
+				),
 			}
 	return {}
 
 
-func _upstream_transport_delay(node_id: StringName) -> float:
-	return _upstream_transport_delay_from(node_id, {})
+func connection_flow_start_time(
+	from_node_id: StringName,
+	to_node_id: StringName,
+	to_port: int
+) -> float:
+	return _connection_flow_start_time_from(from_node_id, to_node_id, to_port, {})
 
 
-func _upstream_transport_delay_from(node_id: StringName, visited: Dictionary) -> float:
-	if node_id == &"" or visited.has(node_id):
+func _connection_flow_start_time_from(
+	from_node_id: StringName,
+	to_node_id: StringName,
+	to_port: int,
+	visited: Dictionary
+) -> float:
+	var key := _connection_flow_key(from_node_id, 0, to_node_id, to_port)
+	if not connection_flow_started_at.has(key):
+		return INF
+	var upstream_available_time := _node_flow_available_time(from_node_id, visited)
+	if is_inf(upstream_available_time):
+		return INF
+	return maxf(float(connection_flow_started_at[key]), upstream_available_time)
+
+
+func _node_flow_available_time(node_id: StringName, visited: Dictionary) -> float:
+	if _material_node(node_id) != null:
 		return 0.0
+	if _relay_node(node_id) == null or visited.has(node_id):
+		return INF
 	visited[node_id] = true
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["to_node"]) != node_id:
 			continue
 		var from_node_id := StringName(connection["from_node"])
+		var to_port := int(connection["to_port"])
+		var segment_start_time := _connection_flow_start_time_from(
+			from_node_id,
+			node_id,
+			to_port,
+			visited
+		)
+		if is_inf(segment_start_time):
+			return INF
 		var line_length := connection_world_length(
 			from_node_id,
 			node_id,
-			int(connection["to_port"])
+			to_port
 		)
-		return (
-			_upstream_transport_delay_from(from_node_id, visited)
-			+ flow_travel_duration(line_length)
-		)
-	return 0.0
+		return segment_start_time + flow_travel_duration(line_length)
+	return INF
+
+
+func _connection_flow_key(
+	from_node_id: StringName,
+	from_port: int,
+	to_node_id: StringName,
+	to_port: int
+) -> String:
+	return "%s:%d>%s:%d" % [from_node_id, from_port, to_node_id, to_port]
 
 
 func flow_animation_time_seconds() -> float:
@@ -1093,6 +1160,14 @@ func _remove_input_connection(to_node_id: StringName, to_port: int) -> bool:
 			continue
 		if int(connection["to_port"]) != to_port:
 			continue
+		connection_flow_started_at.erase(
+			_connection_flow_key(
+				StringName(connection["from_node"]),
+				int(connection["from_port"]),
+				StringName(connection["to_node"]),
+				int(connection["to_port"])
+			)
+		)
 		factory_graph.disconnect_node(
 			StringName(connection["from_node"]),
 			int(connection["from_port"]),

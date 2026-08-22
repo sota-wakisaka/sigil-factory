@@ -60,7 +60,7 @@ func _test_fixed_factory_landmarks() -> void:
 		),
 		"conveyor throughput should come from fixed world spacing and grade speed"
 	)
-	var sample_time := 0.6
+	var sample_time := 1.4
 	var short_progress: float = prototype.flow_packet_progress(short_line_length, 0, 0, sample_time)
 	var long_progress: float = prototype.flow_packet_progress(long_line_length, 0, 0, sample_time)
 	var next_long_progress: float = prototype.flow_packet_progress(long_line_length, 0, 1, sample_time)
@@ -83,6 +83,9 @@ func _test_fixed_factory_landmarks() -> void:
 		"Glyphs should keep the same world spacing on every conveyor length"
 	)
 	_expect(prototype.flow_packet_progress(short_line_length, 0, 0, 0.0) == prototype.FLOW_PATH_START, "transport should begin just outside its source port")
+	_expect(prototype.flow_packet_progress(short_line_length, 1.0, 0, 0.99) < 0.0, "a newly connected conveyor should stay empty before its start time")
+	_expect(prototype.flow_packet_progress(short_line_length, 1.0, 0, 1.0) == prototype.FLOW_PATH_START, "the first Glyph should emerge from the source when transport starts")
+	_expect(prototype.flow_packet_progress(long_line_length, 1.0, 1, 1.0) < 0.0, "a new conveyor should not be prefilled with older Glyphs")
 	var short_arrival_time: float = prototype.flow_travel_duration(short_line_length)
 	_expect(is_equal_approx(prototype.flow_packet_progress(short_line_length, 0, 0, short_arrival_time), 1.0), "transport should reach the exact input center before the arrival effect begins")
 	_expect(prototype.flow_connection_arrival_progress(short_line_length, 0.0, short_arrival_time + 0.1) > 0.0, "the arrival ring should expand after a Glyph crosses the input")
@@ -169,6 +172,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect("中継 1" in prototype.status_label.text, "the toolbar should report the number of placed relays")
 	_expect(prototype._landmark_visual(relay).body_radius() > 0.0, "relay nodes should use the circular factory visual language")
 	var relay_source_click := InputEventMouseButton.new()
+	prototype.flow_time_override = 10.0
 	relay_source_click.button_index = MOUSE_BUTTON_LEFT
 	relay_source_click.pressed = true
 	relay_source_click.position = prototype.directional_output_position(StringName(circle_source.name), prototype.factory_graph)
@@ -184,7 +188,40 @@ func _test_fixed_factory_landmarks() -> void:
 	relay.gui_input.emit(relay_input_click)
 	_expect(prototype.output_glyph_kind(relay_id) == &"circle", "clicking a material output and the visible relay input should create the connection")
 	_expect(prototype.output_glyph_kind(relay_id) == &"circle", "a relay should preserve its incoming Glyph kind")
+	var circle_source_id := StringName(circle_source.name)
+	var upstream_flow_start: float = prototype.connection_flow_start_time(
+		circle_source_id,
+		relay_id,
+		0
+	)
+	var upstream_line_length: float = prototype.connection_world_length(
+		circle_source_id,
+		relay_id,
+		0
+	)
+	_expect(is_equal_approx(upstream_flow_start, 10.0), "a material conveyor should begin when its connection is created")
+	_expect(
+		prototype.flow_packet_progress(upstream_line_length, upstream_flow_start, 0, 10.0)
+		== prototype.FLOW_PATH_START,
+		"the first live Glyph should emerge from the material source"
+	)
+	_expect(
+		prototype.flow_packet_progress(upstream_line_length, upstream_flow_start, 1, 10.0) < 0.0,
+		"a live material conveyor should not be instantly prefilled"
+	)
 	_expect(prototype.connect_output_to_input(relay_id, StringName(prototype.summoner_node.name), 0), "a relay output should connect to a summoner input")
+	var downstream_flow_start: float = prototype.connection_flow_start_time(
+		relay_id,
+		StringName(prototype.summoner_node.name),
+		0
+	)
+	_expect(
+		is_equal_approx(
+			downstream_flow_start,
+			upstream_flow_start + prototype.flow_travel_duration(upstream_line_length)
+		),
+		"a relay conveyor should stay empty until the first upstream Glyph arrives"
+	)
 	var relay_center: Vector2 = prototype._node_center_in(relay, prototype.factory_graph)
 	var relay_input: Vector2 = prototype.directional_node_input_position(relay_id, 0, prototype.factory_graph)
 	var relay_output: Vector2 = prototype.directional_output_position(relay_id, prototype.factory_graph)
