@@ -232,16 +232,37 @@ func _test_fixed_factory_landmarks() -> void:
 		"right-clicking a processor body should open that node's settings menu"
 	)
 	_expect(
-		int(prototype.rotation_settings_angle.value) == 45,
-		"the settings menu should start from the selected node's current angle"
+		prototype.rotation_settings_preset_buttons.has(45)
+		and prototype.rotation_settings_preset_buttons[45].button_pressed
+		and prototype.rotation_settings_preset_buttons[45].icon != null,
+		"the settings menu should start from the selected preset and show its direction"
 	)
-	prototype.rotation_settings_angle.value = 37.0
+	var original_rotation_glyph: String = prototype.output_glyph(rotation_id).canonical_serialization()
+	prototype.rotation_settings_preset_buttons[72].mouse_entered.emit()
 	_expect(
-		prototype.rotation_angle(rotation_id) == 37
+		prototype.rotation_angle(rotation_id) == 45
+		and prototype._landmark_visual(rotation).rotation_angle_degrees == 72
+		and prototype.output_glyph(rotation_id).canonical_serialization() == original_rotation_glyph,
+		"hovering a preset should preview only its direction without changing factory state"
+	)
+	prototype.rotation_settings_preset_buttons[72].mouse_exited.emit()
+	_expect(
+		prototype._landmark_visual(rotation).rotation_angle_degrees == 45,
+		"leaving a preset should restore the committed direction"
+	)
+	prototype.rotation_settings_preset_buttons[60].pressed.emit()
+	_expect(
+		prototype.rotation_angle(rotation_id) == 60
+		and prototype.rotation_settings_preset_buttons[60].button_pressed
 		and
 		prototype.output_glyph(rotation_id).canonical_serialization()
-		== prototype.primitive_glyph(&"square").rotated_degrees(37).canonical_serialization(),
-		"editing the menu's one-degree value should deterministically rebuild its output Glyph"
+		== prototype.primitive_glyph(&"square").rotated_degrees(60).canonical_serialization(),
+		"selecting a preset should deterministically rebuild its output Glyph"
+	)
+	_expect(
+		not prototype.set_rotation_angle(rotation_id, 37)
+		and prototype.rotation_angle(rotation_id) == 60,
+		"arbitrary near-match angles should be rejected"
 	)
 	prototype.rotation_settings_popup.hide()
 	var body_wheel := InputEventMouseButton.new()
@@ -250,7 +271,7 @@ func _test_fixed_factory_landmarks() -> void:
 	body_wheel.position = settings_click.position
 	rotation.gui_input.emit(body_wheel)
 	_expect(
-		prototype.rotation_angle(rotation_id) == 37,
+		prototype.rotation_angle(rotation_id) == 60,
 		"scrolling the node body should no longer modify its angle outside the settings menu"
 	)
 	prototype.disconnect_input(rotation_id, 0)
@@ -741,10 +762,12 @@ func _test_processed_rotation_target() -> void:
 		== prototype.target_glyph(&"diamond").canonical_serialization(),
 		"the summon event should retain the same canonical processed Glyph shown on the conveyor"
 	)
-	_expect(prototype.set_rotation_angle(rotation_id, 37), "an active processor should accept a new arbitrary angle")
+	_expect(not prototype.set_rotation_angle(rotation_id, 37), "an active processor should reject a non-preset angle")
+	_expect(prototype.summon_state(2) == &"matched", "a rejected angle must not restart or change the active route")
+	_expect(prototype.set_rotation_angle(rotation_id, 60), "an active processor should accept another exact preset")
 	_expect(prototype.summon_state(2) == &"transporting", "changing an active processor should restart only its downstream delivery")
 	_advance_input_to_first_arrival(prototype, 2)
-	_expect(prototype.summon_state(2) == &"mismatch", "a 37 degree Square should not match the 45 degree Diamond")
+	_expect(prototype.summon_state(2) == &"mismatch", "a 60 degree Square should not match the 45 degree Diamond")
 	_expect(prototype.summoned_monster_count(&"razor_kite") == razor_kites_after_match, "a mismatched processed Glyph must not summon")
 	_expect(prototype.set_rotation_angle(rotation_id, 45), "the rotation should return to the target angle")
 	_advance_input_to_first_arrival(prototype, 2)

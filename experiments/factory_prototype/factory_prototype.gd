@@ -28,6 +28,11 @@ const SUMMON_EVENT_HISTORY_LIMIT := 128
 const FLOW_TRAIL_SCREEN_LENGTH := 18.0
 const FLOW_PATH_START := 0.0
 const FLOW_PATH_END := 1.0
+const ROTATION_ANGLE_PRESETS := [
+	0, 30, 45, 60, 72, 90, 120, 135, 144,
+	180, 216, 225, 240, 270, 288, 300, 315, 330,
+]
+const SCALE_PERCENT_PRESETS := [25, 50, 75, 100, 150, 200, 300]
 const TARGET_ORDER := [&"circle", &"triangle", &"square", &"diamond"]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -128,10 +133,11 @@ var rotation_placement_active := false
 var rotation_serial := 0
 var rotation_settings_popup: PopupPanel
 var rotation_settings_title: Label
-var rotation_settings_angle: SpinBox
+var rotation_settings_preset_buttons: Dictionary = {}
+var rotation_settings_icon_cache: Dictionary = {}
 var rotation_settings_delete_button: Button
 var rotation_settings_node_id: StringName = &""
-var rotation_settings_syncing := false
+var rotation_settings_hover_angle := -1
 var line_settings_popup: PopupPanel
 var line_settings_title: Label
 var line_settings_details: Label
@@ -401,6 +407,8 @@ func set_rotation_angle(node_id: StringName, angle_degrees: int) -> bool:
 	if rotation == null:
 		return false
 	var normalized_angle := posmod(angle_degrees, 360)
+	if not ROTATION_ANGLE_PRESETS.has(normalized_angle):
+		return false
 	if rotation_angle(node_id) == normalized_angle:
 		return false
 	var now := flow_animation_time_seconds()
@@ -445,7 +453,7 @@ func open_relay_settings(node_id: StringName, viewport_position: Vector2) -> boo
 
 func open_rotation_settings(node_id: StringName, viewport_position: Vector2) -> bool:
 	var rotation := _rotation_node(node_id)
-	if rotation == null or rotation_settings_popup == null or rotation_settings_angle == null:
+	if rotation == null or rotation_settings_popup == null or rotation_settings_preset_buttons.is_empty():
 		return false
 	if relay_settings_popup != null:
 		relay_settings_popup.hide()
@@ -453,17 +461,16 @@ func open_rotation_settings(node_id: StringName, viewport_position: Vector2) -> 
 		line_settings_popup.hide()
 	rotation_settings_node_id = node_id
 	rotation_settings_title.text = "回転ノード // %s" % String(node_id)
-	rotation_settings_syncing = true
-	rotation_settings_angle.set_value_no_signal(rotation_angle(node_id))
-	rotation_settings_syncing = false
-	var popup_size := Vector2i(252, 188)
+	_sync_rotation_preset_buttons(rotation_angle(node_id))
+	var popup_size := Vector2i(326, 338)
 	var viewport_size := Vector2i(get_viewport_rect().size)
 	var popup_position := Vector2i(viewport_position.round()) + Vector2i(10, 8)
 	popup_position.x = clampi(popup_position.x, 0, maxi(viewport_size.x - popup_size.x, 0))
 	popup_position.y = clampi(popup_position.y, 0, maxi(viewport_size.y - popup_size.y, 0))
 	rotation_settings_popup.popup(Rect2i(popup_position, popup_size))
-	rotation_settings_angle.get_line_edit().grab_focus()
-	rotation_settings_angle.get_line_edit().select_all()
+	var selected_button = rotation_settings_preset_buttons.get(rotation_angle(node_id))
+	if selected_button is Button:
+		selected_button.grab_focus()
 	return true
 
 
@@ -2142,7 +2149,7 @@ func _build_rotation_settings_popup() -> void:
 	rotation_settings_popup.add_child(margin)
 
 	var column := VBoxContainer.new()
-	column.custom_minimum_size = Vector2(220.0, 138.0)
+	column.custom_minimum_size = Vector2(294.0, 298.0)
 	column.add_theme_constant_override("separation", 8)
 	margin.add_child(column)
 
@@ -2151,27 +2158,37 @@ func _build_rotation_settings_popup() -> void:
 	rotation_settings_title.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
 	column.add_child(rotation_settings_title)
 
-	var angle_row := HBoxContainer.new()
-	angle_row.add_theme_constant_override("separation", 10)
-	column.add_child(angle_row)
 	var angle_label := Label.new()
-	angle_label.text = "回転角度"
-	angle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	angle_row.add_child(angle_label)
-	rotation_settings_angle = SpinBox.new()
-	rotation_settings_angle.name = "RotationAngleSpinBox"
-	rotation_settings_angle.min_value = 0.0
-	rotation_settings_angle.max_value = 359.0
-	rotation_settings_angle.step = 1.0
-	rotation_settings_angle.allow_greater = false
-	rotation_settings_angle.allow_lesser = false
-	rotation_settings_angle.suffix = "°"
-	rotation_settings_angle.custom_minimum_size = Vector2(112.0, 32.0)
-	rotation_settings_angle.value_changed.connect(_on_rotation_settings_angle_changed)
-	angle_row.add_child(rotation_settings_angle)
+	angle_label.text = "回転候補"
+	angle_label.add_theme_font_size_override("font_size", 12)
+	column.add_child(angle_label)
+
+	var preset_grid := GridContainer.new()
+	preset_grid.name = "RotationPresetGrid"
+	preset_grid.columns = 4
+	preset_grid.add_theme_constant_override("h_separation", 4)
+	preset_grid.add_theme_constant_override("v_separation", 4)
+	column.add_child(preset_grid)
+	var preset_group := ButtonGroup.new()
+	preset_group.allow_unpress = false
+	for angle in ROTATION_ANGLE_PRESETS:
+		var preset_button := Button.new()
+		preset_button.name = "RotationPreset%d" % int(angle)
+		preset_button.text = "%d°" % int(angle)
+		preset_button.icon = _rotation_preset_icon(int(angle))
+		preset_button.expand_icon = false
+		preset_button.toggle_mode = true
+		preset_button.button_group = preset_group
+		preset_button.custom_minimum_size = Vector2(69.0, 34.0)
+		preset_button.tooltip_text = "%d°へ回転 // クリックで確定" % int(angle)
+		preset_button.pressed.connect(_on_rotation_preset_pressed.bind(int(angle)))
+		preset_button.mouse_entered.connect(_on_rotation_preset_hovered.bind(int(angle)))
+		preset_button.mouse_exited.connect(_on_rotation_preset_hover_ended.bind(int(angle)))
+		preset_grid.add_child(preset_button)
+		rotation_settings_preset_buttons[int(angle)] = preset_button
 
 	var hint := Label.new()
-	hint.text = "0〜359° // 1°単位"
+	hint.text = "対称形に使う角度だけを選択"
 	hint.add_theme_font_size_override("font_size", 11)
 	hint.add_theme_color_override("font_color", Color(0.44, 0.68, 0.78))
 	column.add_child(hint)
@@ -2184,10 +2201,73 @@ func _build_rotation_settings_popup() -> void:
 	column.add_child(rotation_settings_delete_button)
 
 
-func _on_rotation_settings_angle_changed(value: float) -> void:
-	if rotation_settings_syncing or rotation_settings_node_id == &"":
+func _rotation_preset_icon(angle_degrees: int) -> Texture2D:
+	if rotation_settings_icon_cache.has(angle_degrees):
+		return rotation_settings_icon_cache[angle_degrees]
+	var radians := deg_to_rad(float(angle_degrees) - 90.0)
+	var direction := Vector2.from_angle(radians)
+	var endpoint := Vector2(11.0, 11.0) + direction * 7.2
+	var tangent := Vector2(-direction.y, direction.x)
+	var arrow_base := endpoint - direction * 3.0
+	var arrow_left := arrow_base + tangent * 2.2
+	var arrow_right := arrow_base - tangent * 2.2
+	var body := (
+		"<circle cx='11' cy='11' r='9' fill='none' stroke='#294d66' stroke-width='1.1'/>"
+		+ "<circle cx='11' cy='11' r='1.7' fill='#66d6ff'/>"
+		+ "<path d='M11 11 L%.2f %.2f M%.2f %.2f L%.2f %.2f L%.2f %.2f' fill='none' stroke='#9edcff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/>" % [
+			endpoint.x, endpoint.y,
+			arrow_left.x, arrow_left.y,
+			endpoint.x, endpoint.y,
+			arrow_right.x, arrow_right.y,
+		]
+	)
+	var svg := "<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'>%s</svg>" % body
+	var image := Image.new()
+	if image.load_svg_from_string(svg, 1.0) != OK:
+		return null
+	var texture := ImageTexture.create_from_image(image)
+	rotation_settings_icon_cache[angle_degrees] = texture
+	return texture
+
+
+func _sync_rotation_preset_buttons(angle_degrees: int) -> void:
+	for angle in rotation_settings_preset_buttons:
+		var button = rotation_settings_preset_buttons[angle]
+		if button is Button:
+			button.set_pressed_no_signal(int(angle) == angle_degrees)
+
+
+func _on_rotation_preset_pressed(angle_degrees: int) -> void:
+	if rotation_settings_node_id == &"":
 		return
-	set_rotation_angle(rotation_settings_node_id, roundi(value))
+	set_rotation_angle(rotation_settings_node_id, angle_degrees)
+	_sync_rotation_preset_buttons(rotation_angle(rotation_settings_node_id))
+
+
+func _on_rotation_preset_hovered(angle_degrees: int) -> void:
+	if rotation_settings_node_id == &"":
+		return
+	rotation_settings_hover_angle = angle_degrees
+	var rotation := _rotation_node(rotation_settings_node_id)
+	if rotation == null:
+		return
+	var visual := _landmark_visual(rotation)
+	if visual != null:
+		visual.configure_rotation(angle_degrees)
+
+
+func _on_rotation_preset_hover_ended(angle_degrees: int) -> void:
+	if rotation_settings_hover_angle != angle_degrees:
+		return
+	rotation_settings_hover_angle = -1
+	if rotation_settings_node_id == &"":
+		return
+	var rotation := _rotation_node(rotation_settings_node_id)
+	if rotation == null:
+		return
+	var visual := _landmark_visual(rotation)
+	if visual != null:
+		visual.configure_rotation(rotation_angle(rotation_settings_node_id))
 
 
 func _on_rotation_settings_delete_pressed() -> void:
@@ -2197,6 +2277,13 @@ func _on_rotation_settings_delete_pressed() -> void:
 
 
 func _on_rotation_settings_popup_hidden() -> void:
+	if rotation_settings_node_id != &"":
+		var rotation := _rotation_node(rotation_settings_node_id)
+		if rotation != null:
+			var visual := _landmark_visual(rotation)
+			if visual != null:
+				visual.configure_rotation(rotation_angle(rotation_settings_node_id))
+	rotation_settings_hover_angle = -1
 	rotation_settings_node_id = &""
 
 
@@ -2457,6 +2544,9 @@ func _make_rotation_node(
 	world_center: Vector2,
 	angle_degrees: int
 ) -> GraphNode:
+	var preset_angle := posmod(angle_degrees, 360)
+	if not ROTATION_ANGLE_PRESETS.has(preset_angle):
+		preset_angle = 45
 	var node := GraphNode.new()
 	node.name = String(node_id)
 	node.title = ""
@@ -2464,7 +2554,7 @@ func _make_rotation_node(
 	node.resizable = false
 	node.set_meta("landmark_kind", &"rotation")
 	node.set_meta("rotation_node", true)
-	node.set_meta("rotation_degrees", posmod(angle_degrees, 360))
+	node.set_meta("rotation_degrees", preset_angle)
 
 	var port_row := Control.new()
 	port_row.custom_minimum_size = Vector2(1.0, 1.0)
@@ -2473,12 +2563,12 @@ func _make_rotation_node(
 	node.set_slot(0, true, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
 
 	var visual = FactoryLandmarkVisualModel.new()
-	visual.configure_rotation(angle_degrees)
+	visual.configure_rotation(preset_angle)
 	node.add_child(visual)
 	_configure_round_landmark_node(node, visual.custom_minimum_size)
 	node.position_offset = world_center - visual.custom_minimum_size * 0.5
 	node.mouse_filter = Control.MOUSE_FILTER_PASS
-	node.tooltip_text = "回転ノード // %d° // 右クリックで設定" % posmod(angle_degrees, 360)
+	node.tooltip_text = "回転ノード // %d° // 右クリックで設定" % preset_angle
 	node.gui_input.connect(_on_rotation_node_gui_input.bind(node))
 	return node
 
