@@ -53,7 +53,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(counts[&"square"] == 10, "ten Square material deposits should exist")
 	_expect(prototype.target_panel != null and prototype.target_panel.anchor_left == 1.0, "the target sigil panel should stay at the upper right")
 	_expect(prototype.target_buttons.size() == 3, "Circle, Triangle, and Square should be selectable targets")
-	_expect(prototype.input_buttons.size() == 3, "the summoner should expose three independently selectable inputs")
+	_expect(prototype.target_panel.find_child("Input1Button", true, false) == null, "the target panel should not duplicate summoner inputs as tabs")
 	_expect(prototype.summoner_input_labels.size() == 3, "the summoner node should show all three input targets")
 	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")
 	_expect(prototype.target_kind_for_input(1) == &"triangle", "input 2 should initially target Triangle")
@@ -61,6 +61,10 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.selected_input_index == 0 and prototype.selected_target_kind == &"circle", "the target panel should initially show input 1")
 	_expect(prototype.target_monster_id() == &"ring_wisp", "input 1 should show the Ring Wisp")
 	_expect(prototype.summon_state() == &"idle", "input 1 should start disconnected")
+	var input_hover := InputEventMouseMotion.new()
+	input_hover.position = prototype.directional_input_position(1, prototype.factory_graph)
+	prototype.factory_graph.gui_input.emit(input_hover)
+	_expect(prototype.hovered_input_index == 1 and "INPUT 2" in prototype.factory_graph.tooltip_text, "hovering a summoner input should reveal its direct selection action")
 
 	var circle_source := _first_material(prototype, &"circle")
 	var triangle_source := _first_material(prototype, &"triangle")
@@ -76,18 +80,21 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.summon_state() == &"matched", "matching Circle should start summoning")
 	_expect("環霊ウィスプ" in prototype.summon_state_label.text, "the Circle summon state should name its monster")
 
-	_expect(prototype.select_input(1), "input 2 should be selectable")
+	_click_input(prototype, 1)
+	_expect(prototype.selected_input_index == 1, "clicking summoner input 2 should select it")
 	_expect(prototype.selected_target_kind == &"triangle" and prototype.target_monster_id() == &"stinger", "the panel should switch to input 2's Triangle target")
 	_expect(triangle_source != null and prototype.connect_material_to_summoner(StringName(triangle_source.name), 1), "a Triangle deposit should connect independently to input 2")
 	_expect(prototype.summon_state(0) == &"matched" and prototype.summon_state(1) == &"matched", "inputs 1 and 2 should judge their own sigils independently")
 
-	_expect(prototype.select_input(2), "input 3 should be selectable")
+	_click_input(prototype, 2)
+	_expect(prototype.selected_input_index == 2, "clicking summoner input 3 should select it")
 	_expect(prototype.selected_target_kind == &"square" and prototype.target_monster_id() == &"stone_block", "the panel should switch to input 3's Square target")
 	_expect(square_source != null and prototype.connect_material_to_summoner(StringName(square_source.name), 2), "a Square deposit should connect independently to input 3")
 	_expect(prototype.factory_graph.get_connection_list().size() == 3, "the summoner should retain one connection per input")
 	_expect(prototype.summoning_monsters() == [&"ring_wisp", &"stinger", &"stone_block"], "all three matching inputs should summon their own monsters")
 
-	_expect(prototype.select_input(1) and prototype.select_target(&"square"), "input 2's target should be independently configurable")
+	_click_input(prototype, 1)
+	_expect(prototype.select_target(&"square"), "the selected input 2 target should be independently configurable")
 	_expect(prototype.summon_state(0) == &"matched", "changing input 2 must not change input 1's result")
 	_expect(prototype.summon_state(1) == &"mismatch", "input 2 should re-evaluate against its new target")
 	_expect(prototype.summon_state(2) == &"matched", "changing input 2 must not change input 3's result")
@@ -96,7 +103,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.factory_graph.get_connection_list().size() == 3, "replacing one input should preserve the other input connections")
 	_expect(prototype.summon_state(1) == &"matched", "input 2 should match after its own reconnection")
 
-	prototype.select_input(2)
+	_click_input(prototype, 2)
 	var active_connection := _connection_for_input(prototype, 2)
 	prototype.factory_graph.disconnection_request.emit(
 		StringName(active_connection["from_node"]),
@@ -134,12 +141,14 @@ func _test_fixed_factory_landmarks() -> void:
 	input_click.pressed = true
 	input_click.position = prototype.directional_input_position(2, prototype.factory_graph)
 	prototype.factory_graph.gui_input.emit(input_click)
+	_expect(prototype.selected_input_index == 2, "connecting through an input port should also select that input")
 	_expect(prototype.summon_state(2) == &"matched", "clicking an all-direction input should finish the connection")
 	var disconnect_click := InputEventMouseButton.new()
 	disconnect_click.button_index = MOUSE_BUTTON_RIGHT
 	disconnect_click.pressed = true
 	disconnect_click.position = prototype.directional_input_position(2, prototype.factory_graph)
 	prototype.factory_graph.gui_input.emit(disconnect_click)
+	_expect(prototype.selected_input_index == 2, "right-clicking an input should keep its target selected")
 	_expect(prototype.summon_state(2) == &"idle", "right-clicking a directional input should disconnect only that input")
 
 	var bounds := Rect2()
@@ -183,3 +192,11 @@ func _connection_for_input(prototype, input_index: int) -> Dictionary:
 		if int(connection["to_port"]) == input_index:
 			return connection
 	return {}
+
+
+func _click_input(prototype, input_index: int) -> void:
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = prototype.directional_input_position(input_index, prototype.factory_graph)
+	prototype.factory_graph.gui_input.emit(click)

@@ -82,11 +82,12 @@ var target_name_label: Label
 var target_role_label: Label
 var summon_state_label: Label
 var target_buttons: Dictionary = {}
-var input_buttons: Array[Button] = []
 var summoner_input_labels: Array[Label] = []
 var input_target_kinds: Array[StringName] = [&"circle", &"triangle", &"square"]
 var selected_input_index := 0
 var connecting_material_id: StringName = &""
+var hovered_material_id: StringName = &""
+var hovered_input_index := -1
 var connection_pointer := Vector2.ZERO
 var connection_press_position := Vector2.ZERO
 var connection_drag_moved := false
@@ -263,6 +264,17 @@ func _on_disconnection_request(
 func _on_factory_graph_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		connection_pointer = event.position
+		hovered_input_index = directional_input_at(event.position)
+		hovered_material_id = directional_output_at(event.position)
+		if hovered_input_index >= 0:
+			factory_graph.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			factory_graph.tooltip_text = "INPUT %d // 左クリックで目標表示 // 右クリックで切断" % (hovered_input_index + 1)
+		elif hovered_material_id != &"":
+			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
+			factory_graph.tooltip_text = "出力 // クリックまたはドラッグで接続"
+		else:
+			factory_graph.mouse_default_cursor_shape = Control.CURSOR_ARROW
+			factory_graph.tooltip_text = ""
 		if connecting_material_id != &"" and event.position.distance_to(connection_press_position) > 4.0:
 			connection_drag_moved = true
 		return
@@ -272,6 +284,7 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 	if mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
 		var disconnect_input := directional_input_at(mouse_event.position)
 		if disconnect_input >= 0:
+			select_input(disconnect_input)
 			disconnect_summoner(disconnect_input)
 			factory_graph.accept_event()
 		return
@@ -280,8 +293,10 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 	connection_pointer = mouse_event.position
 	if mouse_event.pressed:
 		var input_index := directional_input_at(mouse_event.position)
-		if input_index >= 0 and connecting_material_id != &"":
-			connect_material_to_summoner(connecting_material_id, input_index)
+		if input_index >= 0:
+			select_input(input_index)
+			if connecting_material_id != &"":
+				connect_material_to_summoner(connecting_material_id, input_index)
 			factory_graph.accept_event()
 			return
 		var material_id := directional_output_at(mouse_event.position)
@@ -301,6 +316,7 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	var release_input := directional_input_at(mouse_event.position)
 	if release_input >= 0:
+		select_input(release_input)
 		connect_material_to_summoner(connecting_material_id, release_input)
 		factory_graph.accept_event()
 		return
@@ -399,7 +415,7 @@ func _draw_directional_ports(overlay: Control) -> void:
 	for node in material_nodes:
 		var node_id := StringName(node.name)
 		var position := directional_output_position(node_id, overlay)
-		var active := node_id == connecting_material_id
+		var active := node_id == connecting_material_id or node_id == hovered_material_id
 		var direction := _node_center_in(node, overlay).direction_to(position)
 		_draw_output_port(overlay, position, direction, PORT_COLOR if active else PORT_IDLE_COLOR, active)
 	for input_index in SUMMONER_INPUT_COUNT:
@@ -413,6 +429,8 @@ func _draw_directional_ports(overlay: Control) -> void:
 		elif connecting_material_id != &"":
 			color = PORT_COLOR
 		_draw_input_port(overlay, position, color)
+		if input_index == hovered_input_index:
+			overlay.draw_arc(position, PORT_DRAW_RADIUS + 6.0, 0.0, TAU, 20, Color(0.38, 0.80, 1.0, 0.76), 1.0, true)
 		if input_index == selected_input_index:
 			overlay.draw_arc(position, PORT_DRAW_RADIUS + 4.0, 0.0, TAU, 20, Color(0.70, 0.92, 1.0, 0.9), 1.2, true)
 
@@ -539,8 +557,6 @@ func _refresh_summon_state() -> void:
 	target_preview.configure_target(target_kind)
 	target_name_label.text = String(definition["monster_name"])
 	target_role_label.text = String(definition["role"])
-	for input_index in input_buttons.size():
-		input_buttons[input_index].set_pressed_no_signal(input_index == selected_input_index)
 	for kind in target_buttons:
 		var button: Button = target_buttons[kind]
 		button.set_pressed_no_signal(StringName(kind) == target_kind)
@@ -658,7 +674,7 @@ func _build_target_panel() -> PanelContainer:
 	panel.offset_left = -322.0
 	panel.offset_top = 12.0
 	panel.offset_right = -12.0
-	panel.offset_bottom = 296.0
+	panel.offset_bottom = 252.0
 	panel.add_theme_stylebox_override("panel", _target_panel_style())
 
 	var margin := MarginContainer.new()
@@ -676,23 +692,6 @@ func _build_target_panel() -> PanelContainer:
 	target_header_label.add_theme_font_size_override("font_size", 14)
 	target_header_label.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
 	column.add_child(target_header_label)
-
-	var input_selector := HBoxContainer.new()
-	input_selector.alignment = BoxContainer.ALIGNMENT_CENTER
-	input_selector.add_theme_constant_override("separation", 6)
-	column.add_child(input_selector)
-	var input_group := ButtonGroup.new()
-	for input_index in SUMMONER_INPUT_COUNT:
-		var input_button := Button.new()
-		input_button.name = "Input%dButton" % (input_index + 1)
-		input_button.text = "INPUT %d" % (input_index + 1)
-		input_button.tooltip_text = "召喚器の入力%dを表示・設定" % (input_index + 1)
-		input_button.custom_minimum_size = Vector2(82.0, 28.0)
-		input_button.toggle_mode = true
-		input_button.button_group = input_group
-		input_button.pressed.connect(select_input.bind(input_index))
-		input_buttons.append(input_button)
-		input_selector.add_child(input_button)
 
 	var target_row := HBoxContainer.new()
 	target_row.add_theme_constant_override("separation", 10)
