@@ -2,12 +2,17 @@ class_name FactoryPrototype
 extends Control
 
 const FactoryLandmarkVisualModel := preload("res://experiments/factory_prototype/factory_landmark.gd")
+const FactoryDirectionalOverlayModel := preload("res://experiments/factory_prototype/factory_directional_overlay.gd")
 
 const MENU_SCENE := "res://src/main_menu.tscn"
 const PLAYFIELD_SIZE := Vector2(9000.0, 6000.0)
 const SUMMONER_POSITION := Vector2(4400.0, 2895.0)
 const SUMMONER_INPUT_COUNT := 3
 const PORT_COLOR := Color(0.28, 0.78, 1.0, 1.0)
+const PORT_IDLE_COLOR := Color(0.20, 0.55, 0.70, 0.92)
+const PORT_HIT_RADIUS := 13.0
+const PORT_DRAW_RADIUS := 5.5
+const BUILTIN_PORT_COLOR := Color(0.0, 0.0, 0.0, 0.0)
 const TARGET_ORDER := [&"circle", &"triangle", &"square"]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -67,6 +72,8 @@ const MATERIAL_LAYOUT := [
 var factory_graph: GraphEdit
 var summoner_node: GraphNode
 var material_nodes: Array[GraphNode] = []
+var connection_overlay
+var port_overlay
 var status_label: Label
 var target_panel: PanelContainer
 var target_preview
@@ -79,6 +86,10 @@ var input_buttons: Array[Button] = []
 var summoner_input_labels: Array[Label] = []
 var input_target_kinds: Array[StringName] = [&"circle", &"triangle", &"square"]
 var selected_input_index := 0
+var connecting_material_id: StringName = &""
+var connection_pointer := Vector2.ZERO
+var connection_press_position := Vector2.ZERO
+var connection_drag_moved := false
 var selected_target_kind: StringName:
 	get:
 		if selected_input_index < 0 or selected_input_index >= input_target_kinds.size():
@@ -207,6 +218,7 @@ func connect_material_to_summoner(material_node_id: StringName, input_index: int
 	if error != OK:
 		_refresh_summon_state()
 		return false
+	_clear_directional_connection_preview()
 	_refresh_summon_state()
 	return true
 
@@ -246,6 +258,251 @@ func _on_disconnection_request(
 	if factory_graph.is_node_connected(from_node, from_port, to_node, to_port):
 		factory_graph.disconnect_node(from_node, from_port, to_node, to_port)
 	_refresh_summon_state()
+
+
+func _on_factory_graph_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		connection_pointer = event.position
+		if connecting_material_id != &"" and event.position.distance_to(connection_press_position) > 4.0:
+			connection_drag_moved = true
+		return
+	if not event is InputEventMouseButton:
+		return
+	var mouse_event := event as InputEventMouseButton
+	if mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
+		var disconnect_input := directional_input_at(mouse_event.position)
+		if disconnect_input >= 0:
+			disconnect_summoner(disconnect_input)
+			factory_graph.accept_event()
+		return
+	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	connection_pointer = mouse_event.position
+	if mouse_event.pressed:
+		var input_index := directional_input_at(mouse_event.position)
+		if input_index >= 0 and connecting_material_id != &"":
+			connect_material_to_summoner(connecting_material_id, input_index)
+			factory_graph.accept_event()
+			return
+		var material_id := directional_output_at(mouse_event.position)
+		if material_id != &"":
+			connecting_material_id = material_id
+			connection_press_position = mouse_event.position
+			connection_drag_moved = false
+			summon_state_label.text = "接続先の召喚器入力を選択"
+			summon_state_label.add_theme_color_override("font_color", Color(0.58, 0.86, 1.0))
+			factory_graph.accept_event()
+			return
+		if connecting_material_id != &"":
+			_clear_directional_connection_preview()
+			_refresh_summon_state()
+		return
+	if connecting_material_id == &"":
+		return
+	var release_input := directional_input_at(mouse_event.position)
+	if release_input >= 0:
+		connect_material_to_summoner(connecting_material_id, release_input)
+		factory_graph.accept_event()
+		return
+	if connection_drag_moved:
+		_clear_directional_connection_preview()
+		_refresh_summon_state()
+		factory_graph.accept_event()
+
+
+func _clear_directional_connection_preview() -> void:
+	connecting_material_id = &""
+	connection_drag_moved = false
+
+
+func directional_output_at(graph_position: Vector2) -> StringName:
+	for node in material_nodes:
+		var node_id := StringName(node.name)
+		if graph_position.distance_to(directional_output_position(node_id, factory_graph)) <= PORT_HIT_RADIUS:
+			return node_id
+	return &""
+
+
+func directional_input_at(graph_position: Vector2) -> int:
+	for input_index in SUMMONER_INPUT_COUNT:
+		if graph_position.distance_to(directional_input_position(input_index, factory_graph)) <= PORT_HIT_RADIUS:
+			return input_index
+	return -1
+
+
+func directional_output_position(node_id: StringName, coordinate_space: Control) -> Vector2:
+	var source := _material_node(node_id)
+	if source == null or summoner_node == null or coordinate_space == null:
+		return Vector2.ZERO
+	var source_center := _node_center_in(source, coordinate_space)
+	var summoner_center := _node_center_in(summoner_node, coordinate_space)
+	var direction := source_center.direction_to(summoner_center)
+	return _node_boundary_position(source, direction, coordinate_space)
+
+
+func directional_input_position(input_index: int, coordinate_space: Control) -> Vector2:
+	if (
+		input_index < 0
+		or input_index >= SUMMONER_INPUT_COUNT
+		or summoner_node == null
+		or coordinate_space == null
+	):
+		return Vector2.ZERO
+	var direction := _summoner_input_direction(input_index, coordinate_space)
+	var base := _node_boundary_position(summoner_node, direction, coordinate_space)
+	var tangent := Vector2(-direction.y, direction.x)
+	base += tangent * float(input_index - 1) * 18.0
+	return base
+
+
+func directional_port_direction(node_id: StringName, port_kind: StringName, input_index: int = -1) -> Vector2:
+	var node: GraphNode = summoner_node if port_kind == &"input" else _material_node(node_id)
+	if node == null:
+		return Vector2.ZERO
+	var point := (
+		directional_input_position(input_index, factory_graph)
+		if port_kind == &"input"
+		else directional_output_position(node_id, factory_graph)
+	)
+	return _node_center_in(node, factory_graph).direction_to(point)
+
+
+func draw_directional_overlay(overlay: Control, layer: StringName) -> void:
+	if factory_graph == null or summoner_node == null:
+		return
+	if layer == &"connections":
+		_draw_directional_connection_lines(overlay)
+		return
+	_draw_directional_ports(overlay)
+
+
+func _draw_directional_connection_lines(overlay: Control) -> void:
+	for connection in factory_graph.get_connection_list():
+		var from_node_id := StringName(connection["from_node"])
+		var input_index := int(connection["to_port"])
+		var start := directional_output_position(from_node_id, overlay)
+		var finish := directional_input_position(input_index, overlay)
+		var color := PORT_COLOR
+		match summon_state(input_index):
+			&"matched":
+				color = Color(0.34, 0.86, 0.76, 0.96)
+			&"mismatch":
+				color = Color(0.96, 0.62, 0.34, 0.96)
+		_draw_connection_curve(overlay, start, finish, color, 3.0)
+	if connecting_material_id != &"":
+		var preview_start: Vector2 = directional_output_position(connecting_material_id, overlay)
+		var preview_finish: Vector2 = _convert_control_point(factory_graph, connection_pointer, overlay)
+		_draw_connection_curve(overlay, preview_start, preview_finish, Color(0.42, 0.82, 1.0, 0.72), 2.0)
+
+
+func _draw_directional_ports(overlay: Control) -> void:
+	for node in material_nodes:
+		var node_id := StringName(node.name)
+		var position := directional_output_position(node_id, overlay)
+		var active := node_id == connecting_material_id
+		var direction := _node_center_in(node, overlay).direction_to(position)
+		_draw_output_port(overlay, position, direction, PORT_COLOR if active else PORT_IDLE_COLOR, active)
+	for input_index in SUMMONER_INPUT_COUNT:
+		var position := directional_input_position(input_index, overlay)
+		var state := summon_state(input_index)
+		var color := PORT_IDLE_COLOR
+		if state == &"matched":
+			color = Color(0.34, 0.86, 0.76, 1.0)
+		elif state == &"mismatch":
+			color = Color(0.96, 0.62, 0.34, 1.0)
+		elif connecting_material_id != &"":
+			color = PORT_COLOR
+		_draw_input_port(overlay, position, color)
+		if input_index == selected_input_index:
+			overlay.draw_arc(position, PORT_DRAW_RADIUS + 4.0, 0.0, TAU, 20, Color(0.70, 0.92, 1.0, 0.9), 1.2, true)
+
+
+func _draw_output_port(
+	overlay: Control,
+	position: Vector2,
+	direction: Vector2,
+	color: Color,
+	active: bool
+) -> void:
+	var safe_direction := direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
+	var tangent := Vector2(-safe_direction.y, safe_direction.x)
+	var radius := PORT_DRAW_RADIUS + (1.5 if active else 0.0)
+	var points := PackedVector2Array([
+		position + safe_direction * radius,
+		position + tangent * radius,
+		position - safe_direction * radius,
+		position - tangent * radius,
+	])
+	overlay.draw_colored_polygon(points, color)
+	overlay.draw_polyline(points + PackedVector2Array([points[0]]), Color(0.78, 0.94, 1.0, 0.92), 1.0, true)
+
+
+func _draw_input_port(overlay: Control, position: Vector2, color: Color) -> void:
+	overlay.draw_circle(position, PORT_DRAW_RADIUS + 2.0, Color(0.01, 0.05, 0.08, 0.96), true)
+	overlay.draw_arc(position, PORT_DRAW_RADIUS, 0.0, TAU, 20, color, 2.0, true)
+
+
+func _draw_connection_curve(
+	overlay: Control,
+	start: Vector2,
+	finish: Vector2,
+	color: Color,
+	width: float
+) -> void:
+	var distance := start.distance_to(finish)
+	var direction := start.direction_to(finish)
+	var handle_length := minf(distance * 0.28, 120.0)
+	var first_control := start + direction * handle_length
+	var second_control := finish - direction * handle_length
+	var points := PackedVector2Array()
+	for index in 25:
+		points.append(start.bezier_interpolate(first_control, second_control, finish, float(index) / 24.0))
+	overlay.draw_polyline(points, color, width, true)
+
+
+func _summoner_input_direction(input_index: int, coordinate_space: Control) -> Vector2:
+	for connection in factory_graph.get_connection_list():
+		if (
+			StringName(connection["to_node"]) == StringName(summoner_node.name)
+			and int(connection["to_port"]) == input_index
+		):
+			var source := _material_node(StringName(connection["from_node"]))
+			if source != null:
+				return _node_center_in(summoner_node, coordinate_space).direction_to(
+					_node_center_in(source, coordinate_space)
+				)
+	if connecting_material_id != &"":
+		var active_source := _material_node(connecting_material_id)
+		if active_source != null:
+			return _node_center_in(summoner_node, coordinate_space).direction_to(
+				_node_center_in(active_source, coordinate_space)
+			)
+	return Vector2.from_angle([PI, -PI * 0.5, 0.0][input_index])
+
+
+func _node_boundary_position(node: GraphNode, direction: Vector2, coordinate_space: Control) -> Vector2:
+	var local_size := node.size
+	if local_size.x <= 0.0 or local_size.y <= 0.0:
+		local_size = node.custom_minimum_size
+	var center := local_size * 0.5
+	var safe_direction := direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
+	var half_extent := Vector2(maxf(center.x - 5.0, 1.0), maxf(center.y - 5.0, 1.0))
+	var x_scale := INF if is_zero_approx(safe_direction.x) else half_extent.x / absf(safe_direction.x)
+	var y_scale := INF if is_zero_approx(safe_direction.y) else half_extent.y / absf(safe_direction.y)
+	var local_position := center + safe_direction * minf(x_scale, y_scale)
+	return _convert_control_point(node, local_position, coordinate_space)
+
+
+func _node_center_in(node: GraphNode, coordinate_space: Control) -> Vector2:
+	var local_size := node.size
+	if local_size.x <= 0.0 or local_size.y <= 0.0:
+		local_size = node.custom_minimum_size
+	return _convert_control_point(node, local_size * 0.5, coordinate_space)
+
+
+func _convert_control_point(source: Control, local_point: Vector2, destination: Control) -> Vector2:
+	var global_point := source.get_global_transform() * local_point
+	return destination.get_global_transform().affine_inverse() * global_point
 
 
 func _remove_summoner_input_connection(input_index: int) -> void:
@@ -373,7 +630,14 @@ func _build_ui() -> void:
 	factory_graph.zoom = 0.36
 	factory_graph.connection_request.connect(_on_connection_request)
 	factory_graph.disconnection_request.connect(_on_disconnection_request)
+	factory_graph.gui_input.connect(_on_factory_graph_input)
 	graph_area.add_child(factory_graph)
+
+	connection_overlay = FactoryDirectionalOverlayModel.new()
+	connection_overlay.name = "DirectionalConnectionOverlay"
+	connection_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	connection_overlay.configure(self, &"connections")
+	factory_graph.add_child(connection_overlay)
 
 	target_panel = _build_target_panel()
 	graph_area.add_child(target_panel)
@@ -493,6 +757,13 @@ func _place_landmarks() -> void:
 	summoner_node = _make_summoner_node()
 	factory_graph.add_child(summoner_node)
 
+	port_overlay = FactoryDirectionalOverlayModel.new()
+	port_overlay.name = "DirectionalPortOverlay"
+	port_overlay.z_index = 20
+	port_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	port_overlay.configure(self, &"ports")
+	factory_graph.add_child(port_overlay)
+
 
 func _make_material_node(node_id: StringName, kind: StringName, world_position: Vector2) -> GraphNode:
 	var node := GraphNode.new()
@@ -508,7 +779,8 @@ func _make_material_node(node_id: StringName, kind: StringName, world_position: 
 	var visual = FactoryLandmarkVisualModel.new()
 	visual.configure(kind)
 	node.add_child(visual)
-	node.set_slot(0, false, 0, PORT_COLOR, true, 0, PORT_COLOR)
+	node.set_slot(0, false, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return node
 
 
@@ -532,11 +804,12 @@ func _make_summoner_node() -> GraphNode:
 		input_row.add_child(input_label)
 		summoner_input_labels.append(input_label)
 		node.add_child(input_row)
-		node.set_slot(input_index, true, input_index, PORT_COLOR, false, 0, PORT_COLOR)
+		node.set_slot(input_index, true, input_index, BUILTIN_PORT_COLOR, false, 0, BUILTIN_PORT_COLOR)
 
 	var visual = FactoryLandmarkVisualModel.new()
 	visual.configure(&"summoner")
 	node.add_child(visual)
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return node
 
 

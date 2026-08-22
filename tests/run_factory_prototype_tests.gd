@@ -42,6 +42,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.fixed_landmark_count() == 31, "thirty material deposits and one summoner should be fixed landmarks")
 	_expect(prototype.all_landmarks_locked(), "material nodes and the summoner should not be draggable")
 	_expect(prototype.factory_graph.minimap_enabled, "a minimap should support navigation across the large map")
+	_expect(prototype.connection_overlay != null and prototype.port_overlay != null, "directional ports and connections should use dedicated overlays")
 	_expect(prototype.factory_graph.zoom <= 0.40, "the initial camera should show the wider inner deposit ring")
 	_expect(prototype.summoner_node.position_offset == prototype.SUMMONER_POSITION, "the summoner should remain at the factory center")
 	_expect(prototype.summoner_node.get_meta("landmark_kind") == &"summoner", "the center landmark should be identifiable as the summoner")
@@ -106,6 +107,40 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.summon_state(2) == &"idle", "disconnecting input 3 should stop only that input")
 	_expect(prototype.summon_state(0) == &"matched" and prototype.summon_state(1) == &"matched", "disconnecting input 3 should preserve the other summons")
 	_expect(prototype.factory_graph.get_connection_list().size() == 2, "disconnecting one input should preserve two connections")
+
+	_expect(prototype.directional_port_direction(&"circle_01", &"output").x > 0.9, "a west-side material output should face east toward the center")
+	_expect(prototype.directional_port_direction(&"triangle_01", &"output").x < -0.9, "an east-side material output should face west toward the center")
+	_expect(prototype.directional_port_direction(&"square_04", &"output").y > 0.9, "a north-side material output should face south toward the center")
+	_expect(prototype.directional_port_direction(&"square_08", &"output").y < -0.9, "a south-side material output should face north toward the center")
+	for input_index in 2:
+		var connection := _connection_for_input(prototype, input_index)
+		var connected_source: GraphNode = prototype._material_node(StringName(connection["from_node"]))
+		var expected_direction: Vector2 = prototype._node_center_in(prototype.summoner_node, prototype.factory_graph).direction_to(
+			prototype._node_center_in(connected_source, prototype.factory_graph)
+		)
+		_expect(
+			prototype.directional_port_direction(&"summoner_center", &"input", input_index).dot(expected_direction) > 0.80,
+			"a connected summoner input should face its actual upstream node"
+		)
+
+	var output_click := InputEventMouseButton.new()
+	output_click.button_index = MOUSE_BUTTON_LEFT
+	output_click.pressed = true
+	output_click.position = prototype.directional_output_position(StringName(square_source.name), prototype.factory_graph)
+	prototype.factory_graph.gui_input.emit(output_click)
+	_expect(prototype.connecting_material_id == StringName(square_source.name), "clicking a directional output should start a connection")
+	var input_click := InputEventMouseButton.new()
+	input_click.button_index = MOUSE_BUTTON_LEFT
+	input_click.pressed = true
+	input_click.position = prototype.directional_input_position(2, prototype.factory_graph)
+	prototype.factory_graph.gui_input.emit(input_click)
+	_expect(prototype.summon_state(2) == &"matched", "clicking an all-direction input should finish the connection")
+	var disconnect_click := InputEventMouseButton.new()
+	disconnect_click.button_index = MOUSE_BUTTON_RIGHT
+	disconnect_click.pressed = true
+	disconnect_click.position = prototype.directional_input_position(2, prototype.factory_graph)
+	prototype.factory_graph.gui_input.emit(disconnect_click)
+	_expect(prototype.summon_state(2) == &"idle", "right-clicking a directional input should disconnect only that input")
 
 	var bounds := Rect2()
 	var first := true
