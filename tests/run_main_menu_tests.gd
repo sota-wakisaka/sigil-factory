@@ -27,18 +27,6 @@ func _initialize() -> void:
 			await scene_changed
 
 	_expect(current_scene != null and current_scene.name == "MainMenu", "the factory return should restore the menu")
-	if current_scene != null:
-		current_scene.sigil_lab_button.pressed.emit()
-		await scene_changed
-
-	_expect(current_scene != null and current_scene.name == "SigilLab", "the Sigil Lab button should open Sigil Lab")
-	if current_scene != null:
-		_expect(current_scene.menu_button != null and current_scene.menu_button.visible, "Sigil Lab should expose a menu return button")
-		if current_scene.menu_button != null:
-			current_scene.menu_button.pressed.emit()
-			await scene_changed
-
-	_expect(current_scene != null and current_scene.name == "MainMenu", "the Sigil Lab return should restore the menu")
 	_finish()
 
 

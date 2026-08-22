@@ -2,10 +2,8 @@ class_name MainMenu
 extends Control
 
 const FACTORY_PROTOTYPE_SCENE := "res://experiments/rune_factory/rune_factory_prototype.tscn"
-const SIGIL_LAB_SCENE := "res://experiments/sigil_lab/sigil_lab.tscn"
 
 var factory_button: Button
-var sigil_lab_button: Button
 
 
 func _ready() -> void:
@@ -30,10 +28,6 @@ func _draw() -> void:
 
 func open_factory_prototype() -> void:
 	get_tree().change_scene_to_file(FACTORY_PROTOTYPE_SCENE)
-
-
-func open_sigil_lab() -> void:
-	get_tree().change_scene_to_file(SIGIL_LAB_SCENE)
 
 
 func _build_ui() -> void:
@@ -89,20 +83,8 @@ func _build_ui() -> void:
 	factory_button.pressed.connect(open_factory_prototype)
 	choices.add_child(factory_button)
 
-	sigil_lab_button = _menu_card(
-		"SIGIL LAB",
-		"ノードを自由に接続する編集室",
-		"シジルグラフの作成とJSON出力"
-	)
-	sigil_lab_button.name = "SigilLabButton"
-	sigil_lab_button.pressed.connect(open_sigil_lab)
-	choices.add_child(sigil_lab_button)
-
-	factory_button.focus_neighbor_right = factory_button.get_path_to(sigil_lab_button)
-	sigil_lab_button.focus_neighbor_left = sigil_lab_button.get_path_to(factory_button)
-
 	var hint := Label.new()
-	hint.text = "← → で選択  /  Enterで開く"
+	hint.text = "Enterで開く"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(0.38, 0.52, 0.62))

@@ -2,7 +2,7 @@
 
 Godot 4とGDScriptで開発している、ルーンを加工・合成して召喚する工場ゲームのプロジェクトです。
 
-現在の開発対象は、遊びの核となるルーン工場です。旧来の幾何Glyph工場、ルート選択、戦闘、報酬を含む進行は現行プロトタイプの対象外です。Sigil Labは過去方式を比較・参照するため独立して残しています。
+現在の開発対象は、遊びの核となるルーン工場です。旧来の幾何Glyph工場、ルート選択、戦闘、報酬を含む進行は現行プロトタイプの対象外です。
 
 ## 現在の開発対象
 
@@ -17,24 +17,16 @@ Godot 4とGDScriptで開発している、ルーンを加工・合成して召�
 
 - [`docs/FACTORY_PROTOTYPE.md`](docs/FACTORY_PROTOTYPE.md) — 現行ルーン工場の優先仕様
 - [`docs/FACTORY_SPEC.md`](docs/FACTORY_SPEC.md) — 将来候補を含む工場・物流資料（矛盾時は上記を優先）
-- [`docs/SIGIL_SPEC.md`](docs/SIGIL_SPEC.md) — 旧Glyph方式の参照資料
-- [`docs/SIGIL_VISUAL_SPEC.md`](docs/SIGIL_VISUAL_SPEC.md) — 旧Glyph表示の参照資料
 
 ## 起動
 
-Godot 4.7.1でプロジェクトを実行するとメインメニューが開き、Rune Factoryと旧Sigil Labを選択できます。
+Godot 4.7.1でプロジェクトを実行するとメインメニューが開き、ルーン工場プロトタイプを開始できます。
 
 ```powershell
 & "C:\Program Files\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe" --path .
 ```
 
 ## テスト
-
-シジルラボ:
-
-```powershell
-& "C:\Program Files\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe" --headless --path . --script res://tests/run_sigil_lab_tests.gd
-```
 
 ルーン工場とメニュー:
 
