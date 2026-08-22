@@ -29,7 +29,7 @@ func _test_main_menu() -> void:
 	await process_frame
 	_expect(menu.factory_button != null, "the menu should expose a Factory Prototype button")
 	_expect(menu.sigil_lab_button != null, "the menu should preserve the Sigil Lab entry")
-	_expect(menu.FACTORY_PROTOTYPE_SCENE == "res://experiments/factory_prototype/factory_prototype.tscn", "the Factory Prototype entry should target the new scene")
+	_expect(menu.FACTORY_PROTOTYPE_SCENE == "res://experiments/rune_factory/rune_factory_prototype.tscn", "the Factory Prototype entry should target Rune Factory")
 	_expect(menu.SIGIL_LAB_SCENE == "res://experiments/sigil_lab/sigil_lab.tscn", "the Sigil Lab entry should target the current Lab")
 	menu.queue_free()
 	await process_frame

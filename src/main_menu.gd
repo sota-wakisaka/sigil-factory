@@ -1,7 +1,7 @@
 class_name MainMenu
 extends Control
 
-const FACTORY_PROTOTYPE_SCENE := "res://experiments/factory_prototype/factory_prototype.tscn"
+const FACTORY_PROTOTYPE_SCENE := "res://experiments/rune_factory/rune_factory_prototype.tscn"
 const SIGIL_LAB_SCENE := "res://experiments/sigil_lab/sigil_lab.tscn"
 
 var factory_button: Button
@@ -65,7 +65,7 @@ func _build_ui() -> void:
 	column.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "魔導工場を構築し、形を生産する"
+	subtitle.text = "魔導工場を構築し、ルーンの組を生産する"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 14)
 	subtitle.add_theme_color_override("font_color", Color(0.50, 0.66, 0.76))
@@ -81,9 +81,9 @@ func _build_ui() -> void:
 	column.add_child(choices)
 
 	factory_button = _menu_card(
-		"工場プロトタイプ",
-		"○ △ □ が点在する広域工場",
-		"固定素材から中央の召喚器へ"
+		"ルーン工場プロトタイプ",
+		"赤・青・緑の24ルーンが点在する広域工場",
+		"移動・消滅・属性変換・抽出・合成"
 	)
 	factory_button.name = "FactoryPrototypeButton"
 	factory_button.pressed.connect(open_factory_prototype)

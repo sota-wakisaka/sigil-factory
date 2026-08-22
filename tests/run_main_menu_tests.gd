@@ -18,7 +18,7 @@ func _initialize() -> void:
 
 	current_scene.factory_button.pressed.emit()
 	await scene_changed
-	_expect(current_scene != null and current_scene.name == "FactoryPrototype", "the Factory Prototype button should open the factory")
+	_expect(current_scene != null and current_scene.name == "RuneFactoryPrototype", "the Rune Factory button should open the factory")
 	if current_scene != null:
 		var factory_back: Button = current_scene.find_child("BackButton", true, false)
 		_expect(factory_back != null and factory_back.visible, "the factory should expose a menu return button")
