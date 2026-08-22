@@ -51,8 +51,6 @@ func _draw() -> void:
 		_draw_summoner(center, radius, accent)
 	elif node_kind == &"shift":
 		_draw_shift(center, radius, accent)
-	elif node_kind == &"attune":
-		_draw_attune(center, radius)
 	elif node_kind == &"extract":
 		_draw_extract(center, radius, accent)
 	elif node_kind == &"merge":
@@ -89,18 +87,6 @@ func _draw_shift(center: Vector2, radius: float, accent: Color) -> void:
 	packet_view.modulate.a = 0.35
 
 
-func _draw_attune(center: Vector2, radius: float) -> void:
-	for attribute_index in RunePacketModel.ATTRIBUTE_COUNT:
-		var angle := -PI * 0.5 + TAU * float(attribute_index) / 3.0
-		var direction := Vector2.from_angle(angle)
-		var point := center + direction * radius * 0.58
-		draw_circle(point, 5.0, RunePacketModel.attribute_color(attribute_index), true)
-		var next_direction := Vector2.from_angle(angle + TAU / 3.0)
-		draw_arc(center, radius * 0.58, angle + 0.18, angle + TAU / 3.0 - 0.18, 12, Color(0.76, 0.92, 1.0, 0.62), 1.2)
-		draw_circle(center + next_direction * radius * 0.58, 1.7, Color(0.76, 0.92, 1.0, 0.78), true)
-	packet_view.modulate.a = 0.28
-
-
 func _draw_extract(center: Vector2, radius: float, accent: Color) -> void:
 	draw_line(center + Vector2(0.0, -radius * 0.45), center, accent, 1.8)
 	draw_line(center, center + Vector2(-radius * 0.42, radius * 0.34), accent, 1.8)
@@ -129,10 +115,6 @@ func _draw_relay(center: Vector2, radius: float, accent: Color) -> void:
 
 
 func _accent_color() -> Color:
-	if node_kind == &"source" and packet != null and not packet.is_empty():
-		var ids: Array[int] = packet.rune_ids_expanded()
-		if not ids.is_empty():
-			return RunePacketModel.attribute_color(RunePacketModel.attribute_for_id(ids[0]))
 	if node_kind == &"summoner":
 		return Color(0.82, 0.66, 1.0)
 	if node_kind == &"extract":

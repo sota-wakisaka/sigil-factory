@@ -3,7 +3,7 @@ extends Control
 
 const RunePacketModel := preload("res://src/rune/rune_packet.gd")
 
-enum DisplayMode { STRIP, WHEELS, NODE }
+enum DisplayMode { STRIP, BOARD, NODE }
 
 var packet
 var removed_packet
@@ -11,24 +11,27 @@ var display_mode := DisplayMode.STRIP
 var show_empty_slots := false
 var show_catalog := false
 var opacity := 1.0
+var preview_direction := Vector2i.ZERO
 
 
 func configure(
 	next_packet,
 	next_mode: DisplayMode = DisplayMode.STRIP,
-	next_removed = null
+	next_removed = null,
+	next_preview_direction: Vector2i = Vector2i.ZERO
 ) -> void:
 	packet = next_packet.copy() if next_packet != null else RunePacketModel.empty()
 	removed_packet = next_removed.copy() if next_removed != null else RunePacketModel.empty()
 	display_mode = next_mode
+	preview_direction = next_preview_direction
 	custom_minimum_size = _minimum_size_for_mode()
 	queue_redraw()
 
 
 func _minimum_size_for_mode() -> Vector2:
 	match display_mode:
-		DisplayMode.WHEELS:
-			return Vector2(342.0, 122.0)
+		DisplayMode.BOARD:
+			return Vector2(342.0, 230.0)
 		DisplayMode.NODE:
 			return Vector2(112.0, 112.0)
 		_:
@@ -39,8 +42,8 @@ func _draw() -> void:
 	if packet == null:
 		return
 	match display_mode:
-		DisplayMode.WHEELS:
-			_draw_wheels()
+		DisplayMode.BOARD:
+			_draw_board()
 		DisplayMode.NODE:
 			_draw_node_packet()
 		_:
@@ -61,56 +64,68 @@ func _draw_strip() -> void:
 			draw_circle(center, diameter * 0.34, Color(0.22, 0.42, 0.50, 0.18), false, 1.0)
 
 
-func _draw_wheels() -> void:
-	var wheel_radius := minf(43.0, size.y * 0.38)
-	var usable_width := size.x - 18.0
-	for attribute_index in RunePacketModel.ATTRIBUTE_COUNT:
-		var center := Vector2(
-			9.0 + usable_width * (float(attribute_index) + 0.5) / 3.0,
-			size.y * 0.54
-		)
-		var color := RunePacketModel.attribute_color(attribute_index)
-		draw_circle(center, wheel_radius, Color(0.006, 0.028, 0.042, 0.94), true)
-		draw_arc(center, wheel_radius, 0.0, TAU, 48, Color(color, 0.64), 1.5)
-		draw_circle(center, 7.0, Color(0.40, 0.09, 0.13, 0.88), true)
-		draw_line(center + Vector2(-4.0, -4.0), center + Vector2(4.0, 4.0), Color(1.0, 0.55, 0.60, 0.88), 1.4)
-		draw_line(center + Vector2(4.0, -4.0), center + Vector2(-4.0, 4.0), Color(1.0, 0.55, 0.60, 0.88), 1.4)
-		for position_index in RunePacketModel.RUNES_PER_ATTRIBUTE:
-			# Preserve the 3x3 board address in the circular UI: top stays top,
-			# corners stay diagonal, and a move always points at its visible destination.
-			var angle: float = Vector2(RunePacketModel.POSITION_COORDS[position_index]).angle()
-			var slot_center := center + Vector2.from_angle(angle) * wheel_radius * 0.68
-			var amount: int = packet.count_for(attribute_index, position_index)
-			var removed_amount: int = removed_packet.count_for(attribute_index, position_index)
+func _draw_board() -> void:
+	var center := size * 0.5
+	var step := minf((size.x - 28.0) / 8.0, (size.y - 20.0) / 8.0)
+	var highlighted_sinks := {}
+	if preview_direction != Vector2i.ZERO:
+		for id in removed_packet.rune_ids_expanded():
+			var destination: Vector2i = RunePacketModel.coord_for_id(id) + preview_direction
+			highlighted_sinks[destination] = int(highlighted_sinks.get(destination, 0)) + 1
+
+	# A faint orthogonal scaffold makes every one-cell move visually literal.
+	for y in range(-RunePacketModel.SINK_RING_RADIUS, RunePacketModel.SINK_RING_RADIUS + 1):
+		for x in range(-RunePacketModel.SINK_RING_RADIUS, RunePacketModel.SINK_RING_RADIUS + 1):
+			var coord := Vector2i(x, y)
+			if not RunePacketModel.is_display_coord(coord):
+				continue
+			for delta: Vector2i in [Vector2i.RIGHT, Vector2i.DOWN]:
+				var neighbor: Vector2i = coord + delta
+				if RunePacketModel.is_display_coord(neighbor):
+					draw_line(
+						center + Vector2(coord) * step,
+						center + Vector2(neighbor) * step,
+						Color(0.30, 0.55, 0.64, 0.16),
+						1.0
+					)
+
+	for y in range(-RunePacketModel.SINK_RING_RADIUS, RunePacketModel.SINK_RING_RADIUS + 1):
+		for x in range(-RunePacketModel.SINK_RING_RADIUS, RunePacketModel.SINK_RING_RADIUS + 1):
+			var coord := Vector2i(x, y)
+			if not RunePacketModel.is_display_coord(coord):
+				continue
+			var slot_center := center + Vector2(coord) * step
+			var rune_id := RunePacketModel.rune_id_for_coord(coord)
+			if rune_id < 0:
+				_draw_sink(slot_center, step * 0.31, int(highlighted_sinks.get(coord, 0)))
+				continue
+			var amount: int = packet.count_for(rune_id)
+			var removed_amount: int = removed_packet.count_for(rune_id)
 			if amount > 0:
-				_draw_rune_chip(
-					slot_center,
-					10.5,
-					RunePacketModel.rune_id(attribute_index, position_index),
-					amount,
-					opacity
-				)
+				_draw_rune_chip(slot_center, step * 0.42, rune_id, amount, opacity)
 			elif removed_amount > 0:
-				_draw_removed_chip(slot_center, 10.5, RunePacketModel.rune_id(attribute_index, position_index), removed_amount)
+				_draw_removed_chip(slot_center, step * 0.42, rune_id, removed_amount)
 			elif show_catalog:
-				_draw_rune_chip(
-					slot_center,
-					9.2,
-					RunePacketModel.rune_id(attribute_index, position_index),
-					1,
-					0.52
-				)
+				_draw_rune_chip(slot_center, step * 0.37, rune_id, 1, 0.56)
 			else:
-				draw_circle(slot_center, 3.0, Color(color, 0.26), false, 1.0)
-		var label: String = str(RunePacketModel.ATTRIBUTE_LABELS[attribute_index])
+				draw_circle(slot_center, step * 0.12, Color(RunePacketModel.RUNE_COLOR, 0.26), false, 1.0)
+
+
+func _draw_sink(center: Vector2, radius: float, removed_count: int) -> void:
+	var alpha := 0.98 if removed_count > 0 else 0.54
+	draw_circle(center, radius, Color(0.09, 0.025, 0.035, 0.72), true)
+	var cross := radius * 0.58
+	draw_line(center - Vector2.ONE * cross, center + Vector2.ONE * cross, Color(RunePacketModel.SINK_COLOR, alpha), 1.7)
+	draw_line(center + Vector2(-cross, cross), center + Vector2(cross, -cross), Color(RunePacketModel.SINK_COLOR, alpha), 1.7)
+	if removed_count > 1:
 		draw_string(
 			ThemeDB.fallback_font,
-			center + Vector2(-12.0, wheel_radius + 17.0),
-			label,
-			HORIZONTAL_ALIGNMENT_CENTER,
-			24.0,
-			12,
-			Color(color, 0.92)
+			center + Vector2(radius * 0.45, -radius * 0.45),
+			str(removed_count),
+			HORIZONTAL_ALIGNMENT_LEFT,
+			10.0,
+			8,
+			Color(1.0, 0.84, 0.86)
 		)
 
 
@@ -128,8 +143,7 @@ func _draw_node_packet() -> void:
 
 
 func _draw_rune_chip(center: Vector2, radius: float, rune_id: int, amount: int, alpha: float) -> void:
-	var attribute_index := RunePacketModel.attribute_for_id(rune_id)
-	var color := RunePacketModel.attribute_color(attribute_index)
+	var color := RunePacketModel.rune_color(rune_id)
 	draw_circle(center, radius, Color(0.008, 0.035, 0.052, 0.96 * alpha), true)
 	draw_circle(center, radius, Color(color, 0.88 * alpha), false, maxf(1.0, radius * 0.13))
 	var symbol := RunePacketModel.rune_symbol(rune_id)

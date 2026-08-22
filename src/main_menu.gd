@@ -82,8 +82,8 @@ func _build_ui() -> void:
 
 	factory_button = _menu_card(
 		"ルーン工場プロトタイプ",
-		"赤・青・緑の24ルーンが点在する広域工場",
-		"移動・消滅・属性変換・抽出・合成"
+		"菱形盤面の24ルーンが点在する広域工場",
+		"1マス移動・消滅環・抽出・合成"
 	)
 	factory_button.name = "FactoryPrototypeButton"
 	factory_button.pressed.connect(open_factory_prototype)

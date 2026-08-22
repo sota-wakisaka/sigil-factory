@@ -22,44 +22,56 @@ func _run() -> void:
 
 
 func _test_packet_domain() -> void:
-	var red_left = RunePacketModel.singleton(0, 3)
-	var red_top_left = RunePacketModel.singleton(0, 0)
-	var red_bottom_left = RunePacketModel.singleton(0, 5)
-	var column = red_left.merged(red_top_left).merged(red_bottom_left)
-	_expect(column != null and column.total_count() == 3, "same-attribute runes should merge")
-	var shifted = column.shifted(Vector2i.RIGHT)
-	_expect(shifted.total_count() == 2, "the rune entering the center should disappear")
+	_expect(RunePacketModel.RUNE_COORDS.size() == 24, "the diamond should contain twenty-four live rune cells")
+	var directions := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
+	for rune_id in RunePacketModel.RUNE_TYPE_COUNT:
+		for direction: Vector2i in directions:
+			var destination: Vector2i = RunePacketModel.coord_for_id(rune_id) + direction
+			var destination_id: int = RunePacketModel.rune_id_for_coord(destination)
+			var moved = RunePacketModel.singleton(rune_id).shifted(direction)
+			_expect(
+				(destination_id >= 0 and moved.total_count() == 1 and moved.count_for(destination_id) == 1)
+				or (destination_id < 0 and RunePacketModel.is_sink_coord(destination) and moved.is_empty()),
+				"every one-cell move should land on a visible rune or sink cell"
+			)
+	var middle = RunePacketModel.singleton(5)
+	var center_neighbor = RunePacketModel.singleton(11)
+	var pair = middle.merged(center_neighbor)
+	_expect(pair != null and pair.total_count() == 2, "different board runes should merge")
+	var shifted = pair.shifted(Vector2i.RIGHT)
+	_expect(shifted.total_count() == 1, "the rune entering the central sink should disappear")
 	_expect(
-		shifted.count_for(0, 1) == 1 and shifted.count_for(0, 6) == 1,
-		"the remaining runes should map to their destination cells"
+		shifted.count_for(6) == 1,
+		"a rune entering a normal cell should become that destination rune"
 	)
-	var edge = RunePacketModel.singleton(0, 2).shifted(Vector2i.RIGHT)
-	_expect(edge != null and edge.is_empty(), "a rune leaving the board should disappear")
-	var attuned = shifted.attuned(1)
+	var edge = RunePacketModel.singleton(0).shifted(Vector2i.UP)
+	_expect(edge != null and edge.is_empty(), "a rune entering the visible outer sink ring should disappear")
+	var preview: Dictionary = pair.shifted_preview(Vector2i.RIGHT)
 	_expect(
-		attuned.count_for(1, 1) == 1 and attuned.count_for(1, 6) == 1,
-		"attribute conversion should retain position and multiplicity"
+		preview["removed"].count_for(11) == 1 and preview["direction"] == Vector2i.RIGHT,
+		"move preview should identify both the removed rune and its sink direction"
 	)
-	var twins = RunePacketModel.singleton(0, 0).merged(RunePacketModel.singleton(0, 0))
+	var twins = RunePacketModel.singleton(11).merged(RunePacketModel.singleton(11))
 	_expect(
-		twins != null and twins.total_count() == 2 and twins.count_for(0, 0) == 2,
+		twins != null and twins.total_count() == 2 and twins.count_for(11) == 2,
 		"merging an identical rune should retain both copies"
 	)
-	var split = attuned.extracted(&"position", 1)
+	var ring_packet = RunePacketModel.from_rune_ids([11, 5, 0])
+	var split = ring_packet.extracted(&"ring", 1)
 	_expect(
 		bool(split["ok"])
 		and split["selected"].total_count() == 1
-		and split["remainder"].total_count() == 1,
-		"position extraction should return selected and remainder packets"
+		and split["remainder"].total_count() == 2,
+		"ring extraction should return the selected ring and the remainder"
 	)
-	_expect(not bool(attuned.extracted(&"unknown", 1)["ok"]), "an unknown extraction selector should fail closed")
+	_expect(not bool(ring_packet.extracted(&"unknown", 1)["ok"]), "an unknown extraction selector should fail closed")
 	var too_many = RunePacketModel.empty()
 	for _index in RunePacketModel.MAX_RUNES:
-		too_many = too_many.merged(RunePacketModel.singleton(0, 0))
+		too_many = too_many.merged(RunePacketModel.singleton(11))
 	_expect(
 		too_many != null
 		and too_many.total_count() == RunePacketModel.MAX_RUNES
-		and too_many.merged(RunePacketModel.singleton(0, 0)) == null,
+		and too_many.merged(RunePacketModel.singleton(11)) == null,
 		"packets should fail closed above eight runes"
 	)
 	_expect(
@@ -80,6 +92,10 @@ func _test_factory_scene() -> void:
 		return
 	_expect(prototype.source_count() == 24, "the world should contain all twenty-four rune sources")
 	_expect(
+		not prototype.placement_serials.has(&"attune") and not prototype.toolbar_buttons.has(&"attune"),
+		"attribute conversion should be absent from the rune factory"
+	)
+	_expect(
 		prototype.connection_overlay.z_index >= 0,
 		"connection lines should render in front of the GraphEdit background"
 	)
@@ -94,18 +110,19 @@ func _test_factory_scene() -> void:
 		int(tiers[&"near"]) == 2 and int(tiers[&"middle"]) == 6 and int(tiers[&"far"]) == 16,
 		"two sources should be near and more rune types should appear farther away"
 	)
-	var red_source := StringName("source_red_1")
+	var rune_source := StringName("source_rune_12")
 	var shift = prototype.place_processor(&"shift", Vector2(3800.0, 2700.0))
-	var attune = prototype.place_processor(&"attune", Vector2(4100.0, 2700.0))
+	var relay = prototype.place_processor(&"relay", Vector2(4100.0, 2700.0))
 	var shift_id := StringName(shift.name)
-	var attune_id := StringName(attune.name)
+	var relay_id := StringName(relay.name)
+	prototype.set_shift_direction(shift_id, Vector2i.UP)
 	_expect(
-		prototype.connect_nodes(red_source, 0, shift_id, 0)
-		and prototype.connect_nodes(shift_id, 0, attune_id, 0),
+		prototype.connect_nodes(rune_source, 0, shift_id, 0)
+		and prototype.connect_nodes(shift_id, 0, relay_id, 0),
 		"a source should connect through rune processors"
 	)
 	var first_connection = prototype._connection_to(shift_id, 0)
-	var line_start: Vector2 = prototype._port_position(red_source, 0, true, prototype.connection_overlay)
+	var line_start: Vector2 = prototype._port_position(rune_source, 0, true, prototype.connection_overlay)
 	var line_finish: Vector2 = prototype._port_position(shift_id, 0, false, prototype.connection_overlay)
 	_expect(
 		line_start.distance_to(line_finish) > 1.0,
@@ -119,27 +136,26 @@ func _test_factory_scene() -> void:
 		"transport distance should match the line drawn between its ports"
 	)
 	prototype.node_menu_node_id = shift_id
-	prototype._preview_node_menu_item(103)
+	prototype._preview_node_menu_item(101)
 	_expect(prototype.setting_preview_panel.visible, "hovering a setting should reveal a non-destructive preview")
 	_expect(prototype.setting_preview_detail.text.contains("消滅"), "shift preview should expose removals before commit")
 	prototype._clear_node_setting_preview()
-	prototype.set_shift_direction(shift_id, Vector2i.RIGHT)
-	var result = prototype.output_packet(attune_id)
+	var result = prototype.output_packet(relay_id)
 	_expect(
-		result != null and result.count_for(1, 1) == 1,
-		"right shift then attribute conversion should produce the expected blue rune"
+		result != null and result.count_for(5) == 1,
+		"one-cell movement should produce the rune at the visible destination"
 	)
 	var merge = prototype.place_processor(&"merge", Vector2(4250.0, 3150.0))
 	var merge_id := StringName(merge.name)
 	_expect(
-		prototype.connect_nodes(red_source, 0, merge_id, 0)
-		and prototype.connect_nodes(red_source, 0, merge_id, 1),
+		prototype.connect_nodes(rune_source, 0, merge_id, 0)
+		and prototype.connect_nodes(rune_source, 0, merge_id, 1),
 		"one source output should branch into two merge inputs"
 	)
 	var twins = prototype.output_packet(merge_id)
-	_expect(twins != null and twins.count_for(0, 0) == 2, "factory merge should preserve identical runes")
+	_expect(twins != null and twins.count_for(11) == 2, "factory merge should preserve identical runes")
 	prototype.select_input(0)
-	prototype.select_target(&"red_twins")
+	prototype.select_target(&"rune_twins")
 	_expect(
 		prototype.connect_nodes(merge_id, 0, StringName(prototype.summoner_node.name), 0),
 		"a completed rune packet should connect to a summoner input"

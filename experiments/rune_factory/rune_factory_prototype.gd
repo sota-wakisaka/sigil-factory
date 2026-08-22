@@ -22,38 +22,38 @@ const SHIFT_DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.
 const SHIFT_LABELS := ["↑", "→", "↓", "←"]
 
 const TARGET_ORDER: Array[StringName] = [
-	&"red_seed", &"blue_seed", &"green_seed", &"red_twins", &"tricolor",
+	&"inner_seed", &"north_seed", &"south_seed", &"rune_twins", &"three_runes",
 ]
 const TARGET_DEFINITIONS := {
-	&"red_seed": {
-		"label": "赤の一字",
-		"monster": "緋小鬼",
+	&"inner_seed": {
+		"label": "内環一字",
+		"monster": "刻小鬼",
 		"role": "近接・量産",
+		"runes": [11],
+	},
+	&"north_seed": {
+		"label": "北端一字",
+		"monster": "針羽虫",
+		"role": "遠隔・軽量",
 		"runes": [0],
 	},
-	&"blue_seed": {
-		"label": "青の一字",
-		"monster": "蒼羽虫",
-		"role": "遠隔・軽量",
-		"runes": [10],
-	},
-	&"green_seed": {
-		"label": "緑の一字",
-		"monster": "翠甲仔",
+	&"south_seed": {
+		"label": "南端一字",
+		"monster": "殻仔",
 		"role": "防壁・低速",
-		"runes": [21],
+		"runes": [23],
 	},
-	&"red_twins": {
-		"label": "赤の双字",
+	&"rune_twins": {
+		"label": "同符双字",
 		"monster": "双角インプ",
 		"role": "同字合成・突撃",
-		"runes": [0, 0],
+		"runes": [11, 11],
 	},
-	&"tricolor": {
-		"label": "三彩句",
-		"monster": "三相キメラ",
+	&"three_runes": {
+		"label": "三字句",
+		"monster": "綴合獣",
 		"role": "複合・汎用",
-		"runes": [1, 11, 23],
+		"runes": [5, 12, 18],
 	},
 }
 
@@ -71,7 +71,7 @@ var connecting_from_node: StringName = &""
 var connecting_from_port := 0
 var pointer_position := Vector2.ZERO
 var placement_kind: StringName = &""
-var placement_serials := {&"relay": 0, &"shift": 0, &"attune": 0, &"extract": 0, &"merge": 0}
+var placement_serials := {&"relay": 0, &"shift": 0, &"extract": 0, &"merge": 0}
 var toolbar_buttons: Dictionary = {}
 var status_label: Label
 var target_panel: PanelContainer
@@ -86,7 +86,7 @@ var setting_preview_panel: PanelContainer
 var setting_preview_label: Label
 var setting_preview_detail: Label
 var setting_preview_view: Control
-var input_targets: Array[StringName] = [&"red_seed", &"blue_seed", &"green_seed"]
+var input_targets: Array[StringName] = [&"inner_seed", &"north_seed", &"south_seed"]
 var selected_input_index := 0
 var summoned_counts: Dictionary = {}
 var last_arrival_cycles := [-1, -1, -1]
@@ -200,33 +200,15 @@ func set_shift_direction(node_id: StringName, direction: Vector2i) -> bool:
 	return true
 
 
-func set_attune_delta(node_id: StringName, delta: int) -> bool:
-	var node := _node(node_id)
-	if node == null or _kind(node_id) != &"attune" or delta not in [-1, 1]:
-		return false
-	if int(node.get_meta("delta", 1)) == delta:
-		return false
-	node.set_meta("delta", delta)
-	_reset_downstream_transport(node_id)
-	_refresh_all()
-	return true
-
-
 func set_extract_selector(node_id: StringName, selector_kind: StringName, selector_value: int) -> bool:
 	var node := _node(node_id)
 	if node == null or _kind(node_id) != &"extract":
 		return false
-	if selector_kind == &"attribute":
-		if selector_value < 0 or selector_value >= RunePacketModel.ATTRIBUTE_COUNT:
-			return false
-	elif selector_kind == &"position":
-		if selector_value < 0 or selector_value >= RunePacketModel.RUNES_PER_ATTRIBUTE:
-			return false
-	else:
+	if selector_kind != &"ring" or selector_value < 1 or selector_value > RunePacketModel.RUNE_BOARD_RADIUS:
 		return false
 	if (
-		StringName(node.get_meta("selector_kind", &"attribute")) == selector_kind
-		and int(node.get_meta("selector_value", 0)) == selector_value
+		StringName(node.get_meta("selector_kind", &"ring")) == selector_kind
+		and int(node.get_meta("selector_value", 1)) == selector_value
 	):
 		return false
 	node.set_meta("selector_kind", selector_kind)
@@ -284,12 +266,10 @@ func _output_packet(node_id: StringName, output_port: int, visited: Dictionary):
 		&"shift":
 			var shifted = input_packet.shifted(Vector2i(node.get_meta("direction", Vector2i.RIGHT)))
 			return shifted if shifted != null and not shifted.is_empty() else null
-		&"attune":
-			return input_packet.attuned(int(node.get_meta("delta", 1)))
 		&"extract":
 			var split = input_packet.extracted(
-				StringName(node.get_meta("selector_kind", &"attribute")),
-				int(node.get_meta("selector_value", 0))
+				StringName(node.get_meta("selector_kind", &"ring")),
+				int(node.get_meta("selector_value", 1))
 			)
 			if not bool(split.get("ok", false)):
 				return null
@@ -448,7 +428,7 @@ func _draw_flow_packet(canvas: Control, center: Vector2, packet) -> void:
 	if ids.is_empty():
 		return
 	var primary_id: int = ids[0]
-	var color := RunePacketModel.attribute_color(RunePacketModel.attribute_for_id(primary_id))
+	var color := RunePacketModel.rune_color(primary_id)
 	canvas.draw_circle(center, 9.0, Color(0.005, 0.025, 0.038, 0.96), true)
 	canvas.draw_circle(center, 9.0, Color(color, 0.92), false, 1.5)
 	canvas.draw_string(
@@ -503,9 +483,8 @@ func _build_ui() -> void:
 	toolbar.add_child(back)
 	for definition in [
 		{&"kind": &"relay", &"text": "＋ 中継", &"tip": "内容を変えずに搬送"},
-		{&"kind": &"shift", &"text": "＋ 移動", &"tip": "集合全体を3×3盤上で移動 // 中央・盤外は消滅"},
-		{&"kind": &"attune", &"text": "＋ 属性", &"tip": "位置を保ったまま赤・青・緑を循環"},
-		{&"kind": &"extract", &"text": "＋ 抽出", &"tip": "属性または位置で選別 // 2出力"},
+		{&"kind": &"shift", &"text": "＋ 移動", &"tip": "菱形盤面を1マス移動 // ×へ入るルーンは消滅"},
+		{&"kind": &"extract", &"text": "＋ 抽出", &"tip": "内周・中周・外周で選別 // 2出力"},
 		{&"kind": &"merge", &"text": "＋ 合成", &"tip": "2〜8入力を最大8文字へ合成 // 同字可"},
 	]:
 		var button := Button.new()
@@ -589,7 +568,7 @@ func _build_target_panel() -> PanelContainer:
 	panel.offset_left = -382.0
 	panel.offset_top = 12.0
 	panel.offset_right = -12.0
-	panel.offset_bottom = 455.0
+	panel.offset_bottom = 570.0
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.01, 0.04, 0.058, 0.97)
 	style.border_color = Color(0.20, 0.53, 0.68, 0.88)
@@ -606,14 +585,14 @@ func _build_target_panel() -> PanelContainer:
 	column.add_theme_constant_override("separation", 6)
 	margin.add_child(column)
 	var header := Label.new()
-	header.text = "24ルーン // 赤・青・緑 × 8位置"
+	header.text = "24ルーン // 菱形盤面 // ×は消滅マス"
 	header.add_theme_font_size_override("font_size", 13)
 	header.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
 	column.add_child(header)
 	rune_reference_view = RunePacketViewModel.new()
 	rune_reference_view.show_empty_slots = true
 	rune_reference_view.show_catalog = true
-	rune_reference_view.configure(RunePacketModel.empty(), RunePacketViewModel.DisplayMode.WHEELS)
+	rune_reference_view.configure(RunePacketModel.empty(), RunePacketViewModel.DisplayMode.BOARD)
 	column.add_child(rune_reference_view)
 	target_title = Label.new()
 	target_title.add_theme_font_size_override("font_size", 14)
@@ -664,7 +643,7 @@ func _build_setting_preview_panel() -> PanelContainer:
 	panel.offset_left = -760.0
 	panel.offset_top = 12.0
 	panel.offset_right = -392.0
-	panel.offset_bottom = 188.0
+	panel.offset_bottom = 310.0
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.008, 0.032, 0.048, 0.97)
 	style.border_color = Color(0.34, 0.82, 1.0, 0.92)
@@ -687,7 +666,7 @@ func _build_setting_preview_panel() -> PanelContainer:
 	column.add_child(setting_preview_label)
 	setting_preview_view = RunePacketViewModel.new()
 	setting_preview_view.show_empty_slots = true
-	setting_preview_view.configure(RunePacketModel.empty(), RunePacketViewModel.DisplayMode.WHEELS)
+	setting_preview_view.configure(RunePacketModel.empty(), RunePacketViewModel.DisplayMode.BOARD)
 	column.add_child(setting_preview_view)
 	setting_preview_detail = Label.new()
 	setting_preview_detail.add_theme_font_size_override("font_size", 11)
@@ -697,7 +676,7 @@ func _build_setting_preview_panel() -> PanelContainer:
 
 
 func _place_sources_and_summoner() -> void:
-	var ordered_ids: Array[int] = [0, 8, 16, 1, 9, 17, 2, 10]
+	var ordered_ids: Array[int] = [11, 12, 6, 17, 5, 7, 10, 13]
 	for id in RunePacketModel.RUNE_TYPE_COUNT:
 		if id not in ordered_ids:
 			ordered_ids.append(id)
@@ -708,10 +687,8 @@ func _place_sources_and_summoner() -> void:
 		var tier_count := 2 if order_index < 2 else (6 if order_index < 8 else 16)
 		var angle := -PI * 0.5 + TAU * float(tier_index) / float(tier_count)
 		var center := SUMMONER_POSITION + Vector2.from_angle(angle) * radius
-		var attribute_index := RunePacketModel.attribute_for_id(rune_id)
-		var position_index := RunePacketModel.position_for_id(rune_id)
-		var id_name := StringName("source_%s_%d" % [String(RunePacketModel.ATTRIBUTES[attribute_index]), position_index + 1])
-		var packet = RunePacketModel.singleton(attribute_index, position_index)
+		var id_name := StringName("source_rune_%02d" % (rune_id + 1))
+		var packet = RunePacketModel.singleton(rune_id)
 		var node := _make_factory_node(id_name, &"source", center, true, {"source_packet": packet})
 		source_node_ids.append(id_name)
 		nodes[id_name] = node
@@ -773,10 +750,8 @@ func _default_config(kind: StringName) -> Dictionary:
 	match kind:
 		&"shift":
 			return {"direction": Vector2i.RIGHT}
-		&"attune":
-			return {"delta": 1}
 		&"extract":
-			return {"selector_kind": &"attribute", "selector_value": 0}
+			return {"selector_kind": &"ring", "selector_value": 1}
 	return {}
 
 
@@ -789,9 +764,9 @@ func _refresh_all() -> void:
 		var config := _node_config(id)
 		visual.configure(_kind(id), output_packet(id), config)
 		node.tooltip_text = _node_tooltip(id)
-	status_label.text = "素材 %d // 中継 %d // 移動 %d // 属性 %d // 抽出 %d // 合成 %d" % [
+	status_label.text = "素材 %d // 中継 %d // 移動 %d // 抽出 %d // 合成 %d" % [
 		source_node_ids.size(), _processor_count(&"relay"), _processor_count(&"shift"),
-		_processor_count(&"attune"), _processor_count(&"extract"), _processor_count(&"merge")
+		_processor_count(&"extract"), _processor_count(&"merge")
 	]
 	_refresh_target_panel()
 
@@ -928,14 +903,9 @@ func _open_node_menu(node_id: StringName, global_position: Vector2) -> void:
 		&"shift":
 			for index in SHIFT_DIRECTIONS.size():
 				node_menu.add_item("%s へ1マス" % SHIFT_LABELS[index], 100 + index)
-		&"attune":
-			node_menu.add_item("赤 → 青 → 緑", 200)
-			node_menu.add_item("赤 ← 青 ← 緑", 201)
 		&"extract":
-			for attribute_index in RunePacketModel.ATTRIBUTE_COUNT:
-				node_menu.add_item("%s属性を抽出" % RunePacketModel.ATTRIBUTE_LABELS[attribute_index], 300 + attribute_index)
-			for position_index in RunePacketModel.RUNES_PER_ATTRIBUTE:
-				node_menu.add_item("位置 %d を抽出" % (position_index + 1), 400 + position_index)
+			for ring_index in RunePacketModel.RUNE_BOARD_RADIUS:
+				node_menu.add_item("%sを抽出" % ["内周", "中周", "外周"][ring_index], 300 + ring_index)
 	node_menu.add_item("ノードを削除", 999)
 	node_menu.position = Vector2i(global_position.round())
 	node_menu.popup()
@@ -946,14 +916,8 @@ func _on_node_menu_pressed(id: int) -> void:
 		return
 	if id >= 100 and id < 104:
 		set_shift_direction(node_menu_node_id, SHIFT_DIRECTIONS[id - 100])
-	elif id == 200:
-		set_attune_delta(node_menu_node_id, 1)
-	elif id == 201:
-		set_attune_delta(node_menu_node_id, -1)
 	elif id >= 300 and id < 303:
-		set_extract_selector(node_menu_node_id, &"attribute", id - 300)
-	elif id >= 400 and id < 408:
-		set_extract_selector(node_menu_node_id, &"position", id - 400)
+		set_extract_selector(node_menu_node_id, &"ring", id - 299)
 	elif id == 999:
 		remove_processor(node_menu_node_id)
 
@@ -987,9 +951,7 @@ func _preview_node_menu_item(item_id: int) -> void:
 		return
 	if not (
 		(item_id >= 100 and item_id < 104)
-		or item_id in [200, 201]
 		or (item_id >= 300 and item_id < 303)
-		or (item_id >= 400 and item_id < 408)
 	):
 		_clear_node_setting_preview()
 		return
@@ -1005,32 +967,30 @@ func _preview_node_menu_item(item_id: int) -> void:
 	if input_packet == null:
 		setting_preview_label.text = "未確定プレビュー // 入力待ち"
 		setting_preview_detail.text = "接続後に結果と消滅対象を表示します"
-		setting_preview_view.configure(RunePacketModel.empty(), RunePacketViewModel.DisplayMode.WHEELS)
+		setting_preview_view.configure(RunePacketModel.empty(), RunePacketViewModel.DisplayMode.BOARD)
 		return
 	var output = null
 	var removed = RunePacketModel.empty()
+	var preview_direction := Vector2i.ZERO
 	var detail := ""
 	if item_id >= 100 and item_id < 104:
 		var direction: Vector2i = SHIFT_DIRECTIONS[item_id - 100]
 		var preview = input_packet.shifted_preview(direction)
 		output = preview["output"]
 		removed = preview["removed"]
+		preview_direction = direction
 		detail = "%s へ1マス // 出力 %d字 // 消滅 %d字" % [
 			SHIFT_LABELS[item_id - 100], output.total_count(), removed.total_count()
 		]
-	elif item_id in [200, 201]:
-		output = input_packet.attuned(1 if item_id == 200 else -1)
-		detail = "%s // 位置・個数を保持" % ("赤→青→緑" if item_id == 200 else "赤←青←緑")
 	else:
-		var selector_kind := &"attribute" if item_id >= 300 and item_id < 303 else &"position"
-		var selector_value := item_id - (300 if selector_kind == &"attribute" else 400)
-		var split = input_packet.extracted(selector_kind, selector_value)
+		var selector_value := item_id - 299
+		var split = input_packet.extracted(&"ring", selector_value)
 		output = split["selected"]
 		var remainder = split["remainder"]
 		detail = "◆0 該当 %d字 // ◆1 残り %d字" % [output.total_count(), remainder.total_count()]
 	setting_preview_label.text = "未確定プレビュー // %s" % _node_kind_label(_kind(node_menu_node_id))
 	setting_preview_detail.text = detail
-	setting_preview_view.configure(output, RunePacketViewModel.DisplayMode.WHEELS, removed)
+	setting_preview_view.configure(output, RunePacketViewModel.DisplayMode.BOARD, removed, preview_direction)
 
 
 func _clear_node_setting_preview() -> void:
@@ -1065,11 +1025,9 @@ func _node_tooltip(node_id: StringName) -> String:
 			return "中継 // 内容を変更せず搬送 // 右クリック"
 		&"shift":
 			var direction := Vector2i(node.get_meta("direction", Vector2i.RIGHT))
-			return "移動 %s // 中央・盤外・属性境界は消滅 // 右クリック" % SHIFT_LABELS[SHIFT_DIRECTIONS.find(direction)]
-		&"attune":
-			return "属性変換 // 位置と個数を保持 // 右クリック"
+			return "移動 %s // ×へ入るルーンは消滅 // 右クリック" % SHIFT_LABELS[SHIFT_DIRECTIONS.find(direction)]
 		&"extract":
-			return "抽出 // ◆0=該当 / ◆1=残り // 右クリック"
+			return "環抽出 // ◆0=該当 / ◆1=残り // 右クリック"
 		&"merge":
 			return "合成 // 2〜8入力 // 同じルーン可 // 最大8文字"
 	return ""
@@ -1079,8 +1037,6 @@ func _node_kind_label(kind: StringName) -> String:
 	match kind:
 		&"shift":
 			return "移動"
-		&"attune":
-			return "属性変換"
 		&"extract":
 			return "抽出"
 		&"merge":
@@ -1097,12 +1053,10 @@ func _node_config(node_id: StringName) -> Dictionary:
 	match _kind(node_id):
 		&"shift":
 			return {"direction": node.get_meta("direction", Vector2i.RIGHT)}
-		&"attune":
-			return {"delta": int(node.get_meta("delta", 1))}
 		&"extract":
 			return {
-				"selector_kind": node.get_meta("selector_kind", &"attribute"),
-				"selector_value": int(node.get_meta("selector_value", 0)),
+				"selector_kind": node.get_meta("selector_kind", &"ring"),
+				"selector_value": int(node.get_meta("selector_value", 1)),
 			}
 	return {}
 
@@ -1128,7 +1082,7 @@ func _input_count_for_kind(kind: StringName) -> int:
 		return SUMMONER_INPUT_COUNT
 	if kind == &"merge":
 		return MERGE_INPUT_COUNT
-	if kind in [&"relay", &"shift", &"attune", &"extract"]:
+	if kind in [&"relay", &"shift", &"extract"]:
 		return 1
 	return 0
 
@@ -1136,7 +1090,7 @@ func _input_count_for_kind(kind: StringName) -> int:
 func _output_count_for_kind(kind: StringName) -> int:
 	if kind == &"extract":
 		return 2
-	if kind in [&"source", &"relay", &"shift", &"attune", &"merge"]:
+	if kind in [&"source", &"relay", &"shift", &"merge"]:
 		return 1
 	return 0
 

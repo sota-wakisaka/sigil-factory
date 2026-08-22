@@ -3,30 +3,29 @@ extends RefCounted
 
 const SCRIPT_PATH := "res://src/rune/rune_packet.gd"
 
-const ATTRIBUTE_COUNT := 3
-const RUNES_PER_ATTRIBUTE := 8
-const RUNE_TYPE_COUNT := ATTRIBUTE_COUNT * RUNES_PER_ATTRIBUTE
+const RUNE_TYPE_COUNT := 24
 const MAX_RUNES := 8
+const RUNE_BOARD_RADIUS := 3
+const SINK_RING_RADIUS := 4
 
-const ATTRIBUTES: Array[StringName] = [&"red", &"blue", &"green"]
-const ATTRIBUTE_LABELS := ["赤", "青", "緑"]
-const ATTRIBUTE_COLORS := [
-	Color(0.96, 0.34, 0.34),
-	Color(0.30, 0.64, 1.0),
-	Color(0.30, 0.86, 0.54),
+# The twenty-four live cells form a Manhattan diamond around a central sink.
+# A one-cell move from the live outer edge always lands on the visible sink ring.
+const RUNE_COORDS: Array[Vector2i] = [
+	Vector2i(0, -3),
+	Vector2i(-1, -2), Vector2i(0, -2), Vector2i(1, -2),
+	Vector2i(-2, -1), Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1), Vector2i(2, -1),
+	Vector2i(-3, 0), Vector2i(-2, 0), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0),
+	Vector2i(-2, 1), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1),
+	Vector2i(-1, 2), Vector2i(0, 2), Vector2i(1, 2),
+	Vector2i(0, 3),
 ]
 const RUNE_SYMBOLS := [
 	"ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "ᚹ",
 	"ᚺ", "ᚾ", "ᛁ", "ᛃ", "ᛇ", "ᛈ", "ᛉ", "ᛊ",
 	"ᛏ", "ᛒ", "ᛖ", "ᛗ", "ᛚ", "ᛜ", "ᛞ", "ᛟ",
 ]
-
-# The eight runes of every attribute occupy a 3x3 board whose center is a sink.
-const POSITION_COORDS := [
-	Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1),
-	Vector2i(-1, 0), Vector2i(1, 0),
-	Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1),
-]
+const RUNE_COLOR := Color(0.48, 0.84, 1.0)
+const SINK_COLOR := Color(1.0, 0.42, 0.46)
 
 var _counts := PackedInt32Array()
 
@@ -42,13 +41,13 @@ static func empty():
 	return _create()
 
 
-static func singleton(attribute_index: int, position_index: int):
-	if not valid_address(attribute_index, position_index):
+static func singleton(rune_index: int):
+	if not valid_rune_id(rune_index):
 		return null
 	var counts := PackedInt32Array()
 	counts.resize(RUNE_TYPE_COUNT)
 	counts.fill(0)
-	counts[rune_id(attribute_index, position_index)] = 1
+	counts[rune_index] = 1
 	return _create(counts)
 
 
@@ -59,8 +58,8 @@ static func from_rune_ids(rune_ids: Array):
 	counts.resize(RUNE_TYPE_COUNT)
 	counts.fill(0)
 	for value in rune_ids:
-		var id: int = int(value)
-		if id < 0 or id >= RUNE_TYPE_COUNT:
+		var id := int(value)
+		if not valid_rune_id(id):
 			return null
 		counts[id] += 1
 	return _create(counts)
@@ -85,14 +84,12 @@ func is_empty() -> bool:
 	return total_count() == 0
 
 
-func count_for(attribute_index: int, position_index: int) -> int:
-	if not valid_address(attribute_index, position_index):
-		return 0
-	return int(_counts[rune_id(attribute_index, position_index)])
+func count_for(rune_index: int) -> int:
+	return int(_counts[rune_index]) if valid_rune_id(rune_index) else 0
 
 
 func count_for_id(id: int) -> int:
-	return int(_counts[id]) if id >= 0 and id < RUNE_TYPE_COUNT else 0
+	return count_for(id)
 
 
 func rune_ids_expanded() -> Array[int]:
@@ -109,55 +106,33 @@ func shifted(direction: Vector2i):
 	var result := PackedInt32Array()
 	result.resize(RUNE_TYPE_COUNT)
 	result.fill(0)
-	for attribute_index in ATTRIBUTE_COUNT:
-		for position_index in RUNES_PER_ATTRIBUTE:
-			var amount := count_for(attribute_index, position_index)
-			if amount <= 0:
-				continue
-			var destination: Vector2i = Vector2i(POSITION_COORDS[position_index]) + direction
-			# The center, the outside of the board, and an attribute boundary are sinks.
-			var destination_index := position_index_for_coord(destination)
-			if destination_index < 0:
-				continue
-			result[rune_id(attribute_index, destination_index)] += amount
+	for id in RUNE_TYPE_COUNT:
+		var amount := count_for(id)
+		if amount <= 0:
+			continue
+		var destination_id := rune_id_for_coord(coord_for_id(id) + direction)
+		if destination_id >= 0:
+			result[destination_id] += amount
 	return _create(result)
 
 
 func shifted_preview(direction: Vector2i) -> Dictionary:
 	var output = shifted(direction)
 	if output == null:
-		return {"ok": false, "output": null, "removed": empty()}
+		return {"ok": false, "output": null, "removed": empty(), "direction": Vector2i.ZERO}
 	var removed_counts := PackedInt32Array()
 	removed_counts.resize(RUNE_TYPE_COUNT)
 	removed_counts.fill(0)
-	for attribute_index in ATTRIBUTE_COUNT:
-		for position_index in RUNES_PER_ATTRIBUTE:
-			var amount := count_for(attribute_index, position_index)
-			if amount <= 0:
-				continue
-			if position_index_for_coord(POSITION_COORDS[position_index] + direction) < 0:
-				removed_counts[rune_id(attribute_index, position_index)] = amount
+	for id in RUNE_TYPE_COUNT:
+		var amount := count_for(id)
+		if amount > 0 and rune_id_for_coord(coord_for_id(id) + direction) < 0:
+			removed_counts[id] = amount
 	return {
 		"ok": true,
 		"output": output,
 		"removed": _create(removed_counts),
+		"direction": direction,
 	}
-
-
-func attuned(delta: int):
-	if delta == 0:
-		return copy()
-	var result := PackedInt32Array()
-	result.resize(RUNE_TYPE_COUNT)
-	result.fill(0)
-	for attribute_index in ATTRIBUTE_COUNT:
-		var destination_attribute := posmod(attribute_index + delta, ATTRIBUTE_COUNT)
-		for position_index in RUNES_PER_ATTRIBUTE:
-			result[rune_id(destination_attribute, position_index)] += count_for(
-				attribute_index,
-				position_index
-			)
-	return _create(result)
 
 
 func extracted(selector_kind: StringName, selector_value: int) -> Dictionary:
@@ -167,20 +142,10 @@ func extracted(selector_kind: StringName, selector_value: int) -> Dictionary:
 	remainder.resize(RUNE_TYPE_COUNT)
 	selected.fill(0)
 	remainder.fill(0)
-	if selector_kind not in [&"attribute", &"position"]:
-		return {"ok": false, "selected": null, "remainder": null}
-	if (
-		(selector_kind == &"attribute" and (selector_value < 0 or selector_value >= ATTRIBUTE_COUNT))
-		or (selector_kind == &"position" and (selector_value < 0 or selector_value >= RUNES_PER_ATTRIBUTE))
-	):
+	if selector_kind != &"ring" or selector_value < 1 or selector_value > RUNE_BOARD_RADIUS:
 		return {"ok": false, "selected": null, "remainder": null}
 	for id in RUNE_TYPE_COUNT:
-		var matches := (
-			attribute_for_id(id) == selector_value
-			if selector_kind == &"attribute"
-			else position_for_id(id) == selector_value
-		)
-		if matches:
+		if ring_for_id(id) == selector_value:
 			selected[id] = _counts[id]
 		else:
 			remainder[id] = _counts[id]
@@ -216,7 +181,7 @@ func canonical_code() -> String:
 	for id in RUNE_TYPE_COUNT:
 		if _counts[id] > 0:
 			fields.append("%d:%d" % [id, _counts[id]])
-	return "RUNE_PACKET_V1[%s]" % ",".join(fields)
+	return "RUNE_PACKET_V2[%s]" % ",".join(fields)
 
 
 func short_label() -> String:
@@ -224,40 +189,39 @@ func short_label() -> String:
 		return "∅"
 	var labels := PackedStringArray()
 	for id in rune_ids_expanded():
-		labels.append("%s%s" % [ATTRIBUTE_LABELS[attribute_for_id(id)], position_for_id(id) + 1])
+		labels.append("%s%02d" % [rune_symbol(id), id + 1])
 	return " ".join(labels)
 
 
-static func rune_id(attribute_index: int, position_index: int) -> int:
-	return attribute_index * RUNES_PER_ATTRIBUTE + position_index
+static func valid_rune_id(id: int) -> bool:
+	return id >= 0 and id < RUNE_TYPE_COUNT
 
 
-static func attribute_for_id(id: int) -> int:
-	return int(id / RUNES_PER_ATTRIBUTE)
+static func coord_for_id(id: int) -> Vector2i:
+	return RUNE_COORDS[id] if valid_rune_id(id) else Vector2i(999, 999)
 
 
-static func position_for_id(id: int) -> int:
-	return posmod(id, RUNES_PER_ATTRIBUTE)
+static func rune_id_for_coord(coord: Vector2i) -> int:
+	return RUNE_COORDS.find(coord)
 
 
-static func valid_address(attribute_index: int, position_index: int) -> bool:
-	return (
-		attribute_index >= 0
-		and attribute_index < ATTRIBUTE_COUNT
-		and position_index >= 0
-		and position_index < RUNES_PER_ATTRIBUTE
-	)
+static func ring_for_id(id: int) -> int:
+	var coord := coord_for_id(id)
+	return absi(coord.x) + absi(coord.y) if valid_rune_id(id) else -1
 
 
-static func position_index_for_coord(coord: Vector2i) -> int:
-	if coord == Vector2i.ZERO or absi(coord.x) > 1 or absi(coord.y) > 1:
-		return -1
-	return POSITION_COORDS.find(coord)
+static func is_sink_coord(coord: Vector2i) -> bool:
+	var distance := absi(coord.x) + absi(coord.y)
+	return coord == Vector2i.ZERO or distance == SINK_RING_RADIUS
+
+
+static func is_display_coord(coord: Vector2i) -> bool:
+	return absi(coord.x) + absi(coord.y) <= SINK_RING_RADIUS
 
 
 static func rune_symbol(id: int) -> String:
-	return RUNE_SYMBOLS[id] if id >= 0 and id < RUNE_SYMBOLS.size() else "?"
+	return RUNE_SYMBOLS[id] if valid_rune_id(id) else "?"
 
 
-static func attribute_color(attribute_index: int) -> Color:
-	return ATTRIBUTE_COLORS[attribute_index] if attribute_index >= 0 and attribute_index < ATTRIBUTE_COLORS.size() else Color.WHITE
+static func rune_color(_id: int = -1) -> Color:
+	return RUNE_COLOR

@@ -19,22 +19,23 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 	factory.flow_time_override = 0.0
-	factory.target_panel.visible = false
-	factory.setting_preview_panel.visible = false
 	var relay = factory.place_processor(&"relay", Vector2(3900.0, 2450.0))
 	var shift = factory.place_processor(&"shift", Vector2(4500.0, 2450.0))
-	var attune = factory.place_processor(&"attune", Vector2(5100.0, 2450.0))
+	var second_relay = factory.place_processor(&"relay", Vector2(5100.0, 2450.0))
 	var merge = factory.place_processor(&"merge", Vector2(4500.0, 2750.0))
 	var relay_id := StringName(relay.name)
 	var shift_id := StringName(shift.name)
-	var attune_id := StringName(attune.name)
+	var second_relay_id := StringName(second_relay.name)
 	var merge_id := StringName(merge.name)
-	factory.connect_nodes(&"source_red_1", 0, relay_id, 0)
-	factory.connect_nodes(&"source_red_1", 0, shift_id, 0)
+	factory.set_shift_direction(shift_id, Vector2i.UP)
+	factory.connect_nodes(&"source_rune_12", 0, relay_id, 0)
+	factory.connect_nodes(&"source_rune_12", 0, shift_id, 0)
 	factory.connect_nodes(relay_id, 0, merge_id, 0)
-	factory.connect_nodes(shift_id, 0, attune_id, 0)
-	factory.connect_nodes(attune_id, 0, merge_id, 1)
+	factory.connect_nodes(shift_id, 0, second_relay_id, 0)
+	factory.connect_nodes(second_relay_id, 0, merge_id, 1)
 	factory.connect_nodes(merge_id, 0, StringName(factory.summoner_node.name), 0)
+	factory.node_menu_node_id = shift_id
+	factory._preview_node_menu_item(101)
 	factory.flow_time_override = 0.9
 	await process_frame
 	RenderingServer.force_draw(false)
