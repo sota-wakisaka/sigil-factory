@@ -15,12 +15,13 @@ const PORT_IDLE_COLOR := Color(0.20, 0.55, 0.70, 0.92)
 const PORT_HIT_RADIUS := 13.0
 const PORT_DRAW_RADIUS := 5.5
 const BUILTIN_PORT_COLOR := Color(0.0, 0.0, 0.0, 0.0)
-const FLOW_PACKET_COUNT := 2
-const FLOW_SPEED_WORLD_UNITS_PER_SECOND := 520.0
-const FLOW_ARRIVAL_HOLD_SECONDS := 0.28
-const FLOW_INPUT_STAGGER_SECONDS := 0.23
+const DEFAULT_CONVEYOR_GRADE := 1
+const CONVEYOR_SPEED_BY_GRADE := { 1: 520.0 }
+const FLOW_GLYPH_SPACING_WORLD_UNITS := 600.0
+const FLOW_ARRIVAL_EFFECT_SECONDS := 0.28
+const FLOW_MAX_VISIBLE_GLYPHS := 24
 const FLOW_TRAIL_SCREEN_LENGTH := 18.0
-const FLOW_PATH_START := 0.03
+const FLOW_PATH_START := 0.0
 const FLOW_PATH_END := 1.0
 const TARGET_ORDER := [&"circle", &"triangle", &"square"]
 const TARGET_DEFINITIONS := {
@@ -650,6 +651,7 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 		var start := directional_output_position(from_node_id, overlay)
 		var finish := directional_node_input_position(to_node_id, input_index, overlay)
 		var line_length := connection_world_length(from_node_id, to_node_id, input_index)
+		var path_start_delay := _upstream_transport_delay(from_node_id)
 		var color := PORT_COLOR
 		if summoner_node != null and to_node_id == StringName(summoner_node.name):
 			match summon_state(input_index):
@@ -665,9 +667,9 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 				finish,
 				glyph_kind,
 				color,
-				input_index,
 				now,
-				line_length
+				line_length,
+				path_start_delay
 			)
 
 
@@ -766,19 +768,21 @@ func _draw_flowing_glyphs(
 	finish: Vector2,
 	material_kind: StringName,
 	color: Color,
-	input_index: int,
 	time_seconds: float,
-	line_length: float
+	line_length: float,
+	path_start_delay: float
 ) -> void:
 	var screen_length := maxf(start.distance_to(finish), 1.0)
 	var trail_progress := FLOW_TRAIL_SCREEN_LENGTH / screen_length
-	for packet_index in FLOW_PACKET_COUNT:
+	for packet_index in flow_packet_slot_count(line_length):
 		var progress := flow_packet_progress(
 			line_length,
-			input_index,
+			path_start_delay,
 			packet_index,
 			time_seconds
 		)
+		if progress < 0.0:
+			continue
 		var position := connection_curve_point(start, finish, progress)
 		var previous := connection_curve_point(
 			start,
@@ -795,23 +799,22 @@ func _draw_flowing_glyphs(
 			var mote := connection_curve_point(start, finish, mote_progress)
 			overlay.draw_circle(mote, 1.7 - float(mote_index) * 0.45, Color(color, 0.34), true)
 		_draw_transport_glyph(overlay, position, material_kind, color, direction)
-		var arrival := flow_packet_arrival_progress(
-			line_length,
-			input_index,
-			packet_index,
-			time_seconds
+	var arrival := flow_connection_arrival_progress(
+		line_length,
+		path_start_delay,
+		time_seconds
+	)
+	if arrival >= 0.0:
+		overlay.draw_arc(
+			finish,
+			7.0 + arrival * 17.0,
+			0.0,
+			TAU,
+			28,
+			Color(color, (1.0 - arrival) * 0.72),
+			1.8,
+			true
 		)
-		if arrival >= 0.0:
-			overlay.draw_arc(
-				finish,
-				7.0 + arrival * 17.0,
-				0.0,
-				TAU,
-				28,
-				Color(color, (1.0 - arrival) * 0.72),
-				1.8,
-				true
-			)
 
 
 func _draw_transport_glyph(
@@ -841,89 +844,143 @@ func connection_curve_point(start: Vector2, finish: Vector2, progress: float) ->
 	return start.lerp(finish, clampf(progress, 0.0, 1.0))
 
 
-func flow_travel_duration(line_length: float) -> float:
+func conveyor_speed_for_grade(grade: int = DEFAULT_CONVEYOR_GRADE) -> float:
+	return float(
+		CONVEYOR_SPEED_BY_GRADE.get(
+			grade,
+			CONVEYOR_SPEED_BY_GRADE[DEFAULT_CONVEYOR_GRADE]
+		)
+	)
+
+
+func flow_packet_interval(grade: int = DEFAULT_CONVEYOR_GRADE) -> float:
+	return FLOW_GLYPH_SPACING_WORLD_UNITS / conveyor_speed_for_grade(grade)
+
+
+func flow_travel_duration(
+	line_length: float,
+	grade: int = DEFAULT_CONVEYOR_GRADE
+) -> float:
 	var travel_distance := maxf(line_length, 1.0) * (FLOW_PATH_END - FLOW_PATH_START)
-	return travel_distance / FLOW_SPEED_WORLD_UNITS_PER_SECOND
+	return travel_distance / conveyor_speed_for_grade(grade)
 
 
-func flow_cycle_duration(line_length: float) -> float:
-	return flow_travel_duration(line_length) + FLOW_ARRIVAL_HOLD_SECONDS
+func flow_packet_slot_count(line_length: float) -> int:
+	return clampi(
+		ceili(maxf(line_length, 1.0) / FLOW_GLYPH_SPACING_WORLD_UNITS) + 1,
+		1,
+		FLOW_MAX_VISIBLE_GLYPHS
+	)
 
 
 func flow_packet_elapsed(
-	line_length: float,
-	input_index: int,
+	path_start_delay: float,
 	packet_index: int,
-	time_seconds: float
+	time_seconds: float,
+	grade: int = DEFAULT_CONVEYOR_GRADE
 ) -> float:
-	var cycle_duration := flow_cycle_duration(line_length)
-	var packet_spacing := cycle_duration / float(FLOW_PACKET_COUNT)
-	return fposmod(
-		time_seconds
-		+ float(maxi(input_index, 0)) * FLOW_INPUT_STAGGER_SECONDS
-		+ float(packet_index) * packet_spacing,
-		cycle_duration
-	)
+	var interval := flow_packet_interval(grade)
+	var newest_packet_age := fposmod(time_seconds - path_start_delay, interval)
+	return newest_packet_age + float(packet_index) * interval
 
 
 func flow_packet_progress(
 	line_length: float,
-	input_index: int,
+	path_start_delay: float,
 	packet_index: int,
-	time_seconds: float
+	time_seconds: float,
+	grade: int = DEFAULT_CONVEYOR_GRADE
 ) -> float:
-	var elapsed := flow_packet_elapsed(line_length, input_index, packet_index, time_seconds)
-	var travel_progress := clampf(elapsed / flow_travel_duration(line_length), 0.0, 1.0)
+	var elapsed := flow_packet_elapsed(path_start_delay, packet_index, time_seconds, grade)
+	var travel_duration := flow_travel_duration(line_length, grade)
+	if elapsed > travel_duration:
+		return -1.0
+	var travel_progress := clampf(elapsed / travel_duration, 0.0, 1.0)
 	return lerpf(FLOW_PATH_START, FLOW_PATH_END, travel_progress)
 
 
-func flow_packet_arrival_progress(
+func flow_connection_arrival_progress(
 	line_length: float,
-	input_index: int,
-	packet_index: int,
-	time_seconds: float
+	path_start_delay: float,
+	time_seconds: float,
+	grade: int = DEFAULT_CONVEYOR_GRADE
 ) -> float:
-	var elapsed := flow_packet_elapsed(line_length, input_index, packet_index, time_seconds)
-	var travel_duration := flow_travel_duration(line_length)
-	if elapsed < travel_duration:
+	var arrival_time := path_start_delay + flow_travel_duration(line_length, grade)
+	var elapsed_since_arrival := fposmod(
+		time_seconds - arrival_time,
+		flow_packet_interval(grade)
+	)
+	if elapsed_since_arrival > FLOW_ARRIVAL_EFFECT_SECONDS:
 		return -1.0
 	return clampf(
-		(elapsed - travel_duration) / FLOW_ARRIVAL_HOLD_SECONDS,
+		elapsed_since_arrival / FLOW_ARRIVAL_EFFECT_SECONDS,
 		0.0,
 		1.0
 	)
 
 
-func flow_arrival_cycle(input_index: int, time_seconds: float, line_length: float = -1.0) -> int:
+func flow_arrival_cycle(
+	input_index: int,
+	time_seconds: float,
+	line_length: float = -1.0,
+	path_start_delay: float = -1.0
+) -> int:
 	var resolved_length := line_length
+	var resolved_start_delay := maxf(path_start_delay, 0.0)
 	if resolved_length <= 0.0:
-		resolved_length = _summoner_input_connection_world_length(input_index)
+		var timing := _summoner_input_transport_timing(input_index)
+		resolved_length = float(timing.get("line_length", 0.0))
+		resolved_start_delay = float(timing.get("path_start_delay", 0.0))
 	if resolved_length <= 0.0:
 		return -1
 	var travel_duration := flow_travel_duration(resolved_length)
-	var arrival_interval := flow_cycle_duration(resolved_length) / float(FLOW_PACKET_COUNT)
 	return floori(
-		(
-			time_seconds
-			+ float(maxi(input_index, 0)) * FLOW_INPUT_STAGGER_SECONDS
-			- travel_duration
-		) / arrival_interval
+		(time_seconds - resolved_start_delay - travel_duration)
+		/ flow_packet_interval()
 	)
 
 
-func _summoner_input_connection_world_length(input_index: int) -> float:
+func _summoner_input_transport_timing(input_index: int) -> Dictionary:
 	if factory_graph == null or summoner_node == null:
-		return 0.0
+		return {}
 	for connection in factory_graph.get_connection_list():
 		if (
 			StringName(connection["to_node"]) == StringName(summoner_node.name)
 			and int(connection["to_port"]) == input_index
 		):
-			return connection_world_length(
-				StringName(connection["from_node"]),
-				StringName(connection["to_node"]),
-				input_index
-			)
+			var from_node_id := StringName(connection["from_node"])
+			return {
+				"line_length": connection_world_length(
+					from_node_id,
+					StringName(connection["to_node"]),
+					input_index
+				),
+				"path_start_delay": _upstream_transport_delay(from_node_id),
+			}
+	return {}
+
+
+func _upstream_transport_delay(node_id: StringName) -> float:
+	return _upstream_transport_delay_from(node_id, {})
+
+
+func _upstream_transport_delay_from(node_id: StringName, visited: Dictionary) -> float:
+	if node_id == &"" or visited.has(node_id):
+		return 0.0
+	visited[node_id] = true
+	for connection in factory_graph.get_connection_list():
+		if StringName(connection["to_node"]) != node_id:
+			continue
+		var from_node_id := StringName(connection["from_node"])
+		var line_length := connection_world_length(
+			from_node_id,
+			node_id,
+			int(connection["to_port"])
+		)
+		return (
+			_upstream_transport_delay_from(from_node_id, visited)
+			+ flow_travel_duration(line_length)
+		)
 	return 0.0
 
 

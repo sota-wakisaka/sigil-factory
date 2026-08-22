@@ -49,9 +49,21 @@ func _test_fixed_factory_landmarks() -> void:
 		prototype.flow_travel_duration(long_line_length) > prototype.flow_travel_duration(short_line_length) * 1.99,
 		"a line twice as long should take twice as long to traverse"
 	)
+	_expect(
+		prototype.flow_packet_slot_count(long_line_length) > prototype.flow_packet_slot_count(short_line_length),
+		"a longer conveyor should hold more Glyphs instead of changing their spacing"
+	)
+	_expect(
+		is_equal_approx(
+			prototype.flow_packet_interval(),
+			prototype.FLOW_GLYPH_SPACING_WORLD_UNITS / prototype.conveyor_speed_for_grade(1)
+		),
+		"conveyor throughput should come from fixed world spacing and grade speed"
+	)
 	var sample_time := 0.6
 	var short_progress: float = prototype.flow_packet_progress(short_line_length, 0, 0, sample_time)
 	var long_progress: float = prototype.flow_packet_progress(long_line_length, 0, 0, sample_time)
+	var next_long_progress: float = prototype.flow_packet_progress(long_line_length, 0, 1, sample_time)
 	_expect(
 		short_progress > long_progress,
 		"the same elapsed time should cover a smaller fraction of a longer line"
@@ -63,14 +75,29 @@ func _test_fixed_factory_landmarks() -> void:
 		),
 		"transported Glyphs should cover the same world distance at the same time"
 	)
+	_expect(
+		is_equal_approx(
+			(next_long_progress - long_progress) * long_line_length,
+			prototype.FLOW_GLYPH_SPACING_WORLD_UNITS
+		),
+		"Glyphs should keep the same world spacing on every conveyor length"
+	)
 	_expect(prototype.flow_packet_progress(short_line_length, 0, 0, 0.0) == prototype.FLOW_PATH_START, "transport should begin just outside its source port")
 	var short_arrival_time: float = prototype.flow_travel_duration(short_line_length)
 	_expect(is_equal_approx(prototype.flow_packet_progress(short_line_length, 0, 0, short_arrival_time), 1.0), "transport should reach the exact input center before the arrival effect begins")
-	_expect(prototype.flow_packet_arrival_progress(short_line_length, 0, 0, short_arrival_time + 0.1) > 0.0, "the Glyph should remain centered on its input while the arrival ring expands")
+	_expect(prototype.flow_connection_arrival_progress(short_line_length, 0.0, short_arrival_time + 0.1) > 0.0, "the arrival ring should expand after a Glyph crosses the input")
 	_expect(
 		prototype.flow_arrival_cycle(0, short_arrival_time + 0.01, short_line_length)
 		> prototype.flow_arrival_cycle(0, short_arrival_time + 0.01, long_line_length),
 		"arrival feedback should occur later on a longer line"
+	)
+	var relay_delay: float = prototype.flow_travel_duration(600.0)
+	_expect(
+		is_equal_approx(
+			prototype.flow_packet_progress(600.0, relay_delay, 0, relay_delay + 0.2),
+			prototype.flow_packet_progress(600.0, 0.0, 0, 0.2)
+		),
+		"a relay should preserve conveyor phase and speed across connected segments"
 	)
 	_expect(prototype.PLAYFIELD_SIZE == Vector2(9000.0, 6000.0), "the available playfield should support a large map")
 	_expect(prototype.material_nodes.size() == 30, "material deposits should be scattered across the large map")
