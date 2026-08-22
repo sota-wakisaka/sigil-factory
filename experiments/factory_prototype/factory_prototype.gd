@@ -16,10 +16,12 @@ const PORT_HIT_RADIUS := 13.0
 const PORT_DRAW_RADIUS := 5.5
 const BUILTIN_PORT_COLOR := Color(0.0, 0.0, 0.0, 0.0)
 const FLOW_PACKET_COUNT := 2
-const FLOW_CYCLE_SECONDS := 2.4
+const FLOW_SPEED_WORLD_UNITS_PER_SECOND := 520.0
+const FLOW_ARRIVAL_HOLD_SECONDS := 0.28
+const FLOW_INPUT_STAGGER_SECONDS := 0.23
+const FLOW_TRAIL_SCREEN_LENGTH := 18.0
 const FLOW_PATH_START := 0.03
 const FLOW_PATH_END := 1.0
-const FLOW_TRAVEL_PHASE := 0.90
 const TARGET_ORDER := [&"circle", &"triangle", &"square"]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -585,6 +587,15 @@ func directional_node_input_position(node_id: StringName, input_port: int, coord
 	return _node_boundary_position(relay, _relay_input_direction(node_id, coordinate_space), coordinate_space)
 
 
+func connection_world_length(from_node_id: StringName, to_node_id: StringName, input_port: int) -> float:
+	if factory_graph == null:
+		return 0.0
+	var start := directional_output_position(from_node_id, factory_graph)
+	var finish := directional_node_input_position(to_node_id, input_port, factory_graph)
+	var safe_zoom := maxf(factory_graph.zoom, 0.001)
+	return start.distance_to(finish) / safe_zoom
+
+
 func directional_port_direction(node_id: StringName, port_kind: StringName, input_index: int = -1) -> Vector2:
 	var node: GraphNode = _factory_node(node_id)
 	if node == null:
@@ -638,6 +649,7 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 		var input_index := int(connection["to_port"])
 		var start := directional_output_position(from_node_id, overlay)
 		var finish := directional_node_input_position(to_node_id, input_index, overlay)
+		var line_length := connection_world_length(from_node_id, to_node_id, input_index)
 		var color := PORT_COLOR
 		if summoner_node != null and to_node_id == StringName(summoner_node.name):
 			match summon_state(input_index):
@@ -654,7 +666,8 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 				glyph_kind,
 				color,
 				input_index,
-				now
+				now,
+				line_length
 			)
 
 
@@ -754,22 +767,41 @@ func _draw_flowing_glyphs(
 	material_kind: StringName,
 	color: Color,
 	input_index: int,
-	time_seconds: float
+	time_seconds: float,
+	line_length: float
 ) -> void:
+	var screen_length := maxf(start.distance_to(finish), 1.0)
+	var trail_progress := FLOW_TRAIL_SCREEN_LENGTH / screen_length
 	for packet_index in FLOW_PACKET_COUNT:
-		var phase := flow_packet_phase(input_index, packet_index, time_seconds)
-		var progress := flow_packet_progress(phase)
+		var progress := flow_packet_progress(
+			line_length,
+			input_index,
+			packet_index,
+			time_seconds
+		)
 		var position := connection_curve_point(start, finish, progress)
-		var previous := connection_curve_point(start, finish, maxf(progress - 0.045, 0.0))
+		var previous := connection_curve_point(
+			start,
+			finish,
+			maxf(progress - trail_progress, FLOW_PATH_START)
+		)
 		var direction := previous.direction_to(position)
 		overlay.draw_line(previous, position, Color(color, 0.34), 2.0, true)
 		for mote_index in 2:
-			var mote_progress := maxf(progress - 0.025 * float(mote_index + 1), 0.0)
+			var mote_progress := maxf(
+				progress - trail_progress * 0.45 * float(mote_index + 1),
+				FLOW_PATH_START
+			)
 			var mote := connection_curve_point(start, finish, mote_progress)
 			overlay.draw_circle(mote, 1.7 - float(mote_index) * 0.45, Color(color, 0.34), true)
 		_draw_transport_glyph(overlay, position, material_kind, color, direction)
-		if phase >= FLOW_TRAVEL_PHASE:
-			var arrival := inverse_lerp(FLOW_TRAVEL_PHASE, 1.0, phase)
+		var arrival := flow_packet_arrival_progress(
+			line_length,
+			input_index,
+			packet_index,
+			time_seconds
+		)
+		if arrival >= 0.0:
 			overlay.draw_arc(
 				finish,
 				7.0 + arrival * 17.0,
@@ -806,35 +838,93 @@ func _draw_transport_glyph(
 
 
 func connection_curve_point(start: Vector2, finish: Vector2, progress: float) -> Vector2:
-	var distance := start.distance_to(finish)
-	var direction := start.direction_to(finish)
-	var handle_length := minf(distance * 0.28, 120.0)
-	var first_control := start + direction * handle_length
-	var second_control := finish - direction * handle_length
-	return start.bezier_interpolate(first_control, second_control, finish, clampf(progress, 0.0, 1.0))
+	return start.lerp(finish, clampf(progress, 0.0, 1.0))
 
 
-func flow_packet_phase(input_index: int, packet_index: int, time_seconds: float) -> float:
+func flow_travel_duration(line_length: float) -> float:
+	var travel_distance := maxf(line_length, 1.0) * (FLOW_PATH_END - FLOW_PATH_START)
+	return travel_distance / FLOW_SPEED_WORLD_UNITS_PER_SECOND
+
+
+func flow_cycle_duration(line_length: float) -> float:
+	return flow_travel_duration(line_length) + FLOW_ARRIVAL_HOLD_SECONDS
+
+
+func flow_packet_elapsed(
+	line_length: float,
+	input_index: int,
+	packet_index: int,
+	time_seconds: float
+) -> float:
+	var cycle_duration := flow_cycle_duration(line_length)
+	var packet_spacing := cycle_duration / float(FLOW_PACKET_COUNT)
 	return fposmod(
-		time_seconds / FLOW_CYCLE_SECONDS
-		+ float(input_index) * 0.17
-		+ float(packet_index) / float(FLOW_PACKET_COUNT),
+		time_seconds
+		+ float(maxi(input_index, 0)) * FLOW_INPUT_STAGGER_SECONDS
+		+ float(packet_index) * packet_spacing,
+		cycle_duration
+	)
+
+
+func flow_packet_progress(
+	line_length: float,
+	input_index: int,
+	packet_index: int,
+	time_seconds: float
+) -> float:
+	var elapsed := flow_packet_elapsed(line_length, input_index, packet_index, time_seconds)
+	var travel_progress := clampf(elapsed / flow_travel_duration(line_length), 0.0, 1.0)
+	return lerpf(FLOW_PATH_START, FLOW_PATH_END, travel_progress)
+
+
+func flow_packet_arrival_progress(
+	line_length: float,
+	input_index: int,
+	packet_index: int,
+	time_seconds: float
+) -> float:
+	var elapsed := flow_packet_elapsed(line_length, input_index, packet_index, time_seconds)
+	var travel_duration := flow_travel_duration(line_length)
+	if elapsed < travel_duration:
+		return -1.0
+	return clampf(
+		(elapsed - travel_duration) / FLOW_ARRIVAL_HOLD_SECONDS,
+		0.0,
 		1.0
 	)
 
 
-func flow_packet_progress(phase: float) -> float:
-	var travel_progress := clampf(phase / FLOW_TRAVEL_PHASE, 0.0, 1.0)
-	return lerpf(FLOW_PATH_START, FLOW_PATH_END, travel_progress)
-
-
-func flow_arrival_cycle(input_index: int, time_seconds: float) -> int:
-	var arrival_interval := FLOW_CYCLE_SECONDS / float(FLOW_PACKET_COUNT)
+func flow_arrival_cycle(input_index: int, time_seconds: float, line_length: float = -1.0) -> int:
+	var resolved_length := line_length
+	if resolved_length <= 0.0:
+		resolved_length = _summoner_input_connection_world_length(input_index)
+	if resolved_length <= 0.0:
+		return -1
+	var travel_duration := flow_travel_duration(resolved_length)
+	var arrival_interval := flow_cycle_duration(resolved_length) / float(FLOW_PACKET_COUNT)
 	return floori(
-		time_seconds / arrival_interval
-		+ float(input_index) * 0.34
-		+ (1.0 - FLOW_TRAVEL_PHASE)
+		(
+			time_seconds
+			+ float(maxi(input_index, 0)) * FLOW_INPUT_STAGGER_SECONDS
+			- travel_duration
+		) / arrival_interval
 	)
+
+
+func _summoner_input_connection_world_length(input_index: int) -> float:
+	if factory_graph == null or summoner_node == null:
+		return 0.0
+	for connection in factory_graph.get_connection_list():
+		if (
+			StringName(connection["to_node"]) == StringName(summoner_node.name)
+			and int(connection["to_port"]) == input_index
+		):
+			return connection_world_length(
+				StringName(connection["from_node"]),
+				StringName(connection["to_node"]),
+				input_index
+			)
+	return 0.0
 
 
 func flow_animation_time_seconds() -> float:

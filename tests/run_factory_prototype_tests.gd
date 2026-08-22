@@ -43,17 +43,35 @@ func _test_fixed_factory_landmarks() -> void:
 
 	_expect(prototype.factory_graph != null, "the prototype should expose a wide GraphEdit playfield")
 	_expect(prototype.flow_audio != null and prototype.flow_audio.streams_ready(), "factory flow feedback should provide generated connection, disconnect, and arrival sounds")
+	var short_line_length := 520.0
+	var long_line_length := 1040.0
 	_expect(
-		is_equal_approx(prototype.flow_packet_phase(0, 1, 0.0) - prototype.flow_packet_phase(0, 0, 0.0), 0.5),
-		"two transported Glyphs should stay evenly spaced on each line"
+		prototype.flow_travel_duration(long_line_length) > prototype.flow_travel_duration(short_line_length) * 1.99,
+		"a line twice as long should take twice as long to traverse"
+	)
+	var sample_time := 0.6
+	var short_progress: float = prototype.flow_packet_progress(short_line_length, 0, 0, sample_time)
+	var long_progress: float = prototype.flow_packet_progress(long_line_length, 0, 0, sample_time)
+	_expect(
+		short_progress > long_progress,
+		"the same elapsed time should cover a smaller fraction of a longer line"
 	)
 	_expect(
-		prototype.flow_packet_phase(0, 0, 0.6) > prototype.flow_packet_phase(0, 0, 0.0),
-		"transported Glyph phase should advance toward the summoner over time"
+		is_equal_approx(
+			(short_progress - prototype.FLOW_PATH_START) * short_line_length,
+			(long_progress - prototype.FLOW_PATH_START) * long_line_length
+		),
+		"transported Glyphs should cover the same world distance at the same time"
 	)
-	_expect(prototype.flow_packet_progress(0.0) == prototype.FLOW_PATH_START, "transport should begin just outside its source port")
-	_expect(prototype.flow_packet_progress(prototype.FLOW_TRAVEL_PHASE) == 1.0, "transport should reach the exact input center before the arrival effect begins")
-	_expect(prototype.flow_packet_progress(0.98) == 1.0, "the Glyph should remain centered on its input while the arrival ring expands")
+	_expect(prototype.flow_packet_progress(short_line_length, 0, 0, 0.0) == prototype.FLOW_PATH_START, "transport should begin just outside its source port")
+	var short_arrival_time: float = prototype.flow_travel_duration(short_line_length)
+	_expect(is_equal_approx(prototype.flow_packet_progress(short_line_length, 0, 0, short_arrival_time), 1.0), "transport should reach the exact input center before the arrival effect begins")
+	_expect(prototype.flow_packet_arrival_progress(short_line_length, 0, 0, short_arrival_time + 0.1) > 0.0, "the Glyph should remain centered on its input while the arrival ring expands")
+	_expect(
+		prototype.flow_arrival_cycle(0, short_arrival_time + 0.01, short_line_length)
+		> prototype.flow_arrival_cycle(0, short_arrival_time + 0.01, long_line_length),
+		"arrival feedback should occur later on a longer line"
+	)
 	_expect(prototype.PLAYFIELD_SIZE == Vector2(9000.0, 6000.0), "the available playfield should support a large map")
 	_expect(prototype.material_nodes.size() == 30, "material deposits should be scattered across the large map")
 	_expect(prototype.fixed_landmark_count() == 31, "thirty material deposits and one summoner should be fixed landmarks")
