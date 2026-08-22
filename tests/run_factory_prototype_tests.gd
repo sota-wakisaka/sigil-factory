@@ -138,7 +138,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(counts[&"triangle"] == 10, "ten Triangle material deposits should exist")
 	_expect(counts[&"square"] == 10, "ten Square material deposits should exist")
 	_expect(prototype.target_panel != null and prototype.target_panel.anchor_left == 1.0, "the target sigil panel should stay at the upper right")
-	_expect(prototype.target_buttons.size() == 4, "the four basic shapes should be selectable targets")
+	_expect(prototype.target_buttons.size() == 8, "basic and radial-layer targets should be selectable")
 	_expect(prototype.target_panel.find_child("Input1Button", true, false) == null, "the target panel should not duplicate summoner inputs as tabs")
 	_expect(prototype.input_target_kinds.size() == 3, "the round summoner should retain three input targets without visible text rows")
 	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")
@@ -154,6 +154,11 @@ func _test_fixed_factory_landmarks() -> void:
 		== prototype.primitive_glyph(&"square").rotated_degrees(45).canonical_serialization(),
 		"the Diamond target should be the canonical result of rotating Square by 45 degrees"
 	)
+	for target_kind in [&"triad", &"four_gate", &"hex_star", &"octa_orbit"]:
+		_expect(
+			prototype.GlyphPainterModel.can_draw(prototype.target_glyph(target_kind)),
+			"radial targets should be real drawable CanonicalGlyph data"
+		)
 	_expect(prototype.selected_input_index == 0 and prototype.selected_target_kind == &"circle", "the target panel should initially show input 1")
 	_expect(prototype.target_monster_id() == &"ring_wisp", "input 1 should show the Ring Wisp")
 	_expect(prototype.summon_state() == &"idle", "input 1 should start disconnected")
@@ -1006,7 +1011,14 @@ func _test_repeat_processing_node() -> void:
 	prototype.connect_output_to_input(StringName(triangle_source.name), move_id, 0)
 	prototype.connect_output_to_input(move_id, repeat_id, 0)
 	var moved_triangle = prototype.primitive_glyph(&"triangle").translated(Vector2i(4, 0))
-	var expected_three = prototype.GlyphModelScript.radial_repeat(moved_triangle, 3)
+	var expected_three = prototype.GlyphModelScript.radial_array(
+		moved_triangle,
+		3,
+		4,
+		0,
+		prototype.GlyphModelScript.FACING_RADIAL,
+		prototype.GlyphModelScript.CONNECTION_NONE
+	)
 	_expect(
 		prototype.output_glyph(repeat_id).canonical_serialization()
 		== expected_three.canonical_serialization(),
@@ -1036,19 +1048,63 @@ func _test_repeat_processing_node() -> void:
 		) == 3,
 		"right-clicking a repeat node should expose its repeat count"
 	)
+	_expect(
+		prototype.repeat_settings_radius.get_item_id(prototype.repeat_settings_radius.selected) == 4
+		and prototype.repeat_settings_phase.selected == 0
+		and prototype.repeat_settings_facing.selected == 1
+		and prototype.repeat_settings_link.selected == 0,
+		"the repeat menu should expose radius, phase, facing, and link settings"
+	)
 	var six_index: int = prototype.repeat_settings_count.get_item_index(6)
 	prototype.repeat_settings_count.select(six_index)
 	prototype.repeat_settings_count.item_selected.emit(six_index)
-	var expected_six = prototype.GlyphModelScript.radial_repeat(moved_triangle, 6)
+	var expected_six = prototype.GlyphModelScript.radial_array(
+		moved_triangle,
+		6,
+		4,
+		0,
+		prototype.GlyphModelScript.FACING_RADIAL,
+		prototype.GlyphModelScript.CONNECTION_NONE
+	)
 	_expect(
 		prototype.repeat_count(repeat_id) == 6
 		and prototype.output_glyph(repeat_id).canonical_serialization()
 		== expected_six.canonical_serialization(),
 		"the repeat menu should deterministically change the radial count"
 	)
-
+	_expect(
+		prototype.set_repeat_layout(
+			repeat_id,
+			3,
+			4,
+			&"base",
+			prototype.GlyphModelScript.FACING_RADIAL,
+			prototype.GlyphModelScript.CONNECTION_RADIAL
+		),
+		"the repeat node should accept a complete radial-layer setting"
+	)
+	var triad_combine = prototype.place_combine_at(
+		Vector2(4300.0, 2450.0),
+		prototype.GlyphModelScript.CONNECTION_SIMPLE
+	)
+	var triad_combine_id := StringName(triad_combine.name)
 	var centered_circle_source := _first_material(prototype, &"circle")
-	var no_op_repeat = prototype.place_repeat_at(Vector2(3900.0, 2800.0), 8)
+	prototype.connect_output_to_input(StringName(centered_circle_source.name), triad_combine_id, 0)
+	prototype.connect_output_to_input(repeat_id, triad_combine_id, 1)
+	_expect(
+		prototype.output_glyph(triad_combine_id).canonical_serialization()
+		== prototype.target_glyph(&"triad").canonical_serialization(),
+		"a player-built radial branch and center core should exactly reproduce the Triad target"
+	)
+
+	var no_op_repeat = prototype.place_repeat_at(
+		Vector2(3900.0, 2800.0),
+		8,
+		0,
+		&"base",
+		prototype.GlyphModelScript.FACING_FIXED,
+		prototype.GlyphModelScript.CONNECTION_NONE
+	)
 	var no_op_id := StringName(no_op_repeat.name)
 	prototype.connect_output_to_input(StringName(centered_circle_source.name), no_op_id, 0)
 	_expect(

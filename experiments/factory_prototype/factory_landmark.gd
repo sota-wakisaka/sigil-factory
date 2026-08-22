@@ -1,6 +1,7 @@
 class_name FactoryLandmarkVisual
 extends Control
 
+const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const INK := Color(0.68, 0.88, 1.0, 1.0)
 const DIM_INK := Color(0.24, 0.62, 0.78, 0.72)
 const DEPOSIT_OFFSETS := [
@@ -20,7 +21,12 @@ var scale_x_percent := 100
 var scale_y_percent := 100
 var move_offset := Vector2i.UP
 var repeat_count := 3
+var repeat_radius := 4
+var repeat_phase_degrees := 0
+var repeat_facing: StringName = &"radial"
+var repeat_link_mode: StringName = &"none"
 var combine_connection_mode: StringName = &"simple"
+var target_glyph_value
 
 
 func configure(next_kind: StringName) -> void:
@@ -53,9 +59,10 @@ func configure(next_kind: StringName) -> void:
 	queue_redraw()
 
 
-func configure_target(next_kind: StringName) -> void:
+func configure_target(next_kind: StringName, next_glyph = null) -> void:
 	landmark_kind = next_kind
 	visual_mode = &"target"
+	target_glyph_value = next_glyph.copy() if next_glyph != null else null
 	custom_minimum_size = Vector2(112.0, 112.0)
 	queue_redraw()
 
@@ -88,10 +95,20 @@ func configure_move(next_offset: Vector2i) -> void:
 	queue_redraw()
 
 
-func configure_repeat(next_count: int) -> void:
+func configure_repeat(
+	next_count: int,
+	next_radius: int = 4,
+	next_phase_degrees: int = 0,
+	next_facing: StringName = &"radial",
+	next_link_mode: StringName = &"none"
+) -> void:
 	landmark_kind = &"repeat"
 	visual_mode = &"repeat"
 	repeat_count = next_count
+	repeat_radius = next_radius
+	repeat_phase_degrees = next_phase_degrees
+	repeat_facing = next_facing
+	repeat_link_mode = next_link_mode
 	custom_minimum_size = Vector2(118.0, 118.0)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	queue_redraw()
@@ -155,7 +172,25 @@ func _draw_target(center: Vector2) -> void:
 		var inner := center + Vector2.from_angle(angle) * frame_radius * 0.86
 		var outer := center + Vector2.from_angle(angle) * frame_radius
 		draw_line(inner, outer, Color(0.30, 0.78, 0.94, 0.44), 1.0, true)
-	_draw_material_shape(center, frame_radius * 0.52, INK, 3.0)
+	if target_glyph_value != null and GlyphPainterModel.can_draw(target_glyph_value):
+		var glyph_scale := GlyphPainterModel.fit_scale(
+			target_glyph_value,
+			frame_radius * 0.72,
+			false,
+			0.12,
+			4.0
+		)
+		GlyphPainterModel.draw_glyph(
+			self,
+			target_glyph_value,
+			center,
+			glyph_scale,
+			1.0,
+			false,
+			0.72
+		)
+	else:
+		_draw_material_shape(center, frame_radius * 0.52, INK, 3.0)
 
 
 func _draw_material_deposit(center: Vector2) -> void:
@@ -237,15 +272,41 @@ func _draw_repeat(center: Vector2) -> void:
 	var radius := body_radius()
 	draw_circle(center, radius, Color(0.015, 0.075, 0.11, 0.96), true)
 	draw_arc(center, radius, 0.0, TAU, 64, Color(0.42, 0.82, 1.0, 0.92), 1.6, true)
-	var orbit_radius := radius * 0.50
+	var orbit_radius := lerpf(radius * 0.18, radius * 0.64, clampf(float(repeat_radius) / 6.0, 0.0, 1.0))
 	draw_arc(center, orbit_radius, 0.0, TAU, 48, Color(DIM_INK, 0.50), 1.0, true)
 	for index in repeat_count:
-		var angle := -PI * 0.5 + TAU * float(index) / float(repeat_count)
+		var angle := deg_to_rad(float(repeat_phase_degrees) - 90.0) + TAU * float(index) / float(repeat_count)
 		var direction := Vector2.from_angle(angle)
 		var point := center + direction * orbit_radius
-		draw_line(center + direction * 7.0, point - direction * 5.0, Color(DIM_INK, 0.68), 1.0, true)
+		if repeat_link_mode == &"radial":
+			draw_line(center + direction * 7.0, point - direction * 5.0, Color(DIM_INK, 0.68), 1.0, true)
 		draw_circle(point, 4.0, Color(0.01, 0.04, 0.06, 1.0), true)
 		draw_arc(point, 4.0, 0.0, TAU, 16, INK, 1.35, true)
+		var facing_angle := 0.0
+		if repeat_facing == &"radial":
+			facing_angle = angle
+		elif repeat_facing == &"tangent":
+			facing_angle = angle + PI * 0.5
+		var facing_direction := Vector2.from_angle(facing_angle)
+		draw_line(point, point + facing_direction * 6.0, INK, 1.0, true)
+	if repeat_link_mode in [&"ring", &"star"]:
+		var step := 2 if repeat_link_mode == &"star" else 1
+		var seen: Dictionary = {}
+		for index in repeat_count:
+			var target_index := posmod(index + step, repeat_count)
+			var key := "%d:%d" % [mini(index, target_index), maxi(index, target_index)]
+			if seen.has(key):
+				continue
+			seen[key] = true
+			var first_angle := deg_to_rad(float(repeat_phase_degrees) - 90.0) + TAU * float(index) / float(repeat_count)
+			var second_angle := deg_to_rad(float(repeat_phase_degrees) - 90.0) + TAU * float(target_index) / float(repeat_count)
+			draw_line(
+				center + Vector2.from_angle(first_angle) * orbit_radius,
+				center + Vector2.from_angle(second_angle) * orbit_radius,
+				Color(DIM_INK, 0.66),
+				1.0,
+				true
+			)
 	draw_circle(center, 3.0, INK, true)
 
 
@@ -324,19 +385,25 @@ func _draw_combine(center: Vector2) -> void:
 	var radius := body_radius()
 	draw_circle(center, radius, Color(0.015, 0.075, 0.11, 0.96), true)
 	draw_arc(center, radius, 0.0, TAU, 64, Color(0.42, 0.82, 1.0, 0.92), 1.6, true)
-	var child_centers := [
-		center + Vector2(-17.0, -12.0),
-		center + Vector2(17.0, -12.0),
-		center + Vector2(0.0, 18.0),
-	]
+	var child_centers: Array[Vector2] = []
+	var child_count := 5 if combine_connection_mode in [&"ring", &"star"] else 3
+	for index in child_count:
+		child_centers.append(
+			center + Vector2.from_angle(-PI * 0.5 + TAU * float(index) / float(child_count)) * 21.0
+		)
 	if combine_connection_mode == &"radial":
 		for child_center in child_centers:
 			draw_line(center, child_center, Color(DIM_INK, 0.88), 1.6, true)
 	elif combine_connection_mode == &"pairwise":
+		for first_index in child_centers.size():
+			for second_index in range(first_index + 1, child_centers.size()):
+				draw_line(child_centers[first_index], child_centers[second_index], Color(DIM_INK, 0.88), 1.6, true)
+	elif combine_connection_mode in [&"ring", &"star"]:
+		var step := 2 if combine_connection_mode == &"star" else 1
 		for index in child_centers.size():
 			draw_line(
 				child_centers[index],
-				child_centers[(index + 1) % child_centers.size()],
+				child_centers[(index + step) % child_centers.size()],
 				Color(DIM_INK, 0.88),
 				1.6,
 				true

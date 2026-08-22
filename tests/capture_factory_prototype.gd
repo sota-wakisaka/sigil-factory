@@ -54,6 +54,9 @@ func _initialize() -> void:
 			view.connect_material_to_summoner(&"circle_01", 0)
 			view.connect_material_to_summoner(&"triangle_01", 1)
 			view.connect_material_to_summoner(&"square_01", 2)
+		elif fixture == "radial_target":
+			view.select_input(0)
+			view.select_target(&"hex_star")
 		elif fixture == "relay_route":
 			var relay = view.place_relay_at(Vector2(3800.0, 2980.0))
 			view.connect_output_to_input(&"circle_01", StringName(relay.name), 0)

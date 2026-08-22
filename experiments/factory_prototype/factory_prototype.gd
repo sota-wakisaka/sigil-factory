@@ -37,16 +37,35 @@ const MOVE_DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.L
 const MOVE_DIRECTION_LABELS := ["↑", "→", "↓", "←"]
 const MOVE_DISTANCE_PRESETS := [1, 2, 3, 4, 5, 6]
 const REPEAT_COUNT_PRESETS := [2, 3, 4, 5, 6, 8]
+const REPEAT_RADIUS_PRESETS := [0, 3, 4, 5, 6]
+const REPEAT_PHASE_MODES := [&"base", &"half"]
+const REPEAT_PHASE_LABELS := ["基準", "半スロット"]
+const REPEAT_FACING_MODES := [
+	GlyphModelScript.FACING_FIXED,
+	GlyphModelScript.FACING_RADIAL,
+	GlyphModelScript.FACING_TANGENT,
+]
+const REPEAT_FACING_LABELS := ["固定", "放射", "接線"]
+const REPEAT_LINK_MODES := [
+	GlyphModelScript.CONNECTION_NONE,
+	GlyphModelScript.CONNECTION_RADIAL,
+	GlyphModelScript.CONNECTION_RING,
+	GlyphModelScript.CONNECTION_STAR,
+]
+const REPEAT_LINK_LABELS := ["なし", "中心", "隣接環", "星形"]
 const COMBINE_INPUT_COUNT := 8
 const COMBINE_CONNECTION_MODES := [
 	GlyphModelScript.CONNECTION_SIMPLE,
 	GlyphModelScript.CONNECTION_RADIAL,
 	GlyphModelScript.CONNECTION_PAIRWISE,
+	GlyphModelScript.CONNECTION_RING,
+	GlyphModelScript.CONNECTION_STAR,
 ]
-const COMBINE_CONNECTION_LABELS := ["単純結合", "中心結合", "相互結合"]
+const COMBINE_CONNECTION_LABELS := ["単純結合", "中心結合", "相互結合", "隣接環", "星形"]
 const COMBINE_INPUT_START_ANGLE := -PI * 0.5
 const TARGET_ORDER := [
 	&"circle", &"triangle", &"square", &"diamond",
+	&"triad", &"four_gate", &"hex_star", &"octa_orbit",
 ]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -80,6 +99,34 @@ const TARGET_DEFINITIONS := {
 		"monster_id": &"razor_kite",
 		"monster_name": "斜刃カイト",
 		"role": "高速・旋回・切断",
+	},
+	&"triad": {
+		"glyph_label": "△3",
+		"builder": &"triad",
+		"monster_id": &"triad_guard",
+		"monster_name": "三環衛トライアド",
+		"role": "三方向・護衛・連携",
+	},
+	&"four_gate": {
+		"glyph_label": "□4",
+		"builder": &"four_gate",
+		"monster_id": &"four_gate_keeper",
+		"monster_name": "四門機ゲイター",
+		"role": "四方・防衛・周回",
+	},
+	&"hex_star": {
+		"glyph_label": "☆6",
+		"builder": &"hex_star",
+		"monster_id": &"hex_star_familiar",
+		"monster_name": "六芒獣ヘクサ",
+		"role": "六方向・交差・制圧",
+	},
+	&"octa_orbit": {
+		"glyph_label": "○8",
+		"builder": &"octa_orbit",
+		"monster_id": &"octa_orbit_swarm",
+		"monster_name": "八環群オクタ",
+		"role": "八方向・包囲・群体",
 	},
 }
 const MATERIAL_LAYOUT := [
@@ -182,6 +229,10 @@ var repeat_serial := 0
 var repeat_settings_popup: PopupPanel
 var repeat_settings_title: Label
 var repeat_settings_count: OptionButton
+var repeat_settings_radius: OptionButton
+var repeat_settings_phase: OptionButton
+var repeat_settings_facing: OptionButton
+var repeat_settings_link: OptionButton
 var repeat_settings_delete_button: Button
 var repeat_settings_node_id: StringName = &""
 var repeat_settings_syncing := false
@@ -487,7 +538,14 @@ func place_move_at(
 	return move_node
 
 
-func place_repeat_at(world_center: Vector2, count: int = 3) -> GraphNode:
+func place_repeat_at(
+	world_center: Vector2,
+	count: int = 3,
+	radius: int = 4,
+	phase_mode: StringName = &"base",
+	facing: StringName = GlyphModelScript.FACING_RADIAL,
+	link_mode: StringName = GlyphModelScript.CONNECTION_NONE
+) -> GraphNode:
 	if factory_graph == null:
 		return null
 	repeat_serial += 1
@@ -499,7 +557,11 @@ func place_repeat_at(world_center: Vector2, count: int = 3) -> GraphNode:
 	var repeat_node := _make_repeat_node(
 		StringName("repeat_%02d" % repeat_serial),
 		clamped_center,
-		count
+		count,
+		radius,
+		phase_mode,
+		facing,
+		link_mode
 	)
 	repeat_nodes.append(repeat_node)
 	factory_graph.add_child(repeat_node)
@@ -573,10 +635,55 @@ func target_glyph(target_kind: StringName) -> GlyphModel:
 	if not TARGET_DEFINITIONS.has(target_kind):
 		return null
 	var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
+	var builder := StringName(definition.get("builder", &""))
+	if builder != &"":
+		return _build_radial_target(builder)
 	var glyph := primitive_glyph(StringName(definition.get("primitive_id", target_kind)))
 	if glyph == null:
 		return null
 	return glyph.rotated_degrees(int(definition.get("rotation_degrees", 0)))
+
+
+func _build_radial_target(builder: StringName) -> GlyphModel:
+	var center: GlyphModel
+	var field: GlyphModel
+	match builder:
+		&"triad":
+			center = primitive_glyph(&"circle")
+			field = GlyphModelScript.radial_array(
+				primitive_glyph(&"triangle"), 3, 4, 0,
+				GlyphModelScript.FACING_RADIAL,
+				GlyphModelScript.CONNECTION_RADIAL
+			)
+		&"four_gate":
+			center = primitive_glyph(&"circle")
+			field = GlyphModelScript.radial_array(
+				primitive_glyph(&"square"), 4, 5, 45,
+				GlyphModelScript.FACING_FIXED,
+				GlyphModelScript.CONNECTION_RING
+			)
+		&"hex_star":
+			center = primitive_glyph(&"circle")
+			field = GlyphModelScript.radial_array(
+				primitive_glyph(&"triangle"), 6, 5, 0,
+				GlyphModelScript.FACING_RADIAL,
+				GlyphModelScript.CONNECTION_STAR
+			)
+		&"octa_orbit":
+			center = primitive_glyph(&"square")
+			field = GlyphModelScript.radial_array(
+				primitive_glyph(&"circle"), 8, 5, 0,
+				GlyphModelScript.FACING_FIXED,
+				GlyphModelScript.CONNECTION_RING
+			)
+		_:
+			return null
+	if center == null or field == null:
+		return null
+	return GlyphModelScript.combine_many(
+		[center, field],
+		GlyphModelScript.CONNECTION_SIMPLE
+	)
 
 
 func target_monster_id(input_index: int = -1) -> StringName:
@@ -742,18 +849,90 @@ func repeat_count(node_id: StringName) -> int:
 	return int(repeat_node.get_meta("repeat_count", 3)) if repeat_node != null else 0
 
 
-func set_repeat_count(node_id: StringName, count: int) -> bool:
+func repeat_radius(node_id: StringName) -> int:
 	var repeat_node := _repeat_node(node_id)
-	if repeat_node == null or not REPEAT_COUNT_PRESETS.has(count):
+	return int(repeat_node.get_meta("repeat_radius", 4)) if repeat_node != null else -1
+
+
+func repeat_phase_mode(node_id: StringName) -> StringName:
+	var repeat_node := _repeat_node(node_id)
+	return StringName(repeat_node.get_meta("repeat_phase_mode", &"base")) if repeat_node != null else &""
+
+
+func repeat_facing(node_id: StringName) -> StringName:
+	var repeat_node := _repeat_node(node_id)
+	return StringName(repeat_node.get_meta(
+		"repeat_facing",
+		GlyphModelScript.FACING_RADIAL
+	)) if repeat_node != null else &""
+
+
+func repeat_link_mode(node_id: StringName) -> StringName:
+	var repeat_node := _repeat_node(node_id)
+	return StringName(repeat_node.get_meta(
+		"repeat_link_mode",
+		GlyphModelScript.CONNECTION_NONE
+	)) if repeat_node != null else &""
+
+
+func repeat_phase_degrees(node_id: StringName) -> int:
+	var count := repeat_count(node_id)
+	if repeat_phase_mode(node_id) == &"base":
+		return 0
+	if count > 0 and 180 % count == 0:
+		return int(180 / count)
+	return -1
+
+
+func set_repeat_count(node_id: StringName, count: int) -> bool:
+	return set_repeat_layout(
+		node_id,
+		count,
+		repeat_radius(node_id),
+		repeat_phase_mode(node_id),
+		repeat_facing(node_id),
+		repeat_link_mode(node_id)
+	)
+
+
+func set_repeat_layout(
+	node_id: StringName,
+	count: int,
+	radius: int,
+	phase_mode: StringName,
+	facing: StringName,
+	link_mode: StringName
+) -> bool:
+	var repeat_node := _repeat_node(node_id)
+	if (
+		repeat_node == null
+		or not REPEAT_COUNT_PRESETS.has(count)
+		or not REPEAT_RADIUS_PRESETS.has(radius)
+		or not phase_mode in REPEAT_PHASE_MODES
+		or not facing in REPEAT_FACING_MODES
+		or not link_mode in REPEAT_LINK_MODES
+		or (phase_mode == &"half" and 180 % count != 0)
+		or (link_mode == GlyphModelScript.CONNECTION_STAR and count < 4)
+	):
 		return false
-	if repeat_count(node_id) == count:
+	if (
+		repeat_count(node_id) == count
+		and repeat_radius(node_id) == radius
+		and repeat_phase_mode(node_id) == phase_mode
+		and repeat_facing(node_id) == facing
+		and repeat_link_mode(node_id) == link_mode
+	):
 		return false
 	var now := flow_animation_time_seconds()
 	process_transport_at(now)
 	repeat_node.set_meta("repeat_count", count)
+	repeat_node.set_meta("repeat_radius", radius)
+	repeat_node.set_meta("repeat_phase_mode", phase_mode)
+	repeat_node.set_meta("repeat_facing", facing)
+	repeat_node.set_meta("repeat_link_mode", link_mode)
 	var visual := _landmark_visual(repeat_node)
 	if visual != null:
-		visual.configure_repeat(count)
+		visual.configure_repeat(count, radius, repeat_phase_degrees(node_id), facing, link_mode)
 	repeat_node.tooltip_text = _repeat_tooltip(node_id)
 	_restart_outgoing_transport(node_id, now)
 	_normalize_downstream_combine_modes(node_id, now)
@@ -786,13 +965,20 @@ func combine_mode_availability(node_id: StringName) -> Dictionary:
 		GlyphModelScript.CONNECTION_SIMPLE: true,
 		GlyphModelScript.CONNECTION_RADIAL: true,
 		GlyphModelScript.CONNECTION_PAIRWISE: true,
+		GlyphModelScript.CONNECTION_RING: true,
+		GlyphModelScript.CONNECTION_STAR: true,
 	}
 	if _combine_node(node_id) == null:
 		return {"complete": false, "modes": modes}
 	var inputs := _combine_input_glyphs(node_id, {})
 	if inputs.size() < GlyphModelScript.MIN_COMBINE_CHILDREN:
 		return {"complete": false, "modes": modes}
-	for mode in [GlyphModelScript.CONNECTION_RADIAL, GlyphModelScript.CONNECTION_PAIRWISE]:
+	for mode in [
+		GlyphModelScript.CONNECTION_RADIAL,
+		GlyphModelScript.CONNECTION_PAIRWISE,
+		GlyphModelScript.CONNECTION_RING,
+		GlyphModelScript.CONNECTION_STAR,
+	]:
 		var candidate := GlyphModelScript.combine_many(inputs, mode)
 		modes[mode] = (
 			candidate != null
@@ -973,9 +1159,9 @@ func open_repeat_settings(node_id: StringName, viewport_position: Vector2) -> bo
 		if popup != null:
 			popup.hide()
 	repeat_settings_node_id = node_id
-	repeat_settings_title.text = "反復ノード // %s" % String(node_id)
-	_sync_repeat_settings(repeat_count(node_id))
-	var popup_size := Vector2i(286, 190)
+	repeat_settings_title.text = "放射配置 // %s" % String(node_id)
+	_sync_repeat_settings(node_id)
+	var popup_size := Vector2i(320, 390)
 	var viewport_size := Vector2i(get_viewport_rect().size)
 	var popup_position := Vector2i(viewport_position.round()) + Vector2i(10, 8)
 	popup_position.x = clampi(popup_position.x, 0, maxi(viewport_size.x - popup_size.x, 0))
@@ -1267,9 +1453,13 @@ func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 		if move_node != null:
 			return input_glyph.translated(move_offset(node_id))
 		if repeat_node != null:
-			var repeated := GlyphModelScript.radial_repeat(
+			var repeated := GlyphModelScript.radial_array(
 				input_glyph,
-				repeat_count(node_id)
+				repeat_count(node_id),
+				repeat_radius(node_id),
+				repeat_phase_degrees(node_id),
+				repeat_facing(node_id),
+				repeat_link_mode(node_id)
 			)
 			return repeated if GlyphPainterModel.can_draw(repeated) else null
 		return input_glyph
@@ -1790,7 +1980,10 @@ func _output_tooltip(node_id: StringName) -> String:
 			maxi(absi(offset.x), absi(offset.y)),
 		]
 	if _repeat_node(node_id) != null:
-		return "反復出力 // %d回対称 // 複数の下流へ分配可能" % repeat_count(node_id)
+		return "放射配置出力 // %d個・帯%d // 複数の下流へ分配可能" % [
+			repeat_count(node_id),
+			repeat_radius(node_id),
+		]
 	if _combine_node(node_id) != null:
 		return "合成出力 // %d入力 // 複数の下流へ分配可能" % combine_connected_input_count(node_id)
 	return ""
@@ -1815,7 +2008,12 @@ func _move_tooltip(node_id: StringName) -> String:
 
 
 func _repeat_tooltip(node_id: StringName) -> String:
-	return "反復ノード // %d回対称 // 右クリックで設定" % repeat_count(node_id)
+	return "放射配置 // %d個・帯%d・%s・%s // 右クリックで設定" % [
+		repeat_count(node_id),
+		repeat_radius(node_id),
+		REPEAT_FACING_LABELS[maxi(REPEAT_FACING_MODES.find(repeat_facing(node_id)), 0)],
+		REPEAT_LINK_LABELS[maxi(REPEAT_LINK_MODES.find(repeat_link_mode(node_id)), 0)],
+	]
 
 
 func _combine_tooltip(node_id: StringName) -> String:
@@ -1847,7 +2045,7 @@ func _context_node_label(node_id: StringName, input_port: int = -1) -> String:
 			maxi(absi(offset.x), absi(offset.y)),
 		]
 	if _repeat_node(node_id) != null:
-		return "反復 %d回" % repeat_count(node_id)
+		return "放射 %d個 / 帯%d" % [repeat_count(node_id), repeat_radius(node_id)]
 	if _combine_node(node_id) != null:
 		return "合成 %d入力" % combine_connected_input_count(node_id)
 	return String(node_id)
@@ -2816,7 +3014,7 @@ func _refresh_summon_state() -> void:
 func _configure_target_preview(target_kind: StringName) -> void:
 	if target_preview == null or not TARGET_DEFINITIONS.has(target_kind):
 		return
-	target_preview.configure_target(target_kind)
+	target_preview.configure_target(target_kind, target_glyph(target_kind))
 
 
 func _refresh_transport_countdown(time_seconds: float) -> void:
@@ -2910,7 +3108,7 @@ func _build_ui() -> void:
 	repeat_button = Button.new()
 	repeat_button.name = "AddRepeatButton"
 	repeat_button.text = "＋ 反復"
-	repeat_button.tooltip_text = "放射反復ノードを配置 // ノード右クリックで反復数を設定"
+	repeat_button.tooltip_text = "放射配置ノードを配置 // 個数・帯・位相・向き・結線を設定"
 	repeat_button.custom_minimum_size = Vector2(80.0, 34.0)
 	repeat_button.toggle_mode = true
 	repeat_button.pressed.connect(_on_repeat_button_pressed)
@@ -3430,7 +3628,7 @@ func _build_repeat_settings_popup() -> void:
 	repeat_settings_popup.add_child(margin)
 
 	var column := VBoxContainer.new()
-	column.custom_minimum_size = Vector2(254.0, 142.0)
+	column.custom_minimum_size = Vector2(288.0, 336.0)
 	column.add_theme_constant_override("separation", 8)
 	margin.add_child(column)
 
@@ -3443,7 +3641,7 @@ func _build_repeat_settings_popup() -> void:
 	count_row.add_theme_constant_override("separation", 10)
 	column.add_child(count_row)
 	var count_label := Label.new()
-	count_label.text = "放射反復"
+	count_label.text = "個数"
 	count_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	count_row.add_child(count_label)
 	repeat_settings_count = OptionButton.new()
@@ -3454,8 +3652,68 @@ func _build_repeat_settings_popup() -> void:
 	repeat_settings_count.item_selected.connect(_on_repeat_count_selected)
 	count_row.add_child(repeat_settings_count)
 
+	var radius_row := HBoxContainer.new()
+	radius_row.add_theme_constant_override("separation", 10)
+	column.add_child(radius_row)
+	var radius_label := Label.new()
+	radius_label.text = "半径帯"
+	radius_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	radius_row.add_child(radius_label)
+	repeat_settings_radius = OptionButton.new()
+	repeat_settings_radius.name = "RepeatRadiusOption"
+	repeat_settings_radius.custom_minimum_size = Vector2(142.0, 34.0)
+	for radius in REPEAT_RADIUS_PRESETS:
+		repeat_settings_radius.add_item("帯 %d" % int(radius), int(radius))
+	repeat_settings_radius.item_selected.connect(_on_repeat_layout_selected)
+	radius_row.add_child(repeat_settings_radius)
+
+	var phase_row := HBoxContainer.new()
+	phase_row.add_theme_constant_override("separation", 10)
+	column.add_child(phase_row)
+	var phase_label := Label.new()
+	phase_label.text = "位相"
+	phase_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	phase_row.add_child(phase_label)
+	repeat_settings_phase = OptionButton.new()
+	repeat_settings_phase.name = "RepeatPhaseOption"
+	repeat_settings_phase.custom_minimum_size = Vector2(142.0, 34.0)
+	for index in REPEAT_PHASE_MODES.size():
+		repeat_settings_phase.add_item(REPEAT_PHASE_LABELS[index], index)
+	repeat_settings_phase.item_selected.connect(_on_repeat_layout_selected)
+	phase_row.add_child(repeat_settings_phase)
+
+	var facing_row := HBoxContainer.new()
+	facing_row.add_theme_constant_override("separation", 10)
+	column.add_child(facing_row)
+	var facing_label := Label.new()
+	facing_label.text = "向き"
+	facing_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	facing_row.add_child(facing_label)
+	repeat_settings_facing = OptionButton.new()
+	repeat_settings_facing.name = "RepeatFacingOption"
+	repeat_settings_facing.custom_minimum_size = Vector2(142.0, 34.0)
+	for index in REPEAT_FACING_MODES.size():
+		repeat_settings_facing.add_item(REPEAT_FACING_LABELS[index], index)
+	repeat_settings_facing.item_selected.connect(_on_repeat_layout_selected)
+	facing_row.add_child(repeat_settings_facing)
+
+	var link_row := HBoxContainer.new()
+	link_row.add_theme_constant_override("separation", 10)
+	column.add_child(link_row)
+	var link_label := Label.new()
+	link_label.text = "結線"
+	link_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	link_row.add_child(link_label)
+	repeat_settings_link = OptionButton.new()
+	repeat_settings_link.name = "RepeatLinkOption"
+	repeat_settings_link.custom_minimum_size = Vector2(142.0, 34.0)
+	for index in REPEAT_LINK_MODES.size():
+		repeat_settings_link.add_item(REPEAT_LINK_LABELS[index], index)
+	repeat_settings_link.item_selected.connect(_on_repeat_layout_selected)
+	link_row.add_child(repeat_settings_link)
+
 	var hint := Label.new()
-	hint.text = "中心原点のまわりへ等角度配置"
+	hint.text = "上を基準に、同じ帯へ等角度配置"
 	hint.add_theme_font_size_override("font_size", 11)
 	hint.add_theme_color_override("font_color", Color(0.44, 0.68, 0.78))
 	column.add_child(hint)
@@ -3468,20 +3726,49 @@ func _build_repeat_settings_popup() -> void:
 	column.add_child(repeat_settings_delete_button)
 
 
-func _sync_repeat_settings(count: int) -> void:
+func _sync_repeat_settings(node_id: StringName) -> void:
 	repeat_settings_syncing = true
-	var item_index := repeat_settings_count.get_item_index(count)
+	var item_index := repeat_settings_count.get_item_index(repeat_count(node_id))
 	if item_index >= 0:
 		repeat_settings_count.select(item_index)
+	item_index = repeat_settings_radius.get_item_index(repeat_radius(node_id))
+	if item_index >= 0:
+		repeat_settings_radius.select(item_index)
+	repeat_settings_phase.select(maxi(REPEAT_PHASE_MODES.find(repeat_phase_mode(node_id)), 0))
+	repeat_settings_facing.select(maxi(REPEAT_FACING_MODES.find(repeat_facing(node_id)), 0))
+	repeat_settings_link.select(maxi(REPEAT_LINK_MODES.find(repeat_link_mode(node_id)), 0))
+	var half_index := REPEAT_PHASE_MODES.find(&"half")
+	if half_index >= 0:
+		repeat_settings_phase.set_item_disabled(half_index, 180 % repeat_count(node_id) != 0)
+	var star_index := REPEAT_LINK_MODES.find(GlyphModelScript.CONNECTION_STAR)
+	if star_index >= 0:
+		repeat_settings_link.set_item_disabled(star_index, repeat_count(node_id) < 4)
 	repeat_settings_syncing = false
 
 
 func _on_repeat_count_selected(_index: int) -> void:
+	_on_repeat_layout_selected(_index)
+
+
+func _on_repeat_layout_selected(_index: int) -> void:
 	if repeat_settings_syncing or repeat_settings_node_id == &"":
 		return
 	var count := repeat_settings_count.get_item_id(repeat_settings_count.selected)
-	set_repeat_count(repeat_settings_node_id, count)
-	_sync_repeat_settings(repeat_count(repeat_settings_node_id))
+	var phase_mode: StringName = REPEAT_PHASE_MODES[repeat_settings_phase.selected]
+	if phase_mode == &"half" and 180 % count != 0:
+		phase_mode = &"base"
+	var link_mode: StringName = REPEAT_LINK_MODES[repeat_settings_link.selected]
+	if link_mode == GlyphModelScript.CONNECTION_STAR and count < 4:
+		link_mode = GlyphModelScript.CONNECTION_NONE
+	set_repeat_layout(
+		repeat_settings_node_id,
+		count,
+		repeat_settings_radius.get_item_id(repeat_settings_radius.selected),
+		phase_mode,
+		REPEAT_FACING_MODES[repeat_settings_facing.selected],
+		link_mode
+	)
+	_sync_repeat_settings(repeat_settings_node_id)
 
 
 func _on_repeat_settings_delete_pressed() -> void:
@@ -3553,13 +3840,20 @@ func _combine_mode_icon(connection_mode: StringName) -> Texture2D:
 	if combine_settings_icon_cache.has(connection_mode):
 		return combine_settings_icon_cache[connection_mode]
 	var lines := ""
+	var nodes := "<circle cx='5' cy='5' r='2'/><circle cx='25' cy='5' r='2'/><circle cx='15' cy='21' r='2'/>"
 	if connection_mode == GlyphModelScript.CONNECTION_RADIAL:
 		lines = "<path d='M15 12 L5 5 M15 12 L25 5 M15 12 L15 21'/>"
 	elif connection_mode == GlyphModelScript.CONNECTION_PAIRWISE:
 		lines = "<path d='M5 5 L25 5 L15 21 Z'/>"
+	elif connection_mode == GlyphModelScript.CONNECTION_RING:
+		lines = "<path d='M15 3 L26 11 L22 23 L8 23 L4 11 Z'/>"
+		nodes = "<circle cx='15' cy='3' r='1.7'/><circle cx='26' cy='11' r='1.7'/><circle cx='22' cy='23' r='1.7'/><circle cx='8' cy='23' r='1.7'/><circle cx='4' cy='11' r='1.7'/>"
+	elif connection_mode == GlyphModelScript.CONNECTION_STAR:
+		lines = "<path d='M15 3 L22 23 L4 11 L26 11 L8 23 Z'/>"
+		nodes = "<circle cx='15' cy='3' r='1.7'/><circle cx='26' cy='11' r='1.7'/><circle cx='22' cy='23' r='1.7'/><circle cx='8' cy='23' r='1.7'/><circle cx='4' cy='11' r='1.7'/>"
 	var body := (
 		"<g fill='none' stroke='#8edcff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'>%s</g>" % lines
-		+ "<g fill='#bfeaff'><circle cx='5' cy='5' r='2'/><circle cx='25' cy='5' r='2'/><circle cx='15' cy='21' r='2'/></g>"
+		+ "<g fill='#bfeaff'>%s</g>" % nodes
 	)
 	if connection_mode == GlyphModelScript.CONNECTION_RADIAL:
 		body += "<circle cx='15' cy='12' r='2' fill='#bfeaff'/>"
@@ -3702,7 +3996,7 @@ func _build_target_panel() -> PanelContainer:
 	panel.offset_left = -322.0
 	panel.offset_top = 12.0
 	panel.offset_right = -12.0
-	panel.offset_bottom = 300.0
+	panel.offset_bottom = 340.0
 	panel.add_theme_stylebox_override("panel", _target_panel_style())
 
 	var margin := MarginContainer.new()
@@ -3982,9 +4276,21 @@ func _make_move_node(
 func _make_repeat_node(
 	node_id: StringName,
 	world_center: Vector2,
-	count: int
+	count: int,
+	radius: int = 4,
+	phase_mode: StringName = &"base",
+	facing: StringName = GlyphModelScript.FACING_RADIAL,
+	link_mode: StringName = GlyphModelScript.CONNECTION_NONE
 ) -> GraphNode:
 	var safe_count := count if REPEAT_COUNT_PRESETS.has(count) else 3
+	var safe_radius := radius if REPEAT_RADIUS_PRESETS.has(radius) else 4
+	var safe_phase := phase_mode if phase_mode in REPEAT_PHASE_MODES else &"base"
+	if safe_phase == &"half" and 180 % safe_count != 0:
+		safe_phase = &"base"
+	var safe_facing := facing if facing in REPEAT_FACING_MODES else GlyphModelScript.FACING_RADIAL
+	var safe_link := link_mode if link_mode in REPEAT_LINK_MODES else GlyphModelScript.CONNECTION_NONE
+	if safe_link == GlyphModelScript.CONNECTION_STAR and safe_count < 4:
+		safe_link = GlyphModelScript.CONNECTION_NONE
 	var node := GraphNode.new()
 	node.name = String(node_id)
 	node.title = ""
@@ -3993,6 +4299,10 @@ func _make_repeat_node(
 	node.set_meta("landmark_kind", &"repeat")
 	node.set_meta("repeat_node", true)
 	node.set_meta("repeat_count", safe_count)
+	node.set_meta("repeat_radius", safe_radius)
+	node.set_meta("repeat_phase_mode", safe_phase)
+	node.set_meta("repeat_facing", safe_facing)
+	node.set_meta("repeat_link_mode", safe_link)
 
 	var port_row := Control.new()
 	port_row.custom_minimum_size = Vector2(1.0, 1.0)
@@ -4001,7 +4311,13 @@ func _make_repeat_node(
 	node.set_slot(0, true, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
 
 	var visual = FactoryLandmarkVisualModel.new()
-	visual.configure_repeat(safe_count)
+	visual.configure_repeat(
+		safe_count,
+		safe_radius,
+		0 if safe_phase == &"base" else int(180 / safe_count),
+		safe_facing,
+		safe_link
+	)
 	node.add_child(visual)
 	_configure_round_landmark_node(node, visual.custom_minimum_size)
 	node.position_offset = world_center - visual.custom_minimum_size * 0.5
