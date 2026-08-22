@@ -59,6 +59,9 @@ func _initialize() -> void:
 		elif fixture == "relay_settings":
 			var relay = view.place_relay_at(Vector2(3900.0, 2450.0))
 			view.open_relay_settings(StringName(relay.name), Vector2(620.0, 330.0))
+		elif fixture == "scale_settings":
+			var scale = view.place_scale_at(Vector2(3900.0, 2450.0), 200, 50)
+			view.open_scale_settings(StringName(scale.name), Vector2(620.0, 330.0))
 		elif fixture == "line_settings":
 			view.connect_material_to_summoner(&"circle_01", 0)
 			var connection = view._connection_to_input(&"summoner_center", 0)

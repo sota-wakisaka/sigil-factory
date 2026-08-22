@@ -16,6 +16,8 @@ const DEPOSIT_OFFSETS := [
 var landmark_kind: StringName = &"circle"
 var visual_mode: StringName = &"deposit"
 var rotation_angle_degrees := 45
+var scale_x_percent := 100
+var scale_y_percent := 100
 
 
 func configure(next_kind: StringName) -> void:
@@ -28,6 +30,9 @@ func configure(next_kind: StringName) -> void:
 		custom_minimum_size = Vector2(118.0, 118.0)
 	elif landmark_kind == &"rotation":
 		visual_mode = &"rotation"
+		custom_minimum_size = Vector2(118.0, 118.0)
+	elif landmark_kind == &"scale":
+		visual_mode = &"scale"
 		custom_minimum_size = Vector2(118.0, 118.0)
 	else:
 		visual_mode = &"deposit"
@@ -52,13 +57,23 @@ func configure_rotation(next_degrees: int) -> void:
 	queue_redraw()
 
 
+func configure_scale(next_x_percent: int, next_y_percent: int) -> void:
+	landmark_kind = &"scale"
+	visual_mode = &"scale"
+	scale_x_percent = next_x_percent
+	scale_y_percent = next_y_percent
+	custom_minimum_size = Vector2(118.0, 118.0)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	queue_redraw()
+
+
 func body_radius() -> float:
 	var visual_size := size
 	if visual_size.x <= 0.0 or visual_size.y <= 0.0:
 		visual_size = custom_minimum_size
 	if visual_mode == &"summoner":
 		return minf(visual_size.x, visual_size.y) * 0.36 + 18.0
-	if visual_mode == &"relay" or visual_mode == &"rotation":
+	if visual_mode == &"relay" or visual_mode == &"rotation" or visual_mode == &"scale":
 		return minf(visual_size.x, visual_size.y) * 0.38
 	return minf(visual_size.x, visual_size.y) * 0.43
 
@@ -73,6 +88,9 @@ func _draw() -> void:
 		return
 	if visual_mode == &"rotation":
 		_draw_rotation(center)
+		return
+	if visual_mode == &"scale":
+		_draw_scale(center)
 		return
 	if visual_mode == &"target":
 		_draw_target(center)
@@ -193,3 +211,24 @@ func _draw_rotation(center: Vector2) -> void:
 	]), INK)
 	draw_circle(center, 4.0, Color(0.01, 0.04, 0.06, 1.0), true)
 	draw_arc(center, 4.0, 0.0, TAU, 20, INK, 1.2, true)
+
+
+func _draw_scale(center: Vector2) -> void:
+	var radius := body_radius()
+	draw_circle(center, radius, Color(0.015, 0.075, 0.11, 0.96), true)
+	draw_arc(center, radius, 0.0, TAU, 64, Color(0.42, 0.82, 1.0, 0.92), 1.6, true)
+	var reference_half := Vector2.ONE * radius * 0.38
+	var reference_rect := Rect2(center - reference_half, reference_half * 2.0)
+	draw_dashed_line(reference_rect.position, Vector2(reference_rect.end.x, reference_rect.position.y), DIM_INK, 1.0, 4.0)
+	draw_dashed_line(Vector2(reference_rect.end.x, reference_rect.position.y), reference_rect.end, DIM_INK, 1.0, 4.0)
+	draw_dashed_line(reference_rect.end, Vector2(reference_rect.position.x, reference_rect.end.y), DIM_INK, 1.0, 4.0)
+	draw_dashed_line(Vector2(reference_rect.position.x, reference_rect.end.y), reference_rect.position, DIM_INK, 1.0, 4.0)
+	var max_percent := maxf(float(maxi(scale_x_percent, scale_y_percent)), 100.0)
+	var shape_half := Vector2(
+		radius * 0.54 * float(scale_x_percent) / max_percent,
+		radius * 0.54 * float(scale_y_percent) / max_percent
+	)
+	shape_half.x = maxf(shape_half.x, 4.0)
+	shape_half.y = maxf(shape_half.y, 4.0)
+	draw_rect(Rect2(center - shape_half, shape_half * 2.0), INK, false, 2.0, true)
+	draw_circle(center, 2.5, INK, true)

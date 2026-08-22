@@ -10,6 +10,7 @@ func _initialize() -> void:
 	await _test_main_menu()
 	await _test_fixed_factory_landmarks()
 	await _test_processed_rotation_target()
+	await _test_scale_processing_node()
 	if failures == 0:
 		print("All Factory Prototype tests passed.")
 	quit(failures)
@@ -793,6 +794,93 @@ func _test_processed_rotation_target() -> void:
 	_expect(prototype.factory_graph.get_connection_list().is_empty(), "deleting a processor should remove all of its attached conveyors")
 	_expect(prototype.summon_state(2) == &"idle", "deleting a connected processor should clear its downstream summon state")
 	_expect("回転 0" in prototype.status_label.text, "deleting a rotation node should refresh the equipment count")
+	prototype.queue_free()
+	await process_frame
+
+
+func _test_scale_processing_node() -> void:
+	var prototype = FactoryPrototypeScene.instantiate()
+	root.add_child(prototype)
+	await process_frame
+	await process_frame
+	prototype.flow_time_override = 0.0
+	_expect(
+		prototype.scale_button != null and prototype.scale_button.text == "＋ 変形",
+		"the toolbar should expose stepped scale-node placement"
+	)
+	var square_source := _first_material(prototype, &"square")
+	var scale = prototype.place_scale_at(Vector2(3900.0, 2450.0), 200, 50)
+	var scale_id := StringName(scale.name)
+	_expect(
+		scale.draggable
+		and prototype.scale_percent(scale_id) == Vector2i(200, 50)
+		and "変形 1" in prototype.status_label.text,
+		"a scale node should use the requested presets and update the equipment count"
+	)
+	_expect(
+		not prototype.set_scale_percent(scale_id, 125, 50)
+		and prototype.scale_percent(scale_id) == Vector2i(200, 50),
+		"non-preset stretch values should fail closed"
+	)
+	_expect(
+		prototype.connect_output_to_input(StringName(square_source.name), scale_id, 0),
+		"a material should connect to the scale input from any direction"
+	)
+	prototype.select_input(1)
+	_expect(prototype.select_target(&"square"), "the scale test input should target the original Square")
+	_expect(
+		prototype.connect_output_to_input(scale_id, StringName(prototype.summoner_node.name), 1),
+		"a scaled output should connect to a summoner input"
+	)
+	var expected_stretched: Object = prototype.primitive_glyph(&"square").stretched_percent(200, 50)
+	_expect(
+		prototype.output_glyph(scale_id).canonical_serialization()
+		== expected_stretched.canonical_serialization(),
+		"the scale processor should return a new deterministically stretched Glyph"
+	)
+	_advance_input_to_first_arrival(prototype, 1)
+	_expect(prototype.summon_state(1) == &"mismatch", "a stretched rectangle should not match the original Square")
+
+	var menu_click := InputEventMouseButton.new()
+	menu_click.button_index = MOUSE_BUTTON_RIGHT
+	menu_click.pressed = true
+	menu_click.position = prototype._convert_control_point(
+		prototype.factory_graph,
+		prototype._node_center_in(scale, prototype.factory_graph),
+		scale
+	)
+	menu_click.global_position = Vector2(620.0, 360.0)
+	scale.gui_input.emit(menu_click)
+	_expect(
+		prototype.scale_settings_popup.visible
+		and prototype.scale_settings_node_id == scale_id
+		and prototype.scale_settings_x.get_item_id(prototype.scale_settings_x.selected) == 200
+		and prototype.scale_settings_y.get_item_id(prototype.scale_settings_y.selected) == 50
+		and prototype.scale_settings_x.get_item_icon(0) != null,
+		"right-clicking a scale node should open shape-backed preset controls"
+	)
+	var x_100_index: int = prototype.scale_settings_x.get_item_index(100)
+	var y_100_index: int = prototype.scale_settings_y.get_item_index(100)
+	prototype.scale_settings_x.select(x_100_index)
+	prototype.scale_settings_x.item_selected.emit(x_100_index)
+	prototype.scale_settings_y.select(y_100_index)
+	prototype.scale_settings_y.item_selected.emit(y_100_index)
+	_expect(
+		prototype.scale_percent(scale_id) == Vector2i(100, 100)
+		and prototype.output_glyph(scale_id).canonical_serialization()
+		== prototype.primitive_glyph(&"square").canonical_serialization(),
+		"selecting the 100 percent presets should restore the exact source Glyph"
+	)
+	_expect(prototype.summon_state(1) == &"transporting", "changing a scale preset should restart downstream transport")
+	_advance_input_to_first_arrival(prototype, 1)
+	_expect(prototype.summon_state(1) == &"matched", "the restored 100 percent Square should summon after arrival")
+
+	prototype.scale_settings_delete_button.pressed.emit()
+	await process_frame
+	_expect(prototype.scale_nodes.is_empty(), "the scale-node menu should delete that processor")
+	_expect(prototype.factory_graph.get_connection_list().is_empty(), "deleting a scale node should remove attached conveyors")
+	_expect(prototype.summon_state(1) == &"idle", "deleting a scale node should clear downstream summon state")
+	_expect("変形 0" in prototype.status_label.text, "deleting a scale node should refresh the equipment count")
 	prototype.queue_free()
 	await process_frame
 
