@@ -43,6 +43,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.all_landmarks_locked(), "material nodes and the summoner should not be draggable")
 	_expect(prototype.factory_graph.minimap_enabled, "a minimap should support navigation across the large map")
 	_expect(prototype.connection_overlay != null and prototype.port_overlay != null, "directional ports and connections should use dedicated overlays")
+	_expect(is_zero_approx(prototype.factory_graph.connection_lines_thickness), "native GraphEdit lines should stay hidden behind the circular directional renderer")
 	_expect(prototype.factory_graph.zoom <= 0.40, "the initial camera should show the wider inner deposit ring")
 	_expect(prototype.summoner_node.position_offset == prototype.SUMMONER_POSITION, "the summoner should remain at the factory center")
 	_expect(prototype.summoner_node.get_meta("landmark_kind") == &"summoner", "the center landmark should be identifiable as the summoner")

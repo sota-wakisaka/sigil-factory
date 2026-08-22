@@ -719,6 +719,10 @@ func _build_ui() -> void:
 	factory_graph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	factory_graph.right_disconnects = true
 	factory_graph.connection_lines_curvature = 0.12
+	# GraphEdit retains topology and emits connection signals, while the directional
+	# overlay is the sole visual line renderer. Native lines still target the hidden
+	# rectangular slots and otherwise appear as displaced shadows around round nodes.
+	factory_graph.connection_lines_thickness = 0.0
 	factory_graph.minimap_enabled = true
 	factory_graph.zoom = 0.36
 	factory_graph.connection_request.connect(_on_connection_request)
