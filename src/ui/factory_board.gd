@@ -24,11 +24,11 @@ const WARNING_COLOR := Color(1.0, 0.38, 0.28, 1.0)
 const WAITING_COLOR := Color(1.0, 0.72, 0.24, 1.0)
 const MATCH_COLOR := Color(0.36, 1.0, 0.58, 1.0)
 const PRODUCTION_INCREASE_COLOR := Color(0.3, 0.86, 0.94, 1.0)
-const SOURCE_OPTION_LABELS := ["環", "棘", "目", "十字", "的", "星", "方位"]
+const SOURCE_OPTION_LABELS := ["環", "棘", "目", "十字", "的", "星"]
 const SOURCE_OPTION_IDS := [
 	&"ring", &"spike",
 	MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS, MeaningGlyphsModel.TARGET,
-	MeaningGlyphsModel.STAR, MeaningGlyphsModel.COMPASS,
+	MeaningGlyphsModel.STAR,
 ]
 const COMBINE_OPTION_LABELS := ["中心", "相互", "単純"]
 const COMBINE_OPTION_IDS := [

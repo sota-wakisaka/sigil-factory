@@ -110,10 +110,10 @@ static func recipes() -> Array[SigilRecipeModel]:
 			&"golem"
 		),
 		SigilRecipeModel.new(
-			&"fortress_compass",
+			&"fortress_mark",
 			GlyphModel.combine(
 				MeaningGlyphsModel.glyph(MeaningGlyphsModel.TARGET),
-				MeaningGlyphsModel.glyph(MeaningGlyphsModel.COMPASS),
+				MeaningGlyphsModel.glyph(MeaningGlyphsModel.CROSS),
 				GlyphModel.CONNECTION_SIMPLE
 			),
 			&"golem"
@@ -158,7 +158,7 @@ static func layout_for_plan(plan_id: StringName) -> Dictionary:
 		PLAN_FORTRESS:
 			return {
 				&"target_source": Vector2(85, 90),
-				&"compass_source": Vector2(85, 300),
+				&"cross_source": Vector2(85, 300),
 				&"combiner": Vector2(260, 195),
 				&"summoner": Vector2(410, 195),
 			}
@@ -182,7 +182,7 @@ static func plan_name(plan_id: StringName) -> String:
 		PLAN_GOLEM:
 			return "結合の巨像"
 		PLAN_FORTRESS:
-			return "要塞方位の巨像"
+			return "要塞標章の巨像"
 		_:
 			return "目の斥候"
 
@@ -200,7 +200,7 @@ static func plan_description(plan_id: StringName) -> String:
 		PLAN_GOLEM:
 			return "環＋棘 // 結合後に着色"
 		PLAN_FORTRESS:
-			return "的＋方位 // 2素材の単純結合"
+			return "的＋十字 // 2素材の単純結合"
 		_:
 			return "目 // 単一素材の短工程"
 
@@ -217,8 +217,8 @@ static func sigil_name(recipe_id: StringName) -> String:
 			return "警戒十字シジル"
 		&"bound_colossus":
 			return "巨像シジル"
-		&"fortress_compass":
-			return "要塞方位シジル"
+		&"fortress_mark":
+			return "要塞標章シジル"
 		_:
 			return String(recipe_id)
 
@@ -235,7 +235,7 @@ static func recipe_factory_trait(recipe_id: StringName) -> String:
 			return "単一素材・中頻度"
 		&"bound_colossus":
 			return "2素材・結合後加工"
-		&"fortress_compass":
+		&"fortress_mark":
 			return "2素材・単純結合"
 	return ""
 
@@ -245,7 +245,7 @@ static func default_recipe_id_for_unit(unit_id: StringName) -> StringName:
 		&"sentinel":
 			return &"vigil_cross"
 		&"golem":
-			return &"fortress_compass"
+			return &"fortress_mark"
 		_:
 			return &"watchful_eye"
 
@@ -271,7 +271,7 @@ static func recipe_id_for_plan(plan_id: StringName) -> StringName:
 		PLAN_GOLEM:
 			return &"bound_colossus"
 		PLAN_FORTRESS:
-			return &"fortress_compass"
+			return &"fortress_mark"
 		_:
 			return &"watchful_eye"
 
@@ -312,7 +312,7 @@ static func source_interval_for_glyph(glyph_id: StringName) -> int:
 		return 54
 	if glyph_id == MeaningGlyphsModel.CROSS:
 		return 22
-	if glyph_id == MeaningGlyphsModel.TARGET or glyph_id == MeaningGlyphsModel.COMPASS:
+	if glyph_id == MeaningGlyphsModel.TARGET:
 		return 54
 	if glyph_id == MeaningGlyphsModel.STAR:
 		return 36
@@ -393,7 +393,7 @@ static func _build_golem_factory(simulation: FactorySimulation) -> void:
 
 static func _build_fortress_factory(simulation: FactorySimulation) -> void:
 	simulation.add_node(_meaning_source(&"target_source", MeaningGlyphsModel.TARGET, source_interval_for_glyph(MeaningGlyphsModel.TARGET)))
-	simulation.add_node(_meaning_source(&"compass_source", MeaningGlyphsModel.COMPASS, source_interval_for_glyph(MeaningGlyphsModel.COMPASS)))
+	simulation.add_node(_meaning_source(&"cross_source", MeaningGlyphsModel.CROSS, source_interval_for_glyph(MeaningGlyphsModel.CROSS)))
 	simulation.add_node(FactoryNodeModel.new(
 		&"combiner",
 		FactoryNodeModel.NodeKind.COMBINER,
@@ -404,7 +404,7 @@ static func _build_fortress_factory(simulation: FactorySimulation) -> void:
 	))
 	simulation.add_node(FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_target", &"target_source", &"combiner", 0, 2))
-	simulation.connect_nodes(FactoryLineModel.new(&"line_compass", &"compass_source", &"combiner", 1, 2))
+	simulation.connect_nodes(FactoryLineModel.new(&"line_cross", &"cross_source", &"combiner", 1, 2))
 	simulation.connect_nodes(FactoryLineModel.new(&"line_summon", &"combiner", &"summoner", 0, 2))
 
 

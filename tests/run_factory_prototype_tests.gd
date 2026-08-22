@@ -111,7 +111,7 @@ func _test_fixed_factory_landmarks() -> void:
 	)
 	_expect(prototype.PLAYFIELD_SIZE == Vector2(9000.0, 6000.0), "the available playfield should support a large map")
 	_expect(prototype.material_nodes.size() == 30, "material deposits should be scattered across the large map")
-	_expect(prototype.fixed_landmark_count() == 36, "thirty material deposits, five meaning deposits, and one summoner should be fixed landmarks")
+	_expect(prototype.fixed_landmark_count() == 35, "thirty material deposits, four meaning deposits, and one summoner should be fixed landmarks")
 	_expect(prototype.all_landmarks_locked(), "material nodes and the summoner should not be draggable")
 	_expect(prototype.factory_graph.minimap_enabled, "a minimap should support navigation across the large map")
 	_expect(not prototype.factory_graph.is_showing_arrange_button(), "automatic selected-node arrangement should stay hidden for the radial factory layout")
@@ -140,7 +140,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(counts[&"triangle"] == 10, "ten Triangle material deposits should exist")
 	_expect(counts[&"square"] == 10, "ten Square material deposits should exist")
 	_expect(prototype.target_panel != null and prototype.target_panel.anchor_left == 1.0, "the target sigil panel should stay at the upper right")
-	_expect(prototype.target_buttons.size() == 9, "four basic and five registered Glyphs should be selectable targets")
+	_expect(prototype.target_buttons.size() == 8, "four basic and four registered Glyphs should be selectable targets")
 	_expect(prototype.target_panel.find_child("Input1Button", true, false) == null, "the target panel should not duplicate summoner inputs as tabs")
 	_expect(prototype.input_target_kinds.size() == 3, "the round summoner should retain three input targets without visible text rows")
 	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")
@@ -186,7 +186,7 @@ func _test_fixed_factory_landmarks() -> void:
 	var relay: GraphNode = prototype.relay_nodes[0]
 	var relay_id := StringName(relay.name)
 	_expect(relay.draggable and not relay.get_meta("fixed_landmark", false), "relay nodes should be draggable player-built equipment")
-	_expect(prototype.fixed_landmark_count() == 36, "placing a relay should not change the fixed-landmark count")
+	_expect(prototype.fixed_landmark_count() == 35, "placing a relay should not change the fixed-landmark count")
 	_expect("中継 1" in prototype.status_label.text, "the toolbar should report the number of placed relays")
 	_expect(prototype._landmark_visual(relay).body_radius() > 0.0, "relay nodes should use the circular factory visual language")
 	prototype.begin_rotation_placement()
@@ -731,7 +731,7 @@ func _test_fixed_factory_landmarks() -> void:
 		"deleting from the relay menu should remove only that player-built node"
 	)
 	_expect("中継 1" in prototype.status_label.text, "deleting a relay should refresh the factory equipment count")
-	_expect(prototype.fixed_landmark_count() == 36, "deleting player equipment must not remove fixed landmarks")
+	_expect(prototype.fixed_landmark_count() == 35, "deleting player equipment must not remove fixed landmarks")
 
 	prototype.queue_free()
 	await process_frame
@@ -743,7 +743,7 @@ func _test_meaning_glyph_deposits() -> void:
 	await process_frame
 	await process_frame
 	prototype.flow_time_override = 0.0
-	_expect(prototype.meaning_nodes.size() == 5, "all five registered meaning Glyphs should exist as fixed deposits")
+	_expect(prototype.meaning_nodes.size() == 4, "all four registered meaning Glyphs should exist as fixed deposits")
 	var counts: Dictionary = prototype.meaning_glyph_counts()
 	for glyph_id in MeaningGlyphsModel.IDS:
 		_expect(counts[glyph_id] == 1, "%s should have one fixed meaning deposit" % glyph_id)

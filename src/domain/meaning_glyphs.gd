@@ -9,14 +9,12 @@ const EYE := &"eye"
 const CROSS := &"cross"
 const TARGET := &"target"
 const STAR := &"star"
-const COMPASS := &"compass"
-const IDS := [EYE, CROSS, TARGET, STAR, COMPASS]
+const IDS := [EYE, CROSS, TARGET, STAR]
 const LABELS := {
 	EYE: "目",
 	CROSS: "十字",
 	TARGET: "的",
 	STAR: "星",
-	COMPASS: "方位",
 }
 
 
@@ -38,8 +36,6 @@ static func glyph(glyph_id: StringName) -> GlyphModel:
 			return _target()
 		STAR:
 			return _star()
-		COMPASS:
-			return _compass()
 	return null
 
 
@@ -77,13 +73,5 @@ static func _star() -> GlyphModel:
 	var triangle := GlyphModel.new([GlyphComponentModel.new(&"triangle")])
 	return GlyphModel.combine_many(
 		[triangle, triangle.rotated_degrees(180)],
-		GlyphModel.CONNECTION_SIMPLE
-	)
-
-
-static func _compass() -> GlyphModel:
-	var cross := _cross()
-	return GlyphModel.combine_many(
-		[cross, cross.rotated_degrees(45)],
 		GlyphModel.CONNECTION_SIMPLE
 	)

@@ -49,7 +49,7 @@ const COMBINE_INPUT_START_ANGLE := -PI * 0.5
 const TARGET_ORDER := [
 	&"circle", &"triangle", &"square", &"diamond",
 	MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS, MeaningGlyphsModel.TARGET,
-	MeaningGlyphsModel.STAR, MeaningGlyphsModel.COMPASS,
+	MeaningGlyphsModel.STAR,
 ]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -112,13 +112,6 @@ const TARGET_DEFINITIONS := {
 		"monster_name": "星火スパーク",
 		"role": "飛行・散開・連射",
 	},
-	MeaningGlyphsModel.COMPASS: {
-		"glyph_label": "✥",
-		"meaning_glyph_id": MeaningGlyphsModel.COMPASS,
-		"monster_id": &"compass_guide",
-		"monster_name": "羅針ガイド",
-		"role": "誘導・索敵・支援",
-	},
 }
 const MATERIAL_LAYOUT := [
 	# Inner deposits keep all three materials available near the first factory hub.
@@ -155,11 +148,10 @@ const MATERIAL_LAYOUT := [
 	{ "id": &"square_10", "kind": &"square", "position": Vector2(1600.0, 1500.0) },
 ]
 const MEANING_GLYPH_LAYOUT := [
-	{ "id": &"eye_vein", "glyph_id": MeaningGlyphsModel.EYE, "position": Vector2(5050.0, 1000.0) },
-	{ "id": &"cross_vein", "glyph_id": MeaningGlyphsModel.CROSS, "position": Vector2(6900.0, 2200.0) },
-	{ "id": &"target_vein", "glyph_id": MeaningGlyphsModel.TARGET, "position": Vector2(6650.0, 4050.0) },
-	{ "id": &"star_vein", "glyph_id": MeaningGlyphsModel.STAR, "position": Vector2(4550.0, 4950.0) },
-	{ "id": &"compass_vein", "glyph_id": MeaningGlyphsModel.COMPASS, "position": Vector2(1800.0, 2850.0) },
+	{ "id": &"eye_vein", "glyph_id": MeaningGlyphsModel.EYE, "position": Vector2(4400.0, 1150.0) },
+	{ "id": &"cross_vein", "glyph_id": MeaningGlyphsModel.CROSS, "position": Vector2(6850.0, 2895.0) },
+	{ "id": &"target_vein", "glyph_id": MeaningGlyphsModel.TARGET, "position": Vector2(4400.0, 4750.0) },
+	{ "id": &"star_vein", "glyph_id": MeaningGlyphsModel.STAR, "position": Vector2(1950.0, 2895.0) },
 ]
 
 var factory_graph: GraphEdit
@@ -3846,7 +3838,7 @@ func _build_target_panel() -> PanelContainer:
 	identity.add_child(target_role_label)
 
 	var selector := GridContainer.new()
-	selector.columns = 5
+	selector.columns = 4
 	selector.add_theme_constant_override("h_separation", 6)
 	selector.add_theme_constant_override("v_separation", 6)
 	column.add_child(selector)
@@ -3857,7 +3849,7 @@ func _build_target_panel() -> PanelContainer:
 		button.name = "%sTargetButton" % String(target_kind).capitalize()
 		button.text = String(definition["glyph_label"])
 		button.tooltip_text = "%s // %s" % [definition["monster_name"], definition["role"]]
-		button.custom_minimum_size = Vector2(52.0, 30.0)
+		button.custom_minimum_size = Vector2(65.0, 30.0)
 		button.toggle_mode = true
 		button.button_group = target_group
 		button.pressed.connect(select_target.bind(target_kind))

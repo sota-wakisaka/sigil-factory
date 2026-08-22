@@ -325,14 +325,12 @@ Combine
 | 十字 | 横長の四角 + 縦長の四角 | 交差・中心 |
 | 的 | 大小の同心円 | 目標・焦点 |
 | 星 | 正向き三角 + 反転三角 | 星・天体 |
-| 方位 | 十字 + 45°回転した十字 | 方角・全周 |
 
 ```text
 Eye     = SimpleCombine(Scale(Circle, 50%, 50%), Scale(Circle, 100%, 50%))
 Cross   = SimpleCombine(Scale(Square, 100%, 25%), Scale(Square, 25%, 100%))
 Target  = SimpleCombine(Circle, Scale(Circle, 50%, 50%))
 Star    = SimpleCombine(Triangle, Rotate(Triangle, 180°))
-Compass = SimpleCombine(Cross, Rotate(Cross, 45°))
 ```
 
 - 登録グリフの外形基準は基本Primitiveの100%とし、下流で部品として並べても実寸が揃うようにする

@@ -74,10 +74,9 @@ func _test_registered_meaning_glyphs() -> void:
 		RegisteredGlyphsModel.CROSS: "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a100,25),40:P(34:p6:square|0,0|0|1|c5:white|a25,100))",
 		RegisteredGlyphsModel.TARGET: "S(3:0,0;39:P(33:p6:circle|0,0|0|1|c5:white|a50,50),32:P(26:p6:circle|0,0|0|1|c5:white))",
 		RegisteredGlyphsModel.STAR: "S(3:0,0;34:P(28:p8:triangle|0,0|0|1|c5:white),35:P(29:p8:triangle|0,0|60|1|c5:white))",
-		RegisteredGlyphsModel.COMPASS: "S(3:0,0;96:S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a100,25),40:P(34:p6:square|0,0|0|1|c5:white|a25,100)),98:S(3:0,0;41:P(35:p6:square|0,0|45|1|c5:white|a100,25),41:P(35:p6:square|0,0|45|1|c5:white|a25,100)))",
 	}
 	var seen_canonicals: Dictionary = {}
-	_expect(RegisteredGlyphsModel.IDS.size() == 5, "the meaning-Glyph set should stay intentionally small")
+	_expect(RegisteredGlyphsModel.IDS.size() == 4, "the meaning-Glyph set should stay intentionally small")
 	for glyph_id in RegisteredGlyphsModel.IDS:
 		var glyph := RegisteredGlyphsModel.glyph(glyph_id)
 		_expect(glyph != null, "%s should be available as a registered meaning Glyph" % glyph_id)
@@ -434,10 +433,10 @@ func _test_lab_scene() -> void:
 	var free_repeat: StringName = lab.add_lab_node(SigilGraphModel.REPEAT, {"count": 6}, Vector2(40, 40))
 	_expect(lab.option_controls[free_repeat] is OptionButton and lab.option_controls[free_repeat].item_count == 6, "Lab repeat should expose all exact equal-angle counts")
 	var registered_cross: StringName = lab.add_lab_node(SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.CROSS}, Vector2(40, 40))
-	_expect(lab.option_controls[registered_cross] is OptionButton and lab.option_controls[registered_cross].item_count == 5, "all authored meaning Glyphs should be reusable from one compact palette node")
+	_expect(lab.option_controls[registered_cross] is OptionButton and lab.option_controls[registered_cross].item_count == 4, "all authored meaning Glyphs should be reusable from one compact palette node")
 	if lab.option_controls[registered_cross] is OptionButton:
 		var registered_option: OptionButton = lab.option_controls[registered_cross]
-		_expect(registered_option.get_item_text(0) == "目" and registered_option.get_item_text(4) == "方位", "meaning-Glyph choices should follow the documented learning order")
+		_expect(registered_option.get_item_text(0) == "目" and registered_option.get_item_text(3) == "星", "meaning-Glyph choices should follow the documented learning order")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"distribute"), "Distributor should be removed from the Lab grammar")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"color"), "color processing should be omitted from the Lab grammar")
 	var output: Dictionary = lab.graph.evaluate_output()

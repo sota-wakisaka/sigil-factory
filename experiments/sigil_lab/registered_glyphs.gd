@@ -9,14 +9,12 @@ const EYE := MeaningGlyphsModel.EYE
 const CROSS := MeaningGlyphsModel.CROSS
 const TARGET := MeaningGlyphsModel.TARGET
 const STAR := MeaningGlyphsModel.STAR
-const COMPASS := MeaningGlyphsModel.COMPASS
 const IDS := MeaningGlyphsModel.IDS
 const SOURCE_GRAPH_PATHS := {
 	EYE: "res://experiments/sigil_lab/registered/eye.json",
 	CROSS: "res://experiments/sigil_lab/registered/cross.json",
 	TARGET: "res://experiments/sigil_lab/registered/target.json",
 	STAR: "res://experiments/sigil_lab/registered/star.json",
-	COMPASS: "res://experiments/sigil_lab/registered/compass.json",
 }
 
 

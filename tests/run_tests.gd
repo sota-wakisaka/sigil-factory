@@ -553,7 +553,7 @@ func _test_complete_overlap_is_rejected() -> void:
 
 
 func _test_meaning_glyph_library_is_owned_and_valid() -> void:
-	_expect(MeaningGlyphsModel.IDS.size() == 5, "shared meaning Glyphs should expose the five accepted marks")
+	_expect(MeaningGlyphsModel.IDS.size() == 4, "shared meaning Glyphs should expose the four accepted marks")
 	var first_eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
 	var second_eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
 	_expect(first_eye != null and second_eye != null, "shared meaning Glyph lookup should return authored copies")
@@ -1811,7 +1811,7 @@ func _test_factory_plans_produce_expected_outputs() -> void:
 		FactoryContent.PLAN_VIGIL: "警戒十字の衛兵",
 		FactoryContent.PLAN_STELLAR: "星印の衛兵",
 		FactoryContent.PLAN_GOLEM: "結合の巨像",
-		FactoryContent.PLAN_FORTRESS: "要塞方位の巨像",
+		FactoryContent.PLAN_FORTRESS: "要塞標章の巨像",
 	}
 	var expectations := {
 		FactoryContent.PLAN_SCOUT: &"scout",
@@ -2273,16 +2273,16 @@ func _test_factory_meaning_source_is_configurable() -> void:
 		return
 	board.selected_node_id = source_id
 	var details := board.selected_node_details()
-	_expect(details["options"].size() == 7 and details["selected_index"] == 2, "source inspector should combine primitive and meaning options")
+	_expect(details["options"].size() == 6 and details["selected_index"] == 2, "source inspector should combine primitive and meaning options")
 	var eye := board.source_glyph_for_node(source_id)
 	_expect(
 		eye != null and eye.canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE).canonical_serialization(),
 		"new meaning source should visibly emit the Eye"
 	)
-	_expect(board.configure_selected_node(6), "meaning source should switch to the Compass through the shared inspector")
-	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.COMPASS, "meaning selection should be stored explicitly")
-	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == FactoryContent.source_interval_for_glyph(MeaningGlyphsModel.COMPASS), "meaning selection should use the same canonical source interval as shipped templates")
-	_expect(board.selected_node_details()["title"] == "方位印", "meaning source node should name its registered Glyph")
+	_expect(board.configure_selected_node(5), "meaning source should switch to the Star through the shared inspector")
+	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.STAR, "meaning selection should be stored explicitly")
+	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == FactoryContent.source_interval_for_glyph(MeaningGlyphsModel.STAR), "meaning selection should use the same canonical source interval as shipped templates")
+	_expect(board.selected_node_details()["title"] == "星印", "meaning source node should name its registered Glyph")
 	_expect(board.undo(), "meaning source selection should be undoable")
 	board.selected_node_id = source_id
 	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.EYE, "undo should restore the previous meaning Glyph")
