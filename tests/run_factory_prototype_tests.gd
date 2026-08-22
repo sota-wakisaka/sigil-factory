@@ -42,7 +42,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.fixed_landmark_count() == 31, "thirty material deposits and one summoner should be fixed landmarks")
 	_expect(prototype.all_landmarks_locked(), "material nodes and the summoner should not be draggable")
 	_expect(prototype.factory_graph.minimap_enabled, "a minimap should support navigation across the large map")
-	_expect(prototype.factory_graph.zoom <= 0.60, "the initial camera should show the inner deposit ring")
+	_expect(prototype.factory_graph.zoom <= 0.40, "the initial camera should show the wider inner deposit ring")
 	_expect(prototype.summoner_node.position_offset == prototype.SUMMONER_POSITION, "the summoner should remain at the factory center")
 	_expect(prototype.summoner_node.get_meta("landmark_kind") == &"summoner", "the center landmark should be identifiable as the summoner")
 
@@ -53,15 +53,21 @@ func _test_fixed_factory_landmarks() -> void:
 
 	var bounds := Rect2()
 	var first := true
+	var nearest_deposit_distance := INF
 	for node in prototype.material_nodes:
 		_expect(node.get_meta("fixed_landmark", false), "%s should be marked as a fixed landmark" % node.name)
 		_expect(node.get_meta("material_deposit", false), "%s should be marked as a material deposit" % node.name)
+		nearest_deposit_distance = minf(
+			nearest_deposit_distance,
+			node.position_offset.distance_to(prototype.SUMMONER_POSITION)
+		)
 		if first:
 			bounds = Rect2(node.position_offset, Vector2.ZERO)
 			first = false
 		else:
 			bounds = bounds.expand(node.position_offset)
 	_expect(bounds.size.x >= 7800.0 and bounds.size.y >= 4500.0, "material deposits should span most of the large playfield")
+	_expect(nearest_deposit_distance >= 1250.0, "the summoner should have enough empty space for several processing nodes")
 
 	prototype.queue_free()
 	await process_frame

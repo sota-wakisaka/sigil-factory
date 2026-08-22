@@ -9,12 +9,12 @@ const SUMMONER_POSITION := Vector2(4400.0, 2895.0)
 const PORT_COLOR := Color(0.28, 0.78, 1.0, 1.0)
 const MATERIAL_LAYOUT := [
 	# Inner deposits keep all three materials available near the first factory hub.
-	{ "id": &"circle_01", "kind": &"circle", "position": Vector2(3600.0, 2500.0) },
-	{ "id": &"circle_02", "kind": &"circle", "position": Vector2(3700.0, 3250.0) },
-	{ "id": &"triangle_01", "kind": &"triangle", "position": Vector2(5200.0, 2500.0) },
-	{ "id": &"triangle_02", "kind": &"triangle", "position": Vector2(4400.0, 2350.0) },
-	{ "id": &"square_01", "kind": &"square", "position": Vector2(5300.0, 3000.0) },
-	{ "id": &"square_02", "kind": &"square", "position": Vector2(4400.0, 3400.0) },
+	{ "id": &"circle_01", "kind": &"circle", "position": Vector2(2900.0, 2895.0) },
+	{ "id": &"circle_02", "kind": &"circle", "position": Vector2(5400.0, 2045.0) },
+	{ "id": &"triangle_01", "kind": &"triangle", "position": Vector2(5900.0, 2895.0) },
+	{ "id": &"triangle_02", "kind": &"triangle", "position": Vector2(3400.0, 3745.0) },
+	{ "id": &"square_01", "kind": &"square", "position": Vector2(3400.0, 2045.0) },
+	{ "id": &"square_02", "kind": &"square", "position": Vector2(5400.0, 3745.0) },
 	# Distant deposits make route length and direction part of later factory planning.
 	{ "id": &"circle_03", "kind": &"circle", "position": Vector2(1500.0, 800.0) },
 	{ "id": &"circle_04", "kind": &"circle", "position": Vector2(7100.0, 1000.0) },
@@ -130,7 +130,7 @@ func _build_ui() -> void:
 	factory_graph.right_disconnects = true
 	factory_graph.connection_lines_curvature = 0.12
 	factory_graph.minimap_enabled = true
-	factory_graph.zoom = 0.55
+	factory_graph.zoom = 0.36
 	page.add_child(factory_graph)
 
 	var footer := Label.new()
