@@ -131,7 +131,9 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	process_transport_at(flow_animation_time_seconds())
+	var now := flow_animation_time_seconds()
+	process_transport_at(now)
+	_refresh_transport_countdown(now)
 
 
 func _draw() -> void:
@@ -1064,6 +1066,17 @@ func summoner_arrival_time(input_index: int, arrival_cycle: int) -> float:
 	)
 
 
+func transport_seconds_until_first_arrival(
+	input_index: int,
+	time_seconds: float = -1.0
+) -> float:
+	var resolved_time := flow_animation_time_seconds() if time_seconds < 0.0 else time_seconds
+	var first_arrival := summoner_arrival_time(input_index, 0)
+	if is_inf(first_arrival):
+		return INF
+	return maxf(first_arrival - resolved_time, 0.0)
+
+
 func transport_packets_for_connection(
 	from_node_id: StringName,
 	to_node_id: StringName,
@@ -1413,14 +1426,34 @@ func _refresh_summon_state() -> void:
 			summon_state_label.add_theme_color_override("font_color", Color(0.96, 0.68, 0.38))
 		&"transporting":
 			var material_kind := connected_material_kind(selected_input_index)
-			summon_state_label.text = "輸送中 // %s → INPUT %d" % [
-				_shape_symbol(material_kind),
-				selected_input_index + 1,
-			]
+			_set_transporting_state_text(
+				material_kind,
+				transport_seconds_until_first_arrival(selected_input_index)
+			)
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.78, 0.94))
 		_:
 			summon_state_label.text = "%sを召喚器入力へ接続" % definition["glyph_label"]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
+
+
+func _refresh_transport_countdown(time_seconds: float) -> void:
+	if summon_state_label == null or summon_state(selected_input_index) != &"transporting":
+		return
+	_set_transporting_state_text(
+		connected_material_kind(selected_input_index),
+		transport_seconds_until_first_arrival(selected_input_index, time_seconds)
+	)
+
+
+func _set_transporting_state_text(material_kind: StringName, seconds_remaining: float) -> void:
+	var eta_text := "--"
+	if not is_inf(seconds_remaining):
+		eta_text = "%.1fs" % seconds_remaining
+	summon_state_label.text = "輸送中 // %s → INPUT %d // %s" % [
+		_shape_symbol(material_kind),
+		selected_input_index + 1,
+		eta_text,
+	]
 
 
 func _setup_flow_audio() -> void:

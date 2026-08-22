@@ -348,6 +348,25 @@ func _test_fixed_factory_landmarks() -> void:
 		_expect(prototype.summon_state(0) == &"transporting", "a direct connection should remain in transport before arrival")
 		_expect(prototype.summoned_monster_count(&"ring_wisp") == ring_wisps_before_direct, "a direct connection should not summon on contact")
 		_expect(prototype.flow_audio.arrival_play_count == arrival_sound_before_delivery, "a connection should not play its arrival sound early")
+		var direct_first_arrival: float = prototype.summoner_arrival_time(0, 0)
+		var direct_seconds_remaining: float = prototype.transport_seconds_until_first_arrival(
+			0,
+			prototype.flow_time_override
+		)
+		_expect(direct_seconds_remaining > 0.0, "a newly connected input should expose a positive first-delivery ETA")
+		prototype._refresh_transport_countdown(prototype.flow_time_override)
+		_expect(
+			("%.1fs" % direct_seconds_remaining) in prototype.summon_state_label.text,
+			"the selected input should show its first-delivery ETA while transporting"
+		)
+		var halfway_time := lerpf(prototype.flow_time_override, direct_first_arrival, 0.5)
+		var halfway_remaining: float = prototype.transport_seconds_until_first_arrival(0, halfway_time)
+		prototype._refresh_transport_countdown(halfway_time)
+		_expect(
+			halfway_remaining < direct_seconds_remaining
+			and ("%.1fs" % halfway_remaining) in prototype.summon_state_label.text,
+			"the transport ETA should count down against conveyor travel instead of line progress"
+		)
 		_advance_input_to_first_arrival(prototype, 0)
 		_expect(prototype.flow_audio.arrival_play_count == arrival_sound_before_delivery + 1, "the first delivered Glyph should play one arrival sound")
 	_expect(circle_source != null and prototype.connected_material_kind() == &"circle", "dragging a Circle deposit output should connect directly to the summoner")
