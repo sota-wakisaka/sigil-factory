@@ -52,9 +52,14 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(counts[&"square"] == 10, "ten Square material deposits should exist")
 	_expect(prototype.target_panel != null and prototype.target_panel.anchor_left == 1.0, "the target sigil panel should stay at the upper right")
 	_expect(prototype.target_buttons.size() == 3, "Circle, Triangle, and Square should be selectable targets")
-	_expect(prototype.selected_target_kind == &"circle", "Circle should be the initial target")
-	_expect(prototype.target_monster_id() == &"ring_wisp", "Circle should summon the Ring Wisp")
-	_expect(prototype.summon_state() == &"idle", "the summoner should start disconnected")
+	_expect(prototype.input_buttons.size() == 3, "the summoner should expose three independently selectable inputs")
+	_expect(prototype.summoner_input_labels.size() == 3, "the summoner node should show all three input targets")
+	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")
+	_expect(prototype.target_kind_for_input(1) == &"triangle", "input 2 should initially target Triangle")
+	_expect(prototype.target_kind_for_input(2) == &"square", "input 3 should initially target Square")
+	_expect(prototype.selected_input_index == 0 and prototype.selected_target_kind == &"circle", "the target panel should initially show input 1")
+	_expect(prototype.target_monster_id() == &"ring_wisp", "input 1 should show the Ring Wisp")
+	_expect(prototype.summon_state() == &"idle", "input 1 should start disconnected")
 
 	var circle_source := _first_material(prototype, &"circle")
 	var triangle_source := _first_material(prototype, &"triangle")
@@ -69,24 +74,38 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(circle_source != null and prototype.connected_material_kind() == &"circle", "dragging a Circle deposit output should connect directly to the summoner")
 	_expect(prototype.summon_state() == &"matched", "matching Circle should start summoning")
 	_expect("環霊ウィスプ" in prototype.summon_state_label.text, "the Circle summon state should name its monster")
-	_expect(prototype.select_target(&"triangle"), "Triangle should be selectable as the target")
-	_expect(prototype.target_monster_id() == &"stinger", "Triangle should summon the Stinger")
-	_expect(prototype.summon_state() == &"mismatch", "switching the target should detect the connected Circle mismatch")
-	_expect(triangle_source != null and prototype.connect_material_to_summoner(StringName(triangle_source.name)), "a Triangle deposit should replace the summoner input")
-	_expect(prototype.factory_graph.get_connection_list().size() == 1, "the summoner should keep exactly one direct material input")
-	_expect(prototype.summon_state() == &"matched", "matching Triangle should start summoning")
-	_expect(prototype.select_target(&"square"), "Square should be selectable as the target")
-	_expect(prototype.target_monster_id() == &"stone_block", "Square should summon the Stone Block")
-	_expect(square_source != null and prototype.connect_material_to_summoner(StringName(square_source.name)), "a Square deposit should replace the summoner input")
-	_expect(prototype.summon_state() == &"matched", "matching Square should start summoning")
-	var active_connection: Dictionary = prototype.factory_graph.get_connection_list()[0]
+
+	_expect(prototype.select_input(1), "input 2 should be selectable")
+	_expect(prototype.selected_target_kind == &"triangle" and prototype.target_monster_id() == &"stinger", "the panel should switch to input 2's Triangle target")
+	_expect(triangle_source != null and prototype.connect_material_to_summoner(StringName(triangle_source.name), 1), "a Triangle deposit should connect independently to input 2")
+	_expect(prototype.summon_state(0) == &"matched" and prototype.summon_state(1) == &"matched", "inputs 1 and 2 should judge their own sigils independently")
+
+	_expect(prototype.select_input(2), "input 3 should be selectable")
+	_expect(prototype.selected_target_kind == &"square" and prototype.target_monster_id() == &"stone_block", "the panel should switch to input 3's Square target")
+	_expect(square_source != null and prototype.connect_material_to_summoner(StringName(square_source.name), 2), "a Square deposit should connect independently to input 3")
+	_expect(prototype.factory_graph.get_connection_list().size() == 3, "the summoner should retain one connection per input")
+	_expect(prototype.summoning_monsters() == [&"ring_wisp", &"stinger", &"stone_block"], "all three matching inputs should summon their own monsters")
+
+	_expect(prototype.select_input(1) and prototype.select_target(&"square"), "input 2's target should be independently configurable")
+	_expect(prototype.summon_state(0) == &"matched", "changing input 2 must not change input 1's result")
+	_expect(prototype.summon_state(1) == &"mismatch", "input 2 should re-evaluate against its new target")
+	_expect(prototype.summon_state(2) == &"matched", "changing input 2 must not change input 3's result")
+	_expect("INPUT 2" in prototype.target_header_label.text and prototype.selected_target_kind == &"square", "the target panel should show the selected input's target")
+	_expect(square_source != null and prototype.connect_material_to_summoner(StringName(square_source.name), 1), "reconnecting input 2 should replace only that input")
+	_expect(prototype.factory_graph.get_connection_list().size() == 3, "replacing one input should preserve the other input connections")
+	_expect(prototype.summon_state(1) == &"matched", "input 2 should match after its own reconnection")
+
+	prototype.select_input(2)
+	var active_connection := _connection_for_input(prototype, 2)
 	prototype.factory_graph.disconnection_request.emit(
 		StringName(active_connection["from_node"]),
 		int(active_connection["from_port"]),
 		StringName(active_connection["to_node"]),
 		int(active_connection["to_port"])
 	)
-	_expect(prototype.summon_state() == &"idle" and prototype.factory_graph.get_connection_list().is_empty(), "disconnecting should stop summoning")
+	_expect(prototype.summon_state(2) == &"idle", "disconnecting input 3 should stop only that input")
+	_expect(prototype.summon_state(0) == &"matched" and prototype.summon_state(1) == &"matched", "disconnecting input 3 should preserve the other summons")
+	_expect(prototype.factory_graph.get_connection_list().size() == 2, "disconnecting one input should preserve two connections")
 
 	var bounds := Rect2()
 	var first := true
@@ -122,3 +141,10 @@ func _first_material(prototype, kind: StringName) -> GraphNode:
 		if StringName(node.get_meta("landmark_kind", &"")) == kind:
 			return node
 	return null
+
+
+func _connection_for_input(prototype, input_index: int) -> Dictionary:
+	for connection in prototype.factory_graph.get_connection_list():
+		if int(connection["to_port"]) == input_index:
+			return connection
+	return {}

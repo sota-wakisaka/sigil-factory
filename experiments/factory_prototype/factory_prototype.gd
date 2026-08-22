@@ -6,6 +6,7 @@ const FactoryLandmarkVisualModel := preload("res://experiments/factory_prototype
 const MENU_SCENE := "res://src/main_menu.tscn"
 const PLAYFIELD_SIZE := Vector2(9000.0, 6000.0)
 const SUMMONER_POSITION := Vector2(4400.0, 2895.0)
+const SUMMONER_INPUT_COUNT := 3
 const PORT_COLOR := Color(0.28, 0.78, 1.0, 1.0)
 const TARGET_ORDER := [&"circle", &"triangle", &"square"]
 const TARGET_DEFINITIONS := {
@@ -69,11 +70,20 @@ var material_nodes: Array[GraphNode] = []
 var status_label: Label
 var target_panel: PanelContainer
 var target_preview
+var target_header_label: Label
 var target_name_label: Label
 var target_role_label: Label
 var summon_state_label: Label
 var target_buttons: Dictionary = {}
-var selected_target_kind: StringName = &"circle"
+var input_buttons: Array[Button] = []
+var summoner_input_labels: Array[Label] = []
+var input_target_kinds: Array[StringName] = [&"circle", &"triangle", &"square"]
+var selected_input_index := 0
+var selected_target_kind: StringName:
+	get:
+		if selected_input_index < 0 or selected_input_index >= input_target_kinds.size():
+			return &"circle"
+		return input_target_kinds[selected_input_index]
 
 
 func _ready() -> void:
@@ -116,27 +126,43 @@ func all_landmarks_locked() -> bool:
 func select_target(target_kind: StringName) -> bool:
 	if not TARGET_DEFINITIONS.has(target_kind):
 		return false
-	selected_target_kind = target_kind
-	var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
-	target_preview.configure_target(target_kind)
-	target_name_label.text = String(definition["monster_name"])
-	target_role_label.text = String(definition["role"])
-	for kind in target_buttons:
-		var button: Button = target_buttons[kind]
-		button.set_pressed_no_signal(StringName(kind) == target_kind)
+	input_target_kinds[selected_input_index] = target_kind
 	_refresh_summon_state()
 	return true
 
 
-func target_monster_id() -> StringName:
-	return StringName(TARGET_DEFINITIONS[selected_target_kind]["monster_id"])
+func select_input(input_index: int) -> bool:
+	if input_index < 0 or input_index >= SUMMONER_INPUT_COUNT:
+		return false
+	selected_input_index = input_index
+	_refresh_summon_state()
+	return true
 
 
-func connected_material_kind() -> StringName:
+func target_kind_for_input(input_index: int) -> StringName:
+	if input_index < 0 or input_index >= input_target_kinds.size():
+		return &""
+	return input_target_kinds[input_index]
+
+
+func target_monster_id(input_index: int = -1) -> StringName:
+	var resolved_index := selected_input_index if input_index < 0 else input_index
+	var target_kind := target_kind_for_input(resolved_index)
+	if not TARGET_DEFINITIONS.has(target_kind):
+		return &""
+	return StringName(TARGET_DEFINITIONS[target_kind]["monster_id"])
+
+
+func connected_material_kind(input_index: int = -1) -> StringName:
+	var resolved_index := selected_input_index if input_index < 0 else input_index
+	if resolved_index < 0 or resolved_index >= SUMMONER_INPUT_COUNT:
+		return &""
 	if factory_graph == null or summoner_node == null:
 		return &""
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["to_node"]) != StringName(summoner_node.name):
+			continue
+		if int(connection["to_port"]) != resolved_index:
 			continue
 		var source := _material_node(StringName(connection["from_node"]))
 		if source != null:
@@ -144,23 +170,38 @@ func connected_material_kind() -> StringName:
 	return &""
 
 
-func summon_state() -> StringName:
-	var material_kind := connected_material_kind()
+func summon_state(input_index: int = -1) -> StringName:
+	var resolved_index := selected_input_index if input_index < 0 else input_index
+	var material_kind := connected_material_kind(resolved_index)
 	if material_kind == &"":
 		return &"idle"
-	return &"matched" if material_kind == selected_target_kind else &"mismatch"
+	return &"matched" if material_kind == target_kind_for_input(resolved_index) else &"mismatch"
 
 
-func connect_material_to_summoner(material_node_id: StringName) -> bool:
+func summoning_monsters() -> Array[StringName]:
+	var result: Array[StringName] = []
+	for input_index in SUMMONER_INPUT_COUNT:
+		if summon_state(input_index) == &"matched":
+			result.append(target_monster_id(input_index))
+	return result
+
+
+func connect_material_to_summoner(material_node_id: StringName, input_index: int = -1) -> bool:
+	var resolved_index := selected_input_index if input_index < 0 else input_index
 	var source := _material_node(material_node_id)
-	if source == null or summoner_node == null:
+	if (
+		source == null
+		or summoner_node == null
+		or resolved_index < 0
+		or resolved_index >= SUMMONER_INPUT_COUNT
+	):
 		return false
-	_remove_summoner_connections()
+	_remove_summoner_input_connection(resolved_index)
 	var error := factory_graph.connect_node(
 		StringName(source.name),
 		0,
 		StringName(summoner_node.name),
-		0,
+		resolved_index,
 		true
 	)
 	if error != OK:
@@ -170,8 +211,9 @@ func connect_material_to_summoner(material_node_id: StringName) -> bool:
 	return true
 
 
-func disconnect_summoner() -> void:
-	_remove_summoner_connections()
+func disconnect_summoner(input_index: int = -1) -> void:
+	var resolved_index := selected_input_index if input_index < 0 else input_index
+	_remove_summoner_input_connection(resolved_index)
 	_refresh_summon_state()
 
 
@@ -183,7 +225,8 @@ func _on_connection_request(
 ) -> void:
 	if (
 		from_port != 0
-		or to_port != 0
+		or to_port < 0
+		or to_port >= SUMMONER_INPUT_COUNT
 		or summoner_node == null
 		or to_node != StringName(summoner_node.name)
 		or _material_node(from_node) == null
@@ -191,7 +234,7 @@ func _on_connection_request(
 		summon_state_label.text = "直接接続できるのは資源パッチ → 召喚器"
 		summon_state_label.add_theme_color_override("font_color", Color(0.96, 0.62, 0.40))
 		return
-	connect_material_to_summoner(from_node)
+	connect_material_to_summoner(from_node, to_port)
 
 
 func _on_disconnection_request(
@@ -205,11 +248,15 @@ func _on_disconnection_request(
 	_refresh_summon_state()
 
 
-func _remove_summoner_connections() -> void:
+func _remove_summoner_input_connection(input_index: int) -> void:
+	if input_index < 0 or input_index >= SUMMONER_INPUT_COUNT:
+		return
 	if factory_graph == null or summoner_node == null:
 		return
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["to_node"]) != StringName(summoner_node.name):
+			continue
+		if int(connection["to_port"]) != input_index:
 			continue
 		factory_graph.disconnect_node(
 			StringName(connection["from_node"]),
@@ -229,14 +276,24 @@ func _material_node(node_id: StringName) -> GraphNode:
 func _refresh_summon_state() -> void:
 	if summon_state_label == null:
 		return
-	var state := summon_state()
-	var definition: Dictionary = TARGET_DEFINITIONS[selected_target_kind]
+	var target_kind := selected_target_kind
+	var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
+	target_header_label.text = "召喚目標 // INPUT %d" % (selected_input_index + 1)
+	target_preview.configure_target(target_kind)
+	target_name_label.text = String(definition["monster_name"])
+	target_role_label.text = String(definition["role"])
+	for input_index in input_buttons.size():
+		input_buttons[input_index].set_pressed_no_signal(input_index == selected_input_index)
+	for kind in target_buttons:
+		var button: Button = target_buttons[kind]
+		button.set_pressed_no_signal(StringName(kind) == target_kind)
+	var state := summon_state(selected_input_index)
 	match state:
 		&"matched":
 			summon_state_label.text = "召喚中 // %s" % definition["monster_name"]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.92, 0.76))
 		&"mismatch":
-			var material_kind := connected_material_kind()
+			var material_kind := connected_material_kind(selected_input_index)
 			summon_state_label.text = "不一致 // 接続 %s  /  目標 %s" % [
 				_shape_symbol(material_kind),
 				definition["glyph_label"],
@@ -245,6 +302,21 @@ func _refresh_summon_state() -> void:
 		_:
 			summon_state_label.text = "%sを召喚器へ直接接続" % definition["glyph_label"]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
+	_refresh_summoner_input_labels()
+
+
+func _refresh_summoner_input_labels() -> void:
+	for input_index in summoner_input_labels.size():
+		var label := summoner_input_labels[input_index]
+		var target_kind := target_kind_for_input(input_index)
+		label.text = "入力 %d   %s" % [input_index + 1, _shape_symbol(target_kind)]
+		match summon_state(input_index):
+			&"matched":
+				label.add_theme_color_override("font_color", Color(0.48, 0.92, 0.76))
+			&"mismatch":
+				label.add_theme_color_override("font_color", Color(0.96, 0.68, 0.38))
+			_:
+				label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
 
 
 func _build_ui() -> void:
@@ -322,7 +394,7 @@ func _build_target_panel() -> PanelContainer:
 	panel.offset_left = -322.0
 	panel.offset_top = 12.0
 	panel.offset_right = -12.0
-	panel.offset_bottom = 252.0
+	panel.offset_bottom = 296.0
 	panel.add_theme_stylebox_override("panel", _target_panel_style())
 
 	var margin := MarginContainer.new()
@@ -336,11 +408,27 @@ func _build_target_panel() -> PanelContainer:
 	column.add_theme_constant_override("separation", 6)
 	margin.add_child(column)
 
-	var header := Label.new()
-	header.text = "召喚目標 // TARGET SIGIL"
-	header.add_theme_font_size_override("font_size", 14)
-	header.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
-	column.add_child(header)
+	target_header_label = Label.new()
+	target_header_label.add_theme_font_size_override("font_size", 14)
+	target_header_label.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
+	column.add_child(target_header_label)
+
+	var input_selector := HBoxContainer.new()
+	input_selector.alignment = BoxContainer.ALIGNMENT_CENTER
+	input_selector.add_theme_constant_override("separation", 6)
+	column.add_child(input_selector)
+	var input_group := ButtonGroup.new()
+	for input_index in SUMMONER_INPUT_COUNT:
+		var input_button := Button.new()
+		input_button.name = "Input%dButton" % (input_index + 1)
+		input_button.text = "INPUT %d" % (input_index + 1)
+		input_button.tooltip_text = "召喚器の入力%dを表示・設定" % (input_index + 1)
+		input_button.custom_minimum_size = Vector2(82.0, 28.0)
+		input_button.toggle_mode = true
+		input_button.button_group = input_group
+		input_button.pressed.connect(select_input.bind(input_index))
+		input_buttons.append(input_button)
+		input_selector.add_child(input_button)
 
 	var target_row := HBoxContainer.new()
 	target_row.add_theme_constant_override("separation", 10)
@@ -388,7 +476,7 @@ func _build_target_panel() -> PanelContainer:
 	summon_state_label.add_theme_font_size_override("font_size", 12)
 	column.add_child(summon_state_label)
 
-	select_target(selected_target_kind)
+	select_input(0)
 	return panel
 
 
@@ -427,24 +515,35 @@ func _make_material_node(node_id: StringName, kind: StringName, world_position: 
 func _make_summoner_node() -> GraphNode:
 	var node := GraphNode.new()
 	node.name = "summoner_center"
-	node.title = "召喚器 // 工場中心 // 固定"
+	node.title = "召喚器 // 3入力 // 固定"
 	node.position_offset = SUMMONER_POSITION
 	node.draggable = false
 	node.resizable = false
 	node.set_meta("landmark_kind", &"summoner")
 	node.set_meta("fixed_landmark", true)
 
+	for input_index in SUMMONER_INPUT_COUNT:
+		var input_row := MarginContainer.new()
+		input_row.custom_minimum_size = Vector2(188.0, 28.0)
+		input_row.add_theme_constant_override("margin_left", 12)
+		var input_label := Label.new()
+		input_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		input_label.add_theme_font_size_override("font_size", 12)
+		input_row.add_child(input_label)
+		summoner_input_labels.append(input_label)
+		node.add_child(input_row)
+		node.set_slot(input_index, true, input_index, PORT_COLOR, false, 0, PORT_COLOR)
+
 	var visual = FactoryLandmarkVisualModel.new()
 	visual.configure(&"summoner")
 	node.add_child(visual)
-	node.set_slot(0, true, 0, PORT_COLOR, false, 0, PORT_COLOR)
 	return node
 
 
 func _center_initial_view() -> void:
 	if factory_graph == null:
 		return
-	var summoner_center := SUMMONER_POSITION + Vector2(100.0, 105.0)
+	var summoner_center := SUMMONER_POSITION + summoner_node.size * 0.5
 	factory_graph.scroll_offset = summoner_center * factory_graph.zoom - factory_graph.size * 0.5
 
 
