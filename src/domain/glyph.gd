@@ -14,11 +14,19 @@ const MAX_COMBINE_CHILDREN := 8
 const CONNECTION_SIMPLE := &"simple"
 const CONNECTION_RADIAL := &"radial"
 const CONNECTION_PAIRWISE := &"pairwise"
+const CONNECTION_RING := &"ring"
+const CONNECTION_STAR := &"star"
 const CONNECTION_NONE := &"none"
+const FACING_FIXED := &"fixed"
+const FACING_RADIAL := &"radial"
+const FACING_TANGENT := &"tangent"
+const RADIAL_FACING_MODES := [FACING_FIXED, FACING_RADIAL, FACING_TANGENT]
 const COMBINE_CONNECTION_MODES := [
 	CONNECTION_SIMPLE,
 	CONNECTION_RADIAL,
 	CONNECTION_PAIRWISE,
+	CONNECTION_RING,
+	CONNECTION_STAR,
 	CONNECTION_NONE,
 ]
 
@@ -103,6 +111,49 @@ static func radial_repeat(glyph: GlyphModel, count: int) -> GlyphModel:
 	return combine_many(unique_copies, CONNECTION_NONE)
 
 
+static func radial_array(
+	glyph: GlyphModel,
+	count: int,
+	radius: int,
+	phase_degrees: int = 0,
+	facing: StringName = FACING_RADIAL,
+	connection_mode: StringName = CONNECTION_NONE
+) -> GlyphModel:
+	if (
+		glyph == null
+		or count < MIN_COMBINE_CHILDREN
+		or count > MAX_COMBINE_CHILDREN
+		or 360 % count != 0
+		or radius < 0
+		or not facing in RADIAL_FACING_MODES
+		or not connection_mode in COMBINE_CONNECTION_MODES
+	):
+		return null
+	var source_anchor := glyph._layout_anchor()
+	var copies: Array = []
+	var seen_serializations: Dictionary = {}
+	var angle_step := int(360 / count)
+	for index in count:
+		var slot_angle := posmod(phase_degrees + index * angle_step, 360)
+		var repeated := glyph.copy()
+		repeated._translate_vector(-source_anchor)
+		match facing:
+			FACING_RADIAL:
+				repeated.rotate_degrees(slot_angle)
+			FACING_TANGENT:
+				repeated.rotate_degrees(slot_angle + 90)
+		var target := Vector2.UP.rotated(deg_to_rad(float(slot_angle))) * float(radius)
+		repeated._translate_vector(target)
+		var serialization := repeated.canonical_serialization()
+		if seen_serializations.has(serialization):
+			continue
+		seen_serializations[serialization] = true
+		copies.append(repeated)
+	if copies.size() == 1:
+		return copies[0]
+	return combine_many(copies, connection_mode)
+
+
 func canonical_keys() -> Array[String]:
 	var keys: Array[String] = []
 	for component in components:
@@ -134,6 +185,8 @@ func canonical_serialization() -> String:
 		CONNECTION_SIMPLE: "S",
 		CONNECTION_RADIAL: "C",
 		CONNECTION_PAIRWISE: "M",
+		CONNECTION_RING: "Q",
+		CONNECTION_STAR: "T",
 		CONNECTION_NONE: "R",
 	}.get(combine_connection_mode, "?")
 	return "%s(%s;%s)" % [
@@ -309,18 +362,33 @@ func _rotate_position_degrees(position: Vector2, degrees: int) -> Vector2:
 
 
 func translate(offset: Vector2i) -> void:
+	_translate_vector(Vector2(offset))
+
+
+func _translate_vector(offset: Vector2) -> void:
 	if not combine_children.is_empty():
-		combine_origin = GlyphComponentModel.normalized_position(combine_origin + Vector2(offset))
+		combine_origin = GlyphComponentModel.normalized_position(combine_origin + offset)
 	for component in components:
-		component.position = GlyphComponentModel.normalized_position(component.position + Vector2(offset))
+		component.position = GlyphComponentModel.normalized_position(component.position + offset)
 	for child in combine_children:
-		child.translate(offset)
+		child._translate_vector(offset)
 
 
 func translated(offset: Vector2i) -> GlyphModel:
 	var result := copy()
 	result.translate(offset)
 	return result
+
+
+func _layout_anchor() -> Vector2:
+	if not combine_children.is_empty():
+		return Vector2(combine_origin)
+	if components.is_empty():
+		return Vector2.ZERO
+	var center := Vector2.ZERO
+	for component in components:
+		center += Vector2(component.position)
+	return GlyphComponentModel.normalized_position(center / float(components.size()))
 
 
 func stretch_percent(x_percent: int, y_percent: int) -> void:

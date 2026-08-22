@@ -127,6 +127,22 @@ static func top_level_connection_visuals(
 			scale,
 			show_combine_structure
 		))
+	elif glyph.combine_connection_mode == GlyphModel.CONNECTION_RING:
+		connections.append_array(_cyclic_visible_connections(
+			children,
+			glyph_center,
+			1,
+			scale,
+			show_combine_structure
+		))
+	elif glyph.combine_connection_mode == GlyphModel.CONNECTION_STAR:
+		connections.append_array(_cyclic_visible_connections(
+			children,
+			glyph_center,
+			2,
+			scale,
+			show_combine_structure
+		))
 	elif glyph.combine_connection_mode == GlyphModel.CONNECTION_RADIAL:
 		for child_value in children:
 			var child: GlyphModel = child_value
@@ -198,6 +214,55 @@ static func _pairwise_visible_connections(
 				radii,
 				scale
 			))
+	return connections
+
+
+static func _cyclic_visible_connections(
+	children: Array,
+	origin: Vector2,
+	step: int,
+	scale: float,
+	clip_combine_structure: bool
+) -> Array[Dictionary]:
+	var ordered_children := children.duplicate()
+	ordered_children.sort_custom(func(first, second) -> bool:
+		var first_center := _glyph_center_offset(first, scale)
+		var second_center := _glyph_center_offset(second, scale)
+		var first_angle := (first_center - origin).angle()
+		var second_angle := (second_center - origin).angle()
+		if not is_equal_approx(first_angle, second_angle):
+			return first_angle < second_angle
+		return _canonical_child_less(first, second)
+	)
+	var centers: Array[Vector2] = []
+	var radii: Array[float] = []
+	for child_value in ordered_children:
+		if not child_value is GlyphModel:
+			continue
+		var child: GlyphModel = child_value
+		var child_center := _glyph_center_offset(child, scale)
+		centers.append(child_center)
+		radii.append(_glyph_connection_radius(child, child_center, scale, clip_combine_structure))
+	if centers.size() < 2:
+		return []
+	var connections: Array[Dictionary] = []
+	var seen_pairs: Dictionary = {}
+	var normalized_step := clampi(step, 1, centers.size() - 1)
+	for first_index in centers.size():
+		var second_index := posmod(first_index + normalized_step, centers.size())
+		var low := mini(first_index, second_index)
+		var high := maxi(first_index, second_index)
+		var pair_key := "%d:%d" % [low, high]
+		if seen_pairs.has(pair_key):
+			continue
+		seen_pairs[pair_key] = true
+		connections.append_array(_visible_segment_gaps(
+			centers[first_index],
+			centers[second_index],
+			centers,
+			radii,
+			scale
+		))
 	return connections
 
 

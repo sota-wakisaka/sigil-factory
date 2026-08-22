@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_test_diagnostics_follow_player_facing_priority()
 	_test_combine_structure_is_order_independent()
 	_test_combine_connection_modes_are_visible_and_canonical()
+	_test_radial_array_is_deterministic_and_non_destructive()
 	_test_pairwise_connections_remove_overlaps()
 	_test_combine_children_use_hash_then_serialization_order()
 	_test_combine_hierarchy_affects_matching()
@@ -313,6 +314,85 @@ func _test_combine_connection_modes_are_visible_and_canonical() -> void:
 				and connection["to"].distance_to(child_center) > 0.1,
 				"pairwise connections should stop before entering child Glyphs"
 			)
+
+
+func _test_radial_array_is_deterministic_and_non_destructive() -> void:
+	var source := GlyphModel.new([GlyphComponentModel.new(&"triangle", Vector2(2, 1))])
+	var source_before := source.canonical_serialization()
+	var ring := GlyphModel.radial_array(
+		source,
+		4,
+		4,
+		0,
+		GlyphModel.FACING_RADIAL,
+		GlyphModel.CONNECTION_RING
+	)
+	_expect(ring != null, "radial array should accept a finite four-slot layout")
+	if ring == null:
+		return
+	_expect(source.canonical_serialization() == source_before, "radial array should not mutate its input")
+	_expect(ring.combine_children.size() == 4, "radial array should retain one child per visible slot")
+	var positions: Array[Vector2] = []
+	var rotations: Array[int] = []
+	for component in ring.components:
+		positions.append(component.position)
+		rotations.append(component.rotation_degrees)
+	for expected_position in [Vector2(0, -4), Vector2(4, 0), Vector2(0, 4), Vector2(-4, 0)]:
+		_expect(positions.has(expected_position), "radial array should use stable positions on its radius band")
+	for expected_rotation in [0, 90, 180, 270]:
+		_expect(rotations.has(expected_rotation), "radial facing should rotate each motif toward its slot")
+	var repeated := GlyphModel.radial_array(
+		source,
+		4,
+		4,
+		0,
+		GlyphModel.FACING_RADIAL,
+		GlyphModel.CONNECTION_RING
+	)
+	_expect(
+		repeated.canonical_serialization() == ring.canonical_serialization(),
+		"the same radial settings should produce the same CanonicalGlyph"
+	)
+	var fixed := GlyphModel.radial_array(
+		source,
+		4,
+		4,
+		45,
+		GlyphModel.FACING_FIXED,
+		GlyphModel.CONNECTION_RING
+	)
+	_expect(
+		fixed != null and fixed.canonical_serialization() != ring.canonical_serialization(),
+		"phase and facing should remain visible canonical settings"
+	)
+	var star := GlyphModel.radial_array(
+		source,
+		4,
+		4,
+		0,
+		GlyphModel.FACING_RADIAL,
+		GlyphModel.CONNECTION_STAR
+	)
+	_expect(
+		star != null and star.canonical_serialization() != ring.canonical_serialization(),
+		"ring and star links should be distinct CanonicalGlyphs"
+	)
+	_expect(
+		GlyphPainterModel.top_level_connection_visuals(ring).size() == 4,
+		"four ring slots should draw four adjacent links"
+	)
+	_expect(
+		GlyphPainterModel.top_level_connection_visuals(star).size() == 2,
+		"four star slots should draw the two opposite links selected by step two"
+	)
+	_expect(
+		GlyphModel.radial_array(source, 7, 4) == null,
+		"radial array should reject counts that cannot divide a full turn exactly"
+	)
+	_expect(
+		GlyphModel.radial_array(source, 4, -1) == null,
+		"radial array should reject negative radius bands"
+	)
 
 
 func _test_pairwise_connections_remove_overlaps() -> void:
