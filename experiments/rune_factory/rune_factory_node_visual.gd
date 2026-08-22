@@ -5,9 +5,9 @@ const RunePacketModel := preload("res://src/rune/rune_packet.gd")
 const RunePacketViewModel := preload("res://experiments/rune_factory/rune_packet_view.gd")
 
 var node_kind: StringName = &"relay"
-var packet: RunePacket
+var packet
 var config: Dictionary = {}
-var packet_view: RunePacketView
+var packet_view: Control
 
 
 func _ready() -> void:
@@ -15,7 +15,7 @@ func _ready() -> void:
 	_ensure_packet_view()
 
 
-func configure(next_kind: StringName, next_packet: RunePacket = null, next_config: Dictionary = {}) -> void:
+func configure(next_kind: StringName, next_packet = null, next_config: Dictionary = {}) -> void:
 	node_kind = next_kind
 	packet = next_packet.copy() if next_packet != null else RunePacketModel.empty()
 	config = next_config.duplicate(true)
@@ -130,7 +130,7 @@ func _draw_relay(center: Vector2, radius: float, accent: Color) -> void:
 
 func _accent_color() -> Color:
 	if node_kind == &"source" and packet != null and not packet.is_empty():
-		var ids := packet.rune_ids_expanded()
+		var ids: Array[int] = packet.rune_ids_expanded()
 		if not ids.is_empty():
 			return RunePacketModel.attribute_color(RunePacketModel.attribute_for_id(ids[0]))
 	if node_kind == &"summoner":
@@ -140,4 +140,3 @@ func _accent_color() -> Color:
 	if node_kind == &"merge":
 		return Color(0.72, 0.56, 1.0)
 	return Color(0.38, 0.82, 1.0)
-

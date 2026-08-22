@@ -22,30 +22,30 @@ func _run() -> void:
 
 
 func _test_packet_domain() -> void:
-	var red_left := RunePacketModel.singleton(0, 3)
-	var red_top_left := RunePacketModel.singleton(0, 0)
-	var red_bottom_left := RunePacketModel.singleton(0, 5)
-	var column := red_left.merged(red_top_left).merged(red_bottom_left)
+	var red_left = RunePacketModel.singleton(0, 3)
+	var red_top_left = RunePacketModel.singleton(0, 0)
+	var red_bottom_left = RunePacketModel.singleton(0, 5)
+	var column = red_left.merged(red_top_left).merged(red_bottom_left)
 	_expect(column != null and column.total_count() == 3, "same-attribute runes should merge")
-	var shifted := column.shifted(Vector2i.RIGHT)
+	var shifted = column.shifted(Vector2i.RIGHT)
 	_expect(shifted.total_count() == 2, "the rune entering the center should disappear")
 	_expect(
 		shifted.count_for(0, 1) == 1 and shifted.count_for(0, 6) == 1,
 		"the remaining runes should map to their destination cells"
 	)
-	var edge := RunePacketModel.singleton(0, 2).shifted(Vector2i.RIGHT)
+	var edge = RunePacketModel.singleton(0, 2).shifted(Vector2i.RIGHT)
 	_expect(edge != null and edge.is_empty(), "a rune leaving the board should disappear")
-	var attuned := shifted.attuned(1)
+	var attuned = shifted.attuned(1)
 	_expect(
 		attuned.count_for(1, 1) == 1 and attuned.count_for(1, 6) == 1,
 		"attribute conversion should retain position and multiplicity"
 	)
-	var twins := RunePacketModel.singleton(0, 0).merged(RunePacketModel.singleton(0, 0))
+	var twins = RunePacketModel.singleton(0, 0).merged(RunePacketModel.singleton(0, 0))
 	_expect(
 		twins != null and twins.total_count() == 2 and twins.count_for(0, 0) == 2,
 		"merging an identical rune should retain both copies"
 	)
-	var split := attuned.extracted(&"position", 1)
+	var split = attuned.extracted(&"position", 1)
 	_expect(
 		bool(split["ok"])
 		and split["selected"].total_count() == 1
@@ -53,7 +53,7 @@ func _test_packet_domain() -> void:
 		"position extraction should return selected and remainder packets"
 	)
 	_expect(not bool(attuned.extracted(&"unknown", 1)["ok"]), "an unknown extraction selector should fail closed")
-	var too_many := RunePacketModel.empty()
+	var too_many = RunePacketModel.empty()
 	for _index in RunePacketModel.MAX_RUNES:
 		too_many = too_many.merged(RunePacketModel.singleton(0, 0))
 	_expect(
@@ -73,6 +73,11 @@ func _test_factory_scene() -> void:
 	root.add_child(prototype)
 	await process_frame
 	await process_frame
+	if not prototype.has_method("source_count"):
+		_expect(false, "the Rune Factory script should load without relying on a generated class cache")
+		prototype.queue_free()
+		await process_frame
+		return
 	_expect(prototype.source_count() == 24, "the world should contain all twenty-four rune sources")
 	var tiers: Dictionary = prototype.source_distance_tiers()
 	_expect(

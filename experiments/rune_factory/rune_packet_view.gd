@@ -5,8 +5,8 @@ const RunePacketModel := preload("res://src/rune/rune_packet.gd")
 
 enum DisplayMode { STRIP, WHEELS, NODE }
 
-var packet: RunePacket
-var removed_packet: RunePacket
+var packet
+var removed_packet
 var display_mode := DisplayMode.STRIP
 var show_empty_slots := false
 var show_catalog := false
@@ -14,9 +14,9 @@ var opacity := 1.0
 
 
 func configure(
-	next_packet: RunePacket,
+	next_packet,
 	next_mode: DisplayMode = DisplayMode.STRIP,
-	next_removed: RunePacket = null
+	next_removed = null
 ) -> void:
 	packet = next_packet.copy() if next_packet != null else RunePacketModel.empty()
 	removed_packet = next_removed.copy() if next_removed != null else RunePacketModel.empty()
@@ -48,7 +48,7 @@ func _draw() -> void:
 
 
 func _draw_strip() -> void:
-	var ids := packet.rune_ids_expanded()
+	var ids: Array[int] = packet.rune_ids_expanded()
 	var slot_count := RunePacketModel.MAX_RUNES
 	var gap := 4.0
 	var diameter := minf(30.0, (size.x - gap * float(slot_count - 1)) / float(slot_count))
@@ -80,8 +80,8 @@ func _draw_wheels() -> void:
 			# corners stay diagonal, and a move always points at its visible destination.
 			var angle: float = Vector2(RunePacketModel.POSITION_COORDS[position_index]).angle()
 			var slot_center := center + Vector2.from_angle(angle) * wheel_radius * 0.68
-			var amount := packet.count_for(attribute_index, position_index)
-			var removed_amount := removed_packet.count_for(attribute_index, position_index)
+			var amount: int = packet.count_for(attribute_index, position_index)
+			var removed_amount: int = removed_packet.count_for(attribute_index, position_index)
 			if amount > 0:
 				_draw_rune_chip(
 					slot_center,
@@ -116,7 +116,7 @@ func _draw_wheels() -> void:
 
 func _draw_node_packet() -> void:
 	var center := size * 0.5
-	var ids := packet.rune_ids_expanded()
+	var ids: Array[int] = packet.rune_ids_expanded()
 	if ids.is_empty():
 		draw_circle(center, 8.0, Color(0.28, 0.60, 0.72, 0.34), false, 1.2)
 		return

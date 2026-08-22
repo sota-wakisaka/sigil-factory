@@ -1,6 +1,8 @@
 class_name RunePacket
 extends RefCounted
 
+const SCRIPT_PATH := "res://src/rune/rune_packet.gd"
+
 const ATTRIBUTE_COUNT := 3
 const RUNES_PER_ATTRIBUTE := 8
 const RUNE_TYPE_COUNT := ATTRIBUTE_COUNT * RUNES_PER_ATTRIBUTE
@@ -36,21 +38,21 @@ func _init(next_counts: PackedInt32Array = PackedInt32Array()) -> void:
 		_counts[index] = maxi(int(next_counts[index]), 0)
 
 
-static func empty() -> RunePacket:
-	return RunePacket.new()
+static func empty():
+	return _create()
 
 
-static func singleton(attribute_index: int, position_index: int) -> RunePacket:
+static func singleton(attribute_index: int, position_index: int):
 	if not valid_address(attribute_index, position_index):
 		return null
 	var counts := PackedInt32Array()
 	counts.resize(RUNE_TYPE_COUNT)
 	counts.fill(0)
 	counts[rune_id(attribute_index, position_index)] = 1
-	return RunePacket.new(counts)
+	return _create(counts)
 
 
-static func from_rune_ids(rune_ids: Array) -> RunePacket:
+static func from_rune_ids(rune_ids: Array):
 	if rune_ids.size() > MAX_RUNES:
 		return null
 	var counts := PackedInt32Array()
@@ -61,11 +63,11 @@ static func from_rune_ids(rune_ids: Array) -> RunePacket:
 		if id < 0 or id >= RUNE_TYPE_COUNT:
 			return null
 		counts[id] += 1
-	return RunePacket.new(counts)
+	return _create(counts)
 
 
-func copy() -> RunePacket:
-	return RunePacket.new(_counts.duplicate())
+func copy():
+	return _create(_counts.duplicate())
 
 
 func counts_copy() -> PackedInt32Array:
@@ -101,7 +103,7 @@ func rune_ids_expanded() -> Array[int]:
 	return result
 
 
-func shifted(direction: Vector2i) -> RunePacket:
+func shifted(direction: Vector2i):
 	if direction not in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
 		return null
 	var result := PackedInt32Array()
@@ -118,11 +120,11 @@ func shifted(direction: Vector2i) -> RunePacket:
 			if destination_index < 0:
 				continue
 			result[rune_id(attribute_index, destination_index)] += amount
-	return RunePacket.new(result)
+	return _create(result)
 
 
 func shifted_preview(direction: Vector2i) -> Dictionary:
-	var output := shifted(direction)
+	var output = shifted(direction)
 	if output == null:
 		return {"ok": false, "output": null, "removed": empty()}
 	var removed_counts := PackedInt32Array()
@@ -138,11 +140,11 @@ func shifted_preview(direction: Vector2i) -> Dictionary:
 	return {
 		"ok": true,
 		"output": output,
-		"removed": RunePacket.new(removed_counts),
+		"removed": _create(removed_counts),
 	}
 
 
-func attuned(delta: int) -> RunePacket:
+func attuned(delta: int):
 	if delta == 0:
 		return copy()
 	var result := PackedInt32Array()
@@ -155,7 +157,7 @@ func attuned(delta: int) -> RunePacket:
 				attribute_index,
 				position_index
 			)
-	return RunePacket.new(result)
+	return _create(result)
 
 
 func extracted(selector_kind: StringName, selector_value: int) -> Dictionary:
@@ -184,22 +186,29 @@ func extracted(selector_kind: StringName, selector_value: int) -> Dictionary:
 			remainder[id] = _counts[id]
 	return {
 		"ok": true,
-		"selected": RunePacket.new(selected),
-		"remainder": RunePacket.new(remainder),
+		"selected": _create(selected),
+		"remainder": _create(remainder),
 	}
 
 
-func merged(other: RunePacket) -> RunePacket:
+func merged(other):
 	if other == null or total_count() + other.total_count() > MAX_RUNES:
 		return null
 	var result := _counts.duplicate()
 	for id in RUNE_TYPE_COUNT:
 		result[id] += other.count_for_id(id)
-	return RunePacket.new(result)
+	return _create(result)
 
 
-func matches(other: RunePacket) -> bool:
+func matches(other) -> bool:
 	return other != null and _counts == other._counts
+
+
+static func _create(counts: PackedInt32Array = PackedInt32Array()):
+	# Loading through the script resource keeps command-line startup independent
+	# from Godot's generated global class cache after a fresh checkout/cherry-pick.
+	var script := load(SCRIPT_PATH) as GDScript
+	return script.new(counts) if script != null else null
 
 
 func canonical_code() -> String:

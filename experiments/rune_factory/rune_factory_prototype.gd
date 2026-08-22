@@ -75,9 +75,9 @@ var placement_serials := {&"relay": 0, &"shift": 0, &"attune": 0, &"extract": 0,
 var toolbar_buttons: Dictionary = {}
 var status_label: Label
 var target_panel: PanelContainer
-var rune_reference_view: RunePacketView
-var target_view: RunePacketView
-var current_view: RunePacketView
+var rune_reference_view: Control
+var target_view: Control
+var current_view: Control
 var target_title: Label
 var target_monster: Label
 var target_state: Label
@@ -85,7 +85,7 @@ var target_buttons: Dictionary = {}
 var setting_preview_panel: PanelContainer
 var setting_preview_label: Label
 var setting_preview_detail: Label
-var setting_preview_view: RunePacketView
+var setting_preview_view: Control
 var input_targets: Array[StringName] = [&"red_seed", &"blue_seed", &"green_seed"]
 var selected_input_index := 0
 var summoned_counts: Dictionary = {}
@@ -127,7 +127,7 @@ func flow_time_seconds() -> float:
 	return flow_time_override if flow_time_override >= 0.0 else float(Time.get_ticks_msec()) / 1000.0
 
 
-func target_packet(target_id: StringName) -> RunePacket:
+func target_packet(target_id: StringName):
 	if not TARGET_DEFINITIONS.has(target_id):
 		return null
 	return RunePacketModel.from_rune_ids(TARGET_DEFINITIONS[target_id]["runes"])
@@ -236,11 +236,11 @@ func set_extract_selector(node_id: StringName, selector_kind: StringName, select
 	return true
 
 
-func output_packet(node_id: StringName, output_port: int = 0) -> RunePacket:
+func output_packet(node_id: StringName, output_port: int = 0):
 	return _output_packet(node_id, output_port, {})
 
 
-func _output_packet(node_id: StringName, output_port: int, visited: Dictionary) -> RunePacket:
+func _output_packet(node_id: StringName, output_port: int, visited: Dictionary):
 	if visited.has(node_id):
 		return null
 	var node := _node(node_id)
@@ -250,14 +250,14 @@ func _output_packet(node_id: StringName, output_port: int, visited: Dictionary) 
 	var kind := _kind(node_id)
 	if kind == &"source":
 		var source_packet = node.get_meta("source_packet")
-		return source_packet.copy() if source_packet is RunePacket else null
+		return source_packet.copy() if source_packet != null and source_packet.get_script() == RunePacketModel else null
 	if kind == &"merge":
 		var input_connections := _connections_to(node_id)
 		if input_connections.size() < 2:
 			return null
-		var result := RunePacketModel.empty()
+		var result = RunePacketModel.empty()
 		for connection in input_connections:
-			var input_packet := _output_packet(
+			var input_packet = _output_packet(
 				StringName(connection["from_node"]),
 				int(connection["from_port"]),
 				visited.duplicate()
@@ -271,7 +271,7 @@ func _output_packet(node_id: StringName, output_port: int, visited: Dictionary) 
 	var input_connection := _connection_to(node_id, 0)
 	if input_connection.is_empty():
 		return null
-	var input_packet := _output_packet(
+	var input_packet = _output_packet(
 		StringName(input_connection["from_node"]),
 		int(input_connection["from_port"]),
 		visited
@@ -282,18 +282,18 @@ func _output_packet(node_id: StringName, output_port: int, visited: Dictionary) 
 		&"relay":
 			return input_packet.copy()
 		&"shift":
-			var shifted := input_packet.shifted(Vector2i(node.get_meta("direction", Vector2i.RIGHT)))
+			var shifted = input_packet.shifted(Vector2i(node.get_meta("direction", Vector2i.RIGHT)))
 			return shifted if shifted != null and not shifted.is_empty() else null
 		&"attune":
 			return input_packet.attuned(int(node.get_meta("delta", 1)))
 		&"extract":
-			var split := input_packet.extracted(
+			var split = input_packet.extracted(
 				StringName(node.get_meta("selector_kind", &"attribute")),
 				int(node.get_meta("selector_value", 0))
 			)
 			if not bool(split.get("ok", false)):
 				return null
-			var selected: RunePacket = split["selected"] if output_port == 0 else split["remainder"]
+			var selected = split["selected"] if output_port == 0 else split["remainder"]
 			return selected if selected != null and not selected.is_empty() else null
 	return null
 
@@ -358,7 +358,7 @@ func remove_processor(node_id: StringName) -> bool:
 	return true
 
 
-func connected_packet(input_index: int = -1) -> RunePacket:
+func connected_packet(input_index: int = -1):
 	var resolved := selected_input_index if input_index < 0 else input_index
 	if summoner_node == null or resolved < 0 or resolved >= SUMMONER_INPUT_COUNT:
 		return null
@@ -370,7 +370,7 @@ func connected_packet(input_index: int = -1) -> RunePacket:
 
 func summon_state(input_index: int = -1) -> StringName:
 	var resolved := selected_input_index if input_index < 0 else input_index
-	var packet := connected_packet(resolved)
+	var packet = connected_packet(resolved)
 	if packet == null:
 		return &"idle"
 	if arrival_cycle(resolved, flow_time_seconds()) < 0:
@@ -422,7 +422,7 @@ func _draw_connections(canvas: Control) -> void:
 func _draw_flow(canvas: Control) -> void:
 	var now := flow_time_seconds()
 	for connection in factory_graph.get_connection_list():
-		var packet := output_packet(StringName(connection["from_node"]), int(connection["from_port"]))
+		var packet = output_packet(StringName(connection["from_node"]), int(connection["from_port"]))
 		if packet == null:
 			continue
 		var start_time := _connection_flow_start(connection, {})
@@ -443,11 +443,11 @@ func _draw_flow(canvas: Control) -> void:
 			_draw_flow_packet(canvas, start.lerp(finish, progress), packet)
 
 
-func _draw_flow_packet(canvas: Control, center: Vector2, packet: RunePacket) -> void:
-	var ids := packet.rune_ids_expanded()
+func _draw_flow_packet(canvas: Control, center: Vector2, packet) -> void:
+	var ids: Array[int] = packet.rune_ids_expanded()
 	if ids.is_empty():
 		return
-	var primary_id := ids[0]
+	var primary_id: int = ids[0]
 	var color := RunePacketModel.attribute_color(RunePacketModel.attribute_for_id(primary_id))
 	canvas.draw_circle(center, 9.0, Color(0.005, 0.025, 0.038, 0.96), true)
 	canvas.draw_circle(center, 9.0, Color(color, 0.92), false, 1.5)
@@ -696,7 +696,7 @@ func _place_sources_and_summoner() -> void:
 		var attribute_index := RunePacketModel.attribute_for_id(rune_id)
 		var position_index := RunePacketModel.position_for_id(rune_id)
 		var id_name := StringName("source_%s_%d" % [String(RunePacketModel.ATTRIBUTES[attribute_index]), position_index + 1])
-		var packet := RunePacketModel.singleton(attribute_index, position_index)
+		var packet = RunePacketModel.singleton(attribute_index, position_index)
 		var node := _make_factory_node(id_name, &"source", center, true, {"source_packet": packet})
 		source_node_ids.append(id_name)
 		nodes[id_name] = node
@@ -768,7 +768,7 @@ func _default_config(kind: StringName) -> Dictionary:
 func _refresh_all() -> void:
 	for id in nodes:
 		var node := _node(id)
-		var visual := _visual(node)
+		var visual = _visual(node)
 		if visual == null:
 			continue
 		var config := _node_config(id)
@@ -789,7 +789,7 @@ func _refresh_target_panel() -> void:
 	target_title.text = "INPUT %d // %s" % [selected_input_index + 1, definition["label"]]
 	target_monster.text = "%s // %s" % [definition["monster"], definition["role"]]
 	target_view.configure(target_packet(target_id), RunePacketViewModel.DisplayMode.STRIP)
-	var current := connected_packet(selected_input_index)
+	var current = connected_packet(selected_input_index)
 	current_view.configure(current if current != null else RunePacketModel.empty(), RunePacketViewModel.DisplayMode.STRIP)
 	for id in target_buttons:
 		target_buttons[id].set_pressed_no_signal(id == target_id)
@@ -814,7 +814,7 @@ func _process_summoning(now: float) -> void:
 		var cycle := arrival_cycle(input_index, now)
 		if cycle <= last_arrival_cycles[input_index]:
 			continue
-		var packet := connected_packet(input_index)
+		var packet = connected_packet(input_index)
 		var target_id := input_targets[input_index]
 		if packet != null and packet.matches(target_packet(target_id)):
 			var additions := cycle - maxi(last_arrival_cycles[input_index], -1)
@@ -980,7 +980,7 @@ func _preview_node_menu_item(item_id: int) -> void:
 		return
 	node_menu_preview_id = item_id
 	var input_connection := _connection_to(node_menu_node_id, 0)
-	var input_packet: RunePacket = null
+	var input_packet = null
 	if not input_connection.is_empty():
 		input_packet = output_packet(
 			StringName(input_connection["from_node"]),
@@ -992,12 +992,12 @@ func _preview_node_menu_item(item_id: int) -> void:
 		setting_preview_detail.text = "接続後に結果と消滅対象を表示します"
 		setting_preview_view.configure(RunePacketModel.empty(), RunePacketViewModel.DisplayMode.WHEELS)
 		return
-	var output: RunePacket = null
-	var removed: RunePacket = RunePacketModel.empty()
+	var output = null
+	var removed = RunePacketModel.empty()
 	var detail := ""
 	if item_id >= 100 and item_id < 104:
 		var direction: Vector2i = SHIFT_DIRECTIONS[item_id - 100]
-		var preview := input_packet.shifted_preview(direction)
+		var preview = input_packet.shifted_preview(direction)
 		output = preview["output"]
 		removed = preview["removed"]
 		detail = "%s へ1マス // 出力 %d字 // 消滅 %d字" % [
@@ -1009,9 +1009,9 @@ func _preview_node_menu_item(item_id: int) -> void:
 	else:
 		var selector_kind := &"attribute" if item_id >= 300 and item_id < 303 else &"position"
 		var selector_value := item_id - (300 if selector_kind == &"attribute" else 400)
-		var split := input_packet.extracted(selector_kind, selector_value)
+		var split = input_packet.extracted(selector_kind, selector_value)
 		output = split["selected"]
-		var remainder: RunePacket = split["remainder"]
+		var remainder = split["remainder"]
 		detail = "◆0 該当 %d字 // ◆1 残り %d字" % [output.total_count(), remainder.total_count()]
 	setting_preview_label.text = "未確定プレビュー // %s" % _node_kind_label(_kind(node_menu_node_id))
 	setting_preview_detail.text = detail
@@ -1042,7 +1042,7 @@ func _node_tooltip(node_id: StringName) -> String:
 		return ""
 	match _kind(node_id):
 		&"source":
-			var packet: RunePacket = node.get_meta("source_packet")
+			var packet = node.get_meta("source_packet")
 			return "%s素材 // 固定 // %s" % [packet.short_label(), RunePacketModel.rune_symbol(packet.rune_ids_expanded()[0])]
 		&"summoner":
 			return "召喚器 // 入力ポートでターゲット切替"
@@ -1271,15 +1271,15 @@ func _upstream_direction(node_id: StringName, port: int, space: Control) -> Vect
 
 
 func _node_boundary_in(node: GraphNode, direction: Vector2, space: Control) -> Vector2:
-	var visual := _visual(node)
-	var local_center := visual.size * 0.5 if visual.size.x > 0.0 else visual.custom_minimum_size * 0.5
-	var local_point := local_center + direction.normalized() * visual.body_radius()
+	var visual = _visual(node)
+	var local_center: Vector2 = visual.size * 0.5 if visual.size.x > 0.0 else visual.custom_minimum_size * 0.5
+	var local_point: Vector2 = local_center + direction.normalized() * visual.body_radius()
 	return _convert_point(visual, local_point, space)
 
 
 func _node_center_in(node: GraphNode, space: Control) -> Vector2:
-	var visual := _visual(node)
-	var local_center := visual.size * 0.5 if visual.size.x > 0.0 else visual.custom_minimum_size * 0.5
+	var visual = _visual(node)
+	var local_center: Vector2 = visual.size * 0.5 if visual.size.x > 0.0 else visual.custom_minimum_size * 0.5
 	return _convert_point(visual, local_center, space)
 
 
@@ -1346,10 +1346,10 @@ func _kind(node_id: StringName) -> StringName:
 	return StringName(node.get_meta("rune_kind", &"")) if node != null else &""
 
 
-func _visual(node: GraphNode) -> RuneFactoryNodeVisual:
+func _visual(node: GraphNode):
 	if node == null:
 		return null
 	for child in node.get_children():
-		if child is RuneFactoryNodeVisual:
+		if child.get_script() == RuneFactoryNodeVisualModel:
 			return child
 	return null
