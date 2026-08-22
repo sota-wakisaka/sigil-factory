@@ -33,6 +33,9 @@ const ROTATION_ANGLE_PRESETS := [
 	180, 216, 225, 240, 270, 288, 300, 315, 330,
 ]
 const SCALE_PERCENT_PRESETS := [25, 50, 75, 100, 150, 200, 300]
+const MOVE_DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
+const MOVE_DIRECTION_LABELS := ["↑", "→", "↓", "←"]
+const MOVE_DISTANCE_PRESETS := [1, 2, 3, 4, 5, 6]
 const TARGET_ORDER := [&"circle", &"triangle", &"square", &"diamond"]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -109,6 +112,7 @@ var material_nodes: Array[GraphNode] = []
 var relay_nodes: Array[GraphNode] = []
 var rotation_nodes: Array[GraphNode] = []
 var scale_nodes: Array[GraphNode] = []
+var move_nodes: Array[GraphNode] = []
 var connection_overlay
 var flow_overlay
 var port_overlay
@@ -150,6 +154,16 @@ var scale_settings_delete_button: Button
 var scale_settings_node_id: StringName = &""
 var scale_settings_syncing := false
 var scale_settings_icon_cache: Dictionary = {}
+var move_button: Button
+var move_placement_active := false
+var move_serial := 0
+var move_settings_popup: PopupPanel
+var move_settings_title: Label
+var move_settings_direction_buttons: Dictionary = {}
+var move_settings_distance: OptionButton
+var move_settings_delete_button: Button
+var move_settings_node_id: StringName = &""
+var move_settings_syncing := false
 var line_settings_popup: PopupPanel
 var line_settings_title: Label
 var line_settings_details: Label
@@ -227,6 +241,7 @@ func begin_relay_placement() -> void:
 	_clear_directional_connection_preview()
 	cancel_rotation_placement()
 	cancel_scale_placement()
+	cancel_move_placement()
 	relay_placement_active = true
 	if relay_button != null:
 		relay_button.button_pressed = true
@@ -245,6 +260,7 @@ func begin_rotation_placement() -> void:
 	_clear_directional_connection_preview()
 	cancel_relay_placement()
 	cancel_scale_placement()
+	cancel_move_placement()
 	rotation_placement_active = true
 	if rotation_button != null:
 		rotation_button.button_pressed = true
@@ -263,6 +279,7 @@ func begin_scale_placement() -> void:
 	_clear_directional_connection_preview()
 	cancel_relay_placement()
 	cancel_rotation_placement()
+	cancel_move_placement()
 	scale_placement_active = true
 	if scale_button != null:
 		scale_button.button_pressed = true
@@ -274,6 +291,25 @@ func cancel_scale_placement() -> void:
 	scale_placement_active = false
 	if scale_button != null:
 		scale_button.button_pressed = false
+	_refresh_summon_state()
+
+
+func begin_move_placement() -> void:
+	_clear_directional_connection_preview()
+	cancel_relay_placement()
+	cancel_rotation_placement()
+	cancel_scale_placement()
+	move_placement_active = true
+	if move_button != null:
+		move_button.button_pressed = true
+	status_label.text = "移動ノード // 盤面をクリックして配置 // 右クリックで取消"
+	status_label.add_theme_color_override("font_color", Color(0.58, 0.86, 1.0))
+
+
+func cancel_move_placement() -> void:
+	move_placement_active = false
+	if move_button != null:
+		move_button.button_pressed = false
 	_refresh_summon_state()
 
 
@@ -343,6 +379,30 @@ func place_scale_at(
 	scale.selected = true
 	_refresh_factory_status_label()
 	return scale
+
+
+func place_move_at(
+	world_center: Vector2,
+	offset: Vector2i = Vector2i.UP
+) -> GraphNode:
+	if factory_graph == null:
+		return null
+	move_serial += 1
+	var node_half_size := Vector2.ONE * 59.0
+	var clamped_center := Vector2(
+		clampf(world_center.x, node_half_size.x, PLAYFIELD_SIZE.x - node_half_size.x),
+		clampf(world_center.y, node_half_size.y, PLAYFIELD_SIZE.y - node_half_size.y)
+	)
+	var move_node := _make_move_node(
+		StringName("move_%02d" % move_serial),
+		clamped_center,
+		offset
+	)
+	move_nodes.append(move_node)
+	factory_graph.add_child(move_node)
+	move_node.selected = true
+	_refresh_factory_status_label()
+	return move_node
 
 
 func graph_screen_to_world(screen_position: Vector2) -> Vector2:
@@ -515,6 +575,38 @@ func set_scale_percent(node_id: StringName, x_percent: int, y_percent: int) -> b
 	return true
 
 
+func move_offset(node_id: StringName) -> Vector2i:
+	var move_node := _move_node(node_id)
+	if move_node == null:
+		return Vector2i.UP
+	return Vector2i(move_node.get_meta("move_offset", Vector2i.UP))
+
+
+func set_move_offset(node_id: StringName, offset: Vector2i) -> bool:
+	var move_node := _move_node(node_id)
+	var direction_index := _move_direction_index(offset)
+	var distance := maxi(absi(offset.x), absi(offset.y))
+	if (
+		move_node == null
+		or direction_index < 0
+		or not MOVE_DISTANCE_PRESETS.has(distance)
+		or offset != MOVE_DIRECTIONS[direction_index] * distance
+	):
+		return false
+	if move_offset(node_id) == offset:
+		return false
+	var now := flow_animation_time_seconds()
+	process_transport_at(now)
+	move_node.set_meta("move_offset", offset)
+	var visual := _landmark_visual(move_node)
+	if visual != null:
+		visual.configure_move(offset)
+	move_node.tooltip_text = _move_tooltip(node_id)
+	_restart_outgoing_transport(node_id, now)
+	_refresh_summon_state()
+	return true
+
+
 func open_relay_settings(node_id: StringName, viewport_position: Vector2) -> bool:
 	if _relay_node(node_id) == null or relay_settings_popup == null:
 		return false
@@ -522,6 +614,8 @@ func open_relay_settings(node_id: StringName, viewport_position: Vector2) -> boo
 		rotation_settings_popup.hide()
 	if scale_settings_popup != null:
 		scale_settings_popup.hide()
+	if move_settings_popup != null:
+		move_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	relay_settings_node_id = node_id
@@ -553,6 +647,8 @@ func open_rotation_settings(node_id: StringName, viewport_position: Vector2) -> 
 		relay_settings_popup.hide()
 	if scale_settings_popup != null:
 		scale_settings_popup.hide()
+	if move_settings_popup != null:
+		move_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	rotation_settings_node_id = node_id
@@ -578,6 +674,8 @@ func open_scale_settings(node_id: StringName, viewport_position: Vector2) -> boo
 		relay_settings_popup.hide()
 	if rotation_settings_popup != null:
 		rotation_settings_popup.hide()
+	if move_settings_popup != null:
+		move_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	scale_settings_node_id = node_id
@@ -590,6 +688,35 @@ func open_scale_settings(node_id: StringName, viewport_position: Vector2) -> boo
 	popup_position.y = clampi(popup_position.y, 0, maxi(viewport_size.y - popup_size.y, 0))
 	scale_settings_popup.popup(Rect2i(popup_position, popup_size))
 	scale_settings_x.grab_focus()
+	return true
+
+
+func open_move_settings(node_id: StringName, viewport_position: Vector2) -> bool:
+	var move_node := _move_node(node_id)
+	if move_node == null or move_settings_popup == null:
+		return false
+	if relay_settings_popup != null:
+		relay_settings_popup.hide()
+	if rotation_settings_popup != null:
+		rotation_settings_popup.hide()
+	if scale_settings_popup != null:
+		scale_settings_popup.hide()
+	if line_settings_popup != null:
+		line_settings_popup.hide()
+	move_settings_node_id = node_id
+	move_settings_title.text = "移動ノード // %s" % String(node_id)
+	_sync_move_settings(move_offset(node_id))
+	var popup_size := Vector2i(294, 244)
+	var viewport_size := Vector2i(get_viewport_rect().size)
+	var popup_position := Vector2i(viewport_position.round()) + Vector2i(10, 8)
+	popup_position.x = clampi(popup_position.x, 0, maxi(viewport_size.x - popup_size.x, 0))
+	popup_position.y = clampi(popup_position.y, 0, maxi(viewport_size.y - popup_size.y, 0))
+	move_settings_popup.popup(Rect2i(popup_position, popup_size))
+	var direction_button = move_settings_direction_buttons.get(
+		_move_direction_index(move_offset(node_id))
+	)
+	if direction_button is Button:
+		direction_button.grab_focus()
 	return true
 
 
@@ -613,6 +740,8 @@ func open_line_settings(connection: Dictionary, viewport_position: Vector2) -> b
 		relay_settings_popup.hide()
 	if scale_settings_popup != null:
 		scale_settings_popup.hide()
+	if move_settings_popup != null:
+		move_settings_popup.hide()
 	line_settings_connection = {
 		"from_node": from_node_id,
 		"from_port": from_port,
@@ -689,14 +818,18 @@ func remove_processing_node(node_id: StringName) -> bool:
 		relay_nodes.erase(node)
 	elif _rotation_node(node_id) != null:
 		rotation_nodes.erase(node)
-	else:
+	elif _scale_node(node_id) != null:
 		scale_nodes.erase(node)
+	else:
+		move_nodes.erase(node)
 	if relay_settings_node_id == node_id and relay_settings_popup != null:
 		relay_settings_popup.hide()
 	if rotation_settings_node_id == node_id and rotation_settings_popup != null:
 		rotation_settings_popup.hide()
 	if scale_settings_node_id == node_id and scale_settings_popup != null:
 		scale_settings_popup.hide()
+	if move_settings_node_id == node_id and move_settings_popup != null:
+		move_settings_popup.hide()
 	if (
 		not line_settings_connection.is_empty()
 		and (
@@ -748,7 +881,8 @@ func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 	var relay := _relay_node(node_id)
 	var rotation := _rotation_node(node_id)
 	var scale := _scale_node(node_id)
-	if relay == null and rotation == null and scale == null:
+	var move_node := _move_node(node_id)
+	if relay == null and rotation == null and scale == null and move_node == null:
 		return null
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["to_node"]) != node_id or int(connection["to_port"]) != 0:
@@ -763,6 +897,8 @@ func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 		if scale != null:
 			var stretch := scale_percent(node_id)
 			return input_glyph.stretched_percent(stretch.x, stretch.y)
+		if move_node != null:
+			return input_glyph.translated(move_offset(node_id))
 		return input_glyph
 	return null
 
@@ -986,9 +1122,11 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			else {}
 		)
 		hovered_connection_key = String(hovered_connection.get("key", ""))
-		if relay_placement_active or rotation_placement_active or scale_placement_active:
+		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active:
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
-			if scale_placement_active:
+			if move_placement_active:
+				factory_graph.tooltip_text = "クリックで移動ノードを配置 // 右クリックで取消"
+			elif scale_placement_active:
 				factory_graph.tooltip_text = "クリックで変形ノードを配置 // 右クリックで取消"
 			elif rotation_placement_active:
 				factory_graph.tooltip_text = "クリックで回転ノードを配置 // 右クリックで取消"
@@ -1018,10 +1156,11 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	var mouse_event := event as InputEventMouseButton
 	if mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
-		if relay_placement_active or rotation_placement_active or scale_placement_active:
+		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active:
 			cancel_relay_placement()
 			cancel_rotation_placement()
 			cancel_scale_placement()
+			cancel_move_placement()
 			factory_graph.accept_event()
 			return
 		var input_target := directional_connection_target_at(mouse_event.position)
@@ -1044,9 +1183,11 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	connection_pointer = mouse_event.position
 	if mouse_event.pressed:
-		if relay_placement_active or rotation_placement_active or scale_placement_active:
+		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active:
 			var world_position := graph_screen_to_world(mouse_event.position)
-			if scale_placement_active:
+			if move_placement_active:
+				place_move_at(world_position)
+			elif scale_placement_active:
 				place_scale_at(world_position)
 			elif rotation_placement_active:
 				place_rotation_at(world_position)
@@ -1055,6 +1196,7 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			cancel_relay_placement()
 			cancel_rotation_placement()
 			cancel_scale_placement()
+			cancel_move_placement()
 			factory_graph.accept_event()
 			return
 		var input_target := directional_connection_target_at(mouse_event.position)
@@ -1113,7 +1255,7 @@ func _clear_directional_connection_preview() -> void:
 
 
 func directional_output_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes:
 		var node_id := StringName(node.name)
 		if graph_position.distance_to(directional_output_position(node_id, factory_graph)) <= PORT_HIT_RADIUS:
 			return node_id
@@ -1121,7 +1263,7 @@ func directional_output_at(graph_position: Vector2) -> StringName:
 
 
 func directional_connection_target_at(graph_position: Vector2) -> Dictionary:
-	for processor in relay_nodes + rotation_nodes + scale_nodes:
+	for processor in relay_nodes + rotation_nodes + scale_nodes + move_nodes:
 		var processor_id := StringName(processor.name)
 		if graph_position.distance_to(directional_node_input_position(processor_id, 0, factory_graph)) <= PORT_HIT_RADIUS:
 			return { "node_id": processor_id, "port": 0 }
@@ -1171,7 +1313,7 @@ func directional_input_at(graph_position: Vector2) -> int:
 
 
 func directional_landmark_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes:
 		if graph_position.distance_to(_node_center_in(node, factory_graph)) <= _landmark_radius_in(node, factory_graph):
 			return StringName(node.name)
 	if (
@@ -1199,6 +1341,8 @@ func _landmark_tooltip(node_id: StringName) -> String:
 		return _rotation_tooltip(node_id)
 	if _scale_node(node_id) != null:
 		return _scale_tooltip(node_id)
+	if _move_node(node_id) != null:
+		return _move_tooltip(node_id)
 	return ""
 
 
@@ -1215,6 +1359,12 @@ func _output_tooltip(node_id: StringName) -> String:
 	if _scale_node(node_id) != null:
 		var stretch := scale_percent(node_id)
 		return "変形出力 // 横%d%% 縦%d%% // 複数の下流へ分配可能" % [stretch.x, stretch.y]
+	if _move_node(node_id) != null:
+		var offset := move_offset(node_id)
+		return "移動出力 // %s%d // 複数の下流へ分配可能" % [
+			MOVE_DIRECTION_LABELS[_move_direction_index(offset)],
+			maxi(absi(offset.x), absi(offset.y)),
+		]
 	return ""
 
 
@@ -1225,6 +1375,15 @@ func _rotation_tooltip(node_id: StringName) -> String:
 func _scale_tooltip(node_id: StringName) -> String:
 	var stretch := scale_percent(node_id)
 	return "変形ノード // 横%d%% 縦%d%% // 右クリックで設定" % [stretch.x, stretch.y]
+
+
+func _move_tooltip(node_id: StringName) -> String:
+	var offset := move_offset(node_id)
+	var direction_index := _move_direction_index(offset)
+	return "移動ノード // %s%d // 右クリックで設定" % [
+		MOVE_DIRECTION_LABELS[direction_index],
+		maxi(absi(offset.x), absi(offset.y)),
+	]
 
 
 func _context_node_label(node_id: StringName, input_port: int = -1) -> String:
@@ -1240,6 +1399,12 @@ func _context_node_label(node_id: StringName, input_port: int = -1) -> String:
 	if _scale_node(node_id) != null:
 		var stretch := scale_percent(node_id)
 		return "変形 %d×%d%%" % [stretch.x, stretch.y]
+	if _move_node(node_id) != null:
+		var offset := move_offset(node_id)
+		return "移動 %s%d" % [
+			MOVE_DIRECTION_LABELS[_move_direction_index(offset)],
+			maxi(absi(offset.x), absi(offset.y)),
+		]
 	return String(node_id)
 
 
@@ -1411,13 +1576,13 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 
 
 func _draw_directional_ports(overlay: Control) -> void:
-	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes:
 		var node_id := StringName(node.name)
 		var position := directional_output_position(node_id, overlay)
 		var active := node_id == connecting_material_id or node_id == hovered_material_id
 		var direction := _node_center_in(node, overlay).direction_to(position)
 		_draw_output_port(overlay, position, direction, PORT_COLOR if active else PORT_IDLE_COLOR, active)
-	for processor in relay_nodes + rotation_nodes + scale_nodes:
+	for processor in relay_nodes + rotation_nodes + scale_nodes + move_nodes:
 		var processor_id := StringName(processor.name)
 		var processor_input := directional_node_input_position(processor_id, 0, overlay)
 		var processor_active := hovered_input_node_id == processor_id or connecting_material_id != &""
@@ -2056,12 +2221,22 @@ func _scale_node(node_id: StringName) -> GraphNode:
 	return null
 
 
+func _move_node(node_id: StringName) -> GraphNode:
+	for node in move_nodes:
+		if is_instance_valid(node) and StringName(node.name) == node_id:
+			return node
+	return null
+
+
 func _processing_node(node_id: StringName) -> GraphNode:
 	var relay := _relay_node(node_id)
 	if relay != null:
 		return relay
 	var rotation := _rotation_node(node_id)
-	return rotation if rotation != null else _scale_node(node_id)
+	if rotation != null:
+		return rotation
+	var scale := _scale_node(node_id)
+	return scale if scale != null else _move_node(node_id)
 
 
 func _factory_node(node_id: StringName) -> GraphNode:
@@ -2172,6 +2347,15 @@ func _build_ui() -> void:
 	relay_button.pressed.connect(_on_relay_button_pressed)
 	toolbar.add_child(relay_button)
 
+	move_button = Button.new()
+	move_button.name = "AddMoveButton"
+	move_button.text = "＋ 移動"
+	move_button.tooltip_text = "移動ノードを盤面へ配置 // ノード右クリックで方向と距離を設定"
+	move_button.custom_minimum_size = Vector2(92.0, 34.0)
+	move_button.toggle_mode = true
+	move_button.pressed.connect(_on_move_button_pressed)
+	toolbar.add_child(move_button)
+
 	rotation_button = Button.new()
 	rotation_button.name = "AddRotationButton"
 	rotation_button.text = "＋ 回転"
@@ -2252,6 +2436,7 @@ func _build_ui() -> void:
 	_build_relay_settings_popup()
 	_build_rotation_settings_popup()
 	_build_scale_settings_popup()
+	_build_move_settings_popup()
 	_build_line_settings_popup()
 
 
@@ -2571,6 +2756,111 @@ func _on_scale_settings_delete_pressed() -> void:
 
 func _on_scale_settings_popup_hidden() -> void:
 	scale_settings_node_id = &""
+
+
+func _build_move_settings_popup() -> void:
+	move_settings_popup = PopupPanel.new()
+	move_settings_popup.name = "MoveSettingsPopup"
+	move_settings_popup.popup_hide.connect(_on_move_settings_popup_hidden)
+	add_child(move_settings_popup)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	move_settings_popup.add_child(margin)
+
+	var column := VBoxContainer.new()
+	column.custom_minimum_size = Vector2(262.0, 196.0)
+	column.add_theme_constant_override("separation", 8)
+	margin.add_child(column)
+
+	move_settings_title = Label.new()
+	move_settings_title.add_theme_font_size_override("font_size", 14)
+	move_settings_title.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
+	column.add_child(move_settings_title)
+
+	var direction_label := Label.new()
+	direction_label.text = "方向"
+	direction_label.add_theme_font_size_override("font_size", 11)
+	direction_label.add_theme_color_override("font_color", Color(0.44, 0.68, 0.78))
+	column.add_child(direction_label)
+	var direction_row := HBoxContainer.new()
+	direction_row.add_theme_constant_override("separation", 6)
+	column.add_child(direction_row)
+	var direction_group := ButtonGroup.new()
+	for direction_index in MOVE_DIRECTIONS.size():
+		var button := Button.new()
+		button.name = "MoveDirection%d" % direction_index
+		button.text = MOVE_DIRECTION_LABELS[direction_index]
+		button.custom_minimum_size = Vector2(60.0, 34.0)
+		button.toggle_mode = true
+		button.button_group = direction_group
+		button.pressed.connect(_on_move_direction_pressed.bind(direction_index))
+		move_settings_direction_buttons[direction_index] = button
+		direction_row.add_child(button)
+
+	var distance_row := HBoxContainer.new()
+	distance_row.add_theme_constant_override("separation", 10)
+	column.add_child(distance_row)
+	var distance_label := Label.new()
+	distance_label.text = "距離"
+	distance_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	distance_row.add_child(distance_label)
+	move_settings_distance = OptionButton.new()
+	move_settings_distance.name = "MoveDistanceOption"
+	move_settings_distance.custom_minimum_size = Vector2(156.0, 32.0)
+	for distance in MOVE_DISTANCE_PRESETS:
+		move_settings_distance.add_item("%d単位" % int(distance), int(distance))
+	move_settings_distance.item_selected.connect(_on_move_distance_selected)
+	distance_row.add_child(move_settings_distance)
+
+	move_settings_delete_button = Button.new()
+	move_settings_delete_button.name = "DeleteMoveButton"
+	move_settings_delete_button.text = "移動ノードを削除"
+	move_settings_delete_button.custom_minimum_size = Vector2(0.0, 34.0)
+	move_settings_delete_button.pressed.connect(_on_move_settings_delete_pressed)
+	column.add_child(move_settings_delete_button)
+
+
+func _sync_move_settings(offset: Vector2i) -> void:
+	move_settings_syncing = true
+	var direction_index := _move_direction_index(offset)
+	for index in move_settings_direction_buttons:
+		var button = move_settings_direction_buttons[index]
+		if button is Button:
+			button.set_pressed_no_signal(int(index) == direction_index)
+	var distance := maxi(absi(offset.x), absi(offset.y))
+	move_settings_distance.select(move_settings_distance.get_item_index(distance))
+	move_settings_syncing = false
+
+
+func _on_move_direction_pressed(direction_index: int) -> void:
+	if move_settings_syncing or move_settings_node_id == &"":
+		return
+	var distance := move_settings_distance.get_item_id(move_settings_distance.selected)
+	set_move_offset(move_settings_node_id, MOVE_DIRECTIONS[direction_index] * distance)
+	_sync_move_settings(move_offset(move_settings_node_id))
+
+
+func _on_move_distance_selected(_index: int) -> void:
+	if move_settings_syncing or move_settings_node_id == &"":
+		return
+	var direction_index := _move_direction_index(move_offset(move_settings_node_id))
+	var distance := move_settings_distance.get_item_id(move_settings_distance.selected)
+	set_move_offset(move_settings_node_id, MOVE_DIRECTIONS[direction_index] * distance)
+	_sync_move_settings(move_offset(move_settings_node_id))
+
+
+func _on_move_settings_delete_pressed() -> void:
+	var node_id := move_settings_node_id
+	if node_id != &"":
+		remove_processing_node(node_id)
+
+
+func _on_move_settings_popup_hidden() -> void:
+	move_settings_node_id = &""
 
 
 func _build_line_settings_popup() -> void:
@@ -2894,6 +3184,46 @@ func _make_scale_node(
 	return node
 
 
+func _make_move_node(
+	node_id: StringName,
+	world_center: Vector2,
+	offset: Vector2i
+) -> GraphNode:
+	var direction_index := _move_direction_index(offset)
+	var distance := maxi(absi(offset.x), absi(offset.y))
+	var safe_offset := offset
+	if (
+		direction_index < 0
+		or not MOVE_DISTANCE_PRESETS.has(distance)
+		or offset != MOVE_DIRECTIONS[direction_index] * distance
+	):
+		safe_offset = Vector2i.UP
+	var node := GraphNode.new()
+	node.name = String(node_id)
+	node.title = ""
+	node.draggable = true
+	node.resizable = false
+	node.set_meta("landmark_kind", &"move")
+	node.set_meta("move_node", true)
+	node.set_meta("move_offset", safe_offset)
+
+	var port_row := Control.new()
+	port_row.custom_minimum_size = Vector2(1.0, 1.0)
+	port_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	node.add_child(port_row)
+	node.set_slot(0, true, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
+
+	var visual = FactoryLandmarkVisualModel.new()
+	visual.configure_move(safe_offset)
+	node.add_child(visual)
+	_configure_round_landmark_node(node, visual.custom_minimum_size)
+	node.position_offset = world_center - visual.custom_minimum_size * 0.5
+	node.mouse_filter = Control.MOUSE_FILTER_PASS
+	node.tooltip_text = _move_tooltip(StringName(node.name))
+	node.gui_input.connect(_on_move_node_gui_input.bind(node))
+	return node
+
+
 func _on_relay_button_pressed() -> void:
 	if relay_button.button_pressed:
 		begin_relay_placement()
@@ -2913,6 +3243,13 @@ func _on_scale_button_pressed() -> void:
 		begin_scale_placement()
 	else:
 		cancel_scale_placement()
+
+
+func _on_move_button_pressed() -> void:
+	if move_button.button_pressed:
+		begin_move_placement()
+	else:
+		cancel_move_placement()
 
 
 func _on_relay_node_gui_input(event: InputEvent, relay: GraphNode) -> void:
@@ -3005,11 +3342,42 @@ func _on_scale_node_gui_input(event: InputEvent, scale_node: GraphNode) -> void:
 		scale_node.accept_event()
 
 
+func _on_move_node_gui_input(event: InputEvent, move_node: GraphNode) -> void:
+	if not event is InputEventMouse:
+		return
+	var move_id := StringName(move_node.name)
+	var graph_event := event.duplicate() as InputEventMouse
+	graph_event.position = _convert_control_point(move_node, event.position, factory_graph)
+	var over_input: bool = graph_event.position.distance_to(
+		directional_node_input_position(move_id, 0, factory_graph)
+	) <= PORT_HIT_RADIUS
+	var over_output: bool = graph_event.position.distance_to(
+		directional_output_position(move_id, factory_graph)
+	) <= PORT_HIT_RADIUS
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if (
+			mouse_event.pressed
+			and mouse_event.button_index == MOUSE_BUTTON_RIGHT
+			and not over_input
+			and not over_output
+		):
+			open_move_settings(move_id, mouse_event.global_position)
+			move_node.accept_event()
+			return
+	if not over_input and not over_output:
+		return
+	_on_factory_graph_input(graph_event)
+	if event is InputEventMouseButton:
+		move_node.accept_event()
+
+
 func _refresh_factory_status_label() -> void:
 	if status_label == null:
 		return
-	status_label.text = "広域盤面 9000 × 6000  //  資源 30  //  中継 %d  //  回転 %d  //  変形 %d  //  召喚器 1" % [
+	status_label.text = "中継 %d // 移動 %d // 回転 %d // 変形 %d" % [
 		relay_nodes.size(),
+		move_nodes.size(),
 		rotation_nodes.size(),
 		scale_nodes.size(),
 	]
@@ -3034,6 +3402,18 @@ func _center_initial_view() -> void:
 		return
 	var summoner_center := SUMMONER_POSITION + summoner_node.size * 0.5
 	factory_graph.scroll_offset = summoner_center * factory_graph.zoom - factory_graph.size * 0.5
+
+
+static func _move_direction_index(offset: Vector2i) -> int:
+	if offset.x == 0 and offset.y < 0:
+		return 0
+	if offset.x > 0 and offset.y == 0:
+		return 1
+	if offset.x == 0 and offset.y > 0:
+		return 2
+	if offset.x < 0 and offset.y == 0:
+		return 3
+	return -1
 
 
 static func _kind_label(kind: StringName) -> String:

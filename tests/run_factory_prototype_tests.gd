@@ -9,6 +9,7 @@ var failures := 0
 func _initialize() -> void:
 	await _test_main_menu()
 	await _test_fixed_factory_landmarks()
+	await _test_move_processing_node()
 	await _test_processed_rotation_target()
 	await _test_scale_processing_node()
 	if failures == 0:
@@ -420,13 +421,13 @@ func _test_fixed_factory_landmarks() -> void:
 	)
 	var upstream_first_arrival: float = upstream_flow_start + prototype.flow_travel_duration(upstream_line_length)
 	_expect(branch_flow_start >= prototype.flow_time_override, "a late relay branch should wait for the next available upstream Glyph")
+	var branch_phase := fposmod(
+		branch_flow_start - upstream_first_arrival,
+		prototype.flow_packet_interval()
+	)
 	_expect(
-		is_zero_approx(
-			fposmod(
-				branch_flow_start - upstream_first_arrival,
-				prototype.flow_packet_interval()
-			)
-		),
+		is_zero_approx(branch_phase)
+		or is_equal_approx(branch_phase, prototype.flow_packet_interval()),
 		"a late relay branch should inherit the upstream production phase"
 	)
 	_expect(prototype.connected_material_kind(1) == &"circle", "distributed relay output should preserve the same Glyph on every branch")
@@ -794,6 +795,95 @@ func _test_processed_rotation_target() -> void:
 	_expect(prototype.factory_graph.get_connection_list().is_empty(), "deleting a processor should remove all of its attached conveyors")
 	_expect(prototype.summon_state(2) == &"idle", "deleting a connected processor should clear its downstream summon state")
 	_expect("回転 0" in prototype.status_label.text, "deleting a rotation node should refresh the equipment count")
+	prototype.queue_free()
+	await process_frame
+
+
+func _test_move_processing_node() -> void:
+	var prototype = FactoryPrototypeScene.instantiate()
+	root.add_child(prototype)
+	await process_frame
+	await process_frame
+	prototype.flow_time_override = 0.0
+	_expect(
+		prototype.move_button != null and prototype.move_button.text == "＋ 移動",
+		"the toolbar should expose cardinal move-node placement"
+	)
+	var square_source := _first_material(prototype, &"square")
+	var move_node = prototype.place_move_at(Vector2(3900.0, 2450.0), Vector2i(0, -3))
+	var move_id := StringName(move_node.name)
+	_expect(
+		move_node.draggable
+		and prototype.move_offset(move_id) == Vector2i(0, -3)
+		and "移動 1" in prototype.status_label.text,
+		"a move node should retain its cardinal one-unit-step offset"
+	)
+	_expect(
+		not prototype.set_move_offset(move_id, Vector2i(1, 1))
+		and not prototype.set_move_offset(move_id, Vector2i(0, -7))
+		and prototype.move_offset(move_id) == Vector2i(0, -3),
+		"diagonal and out-of-range move settings should fail closed"
+	)
+	_expect(
+		prototype.connect_output_to_input(StringName(square_source.name), move_id, 0),
+		"a material should connect to the move input"
+	)
+	var source_glyph: Object = prototype.primitive_glyph(&"square")
+	var moved_glyph: Object = prototype.output_glyph(move_id)
+	_expect(
+		moved_glyph.canonical_serialization()
+		== source_glyph.translated(Vector2i(0, -3)).canonical_serialization(),
+		"the move processor should return a translated Glyph"
+	)
+	_expect(
+		source_glyph.components[0].position == Vector2.ZERO,
+		"move processing should not mutate the source Glyph"
+	)
+	prototype.select_input(1)
+	prototype.select_target(&"square")
+	_expect(
+		prototype.connect_output_to_input(move_id, StringName(prototype.summoner_node.name), 1),
+		"a moved output should connect to a summoner input"
+	)
+	_advance_input_to_first_arrival(prototype, 1)
+	_expect(prototype.summon_state(1) == &"mismatch", "a translated Square should not match the centered Square")
+
+	var menu_click := InputEventMouseButton.new()
+	menu_click.button_index = MOUSE_BUTTON_RIGHT
+	menu_click.pressed = true
+	menu_click.position = prototype._convert_control_point(
+		prototype.factory_graph,
+		prototype._node_center_in(move_node, prototype.factory_graph),
+		move_node
+	)
+	menu_click.global_position = Vector2(620.0, 360.0)
+	move_node.gui_input.emit(menu_click)
+	_expect(
+		prototype.move_settings_popup.visible
+		and prototype.move_settings_node_id == move_id
+		and prototype.move_settings_direction_buttons[0].button_pressed
+		and prototype.move_settings_distance.get_item_id(
+			prototype.move_settings_distance.selected
+		) == 3,
+		"right-clicking a move node should expose direction and exact distance"
+	)
+	prototype.move_settings_direction_buttons[1].pressed.emit()
+	var distance_two_index: int = prototype.move_settings_distance.get_item_index(2)
+	prototype.move_settings_distance.select(distance_two_index)
+	prototype.move_settings_distance.item_selected.emit(distance_two_index)
+	_expect(
+		prototype.move_offset(move_id) == Vector2i(2, 0)
+		and prototype.output_glyph(move_id).canonical_serialization()
+		== source_glyph.translated(Vector2i(2, 0)).canonical_serialization(),
+		"the settings menu should apply rightward two-unit movement deterministically"
+	)
+	_expect(prototype.summon_state(1) == &"transporting", "changing movement should restart downstream transport")
+
+	prototype.move_settings_delete_button.pressed.emit()
+	await process_frame
+	_expect(prototype.move_nodes.is_empty(), "the move-node menu should delete that processor")
+	_expect(prototype.factory_graph.get_connection_list().is_empty(), "deleting a move node should remove attached conveyors")
+	_expect(prototype.summon_state(1) == &"idle", "deleting a move node should clear downstream summon state")
 	prototype.queue_free()
 	await process_frame
 

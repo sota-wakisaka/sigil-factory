@@ -62,6 +62,9 @@ func _initialize() -> void:
 		elif fixture == "scale_settings":
 			var scale = view.place_scale_at(Vector2(3900.0, 2450.0), 200, 50)
 			view.open_scale_settings(StringName(scale.name), Vector2(620.0, 330.0))
+		elif fixture == "move_settings":
+			var move_node = view.place_move_at(Vector2(3900.0, 2450.0), Vector2i(0, -3))
+			view.open_move_settings(StringName(move_node.name), Vector2(620.0, 330.0))
 		elif fixture == "line_settings":
 			view.connect_material_to_summoner(&"circle_01", 0)
 			var connection = view._connection_to_input(&"summoner_center", 0)
