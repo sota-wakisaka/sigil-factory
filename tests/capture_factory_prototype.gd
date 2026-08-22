@@ -30,6 +30,8 @@ func _initialize() -> void:
 	capture_viewport.add_child(view)
 	await process_frame
 	await process_frame
+	if scene_id == "factory" and String(options.get("fixture", "")) == "circle_summon":
+		view.connect_material_to_summoner(&"circle_01")
 	await process_frame
 	RenderingServer.force_draw(false)
 

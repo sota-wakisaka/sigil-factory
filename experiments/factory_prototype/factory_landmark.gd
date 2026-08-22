@@ -14,20 +14,44 @@ const DEPOSIT_OFFSETS := [
 ]
 
 var landmark_kind: StringName = &"circle"
+var visual_mode: StringName = &"deposit"
 
 
 func configure(next_kind: StringName) -> void:
 	landmark_kind = next_kind
+	visual_mode = &"summoner" if landmark_kind == &"summoner" else &"deposit"
 	custom_minimum_size = Vector2(152.0, 120.0) if landmark_kind != &"summoner" else Vector2(188.0, 166.0)
+	queue_redraw()
+
+
+func configure_target(next_kind: StringName) -> void:
+	landmark_kind = next_kind
+	visual_mode = &"target"
+	custom_minimum_size = Vector2(112.0, 112.0)
 	queue_redraw()
 
 
 func _draw() -> void:
 	var center := size * 0.5
-	if landmark_kind == &"summoner":
+	if visual_mode == &"summoner":
 		_draw_summoner(center)
 		return
+	if visual_mode == &"target":
+		_draw_target(center)
+		return
 	_draw_material_deposit(center)
+
+
+func _draw_target(center: Vector2) -> void:
+	var frame_radius := minf(size.x, size.y) * 0.43
+	draw_circle(center, frame_radius, Color(0.01, 0.055, 0.08, 0.92), true)
+	draw_arc(center, frame_radius, 0.0, TAU, 64, Color(0.25, 0.72, 0.90, 0.52), 1.0, true)
+	for index in 8:
+		var angle := TAU * float(index) / 8.0
+		var inner := center + Vector2.from_angle(angle) * frame_radius * 0.86
+		var outer := center + Vector2.from_angle(angle) * frame_radius
+		draw_line(inner, outer, Color(0.30, 0.78, 0.94, 0.44), 1.0, true)
+	_draw_material_shape(center, frame_radius * 0.52, INK, 3.0)
 
 
 func _draw_material_deposit(center: Vector2) -> void:
