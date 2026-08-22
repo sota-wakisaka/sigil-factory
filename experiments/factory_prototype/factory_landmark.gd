@@ -15,6 +15,7 @@ const DEPOSIT_OFFSETS := [
 
 var landmark_kind: StringName = &"circle"
 var visual_mode: StringName = &"deposit"
+var rotation_angle_degrees := 45
 
 
 func configure(next_kind: StringName) -> void:
@@ -24,6 +25,9 @@ func configure(next_kind: StringName) -> void:
 		custom_minimum_size = Vector2(176.0, 176.0)
 	elif landmark_kind == &"relay":
 		visual_mode = &"relay"
+		custom_minimum_size = Vector2(118.0, 118.0)
+	elif landmark_kind == &"rotation":
+		visual_mode = &"rotation"
 		custom_minimum_size = Vector2(118.0, 118.0)
 	else:
 		visual_mode = &"deposit"
@@ -39,13 +43,22 @@ func configure_target(next_kind: StringName) -> void:
 	queue_redraw()
 
 
+func configure_rotation(next_degrees: int) -> void:
+	landmark_kind = &"rotation"
+	visual_mode = &"rotation"
+	rotation_angle_degrees = posmod(next_degrees, 360)
+	custom_minimum_size = Vector2(118.0, 118.0)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	queue_redraw()
+
+
 func body_radius() -> float:
 	var visual_size := size
 	if visual_size.x <= 0.0 or visual_size.y <= 0.0:
 		visual_size = custom_minimum_size
 	if visual_mode == &"summoner":
 		return minf(visual_size.x, visual_size.y) * 0.36 + 18.0
-	if visual_mode == &"relay":
+	if visual_mode == &"relay" or visual_mode == &"rotation":
 		return minf(visual_size.x, visual_size.y) * 0.38
 	return minf(visual_size.x, visual_size.y) * 0.43
 
@@ -57,6 +70,9 @@ func _draw() -> void:
 		return
 	if visual_mode == &"relay":
 		_draw_relay(center)
+		return
+	if visual_mode == &"rotation":
+		_draw_rotation(center)
 		return
 	if visual_mode == &"target":
 		_draw_target(center)
@@ -140,3 +156,31 @@ func _draw_relay(center: Vector2) -> void:
 		var direction := Vector2.from_angle(TAU * float(index) / 4.0)
 		draw_line(center + direction * 9.0, center + direction * 18.0, INK, 1.4, true)
 		draw_circle(center + direction * 22.0, 2.8, INK, true)
+
+
+func _draw_rotation(center: Vector2) -> void:
+	var radius := body_radius()
+	draw_circle(center, radius, Color(0.015, 0.075, 0.11, 0.96), true)
+	draw_arc(center, radius, 0.0, TAU, 64, Color(0.42, 0.82, 1.0, 0.92), 1.6, true)
+	for index in 8:
+		var tick_angle := -PI * 0.5 + TAU * float(index) / 8.0
+		var direction := Vector2.from_angle(tick_angle)
+		draw_line(
+			center + direction * radius * 0.72,
+			center + direction * radius * 0.86,
+			Color(DIM_INK, 0.72),
+			1.0,
+			true
+		)
+	var angle := deg_to_rad(float(rotation_angle_degrees) - 90.0)
+	var hand := Vector2.from_angle(angle)
+	var tangent := Vector2(-hand.y, hand.x)
+	var tip := center + hand * radius * 0.58
+	draw_line(center, tip, INK, 2.0, true)
+	draw_colored_polygon(PackedVector2Array([
+		tip + hand * 4.0,
+		tip - hand * 4.0 + tangent * 4.0,
+		tip - hand * 4.0 - tangent * 4.0,
+	]), INK)
+	draw_circle(center, 4.0, Color(0.01, 0.04, 0.06, 1.0), true)
+	draw_arc(center, 4.0, 0.0, TAU, 20, INK, 1.2, true)

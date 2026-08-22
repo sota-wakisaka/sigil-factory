@@ -46,6 +46,10 @@ func _initialize() -> void:
 			var relay = view.place_relay_at(Vector2(3800.0, 2980.0))
 			view.connect_output_to_input(&"circle_01", StringName(relay.name), 0)
 			view.connect_output_to_input(StringName(relay.name), &"summoner_center", 0)
+		elif fixture == "rotation_route":
+			var rotation = view.place_rotation_at(Vector2(3900.0, 2450.0), 45)
+			view.connect_output_to_input(&"square_01", StringName(rotation.name), 0)
+			view.connect_output_to_input(StringName(rotation.name), &"summoner_center", 2)
 		if requested_flow_time >= 0.0:
 			view.flow_time_override = requested_flow_time
 		if options.has("hover_line_input"):

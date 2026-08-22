@@ -161,6 +161,7 @@ func _test_fixed_factory_landmarks() -> void:
 	var triangle_source := _first_material(prototype, &"triangle")
 	var square_source := _first_material(prototype, &"square")
 	_expect(prototype.relay_button != null and prototype.relay_button.text == "＋ 中継", "the toolbar should expose relay placement")
+	_expect(prototype.rotation_button != null and prototype.rotation_button.text == "＋ 回転", "the toolbar should expose rotation placement")
 	prototype.begin_relay_placement()
 	_expect(prototype.relay_placement_active and prototype.relay_button.button_pressed, "relay placement should enter a visible one-shot mode")
 	var relay_world_center := Vector2(5000.0, 4500.0)
@@ -176,6 +177,45 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.fixed_landmark_count() == 31, "placing a relay should not change the fixed-landmark count")
 	_expect("中継 1" in prototype.status_label.text, "the toolbar should report the number of placed relays")
 	_expect(prototype._landmark_visual(relay).body_radius() > 0.0, "relay nodes should use the circular factory visual language")
+	prototype.begin_rotation_placement()
+	_expect(
+		prototype.rotation_placement_active
+		and prototype.rotation_button.button_pressed
+		and not prototype.relay_placement_active,
+		"rotation placement should be a visible one-shot mode exclusive with relay placement"
+	)
+	var rotation_world_center := Vector2(5200.0, 4300.0)
+	var rotation_click := InputEventMouseButton.new()
+	rotation_click.button_index = MOUSE_BUTTON_LEFT
+	rotation_click.pressed = true
+	rotation_click.position = rotation_world_center * prototype.factory_graph.zoom - prototype.factory_graph.scroll_offset
+	prototype.factory_graph.gui_input.emit(rotation_click)
+	_expect(
+		prototype.rotation_nodes.size() == 1 and not prototype.rotation_placement_active,
+		"clicking the board in rotation placement mode should create one processor and exit placement"
+	)
+	var rotation: GraphNode = prototype.rotation_nodes[0]
+	var rotation_id := StringName(rotation.name)
+	_expect(rotation.draggable and prototype.rotation_angle(rotation_id) == 45, "a new rotation node should be draggable and default to 45 degrees")
+	_expect("回転 1" in prototype.status_label.text, "the toolbar should report the number of rotation processors")
+	_expect(
+		prototype.connect_output_to_input(StringName(square_source.name), rotation_id, 0),
+		"a material output should connect to a rotation input from any direction"
+	)
+	var rotated_square = prototype.output_glyph(rotation_id)
+	_expect(
+		rotated_square != null
+		and rotated_square.canonical_serialization()
+		== prototype.primitive_glyph(&"square").rotated_degrees(45).canonical_serialization(),
+		"the rotation node should apply a pure 45 degree transform to its input Glyph"
+	)
+	_expect(prototype.set_rotation_angle(rotation_id, 37), "rotation should accept an arbitrary one-degree setting")
+	_expect(
+		prototype.output_glyph(rotation_id).canonical_serialization()
+		== prototype.primitive_glyph(&"square").rotated_degrees(37).canonical_serialization(),
+		"changing rotation should deterministically rebuild its output Glyph"
+	)
+	prototype.disconnect_input(rotation_id, 0)
 	var relay_source_click := InputEventMouseButton.new()
 	prototype.flow_time_override = 10.0
 	relay_source_click.button_index = MOUSE_BUTTON_LEFT

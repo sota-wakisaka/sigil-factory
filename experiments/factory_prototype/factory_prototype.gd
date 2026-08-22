@@ -88,6 +88,7 @@ var factory_graph: GraphEdit
 var summoner_node: GraphNode
 var material_nodes: Array[GraphNode] = []
 var relay_nodes: Array[GraphNode] = []
+var rotation_nodes: Array[GraphNode] = []
 var connection_overlay
 var flow_overlay
 var port_overlay
@@ -103,6 +104,9 @@ var status_label: Label
 var relay_button: Button
 var relay_placement_active := false
 var relay_serial := 0
+var rotation_button: Button
+var rotation_placement_active := false
+var rotation_serial := 0
 var target_panel: PanelContainer
 var target_preview
 var target_header_label: Label
@@ -173,6 +177,7 @@ func all_landmarks_locked() -> bool:
 
 func begin_relay_placement() -> void:
 	_clear_directional_connection_preview()
+	cancel_rotation_placement()
 	relay_placement_active = true
 	if relay_button != null:
 		relay_button.button_pressed = true
@@ -184,6 +189,23 @@ func cancel_relay_placement() -> void:
 	relay_placement_active = false
 	if relay_button != null:
 		relay_button.button_pressed = false
+	_refresh_summon_state()
+
+
+func begin_rotation_placement() -> void:
+	_clear_directional_connection_preview()
+	cancel_relay_placement()
+	rotation_placement_active = true
+	if rotation_button != null:
+		rotation_button.button_pressed = true
+	status_label.text = "回転ノード // 盤面をクリックして配置 // 右クリックで取消"
+	status_label.add_theme_color_override("font_color", Color(0.58, 0.86, 1.0))
+
+
+func cancel_rotation_placement() -> void:
+	rotation_placement_active = false
+	if rotation_button != null:
+		rotation_button.button_pressed = false
 	_refresh_summon_state()
 
 
@@ -205,6 +227,28 @@ func place_relay_at(world_center: Vector2) -> GraphNode:
 	relay.selected = true
 	_refresh_factory_status_label()
 	return relay
+
+
+func place_rotation_at(world_center: Vector2, angle_degrees: int = 45) -> GraphNode:
+	if factory_graph == null:
+		return null
+	rotation_serial += 1
+	var node_half_size := Vector2.ONE * 59.0
+	var clamped_center := Vector2(
+		clampf(world_center.x, node_half_size.x, PLAYFIELD_SIZE.x - node_half_size.x),
+		clampf(world_center.y, node_half_size.y, PLAYFIELD_SIZE.y - node_half_size.y)
+	)
+	var rotation := _make_rotation_node(
+		StringName("rotation_%02d" % rotation_serial),
+		clamped_center,
+		angle_degrees
+	)
+	rotation_nodes.append(rotation)
+	rotation.tooltip_text = _rotation_tooltip(StringName(rotation.name))
+	factory_graph.add_child(rotation)
+	rotation.selected = true
+	_refresh_factory_status_label()
+	return rotation
 
 
 func graph_screen_to_world(screen_position: Vector2) -> Vector2:
@@ -307,6 +351,45 @@ func output_glyph(node_id: StringName) -> GlyphModel:
 	return _output_glyph(node_id, {})
 
 
+func rotation_angle(node_id: StringName) -> int:
+	var rotation := _rotation_node(node_id)
+	return int(rotation.get_meta("rotation_degrees", 45)) if rotation != null else 0
+
+
+func set_rotation_angle(node_id: StringName, angle_degrees: int) -> bool:
+	var rotation := _rotation_node(node_id)
+	if rotation == null:
+		return false
+	var normalized_angle := posmod(angle_degrees, 360)
+	if rotation_angle(node_id) == normalized_angle:
+		return false
+	var now := flow_animation_time_seconds()
+	process_transport_at(now)
+	rotation.set_meta("rotation_degrees", normalized_angle)
+	var visual := _landmark_visual(rotation)
+	if visual != null:
+		visual.configure_rotation(normalized_angle)
+	rotation.tooltip_text = _rotation_tooltip(node_id)
+	_restart_outgoing_transport(node_id, now)
+	_refresh_summon_state()
+	return true
+
+
+func _restart_outgoing_transport(node_id: StringName, time_seconds: float) -> void:
+	for connection in factory_graph.get_connection_list():
+		if StringName(connection["from_node"]) != node_id:
+			continue
+		var to_node_id := StringName(connection["to_node"])
+		var to_port := int(connection["to_port"])
+		connection_flow_started_at[_connection_flow_key(
+			node_id,
+			int(connection["from_port"]),
+			to_node_id,
+			to_port
+		)] = time_seconds
+		_reset_downstream_transport_state(to_node_id, to_port)
+
+
 func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 	if visited.has(node_id):
 		return null
@@ -314,12 +397,21 @@ func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 	var material := _material_node(node_id)
 	if material != null:
 		return primitive_glyph(StringName(material.get_meta("landmark_kind", &"")))
-	if _relay_node(node_id) == null:
+	var relay := _relay_node(node_id)
+	var rotation := _rotation_node(node_id)
+	if relay == null and rotation == null:
 		return null
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["to_node"]) != node_id or int(connection["to_port"]) != 0:
 			continue
-		return _output_glyph(StringName(connection["from_node"]), visited)
+		var input_glyph := _output_glyph(StringName(connection["from_node"]), visited)
+		if input_glyph == null:
+			return null
+		if rotation != null:
+			return input_glyph.rotated_degrees(
+				int(rotation.get_meta("rotation_degrees", 45))
+			)
+		return input_glyph
 	return null
 
 
@@ -509,7 +601,7 @@ func _on_connection_request(
 	to_port: int
 ) -> void:
 	if from_port != 0 or not _valid_output_node(from_node) or not _valid_input_port(to_node, to_port):
-		summon_state_label.text = "出力ポートから中継入力または召喚器入力へ接続"
+		summon_state_label.text = "出力ポートから加工入力または召喚器入力へ接続"
 		summon_state_label.add_theme_color_override("font_color", Color(0.96, 0.62, 0.40))
 		return
 	connect_output_to_input(from_node, to_node, to_port)
@@ -542,15 +634,19 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			else {}
 		)
 		hovered_connection_key = String(hovered_connection.get("key", ""))
-		if relay_placement_active:
+		if relay_placement_active or rotation_placement_active:
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
-			factory_graph.tooltip_text = "クリックで中継ノードを配置 // 右クリックで取消"
+			factory_graph.tooltip_text = (
+				"クリックで回転ノードを配置 // 右クリックで取消"
+				if rotation_placement_active
+				else "クリックで中継ノードを配置 // 右クリックで取消"
+			)
 		elif hovered_input_node_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 			factory_graph.tooltip_text = (
 				"INPUT %d // 左クリックで目標表示 // 右クリックで切断" % (hovered_input_index + 1)
 				if hovered_input_index >= 0
-				else "中継入力 // 出力から接続 // 右クリックで切断"
+				else "加工入力 // 出力から接続 // 右クリックで切断"
 			)
 		elif hovered_material_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
@@ -569,8 +665,9 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	var mouse_event := event as InputEventMouseButton
 	if mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
-		if relay_placement_active:
+		if relay_placement_active or rotation_placement_active:
 			cancel_relay_placement()
+			cancel_rotation_placement()
 			factory_graph.accept_event()
 			return
 		var disconnect_target := directional_connection_target_at(mouse_event.position)
@@ -594,9 +691,14 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	connection_pointer = mouse_event.position
 	if mouse_event.pressed:
-		if relay_placement_active:
-			place_relay_at(graph_screen_to_world(mouse_event.position))
+		if relay_placement_active or rotation_placement_active:
+			var world_position := graph_screen_to_world(mouse_event.position)
+			if rotation_placement_active:
+				place_rotation_at(world_position)
+			else:
+				place_relay_at(world_position)
 			cancel_relay_placement()
+			cancel_rotation_placement()
 			factory_graph.accept_event()
 			return
 		var input_target := directional_connection_target_at(mouse_event.position)
@@ -614,7 +716,7 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			connecting_material_id = material_id
 			connection_press_position = mouse_event.position
 			connection_drag_moved = false
-			summon_state_label.text = "接続先の中継入力または召喚器入力を選択"
+			summon_state_label.text = "接続先の加工入力または召喚器入力を選択"
 			summon_state_label.add_theme_color_override("font_color", Color(0.58, 0.86, 1.0))
 			factory_graph.accept_event()
 			return
@@ -655,7 +757,7 @@ func _clear_directional_connection_preview() -> void:
 
 
 func directional_output_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + relay_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes:
 		var node_id := StringName(node.name)
 		if graph_position.distance_to(directional_output_position(node_id, factory_graph)) <= PORT_HIT_RADIUS:
 			return node_id
@@ -663,10 +765,10 @@ func directional_output_at(graph_position: Vector2) -> StringName:
 
 
 func directional_connection_target_at(graph_position: Vector2) -> Dictionary:
-	for relay in relay_nodes:
-		var relay_id := StringName(relay.name)
-		if graph_position.distance_to(directional_node_input_position(relay_id, 0, factory_graph)) <= PORT_HIT_RADIUS:
-			return { "node_id": relay_id, "port": 0 }
+	for processor in relay_nodes + rotation_nodes:
+		var processor_id := StringName(processor.name)
+		if graph_position.distance_to(directional_node_input_position(processor_id, 0, factory_graph)) <= PORT_HIT_RADIUS:
+			return { "node_id": processor_id, "port": 0 }
 	if summoner_node != null:
 		for input_index in SUMMONER_INPUT_COUNT:
 			if graph_position.distance_to(directional_input_position(input_index, factory_graph)) <= PORT_HIT_RADIUS:
@@ -713,7 +815,7 @@ func directional_input_at(graph_position: Vector2) -> int:
 
 
 func directional_landmark_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + relay_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes:
 		if graph_position.distance_to(_node_center_in(node, factory_graph)) <= _landmark_radius_in(node, factory_graph):
 			return StringName(node.name)
 	if (
@@ -737,6 +839,8 @@ func _landmark_tooltip(node_id: StringName) -> String:
 		)
 	if _relay_node(node_id) != null:
 		return "中継ノード // グリフを変えずに転送 // ドラッグ移動"
+	if _rotation_node(node_id) != null:
+		return _rotation_tooltip(node_id)
 	return ""
 
 
@@ -748,7 +852,13 @@ func _output_tooltip(node_id: StringName) -> String:
 		)
 	if _relay_node(node_id) != null:
 		return "中継出力 // 複数の下流へ分配可能"
+	if _rotation_node(node_id) != null:
+		return "回転出力 // %d°加工済み // 複数の下流へ分配可能" % rotation_angle(node_id)
 	return ""
+
+
+func _rotation_tooltip(node_id: StringName) -> String:
+	return "回転ノード // %d° // ホイール: 1° // Shift+ホイール: 15°" % rotation_angle(node_id)
 
 
 func _connection_tooltip(connection: Dictionary) -> String:
@@ -800,10 +910,14 @@ func directional_input_position(input_index: int, coordinate_space: Control) -> 
 func directional_node_input_position(node_id: StringName, input_port: int, coordinate_space: Control) -> Vector2:
 	if summoner_node != null and node_id == StringName(summoner_node.name):
 		return directional_input_position(input_port, coordinate_space)
-	var relay := _relay_node(node_id)
-	if relay == null or input_port != 0 or coordinate_space == null:
+	var processor := _processing_node(node_id)
+	if processor == null or input_port != 0 or coordinate_space == null:
 		return Vector2.ZERO
-	return _node_boundary_position(relay, _relay_input_direction(node_id, coordinate_space), coordinate_space)
+	return _node_boundary_position(
+		processor,
+		_processing_input_direction(node_id, coordinate_space),
+		coordinate_space
+	)
 
 
 func connection_world_length(from_node_id: StringName, to_node_id: StringName, input_port: int) -> float:
@@ -915,17 +1029,17 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 
 
 func _draw_directional_ports(overlay: Control) -> void:
-	for node in material_nodes + relay_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes:
 		var node_id := StringName(node.name)
 		var position := directional_output_position(node_id, overlay)
 		var active := node_id == connecting_material_id or node_id == hovered_material_id
 		var direction := _node_center_in(node, overlay).direction_to(position)
 		_draw_output_port(overlay, position, direction, PORT_COLOR if active else PORT_IDLE_COLOR, active)
-	for relay in relay_nodes:
-		var relay_id := StringName(relay.name)
-		var relay_input := directional_node_input_position(relay_id, 0, overlay)
-		var relay_active := hovered_input_node_id == relay_id or connecting_material_id != &""
-		_draw_input_port(overlay, relay_input, PORT_COLOR if relay_active else PORT_IDLE_COLOR)
+	for processor in relay_nodes + rotation_nodes:
+		var processor_id := StringName(processor.name)
+		var processor_input := directional_node_input_position(processor_id, 0, overlay)
+		var processor_active := hovered_input_node_id == processor_id or connecting_material_id != &""
+		_draw_input_port(overlay, processor_input, PORT_COLOR if processor_active else PORT_IDLE_COLOR)
 	for input_index in SUMMONER_INPUT_COUNT:
 		var position := directional_input_position(input_index, overlay)
 		var state := summon_state(input_index)
@@ -1325,7 +1439,7 @@ func _node_next_output_time(
 	not_before_time: float,
 	visited: Dictionary
 ) -> float:
-	if _relay_node(node_id) == null or visited.has(node_id):
+	if _processing_node(node_id) == null or visited.has(node_id):
 		return INF
 	visited[node_id] = true
 	for connection in factory_graph.get_connection_list():
@@ -1378,22 +1492,22 @@ func _summoner_input_direction(input_index: int, _coordinate_space: Control) -> 
 	)
 
 
-func _relay_input_direction(relay_id: StringName, coordinate_space: Control) -> Vector2:
-	var relay := _relay_node(relay_id)
-	if relay == null:
+func _processing_input_direction(node_id: StringName, coordinate_space: Control) -> Vector2:
+	var processor := _processing_node(node_id)
+	if processor == null:
 		return Vector2.LEFT
-	var relay_center := _node_center_in(relay, coordinate_space)
+	var processor_center := _node_center_in(processor, coordinate_space)
 	for connection in factory_graph.get_connection_list():
-		if StringName(connection["to_node"]) != relay_id or int(connection["to_port"]) != 0:
+		if StringName(connection["to_node"]) != node_id or int(connection["to_port"]) != 0:
 			continue
 		var source := _factory_node(StringName(connection["from_node"]))
 		if source != null:
-			return relay_center.direction_to(_node_center_in(source, coordinate_space))
+			return processor_center.direction_to(_node_center_in(source, coordinate_space))
 	if connecting_material_id != &"":
 		var active_source := _factory_node(connecting_material_id)
-		if active_source != null and StringName(active_source.name) != relay_id:
-			return relay_center.direction_to(_node_center_in(active_source, coordinate_space))
-	return _node_center_in(summoner_node, coordinate_space).direction_to(relay_center)
+		if active_source != null and StringName(active_source.name) != node_id:
+			return processor_center.direction_to(_node_center_in(active_source, coordinate_space))
+	return _node_center_in(summoner_node, coordinate_space).direction_to(processor_center)
 
 
 func _node_boundary_position(node: GraphNode, direction: Vector2, coordinate_space: Control) -> Vector2:
@@ -1491,17 +1605,17 @@ func _remove_input_connection(to_node_id: StringName, to_port: int) -> bool:
 
 
 func _valid_output_node(node_id: StringName) -> bool:
-	return _material_node(node_id) != null or _relay_node(node_id) != null
+	return _material_node(node_id) != null or _processing_node(node_id) != null
 
 
 func _valid_input_port(node_id: StringName, input_port: int) -> bool:
 	if summoner_node != null and node_id == StringName(summoner_node.name):
 		return input_port >= 0 and input_port < SUMMONER_INPUT_COUNT
-	return _relay_node(node_id) != null and input_port == 0
+	return _processing_node(node_id) != null and input_port == 0
 
 
 func _would_create_connection_cycle(from_node_id: StringName, to_node_id: StringName) -> bool:
-	if _relay_node(from_node_id) == null:
+	if _processing_node(from_node_id) == null:
 		return false
 	var pending: Array[StringName] = [to_node_id]
 	var visited: Dictionary = {}
@@ -1532,13 +1646,25 @@ func _relay_node(node_id: StringName) -> GraphNode:
 	return null
 
 
+func _rotation_node(node_id: StringName) -> GraphNode:
+	for node in rotation_nodes:
+		if is_instance_valid(node) and StringName(node.name) == node_id:
+			return node
+	return null
+
+
+func _processing_node(node_id: StringName) -> GraphNode:
+	var relay := _relay_node(node_id)
+	return relay if relay != null else _rotation_node(node_id)
+
+
 func _factory_node(node_id: StringName) -> GraphNode:
 	if summoner_node != null and StringName(summoner_node.name) == node_id:
 		return summoner_node
 	var material := _material_node(node_id)
 	if material != null:
 		return material
-	return _relay_node(node_id)
+	return _processing_node(node_id)
 
 
 func _refresh_summon_state() -> void:
@@ -1640,6 +1766,15 @@ func _build_ui() -> void:
 	relay_button.toggle_mode = true
 	relay_button.pressed.connect(_on_relay_button_pressed)
 	toolbar.add_child(relay_button)
+
+	rotation_button = Button.new()
+	rotation_button.name = "AddRotationButton"
+	rotation_button.text = "＋ 回転"
+	rotation_button.tooltip_text = "回転ノードを盤面へ配置 // ホイールで1°ずつ設定"
+	rotation_button.custom_minimum_size = Vector2(92.0, 34.0)
+	rotation_button.toggle_mode = true
+	rotation_button.pressed.connect(_on_rotation_button_pressed)
+	toolbar.add_child(rotation_button)
 
 	var title := Label.new()
 	title.text = "FACTORY PROTOTYPE // 固定素材地帯"
@@ -1903,11 +2038,49 @@ func _make_relay_node(node_id: StringName, world_center: Vector2) -> GraphNode:
 	return node
 
 
+func _make_rotation_node(
+	node_id: StringName,
+	world_center: Vector2,
+	angle_degrees: int
+) -> GraphNode:
+	var node := GraphNode.new()
+	node.name = String(node_id)
+	node.title = ""
+	node.draggable = true
+	node.resizable = false
+	node.set_meta("landmark_kind", &"rotation")
+	node.set_meta("rotation_node", true)
+	node.set_meta("rotation_degrees", posmod(angle_degrees, 360))
+
+	var port_row := Control.new()
+	port_row.custom_minimum_size = Vector2(1.0, 1.0)
+	port_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	node.add_child(port_row)
+	node.set_slot(0, true, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
+
+	var visual = FactoryLandmarkVisualModel.new()
+	visual.configure_rotation(angle_degrees)
+	node.add_child(visual)
+	_configure_round_landmark_node(node, visual.custom_minimum_size)
+	node.position_offset = world_center - visual.custom_minimum_size * 0.5
+	node.mouse_filter = Control.MOUSE_FILTER_PASS
+	node.tooltip_text = "回転ノード // %d° // ホイール: 1° // Shift+ホイール: 15°" % posmod(angle_degrees, 360)
+	node.gui_input.connect(_on_rotation_node_gui_input.bind(node))
+	return node
+
+
 func _on_relay_button_pressed() -> void:
 	if relay_button.button_pressed:
 		begin_relay_placement()
 	else:
 		cancel_relay_placement()
+
+
+func _on_rotation_button_pressed() -> void:
+	if rotation_button.button_pressed:
+		begin_rotation_placement()
+	else:
+		cancel_rotation_placement()
 
 
 func _on_relay_node_gui_input(event: InputEvent, relay: GraphNode) -> void:
@@ -1929,10 +2102,43 @@ func _on_relay_node_gui_input(event: InputEvent, relay: GraphNode) -> void:
 		relay.accept_event()
 
 
+func _on_rotation_node_gui_input(event: InputEvent, rotation: GraphNode) -> void:
+	if not event is InputEventMouse:
+		return
+	var rotation_id := StringName(rotation.name)
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if (
+			mouse_event.pressed
+			and mouse_event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]
+		):
+			var direction := 1 if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP else -1
+			var step := 15 if mouse_event.shift_pressed else 1
+			set_rotation_angle(rotation_id, rotation_angle(rotation_id) + direction * step)
+			rotation.accept_event()
+			return
+	var graph_event := event.duplicate() as InputEventMouse
+	graph_event.position = _convert_control_point(rotation, event.position, factory_graph)
+	var over_input: bool = graph_event.position.distance_to(
+		directional_node_input_position(rotation_id, 0, factory_graph)
+	) <= PORT_HIT_RADIUS
+	var over_output: bool = graph_event.position.distance_to(
+		directional_output_position(rotation_id, factory_graph)
+	) <= PORT_HIT_RADIUS
+	if not over_input and not over_output:
+		return
+	_on_factory_graph_input(graph_event)
+	if event is InputEventMouseButton:
+		rotation.accept_event()
+
+
 func _refresh_factory_status_label() -> void:
 	if status_label == null:
 		return
-	status_label.text = "広域盤面 9000 × 6000  //  資源パッチ 30  //  中継 %d  //  中央召喚器 1" % relay_nodes.size()
+	status_label.text = "広域盤面 9000 × 6000  //  資源 30  //  中継 %d  //  回転 %d  //  召喚器 1" % [
+		relay_nodes.size(),
+		rotation_nodes.size(),
+	]
 
 
 func _configure_round_landmark_node(node: GraphNode, minimum_size: Vector2) -> void:
