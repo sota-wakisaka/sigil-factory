@@ -4,6 +4,9 @@ extends Control
 const FactoryLandmarkVisualModel := preload("res://experiments/factory_prototype/factory_landmark.gd")
 const FactoryDirectionalOverlayModel := preload("res://experiments/factory_prototype/factory_directional_overlay.gd")
 const FactoryFlowAudioModel := preload("res://experiments/factory_prototype/factory_flow_audio.gd")
+const GlyphModelScript := preload("res://src/domain/glyph.gd")
+const GlyphComponentModelScript := preload("res://src/domain/glyph_component.gd")
+const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 
 const MENU_SCENE := "res://src/main_menu.tscn"
 const PLAYFIELD_SIZE := Vector2(9000.0, 6000.0)
@@ -235,6 +238,10 @@ func target_kind_for_input(input_index: int) -> StringName:
 	return input_target_kinds[input_index]
 
 
+func target_glyph_for_input(input_index: int) -> GlyphModel:
+	return primitive_glyph(target_kind_for_input(input_index))
+
+
 func target_monster_id(input_index: int = -1) -> StringName:
 	var resolved_index := selected_input_index if input_index < 0 else input_index
 	var target_kind := target_kind_for_input(resolved_index)
@@ -244,48 +251,84 @@ func target_monster_id(input_index: int = -1) -> StringName:
 
 
 func connected_material_kind(input_index: int = -1) -> StringName:
+	return glyph_primitive_kind(connected_glyph(input_index))
+
+
+func connected_glyph(input_index: int = -1) -> GlyphModel:
 	var resolved_index := selected_input_index if input_index < 0 else input_index
 	if resolved_index < 0 or resolved_index >= SUMMONER_INPUT_COUNT:
-		return &""
+		return null
 	if factory_graph == null or summoner_node == null:
-		return &""
+		return null
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["to_node"]) != StringName(summoner_node.name):
 			continue
 		if int(connection["to_port"]) != resolved_index:
 			continue
-		return output_glyph_kind(StringName(connection["from_node"]))
-	return &""
+		return output_glyph(StringName(connection["from_node"]))
+	return null
+
+
+func primitive_glyph(primitive_id: StringName) -> GlyphModel:
+	if primitive_id == &"":
+		return null
+	return GlyphModelScript.new([
+		GlyphComponentModelScript.new(primitive_id),
+	])
+
+
+func glyph_primitive_kind(glyph: GlyphModel) -> StringName:
+	if (
+		glyph == null
+		or not glyph.combine_children.is_empty()
+		or glyph.components.size() != 1
+		or not glyph.components[0] is GlyphComponentModel
+	):
+		return &""
+	return StringName(glyph.components[0].primitive_id)
+
+
+func glyph_matches_target(glyph: GlyphModel, input_index: int) -> bool:
+	var target_glyph := target_glyph_for_input(input_index)
+	return (
+		glyph != null
+		and target_glyph != null
+		and glyph.canonical_serialization() == target_glyph.canonical_serialization()
+	)
 
 
 func output_glyph_kind(node_id: StringName) -> StringName:
-	return _output_glyph_kind(node_id, {})
+	return glyph_primitive_kind(output_glyph(node_id))
 
 
-func _output_glyph_kind(node_id: StringName, visited: Dictionary) -> StringName:
+func output_glyph(node_id: StringName) -> GlyphModel:
+	return _output_glyph(node_id, {})
+
+
+func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 	if visited.has(node_id):
-		return &""
+		return null
 	visited[node_id] = true
 	var material := _material_node(node_id)
 	if material != null:
-		return StringName(material.get_meta("landmark_kind", &""))
+		return primitive_glyph(StringName(material.get_meta("landmark_kind", &"")))
 	if _relay_node(node_id) == null:
-		return &""
+		return null
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["to_node"]) != node_id or int(connection["to_port"]) != 0:
 			continue
-		return _output_glyph_kind(StringName(connection["from_node"]), visited)
-	return &""
+		return _output_glyph(StringName(connection["from_node"]), visited)
+	return null
 
 
 func summon_state(input_index: int = -1) -> StringName:
 	var resolved_index := selected_input_index if input_index < 0 else input_index
-	var material_kind := connected_material_kind(resolved_index)
-	if material_kind == &"":
+	var glyph := connected_glyph(resolved_index)
+	if glyph == null:
 		return &"idle"
 	if flow_arrival_cycle(resolved_index, flow_animation_time_seconds()) < 0:
 		return &"transporting"
-	return &"matched" if material_kind == target_kind_for_input(resolved_index) else &"mismatch"
+	return &"matched" if glyph_matches_target(glyph, resolved_index) else &"mismatch"
 
 
 func summoning_monsters() -> Array[StringName]:
@@ -307,8 +350,8 @@ func summon_event_count() -> int:
 func process_transport_at(time_seconds: float) -> void:
 	var state_changed := false
 	for input_index in SUMMONER_INPUT_COUNT:
-		var material_kind := connected_material_kind(input_index)
-		if material_kind == &"":
+		var glyph := connected_glyph(input_index)
+		if glyph == null:
 			if flow_arrival_cycles[input_index] != -1:
 				state_changed = true
 			flow_arrival_cycles[input_index] = -1
@@ -323,12 +366,12 @@ func process_transport_at(time_seconds: float) -> void:
 			input_index,
 			previous_cycle + 1,
 			arrival_cycle,
-			material_kind
+			glyph
 		)
 		flow_arrival_cycles[input_index] = arrival_cycle
 		state_changed = true
-		if flow_audio != null and material_kind == target_kind_for_input(input_index):
-			flow_audio.play_arrival(material_kind)
+		if flow_audio != null and glyph_matches_target(glyph, input_index):
+			flow_audio.play_arrival(target_kind_for_input(input_index))
 	if state_changed:
 		_refresh_summon_state()
 
@@ -337,12 +380,14 @@ func _record_summoner_arrivals(
 	input_index: int,
 	first_cycle: int,
 	last_cycle: int,
-	material_kind: StringName
+	glyph: GlyphModel
 ) -> void:
-	if last_cycle < first_cycle:
+	if glyph == null or last_cycle < first_cycle:
 		return
 	var target_kind := target_kind_for_input(input_index)
-	var matched := material_kind == target_kind
+	var material_kind := glyph_primitive_kind(glyph)
+	var matched := glyph_matches_target(glyph, input_index)
+	var canonical_glyph := glyph.canonical_serialization()
 	var arrival_count := last_cycle - first_cycle + 1
 	var monster_id := target_monster_id(input_index) if matched else StringName()
 	if matched:
@@ -356,6 +401,8 @@ func _record_summoner_arrivals(
 			"input_index": input_index,
 			"arrival_cycle": arrival_cycle,
 			"arrival_time": summoner_arrival_time(input_index, arrival_cycle),
+			"glyph": glyph.copy(),
+			"canonical_glyph": canonical_glyph,
 			"glyph_kind": material_kind,
 			"target_kind": target_kind,
 			"matched": matched,
@@ -402,7 +449,7 @@ func connect_output_to_input(from_node_id: StringName, to_node_id: StringName, t
 		var matched := (
 			summoner_node == null
 			or to_node_id != StringName(summoner_node.name)
-			or output_glyph_kind(from_node_id) == target_kind_for_input(to_port)
+			or glyph_matches_target(output_glyph(from_node_id), to_port)
 		)
 		flow_audio.play_connection(matched)
 	return true
@@ -763,7 +810,7 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 			input_index,
 			now
 		)
-		if output_glyph_kind(from_node_id) != &"":
+		if output_glyph(from_node_id) != null:
 			_draw_flowing_glyphs(
 				overlay,
 				start,
@@ -879,7 +926,10 @@ func _draw_flowing_glyphs(
 	var trail_progress := FLOW_TRAIL_SCREEN_LENGTH / screen_length
 	for packet in packets:
 		var progress := float(packet["progress"])
-		var material_kind := StringName(packet["glyph_kind"])
+		var glyph_value = packet.get("glyph")
+		if not glyph_value is GlyphModel:
+			continue
+		var glyph: GlyphModel = glyph_value
 		var position := connection_curve_point(start, finish, progress)
 		var previous := connection_curve_point(
 			start,
@@ -895,7 +945,7 @@ func _draw_flowing_glyphs(
 			)
 			var mote := connection_curve_point(start, finish, mote_progress)
 			overlay.draw_circle(mote, 1.7 - float(mote_index) * 0.45, Color(color, 0.34), true)
-		_draw_transport_glyph(overlay, position, material_kind, color, direction)
+		_draw_transport_glyph(overlay, position, glyph, color, direction)
 	var arrival := flow_connection_arrival_progress(
 		line_length,
 		flow_start_time,
@@ -917,24 +967,23 @@ func _draw_flowing_glyphs(
 func _draw_transport_glyph(
 	overlay: Control,
 	position: Vector2,
-	material_kind: StringName,
+	glyph: GlyphModel,
 	state_color: Color,
 	_direction: Vector2
 ) -> void:
-	var glyph_color := Color(0.80, 0.94, 1.0, 1.0)
 	overlay.draw_circle(position, 11.0, Color(state_color, 0.10), true)
 	overlay.draw_circle(position, 8.0, Color(0.008, 0.035, 0.055, 0.94), true)
-	match material_kind:
-		&"circle":
-			overlay.draw_arc(position, 5.2, 0.0, TAU, 24, glyph_color, 1.8, true)
-		&"triangle":
-			var points := PackedVector2Array()
-			for index in 3:
-				points.append(position + Vector2.from_angle(-PI * 0.5 + TAU * float(index) / 3.0) * 5.8)
-			points.append(points[0])
-			overlay.draw_polyline(points, glyph_color, 1.8, true)
-		&"square":
-			overlay.draw_rect(Rect2(position - Vector2(4.5, 4.5), Vector2(9.0, 9.0)), glyph_color, false, 1.8, true)
+	if glyph == null:
+		return
+	GlyphPainterModel.draw_glyph(
+		overlay,
+		glyph,
+		position,
+		GlyphPainterModel.fit_scale(glyph, 5.6, false, 0.16, 1.15),
+		1.0,
+		false,
+		0.9
+	)
 
 
 func connection_curve_point(start: Vector2, finish: Vector2, progress: float) -> Vector2:
@@ -1098,9 +1147,11 @@ func transport_packets_for_connection(
 	var line_length := connection_world_length(from_node_id, to_node_id, to_port)
 	var interval := flow_packet_interval()
 	var emitted_count := floori((resolved_time - flow_start_time) / interval) + 1
-	var glyph_kind := output_glyph_kind(from_node_id)
-	if glyph_kind == &"":
+	var glyph := output_glyph(from_node_id)
+	if glyph == null:
 		return packets
+	var glyph_kind := glyph_primitive_kind(glyph)
+	var canonical_glyph := glyph.canonical_serialization()
 	for packet_index in flow_packet_slot_count(line_length):
 		var progress := flow_packet_progress(
 			line_length,
@@ -1120,6 +1171,8 @@ func transport_packets_for_connection(
 				sequence_index,
 			],
 			"sequence_index": sequence_index,
+			"glyph": glyph.copy(),
+			"canonical_glyph": canonical_glyph,
 			"glyph_kind": glyph_kind,
 			"emitted_at": emitted_at,
 			"arrival_at": emitted_at + flow_travel_duration(line_length),

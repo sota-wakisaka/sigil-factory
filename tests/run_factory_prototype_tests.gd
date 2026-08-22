@@ -139,6 +139,11 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")
 	_expect(prototype.target_kind_for_input(1) == &"triangle", "input 2 should initially target Triangle")
 	_expect(prototype.target_kind_for_input(2) == &"square", "input 3 should initially target Square")
+	_expect(
+		prototype.target_glyph_for_input(0).canonical_serialization()
+		!= prototype.target_glyph_for_input(1).canonical_serialization(),
+		"summoner targets should be real canonical Glyph data instead of display-only shape names"
+	)
 	_expect(prototype.selected_input_index == 0 and prototype.selected_target_kind == &"circle", "the target panel should initially show input 1")
 	_expect(prototype.target_monster_id() == &"ring_wisp", "input 1 should show the Ring Wisp")
 	_expect(prototype.summon_state() == &"idle", "input 1 should start disconnected")
@@ -188,6 +193,19 @@ func _test_fixed_factory_landmarks() -> void:
 	relay.gui_input.emit(relay_input_click)
 	_expect(prototype.output_glyph_kind(relay_id) == &"circle", "clicking a material output and the visible relay input should create the connection")
 	_expect(prototype.output_glyph_kind(relay_id) == &"circle", "a relay should preserve its incoming Glyph kind")
+	var relay_output_glyph = prototype.output_glyph(relay_id)
+	_expect(
+		relay_output_glyph != null
+		and relay_output_glyph.canonical_serialization()
+		== prototype.primitive_glyph(&"circle").canonical_serialization(),
+		"a relay should expose the same canonical Glyph as its material source"
+	)
+	if relay_output_glyph != null:
+		relay_output_glyph.components[0].primitive_id = &"triangle"
+		_expect(
+			prototype.output_glyph_kind(relay_id) == &"circle",
+			"callers should receive an owned Glyph copy instead of mutating factory output state"
+		)
 	var circle_source_id := StringName(circle_source.name)
 	var upstream_flow_start: float = prototype.connection_flow_start_time(
 		circle_source_id,
@@ -218,6 +236,27 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(initial_packets.size() == 1, "the transport model should own one source packet at connection time")
 	if not initial_packets.is_empty():
 		_expect(String(initial_packets[0]["packet_id"]).ends_with("#0"), "the first transported Glyph should have a stable sequence identity")
+		var transported_glyph = initial_packets[0].get("glyph")
+		_expect(
+			transported_glyph != null
+			and String(initial_packets[0]["canonical_glyph"])
+			== prototype.primitive_glyph(&"circle").canonical_serialization(),
+			"each conveyor packet should carry the canonical Glyph it visibly transports"
+		)
+		if transported_glyph != null:
+			transported_glyph.components[0].primitive_id = &"square"
+			var fresh_packets: Array[Dictionary] = prototype.transport_packets_for_connection(
+				circle_source_id,
+				relay_id,
+				0,
+				10.0
+			)
+			_expect(
+				not fresh_packets.is_empty()
+				and String(fresh_packets[0]["canonical_glyph"])
+				== prototype.primitive_glyph(&"circle").canonical_serialization(),
+				"mutating one packet copy must not alias later transport previews"
+			)
 	_expect(prototype.connect_output_to_input(relay_id, StringName(prototype.summoner_node.name), 0), "a relay output should connect to a summoner input")
 	var downstream_flow_start: float = prototype.connection_flow_start_time(
 		relay_id,
@@ -251,6 +290,11 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.summon_state(0) == &"matched", "Circle routed through a relay should summon after the Glyph arrives")
 	_expect(prototype.summoned_monster_count(&"ring_wisp") == 1, "the first matching arrival should summon exactly one monster")
 	_expect(prototype.summon_event_count() == 1, "the first delivered Glyph should create one arrival event")
+	_expect(
+		String(prototype.summon_events[0]["canonical_glyph"])
+		== prototype.target_glyph_for_input(0).canonical_serialization(),
+		"summon events should record the same canonical Glyph used for matching"
+	)
 	var ring_count_before_rewire: int = prototype.summoned_monster_count(&"ring_wisp")
 	_expect(
 		prototype.connect_output_to_input(StringName(triangle_source.name), relay_id, 0),
