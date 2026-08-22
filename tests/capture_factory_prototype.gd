@@ -22,6 +22,7 @@ func _initialize() -> void:
 
 	var capture_viewport := SubViewport.new()
 	capture_viewport.size = Vector2i(width, height)
+	capture_viewport.gui_embed_subwindows = true
 	capture_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	root.add_child(capture_viewport)
 
@@ -52,6 +53,13 @@ func _initialize() -> void:
 			var rotation = view.place_rotation_at(Vector2(3900.0, 2450.0), 45)
 			view.connect_output_to_input(&"square_01", StringName(rotation.name), 0)
 			view.connect_output_to_input(StringName(rotation.name), &"summoner_center", 2)
+		elif fixture == "rotation_settings":
+			var rotation = view.place_rotation_at(Vector2(3900.0, 2450.0), 45)
+			view.open_rotation_settings(StringName(rotation.name), Vector2(620.0, 330.0))
+		elif fixture == "line_settings":
+			view.connect_material_to_summoner(&"circle_01", 0)
+			var connection = view._connection_to_input(&"summoner_center", 0)
+			view.open_line_settings(connection, Vector2(620.0, 330.0))
 		if requested_flow_time >= 0.0:
 			view.flow_time_override = requested_flow_time
 		if options.has("hover_line_input"):

@@ -215,11 +215,43 @@ func _test_fixed_factory_landmarks() -> void:
 		== prototype.primitive_glyph(&"square").rotated_degrees(45).canonical_serialization(),
 		"the rotation node should apply a pure 45 degree transform to its input Glyph"
 	)
-	_expect(prototype.set_rotation_angle(rotation_id, 37), "rotation should accept an arbitrary one-degree setting")
+	var settings_click := InputEventMouseButton.new()
+	settings_click.button_index = MOUSE_BUTTON_RIGHT
+	settings_click.pressed = true
+	settings_click.position = prototype._convert_control_point(
+		prototype.factory_graph,
+		prototype._node_center_in(rotation, prototype.factory_graph),
+		rotation
+	)
+	settings_click.global_position = Vector2(620.0, 360.0)
+	rotation.gui_input.emit(settings_click)
 	_expect(
+		prototype.rotation_settings_popup != null
+		and prototype.rotation_settings_popup.visible
+		and prototype.rotation_settings_node_id == rotation_id,
+		"right-clicking a processor body should open that node's settings menu"
+	)
+	_expect(
+		int(prototype.rotation_settings_angle.value) == 45,
+		"the settings menu should start from the selected node's current angle"
+	)
+	prototype.rotation_settings_angle.value = 37.0
+	_expect(
+		prototype.rotation_angle(rotation_id) == 37
+		and
 		prototype.output_glyph(rotation_id).canonical_serialization()
 		== prototype.primitive_glyph(&"square").rotated_degrees(37).canonical_serialization(),
-		"changing rotation should deterministically rebuild its output Glyph"
+		"editing the menu's one-degree value should deterministically rebuild its output Glyph"
+	)
+	prototype.rotation_settings_popup.hide()
+	var body_wheel := InputEventMouseButton.new()
+	body_wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+	body_wheel.pressed = true
+	body_wheel.position = settings_click.position
+	rotation.gui_input.emit(body_wheel)
+	_expect(
+		prototype.rotation_angle(rotation_id) == 37,
+		"scrolling the node body should no longer modify its angle outside the settings menu"
 	)
 	prototype.disconnect_input(rotation_id, 0)
 	var relay_source_click := InputEventMouseButton.new()
@@ -470,8 +502,20 @@ func _test_fixed_factory_landmarks() -> void:
 		direct_line_cut.button_index = MOUSE_BUTTON_RIGHT
 		direct_line_cut.pressed = true
 		direct_line_cut.position = direct_line_midpoint
+		direct_line_cut.global_position = Vector2(640.0, 420.0)
+		var direct_disconnect_sound_count: int = prototype.flow_audio.disconnect_play_count
 		prototype.factory_graph.gui_input.emit(direct_line_cut)
-		_expect(prototype.summon_state(0) == &"idle", "right-clicking the visible conveyor should disconnect that route directly")
+		_expect(
+			prototype.line_settings_popup.visible
+			and not prototype.line_settings_connection.is_empty()
+			and "距離" in prototype.line_settings_details.text,
+			"right-clicking the visible conveyor should open its individual menu"
+		)
+		_expect(prototype.summon_state(0) == &"transporting", "opening a conveyor menu must not delete that route")
+		_expect(prototype.flow_audio.disconnect_play_count == direct_disconnect_sound_count, "opening a conveyor menu must not play a deletion sound")
+		prototype.line_settings_delete_button.pressed.emit()
+		_expect(prototype.summon_state(0) == &"idle", "choosing delete in the conveyor menu should remove only that route")
+		_expect(prototype.flow_audio.disconnect_play_count == direct_disconnect_sound_count + 1, "deleting from the conveyor menu should play one disconnect sound")
 		_expect(prototype.hovered_connection_key == "", "disconnecting a hovered conveyor should clear its stale highlight")
 		_expect(
 			prototype.connect_material_to_summoner(StringName(circle_source.name), 0),
@@ -605,10 +649,14 @@ func _test_fixed_factory_landmarks() -> void:
 	disconnect_click.button_index = MOUSE_BUTTON_RIGHT
 	disconnect_click.pressed = true
 	disconnect_click.position = prototype.directional_input_position(2, prototype.factory_graph)
+	disconnect_click.global_position = Vector2(760.0, 520.0)
 	var disconnect_sound_count: int = prototype.flow_audio.disconnect_play_count
 	prototype.factory_graph.gui_input.emit(disconnect_click)
 	_expect(prototype.selected_input_index == 2, "right-clicking an input should keep its target selected")
-	_expect(prototype.summon_state(2) == &"idle", "right-clicking a directional input should disconnect only that input")
+	_expect(prototype.line_settings_popup.visible, "right-clicking a connected input should open the same conveyor menu")
+	_expect(prototype.summon_state(2) == &"matched", "opening the input's conveyor menu must preserve its route")
+	prototype.line_settings_delete_button.pressed.emit()
+	_expect(prototype.summon_state(2) == &"idle", "choosing delete from an input's menu should disconnect only that input")
 	_expect(prototype.flow_audio.disconnect_play_count == disconnect_sound_count + 1, "disconnecting a directional input should play one short disconnect sound")
 	var arrival_sound_count: int = prototype.flow_audio.arrival_play_count
 	prototype.flow_audio.play_arrival(&"circle")

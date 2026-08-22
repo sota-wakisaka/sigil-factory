@@ -121,6 +121,16 @@ var relay_serial := 0
 var rotation_button: Button
 var rotation_placement_active := false
 var rotation_serial := 0
+var rotation_settings_popup: PopupPanel
+var rotation_settings_title: Label
+var rotation_settings_angle: SpinBox
+var rotation_settings_node_id: StringName = &""
+var rotation_settings_syncing := false
+var line_settings_popup: PopupPanel
+var line_settings_title: Label
+var line_settings_details: Label
+var line_settings_delete_button: Button
+var line_settings_connection: Dictionary = {}
 var target_panel: PanelContainer
 var target_preview
 var target_header_label: Label
@@ -399,6 +409,82 @@ func set_rotation_angle(node_id: StringName, angle_degrees: int) -> bool:
 	return true
 
 
+func open_rotation_settings(node_id: StringName, viewport_position: Vector2) -> bool:
+	var rotation := _rotation_node(node_id)
+	if rotation == null or rotation_settings_popup == null or rotation_settings_angle == null:
+		return false
+	if line_settings_popup != null:
+		line_settings_popup.hide()
+	rotation_settings_node_id = node_id
+	rotation_settings_title.text = "回転ノード // %s" % String(node_id)
+	rotation_settings_syncing = true
+	rotation_settings_angle.set_value_no_signal(rotation_angle(node_id))
+	rotation_settings_syncing = false
+	var popup_size := Vector2i(252, 132)
+	var viewport_size := Vector2i(get_viewport_rect().size)
+	var popup_position := Vector2i(viewport_position.round()) + Vector2i(10, 8)
+	popup_position.x = clampi(popup_position.x, 0, maxi(viewport_size.x - popup_size.x, 0))
+	popup_position.y = clampi(popup_position.y, 0, maxi(viewport_size.y - popup_size.y, 0))
+	rotation_settings_popup.popup(Rect2i(popup_position, popup_size))
+	rotation_settings_angle.get_line_edit().grab_focus()
+	rotation_settings_angle.get_line_edit().select_all()
+	return true
+
+
+func open_line_settings(connection: Dictionary, viewport_position: Vector2) -> bool:
+	if line_settings_popup == null or factory_graph == null or connection.is_empty():
+		return false
+	var from_node_id := StringName(connection.get("from_node", &""))
+	var from_port := int(connection.get("from_port", 0))
+	var to_node_id := StringName(connection.get("to_node", &""))
+	var to_port := int(connection.get("to_port", -1))
+	if (
+		from_node_id == &""
+		or to_node_id == &""
+		or to_port < 0
+		or not factory_graph.is_node_connected(from_node_id, from_port, to_node_id, to_port)
+	):
+		return false
+	if rotation_settings_popup != null:
+		rotation_settings_popup.hide()
+	line_settings_connection = {
+		"from_node": from_node_id,
+		"from_port": from_port,
+		"to_node": to_node_id,
+		"to_port": to_port,
+	}
+	line_settings_title.text = "搬送路 // %s → %s" % [
+		_context_node_label(from_node_id),
+		_context_node_label(to_node_id, to_port),
+	]
+	var line_length := connection_world_length(from_node_id, to_node_id, to_port)
+	line_settings_details.text = "距離 %.0f\n初回 %.1fs // 間隔 %.1fs" % [
+		line_length,
+		flow_travel_duration(line_length),
+		flow_packet_interval(),
+	]
+	var popup_size := Vector2i(292, 174)
+	var viewport_size := Vector2i(get_viewport_rect().size)
+	var popup_position := Vector2i(viewport_position.round()) + Vector2i(10, 8)
+	popup_position.x = clampi(popup_position.x, 0, maxi(viewport_size.x - popup_size.x, 0))
+	popup_position.y = clampi(popup_position.y, 0, maxi(viewport_size.y - popup_size.y, 0))
+	line_settings_popup.popup(Rect2i(popup_position, popup_size))
+	line_settings_delete_button.grab_focus()
+	return true
+
+
+func _connection_to_input(to_node_id: StringName, to_port: int) -> Dictionary:
+	if factory_graph == null:
+		return {}
+	for connection in factory_graph.get_connection_list():
+		if (
+			StringName(connection["to_node"]) == to_node_id
+			and int(connection["to_port"]) == to_port
+		):
+			return connection.duplicate()
+	return {}
+
+
 func _restart_outgoing_transport(node_id: StringName, time_seconds: float) -> void:
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["from_node"]) != node_id:
@@ -668,9 +754,9 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		elif hovered_input_node_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 			factory_graph.tooltip_text = (
-				"INPUT %d // 左クリックで目標表示 // 右クリックで切断" % (hovered_input_index + 1)
+				"INPUT %d // 左クリックで目標表示 // 右クリックで搬送路メニュー" % (hovered_input_index + 1)
 				if hovered_input_index >= 0
-				else "加工入力 // 出力から接続 // 右クリックで切断"
+				else "加工入力 // 出力から接続 // 右クリックで搬送路メニュー"
 			)
 		elif hovered_material_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
@@ -694,21 +780,20 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			cancel_rotation_placement()
 			factory_graph.accept_event()
 			return
-		var disconnect_target := directional_connection_target_at(mouse_event.position)
-		if not disconnect_target.is_empty():
-			var disconnect_node := StringName(disconnect_target["node_id"])
-			var disconnect_port := int(disconnect_target["port"])
-			if summoner_node != null and disconnect_node == StringName(summoner_node.name):
-				select_input(disconnect_port)
-			disconnect_input(disconnect_node, disconnect_port)
+		var input_target := directional_connection_target_at(mouse_event.position)
+		if not input_target.is_empty():
+			var input_node := StringName(input_target["node_id"])
+			var input_port := int(input_target["port"])
+			if summoner_node != null and input_node == StringName(summoner_node.name):
+				select_input(input_port)
+			var input_connection := _connection_to_input(input_node, input_port)
+			if not input_connection.is_empty():
+				open_line_settings(input_connection, mouse_event.global_position)
 			factory_graph.accept_event()
 			return
-		var disconnect_connection := directional_connection_at(mouse_event.position)
-		if not disconnect_connection.is_empty():
-			disconnect_input(
-				StringName(disconnect_connection["to_node"]),
-				int(disconnect_connection["to_port"])
-			)
+		var line_connection := directional_connection_at(mouse_event.position)
+		if not line_connection.is_empty():
+			open_line_settings(line_connection, mouse_event.global_position)
 			factory_graph.accept_event()
 		return
 	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
@@ -882,7 +967,20 @@ func _output_tooltip(node_id: StringName) -> String:
 
 
 func _rotation_tooltip(node_id: StringName) -> String:
-	return "回転ノード // %d° // ホイール: 1° // Shift+ホイール: 15°" % rotation_angle(node_id)
+	return "回転ノード // %d° // 右クリックで設定" % rotation_angle(node_id)
+
+
+func _context_node_label(node_id: StringName, input_port: int = -1) -> String:
+	if summoner_node != null and node_id == StringName(summoner_node.name):
+		return "召喚器 INPUT %d" % (input_port + 1)
+	var material := _material_node(node_id)
+	if material != null:
+		return "%s資源" % _shape_symbol(StringName(material.get_meta("landmark_kind", &"")))
+	if _relay_node(node_id) != null:
+		return "中継"
+	if _rotation_node(node_id) != null:
+		return "回転 %d°" % rotation_angle(node_id)
+	return String(node_id)
 
 
 func _connection_tooltip(connection: Dictionary) -> String:
@@ -894,7 +992,7 @@ func _connection_tooltip(connection: Dictionary) -> String:
 	if from_node_id == &"" or to_node_id == &"" or to_port < 0:
 		return ""
 	var line_length := connection_world_length(from_node_id, to_node_id, to_port)
-	return "搬送路 // 距離 %.0f // 初回 %.1fs // 間隔 %.1fs // 右クリックで切断" % [
+	return "搬送路 // 距離 %.0f // 初回 %.1fs // 間隔 %.1fs // 右クリックでメニュー" % [
 		line_length,
 		flow_travel_duration(line_length),
 		flow_packet_interval(),
@@ -1807,7 +1905,7 @@ func _build_ui() -> void:
 	rotation_button = Button.new()
 	rotation_button.name = "AddRotationButton"
 	rotation_button.text = "＋ 回転"
-	rotation_button.tooltip_text = "回転ノードを盤面へ配置 // ホイールで1°ずつ設定"
+	rotation_button.tooltip_text = "回転ノードを盤面へ配置 // ノード右クリックで角度設定"
 	rotation_button.custom_minimum_size = Vector2(92.0, 34.0)
 	rotation_button.toggle_mode = true
 	rotation_button.pressed.connect(_on_rotation_button_pressed)
@@ -1872,6 +1970,118 @@ func _build_ui() -> void:
 	footer.add_theme_font_size_override("font_size", 12)
 	footer.add_theme_color_override("font_color", Color(0.40, 0.58, 0.66))
 	page.add_child(footer)
+	_build_rotation_settings_popup()
+	_build_line_settings_popup()
+
+
+func _build_rotation_settings_popup() -> void:
+	rotation_settings_popup = PopupPanel.new()
+	rotation_settings_popup.name = "RotationSettingsPopup"
+	rotation_settings_popup.popup_hide.connect(_on_rotation_settings_popup_hidden)
+	add_child(rotation_settings_popup)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	rotation_settings_popup.add_child(margin)
+
+	var column := VBoxContainer.new()
+	column.custom_minimum_size = Vector2(220.0, 94.0)
+	column.add_theme_constant_override("separation", 8)
+	margin.add_child(column)
+
+	rotation_settings_title = Label.new()
+	rotation_settings_title.add_theme_font_size_override("font_size", 14)
+	rotation_settings_title.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
+	column.add_child(rotation_settings_title)
+
+	var angle_row := HBoxContainer.new()
+	angle_row.add_theme_constant_override("separation", 10)
+	column.add_child(angle_row)
+	var angle_label := Label.new()
+	angle_label.text = "回転角度"
+	angle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	angle_row.add_child(angle_label)
+	rotation_settings_angle = SpinBox.new()
+	rotation_settings_angle.name = "RotationAngleSpinBox"
+	rotation_settings_angle.min_value = 0.0
+	rotation_settings_angle.max_value = 359.0
+	rotation_settings_angle.step = 1.0
+	rotation_settings_angle.allow_greater = false
+	rotation_settings_angle.allow_lesser = false
+	rotation_settings_angle.suffix = "°"
+	rotation_settings_angle.custom_minimum_size = Vector2(112.0, 32.0)
+	rotation_settings_angle.value_changed.connect(_on_rotation_settings_angle_changed)
+	angle_row.add_child(rotation_settings_angle)
+
+	var hint := Label.new()
+	hint.text = "0〜359° // 1°単位"
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", Color(0.44, 0.68, 0.78))
+	column.add_child(hint)
+
+
+func _on_rotation_settings_angle_changed(value: float) -> void:
+	if rotation_settings_syncing or rotation_settings_node_id == &"":
+		return
+	set_rotation_angle(rotation_settings_node_id, roundi(value))
+
+
+func _on_rotation_settings_popup_hidden() -> void:
+	rotation_settings_node_id = &""
+
+
+func _build_line_settings_popup() -> void:
+	line_settings_popup = PopupPanel.new()
+	line_settings_popup.name = "LineSettingsPopup"
+	line_settings_popup.popup_hide.connect(_on_line_settings_popup_hidden)
+	add_child(line_settings_popup)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	line_settings_popup.add_child(margin)
+
+	var column := VBoxContainer.new()
+	column.custom_minimum_size = Vector2(260.0, 132.0)
+	column.add_theme_constant_override("separation", 8)
+	margin.add_child(column)
+
+	line_settings_title = Label.new()
+	line_settings_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	line_settings_title.add_theme_font_size_override("font_size", 14)
+	line_settings_title.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
+	column.add_child(line_settings_title)
+
+	line_settings_details = Label.new()
+	line_settings_details.add_theme_font_size_override("font_size", 12)
+	line_settings_details.add_theme_color_override("font_color", Color(0.52, 0.74, 0.84))
+	column.add_child(line_settings_details)
+
+	line_settings_delete_button = Button.new()
+	line_settings_delete_button.name = "DeleteLineButton"
+	line_settings_delete_button.text = "搬送路を削除"
+	line_settings_delete_button.custom_minimum_size = Vector2(0.0, 34.0)
+	line_settings_delete_button.pressed.connect(_on_line_settings_delete_pressed)
+	column.add_child(line_settings_delete_button)
+
+
+func _on_line_settings_delete_pressed() -> void:
+	if line_settings_connection.is_empty():
+		return
+	var to_node_id := StringName(line_settings_connection.get("to_node", &""))
+	var to_port := int(line_settings_connection.get("to_port", -1))
+	line_settings_popup.hide()
+	if to_node_id != &"" and to_port >= 0:
+		disconnect_input(to_node_id, to_port)
+
+
+func _on_line_settings_popup_hidden() -> void:
+	line_settings_connection = {}
 
 
 func _configure_graph_hud_occlusion() -> void:
@@ -2101,7 +2311,7 @@ func _make_rotation_node(
 	_configure_round_landmark_node(node, visual.custom_minimum_size)
 	node.position_offset = world_center - visual.custom_minimum_size * 0.5
 	node.mouse_filter = Control.MOUSE_FILTER_PASS
-	node.tooltip_text = "回転ノード // %d° // ホイール: 1° // Shift+ホイール: 15°" % posmod(angle_degrees, 360)
+	node.tooltip_text = "回転ノード // %d° // 右クリックで設定" % posmod(angle_degrees, 360)
 	node.gui_input.connect(_on_rotation_node_gui_input.bind(node))
 	return node
 
@@ -2143,17 +2353,6 @@ func _on_rotation_node_gui_input(event: InputEvent, rotation: GraphNode) -> void
 	if not event is InputEventMouse:
 		return
 	var rotation_id := StringName(rotation.name)
-	if event is InputEventMouseButton:
-		var mouse_event := event as InputEventMouseButton
-		if (
-			mouse_event.pressed
-			and mouse_event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]
-		):
-			var direction := 1 if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP else -1
-			var step := 15 if mouse_event.shift_pressed else 1
-			set_rotation_angle(rotation_id, rotation_angle(rotation_id) + direction * step)
-			rotation.accept_event()
-			return
 	var graph_event := event.duplicate() as InputEventMouse
 	graph_event.position = _convert_control_point(rotation, event.position, factory_graph)
 	var over_input: bool = graph_event.position.distance_to(
@@ -2162,6 +2361,17 @@ func _on_rotation_node_gui_input(event: InputEvent, rotation: GraphNode) -> void
 	var over_output: bool = graph_event.position.distance_to(
 		directional_output_position(rotation_id, factory_graph)
 	) <= PORT_HIT_RADIUS
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if (
+			mouse_event.pressed
+			and mouse_event.button_index == MOUSE_BUTTON_RIGHT
+			and not over_input
+			and not over_output
+		):
+			open_rotation_settings(rotation_id, mouse_event.global_position)
+			rotation.accept_event()
+			return
 	if not over_input and not over_output:
 		return
 	_on_factory_graph_input(graph_event)
