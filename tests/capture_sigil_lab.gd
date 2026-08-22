@@ -1,7 +1,6 @@
 extends SceneTree
 
 const SigilGraphModel := preload("res://experiments/sigil_lab/sigil_graph.gd")
-const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_glyphs.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
 
 
@@ -31,8 +30,6 @@ func _initialize() -> void:
 		lab.load_repeat_template()
 	elif fixture == "distribution":
 		lab.load_distribution_template()
-	elif fixture == "registered":
-		_build_registered_fixture(lab)
 	elif fixture == "export":
 		lab.export_button.pressed.emit()
 	await process_frame
@@ -135,23 +132,6 @@ func _build_transform_order_fixture(lab) -> void:
 	lab.connect_lab_nodes(square, stretch)
 	lab.connect_lab_nodes(stretch, rotate)
 	lab.connect_lab_nodes(rotate, output_id)
-
-
-func _build_registered_fixture(lab) -> void:
-	lab.clear_workspace()
-	var positions := [
-		Vector2(20, 80),
-		Vector2(220, 80),
-		Vector2(420, 80),
-		Vector2(120, 310),
-		Vector2(360, 310),
-	]
-	for index in RegisteredGlyphsModel.IDS.size():
-		lab.add_lab_node(
-			SigilGraphModel.REGISTERED,
-			{"glyph_id": RegisteredGlyphsModel.IDS[index]},
-			positions[index]
-		)
 
 
 func _user_options() -> Dictionary:

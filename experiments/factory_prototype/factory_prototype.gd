@@ -7,7 +7,6 @@ const FactoryFlowAudioModel := preload("res://experiments/factory_prototype/fact
 const GlyphModelScript := preload("res://src/domain/glyph.gd")
 const GlyphComponentModelScript := preload("res://src/domain/glyph_component.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
-const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 
 const MENU_SCENE := "res://src/main_menu.tscn"
 const PLAYFIELD_SIZE := Vector2(9000.0, 6000.0)
@@ -48,8 +47,6 @@ const COMBINE_CONNECTION_LABELS := ["単純結合", "中心結合", "相互結�
 const COMBINE_INPUT_START_ANGLE := -PI * 0.5
 const TARGET_ORDER := [
 	&"circle", &"triangle", &"square", &"diamond",
-	MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS, MeaningGlyphsModel.TARGET,
-	MeaningGlyphsModel.STAR,
 ]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -83,34 +80,6 @@ const TARGET_DEFINITIONS := {
 		"monster_id": &"razor_kite",
 		"monster_name": "斜刃カイト",
 		"role": "高速・旋回・切断",
-	},
-	MeaningGlyphsModel.EYE: {
-		"glyph_label": "◉",
-		"meaning_glyph_id": MeaningGlyphsModel.EYE,
-		"monster_id": &"eye_scout",
-		"monster_name": "眼球ドローン",
-		"role": "索敵・照準・支援",
-	},
-	MeaningGlyphsModel.CROSS: {
-		"glyph_label": "✚",
-		"meaning_glyph_id": MeaningGlyphsModel.CROSS,
-		"monster_id": &"cross_guard",
-		"monster_name": "十字ガード",
-		"role": "歩兵・迎撃・陣形",
-	},
-	MeaningGlyphsModel.TARGET: {
-		"glyph_label": "◎",
-		"meaning_glyph_id": MeaningGlyphsModel.TARGET,
-		"monster_id": &"target_turret",
-		"monster_name": "標定タレット",
-		"role": "遠隔・照準・制圧",
-	},
-	MeaningGlyphsModel.STAR: {
-		"glyph_label": "✶",
-		"meaning_glyph_id": MeaningGlyphsModel.STAR,
-		"monster_id": &"star_spark",
-		"monster_name": "星火スパーク",
-		"role": "飛行・散開・連射",
 	},
 }
 const MATERIAL_LAYOUT := [
@@ -147,17 +116,9 @@ const MATERIAL_LAYOUT := [
 	{ "id": &"square_09", "kind": &"square", "position": Vector2(1800.0, 4200.0) },
 	{ "id": &"square_10", "kind": &"square", "position": Vector2(1600.0, 1500.0) },
 ]
-const MEANING_GLYPH_LAYOUT := [
-	{ "id": &"eye_vein", "glyph_id": MeaningGlyphsModel.EYE, "position": Vector2(4400.0, 1150.0) },
-	{ "id": &"cross_vein", "glyph_id": MeaningGlyphsModel.CROSS, "position": Vector2(6850.0, 2895.0) },
-	{ "id": &"target_vein", "glyph_id": MeaningGlyphsModel.TARGET, "position": Vector2(4400.0, 4750.0) },
-	{ "id": &"star_vein", "glyph_id": MeaningGlyphsModel.STAR, "position": Vector2(1950.0, 2895.0) },
-]
-
 var factory_graph: GraphEdit
 var summoner_node: GraphNode
 var material_nodes: Array[GraphNode] = []
-var meaning_nodes: Array[GraphNode] = []
 var relay_nodes: Array[GraphNode] = []
 var rotation_nodes: Array[GraphNode] = []
 var scale_nodes: Array[GraphNode] = []
@@ -287,7 +248,7 @@ func return_to_menu() -> void:
 
 
 func fixed_landmark_count() -> int:
-	return material_nodes.size() + meaning_nodes.size() + (1 if summoner_node != null else 0)
+	return material_nodes.size() + (1 if summoner_node != null else 0)
 
 
 func material_kind_counts() -> Dictionary:
@@ -299,24 +260,10 @@ func material_kind_counts() -> Dictionary:
 	return counts
 
 
-func meaning_glyph_counts() -> Dictionary:
-	var counts: Dictionary = {}
-	for glyph_id in MeaningGlyphsModel.IDS:
-		counts[glyph_id] = 0
-	for node in meaning_nodes:
-		var glyph_id := StringName(node.get_meta("meaning_glyph_id", &""))
-		if counts.has(glyph_id):
-			counts[glyph_id] = int(counts[glyph_id]) + 1
-	return counts
-
-
 func all_landmarks_locked() -> bool:
 	if summoner_node == null or summoner_node.draggable:
 		return false
 	for node in material_nodes:
-		if node.draggable:
-			return false
-	for node in meaning_nodes:
 		if node.draggable:
 			return false
 	return true
@@ -626,9 +573,6 @@ func target_glyph(target_kind: StringName) -> GlyphModel:
 	if not TARGET_DEFINITIONS.has(target_kind):
 		return null
 	var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
-	var meaning_glyph_id := StringName(definition.get("meaning_glyph_id", &""))
-	if meaning_glyph_id != &"":
-		return MeaningGlyphsModel.glyph(meaning_glyph_id)
 	var glyph := primitive_glyph(StringName(definition.get("primitive_id", target_kind)))
 	if glyph == null:
 		return null
@@ -1279,9 +1223,6 @@ func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 	var material := _material_node(node_id)
 	if material != null:
 		return primitive_glyph(StringName(material.get_meta("landmark_kind", &"")))
-	var meaning := _meaning_node(node_id)
-	if meaning != null:
-		return MeaningGlyphsModel.glyph(StringName(meaning.get_meta("meaning_glyph_id", &"")))
 	var relay := _relay_node(node_id)
 	var rotation := _rotation_node(node_id)
 	var scale := _scale_node(node_id)
@@ -1727,7 +1668,7 @@ func _clear_directional_connection_preview() -> void:
 
 
 func directional_output_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + meaning_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes + combine_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes + combine_nodes:
 		var node_id := StringName(node.name)
 		if graph_position.distance_to(directional_output_position(node_id, factory_graph)) <= PORT_HIT_RADIUS:
 			return node_id
@@ -1792,7 +1733,7 @@ func directional_input_at(graph_position: Vector2) -> int:
 
 
 func directional_landmark_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + meaning_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes + combine_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes + combine_nodes:
 		if graph_position.distance_to(_node_center_in(node, factory_graph)) <= _landmark_radius_in(node, factory_graph):
 			return StringName(node.name)
 	if (
@@ -1814,10 +1755,6 @@ func _landmark_tooltip(node_id: StringName) -> String:
 		return "%s資源パッチ // 固定 // 出力を接続" % _kind_label(
 			StringName(material.get_meta("landmark_kind", &""))
 		)
-	var meaning := _meaning_node(node_id)
-	if meaning != null:
-		var glyph_id := StringName(meaning.get_meta("meaning_glyph_id", &""))
-		return "%s印の資源脈 // 固定 // 出力を接続" % MeaningGlyphsModel.label(glyph_id)
 	if _relay_node(node_id) != null:
 		return "中継ノード // グリフを変えずに転送 // 右クリックで個別メニュー"
 	if _rotation_node(node_id) != null:
@@ -1839,10 +1776,6 @@ func _output_tooltip(node_id: StringName) -> String:
 		return "%s資源パッチ // 固定 // 出力を接続" % _kind_label(
 			StringName(material.get_meta("landmark_kind", &""))
 		)
-	var meaning := _meaning_node(node_id)
-	if meaning != null:
-		var glyph_id := StringName(meaning.get_meta("meaning_glyph_id", &""))
-		return "%s印出力 // 複数の下流へ分配可能" % MeaningGlyphsModel.label(glyph_id)
 	if _relay_node(node_id) != null:
 		return "中継出力 // 複数の下流へ分配可能"
 	if _rotation_node(node_id) != null:
@@ -1900,11 +1833,6 @@ func _context_node_label(node_id: StringName, input_port: int = -1) -> String:
 	var material := _material_node(node_id)
 	if material != null:
 		return "%s資源" % _shape_symbol(StringName(material.get_meta("landmark_kind", &"")))
-	var meaning := _meaning_node(node_id)
-	if meaning != null:
-		return "%s印" % MeaningGlyphsModel.label(
-			StringName(meaning.get_meta("meaning_glyph_id", &""))
-		)
 	if _relay_node(node_id) != null:
 		return "中継"
 	if _rotation_node(node_id) != null:
@@ -2103,7 +2031,7 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 
 
 func _draw_directional_ports(overlay: Control) -> void:
-	for node in material_nodes + meaning_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes + combine_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes + combine_nodes:
 		var node_id := StringName(node.name)
 		var position := directional_output_position(node_id, overlay)
 		var active := node_id == connecting_material_id or node_id == hovered_material_id
@@ -2183,11 +2111,6 @@ func _draw_input_target_marker(
 	color: Color
 ) -> void:
 	var radius := 3.5
-	if MeaningGlyphsModel.has(target_kind):
-		var glyph := MeaningGlyphsModel.glyph(target_kind)
-		var scale := GlyphPainterModel.fit_scale(glyph, radius * 1.7, false, 0.1, 1.0)
-		GlyphPainterModel.draw_glyph(overlay, glyph, position, scale, color.a, false, 0.42)
-		return
 	match target_kind:
 		&"circle":
 			overlay.draw_arc(position, radius, 0.0, TAU, 16, color, 1.1, true)
@@ -2535,7 +2458,7 @@ func _connection_flow_start_time_from(
 	if not connection_flow_started_at.has(key):
 		return INF
 	var connection_created_at := float(connection_flow_started_at[key])
-	if _material_node(from_node_id) != null or _meaning_node(from_node_id) != null:
+	if _material_node(from_node_id) != null:
 		return connection_created_at
 	return _node_next_output_time(from_node_id, connection_created_at, visited)
 
@@ -2747,7 +2670,6 @@ func _remove_input_connection(to_node_id: StringName, to_port: int) -> bool:
 func _valid_output_node(node_id: StringName) -> bool:
 	return (
 		_material_node(node_id) != null
-		or _meaning_node(node_id) != null
 		or _processing_node(node_id) != null
 	)
 
@@ -2781,13 +2703,6 @@ func _would_create_connection_cycle(from_node_id: StringName, to_node_id: String
 func _material_node(node_id: StringName) -> GraphNode:
 	for node in material_nodes:
 		if StringName(node.name) == node_id:
-			return node
-	return null
-
-
-func _meaning_node(node_id: StringName) -> GraphNode:
-	for node in meaning_nodes:
-		if is_instance_valid(node) and StringName(node.name) == node_id:
 			return node
 	return null
 
@@ -2857,9 +2772,6 @@ func _factory_node(node_id: StringName) -> GraphNode:
 	var material := _material_node(node_id)
 	if material != null:
 		return material
-	var meaning := _meaning_node(node_id)
-	if meaning != null:
-		return meaning
 	return _processing_node(node_id)
 
 
@@ -2904,12 +2816,7 @@ func _refresh_summon_state() -> void:
 func _configure_target_preview(target_kind: StringName) -> void:
 	if target_preview == null or not TARGET_DEFINITIONS.has(target_kind):
 		return
-	var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
-	var meaning_glyph_id := StringName(definition.get("meaning_glyph_id", &""))
-	if meaning_glyph_id != &"":
-		target_preview.configure_meaning(meaning_glyph_id, true)
-	else:
-		target_preview.configure_target(target_kind)
+	target_preview.configure_target(target_kind)
 
 
 func _refresh_transport_countdown(time_seconds: float) -> void:
@@ -3874,15 +3781,6 @@ func _place_landmarks() -> void:
 		)
 		material_nodes.append(node)
 		factory_graph.add_child(node)
-	for entry in MEANING_GLYPH_LAYOUT:
-		var node := _make_meaning_node(
-			StringName(entry["id"]),
-			StringName(entry["glyph_id"]),
-			Vector2(entry["position"])
-		)
-		meaning_nodes.append(node)
-		factory_graph.add_child(node)
-
 	summoner_node = _make_summoner_node()
 	factory_graph.add_child(summoner_node)
 
@@ -3914,31 +3812,6 @@ func _make_material_node(node_id: StringName, kind: StringName, world_position: 
 
 	var visual = FactoryLandmarkVisualModel.new()
 	visual.configure(kind)
-	node.add_child(visual)
-	node.set_slot(0, false, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
-	_configure_round_landmark_node(node, visual.custom_minimum_size)
-	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return node
-
-
-func _make_meaning_node(
-	node_id: StringName,
-	glyph_id: StringName,
-	world_position: Vector2
-) -> GraphNode:
-	var node := GraphNode.new()
-	node.name = String(node_id)
-	node.title = ""
-	node.position_offset = world_position
-	node.draggable = false
-	node.resizable = false
-	node.set_meta("landmark_kind", &"meaning")
-	node.set_meta("meaning_glyph_id", glyph_id)
-	node.set_meta("fixed_landmark", true)
-	node.set_meta("meaning_deposit", true)
-
-	var visual = FactoryLandmarkVisualModel.new()
-	visual.configure_meaning(glyph_id)
 	node.add_child(visual)
 	node.set_slot(0, false, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
 	_configure_round_landmark_node(node, visual.custom_minimum_size)

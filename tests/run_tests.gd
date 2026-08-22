@@ -2,7 +2,6 @@ extends SceneTree
 
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
-const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 const GlyphProductionContextModel := preload("res://src/domain/glyph_production_context.gd")
 const SigilMatcher := preload("res://src/domain/sigil_matcher.gd")
 const SigilRecipeModel := preload("res://src/domain/sigil_recipe.gd")
@@ -39,14 +38,11 @@ func _initialize() -> void:
 	_test_combined_move_transforms_structure_center()
 	_test_transform_history_folds_into_final_state()
 	_test_complete_overlap_is_rejected()
-	_test_meaning_glyph_library_is_owned_and_valid()
 	_test_factory_tick_prevents_same_tick_multistage_processing()
 	_test_factory_tick_uses_starting_input_availability()
 	_test_factory_tick_does_not_refill_freed_line()
 	_test_factory_replay_is_independent_of_insertion_order()
 	_test_factory_pipeline_summons_matching_unit()
-	_test_factory_meaning_glyph_source_summons_registered_recipe()
-	_test_factory_combines_meaning_glyphs_into_alternate_recipe()
 	_test_factory_recipe_match_preview_is_non_destructive()
 	_test_factory_records_closest_summon_failure()
 	_test_factory_closest_recipe_is_order_independent()
@@ -89,7 +85,6 @@ func _initialize() -> void:
 	_test_factory_goal_equipment_presence_tracks_inventory()
 	_test_factory_enforces_single_summoner()
 	_test_factory_node_configuration_is_undoable()
-	_test_factory_meaning_source_is_configurable()
 	_test_factory_configuration_discards_work_transactionally()
 	_test_factory_preset_preview_is_undoable()
 	_test_source_configuration_resets_generation_progress()
@@ -552,32 +547,6 @@ func _test_complete_overlap_is_rejected() -> void:
 	)
 
 
-func _test_meaning_glyph_library_is_owned_and_valid() -> void:
-	_expect(MeaningGlyphsModel.IDS.size() == 4, "shared meaning Glyphs should expose the four accepted marks")
-	var first_eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
-	var second_eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
-	_expect(first_eye != null and second_eye != null, "shared meaning Glyph lookup should return authored copies")
-	if first_eye != null and second_eye != null:
-		var untouched := second_eye.canonical_serialization()
-		first_eye.components[0].position = Vector2(9, 9)
-		_expect(
-			second_eye.canonical_serialization() == untouched,
-			"meaning Glyph callers should not share mutable component state"
-		)
-	var seen: Dictionary = {}
-	for glyph_id in MeaningGlyphsModel.IDS:
-		var glyph := MeaningGlyphsModel.glyph(glyph_id)
-		_expect(glyph != null, "%s should be available to product content" % glyph_id)
-		if glyph == null:
-			continue
-		_expect(glyph.structure_validation_errors().is_empty(), "%s should be structurally valid" % glyph_id)
-		_expect(glyph.combine_connection_mode == GlyphModel.CONNECTION_SIMPLE, "%s should keep line-free grouping" % glyph_id)
-		var serialization := glyph.canonical_serialization()
-		_expect(not seen.has(serialization), "%s should remain canonically distinct" % glyph_id)
-		seen[serialization] = true
-	_expect(MeaningGlyphsModel.glyph(&"unknown") == null, "unknown meaning Glyph IDs should fail closed")
-
-
 func _test_factory_tick_prevents_same_tick_multistage_processing() -> void:
 	var simulation := FactorySimulation.new()
 	var source := FactoryNodeModel.new(
@@ -811,108 +780,15 @@ func _test_factory_pipeline_summons_matching_unit() -> void:
 		_expect(context["source_ids"].has(&"source"), "production context should retain source identity")
 
 
-func _test_factory_meaning_glyph_source_summons_registered_recipe() -> void:
-	var simulation := FactorySimulation.new()
-	var source := FactoryNodeModel.new(
-		&"meaning_source",
-		FactoryNodeModel.NodeKind.SOURCE,
-		{"meaning_glyph_id": MeaningGlyphsModel.CROSS, "interval_ticks": 1}
-	)
-	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
-	_expect(simulation.add_node(source), "a registered meaning Glyph should be accepted as a factory source")
-	_expect(simulation.add_node(summoner), "meaning Glyph pipeline should accept a summoner")
-	_expect(
-		simulation.connect_nodes(FactoryLineModel.new(&"meaning_line", &"meaning_source", &"summoner"))["ok"],
-		"meaning Glyph source should connect through ordinary factory lines"
-	)
-	simulation.add_recipe(SigilRecipeModel.new(&"cross_mark", MeaningGlyphsModel.glyph(MeaningGlyphsModel.CROSS), &"sentinel"))
-	for _tick in 8:
-		simulation.tick()
-	_expect(not simulation.summon_events.is_empty(), "registered meaning Glyph should reach exact recipe matching")
-	if not simulation.summon_events.is_empty():
-		_expect(simulation.summon_events[0]["recipe_id"] == &"cross_mark", "meaning source should preserve canonical identity")
-	var ambiguous := FactoryNodeModel.new(
-		&"ambiguous",
-		FactoryNodeModel.NodeKind.SOURCE,
-		{"primitive_id": "ring", "meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": 1}
-	)
-	_expect(simulation.add_node(ambiguous), "restored source configuration should be retained for diagnostics")
-	var unknown := FactoryNodeModel.new(
-		&"unknown",
-		FactoryNodeModel.NodeKind.SOURCE,
-		{"meaning_glyph_id": "missing", "interval_ticks": 1}
-	)
-	_expect(simulation.add_node(unknown), "unknown restored meaning Glyph should be retained for diagnostics")
-	var validation_errors: PackedStringArray = simulation.validate_graph()["errors"]
-	_expect(validation_errors.has("ambiguous_source_glyph:ambiguous"), "a source should not hide two competing Glyph definitions")
-	_expect(validation_errors.has("unknown_meaning_glyph:unknown:missing"), "unknown meaning Glyph IDs should fail closed before simulation")
-	var star_board := FactoryBoard.new()
-	star_board.configure(FactoryContent.PLAN_EMPTY)
-	star_board.set_interaction_enabled(true)
-	star_board.selected_node_id = &"ring_source"
-	_expect(star_board.configure_selected_node(5), "the registered Star should be selectable as one source")
-	_expect(star_board.connect_nodes_interactive(&"ring_source", &"summoner", 0)["ok"], "the low-mana Star route should connect directly to the summoner")
-	var star_preview := star_board.production_snapshot()
-	var vigil_board := FactoryBoard.new()
-	vigil_board.configure(FactoryContent.PLAN_VIGIL)
-	_expect(int(star_preview["counts"][&"sentinel"]) > 0, "Star should be an acquired Sentinel recipe instead of guaranteed discard")
-	_expect(star_board.production_recipe_id(&"sentinel") == &"stellar_sentinel", "production summary should retain which acquired recipe creates the predicted Sentinel")
-	_expect(star_board.production_summary_glyph(&"sentinel").canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR).canonical_serialization(), "production summary should draw Star instead of the standard Vigil Cross for this alternate route")
-	star_board.plan_id = FactoryContent.PLAN_VIGIL
-	_expect(not star_board.production_summary_is_goal(&"sentinel"), "an alternate acquired Sentinel recipe should not borrow the selected Vigil goal ring")
-	_expect(star_board.production_operation_entries() == [{"unit_id": &"sentinel", "recipe_id": &"stellar_sentinel", "count": int(star_preview["counts"][&"sentinel"])}], "production summary should describe the actual Star recipe instead of the workshop template name")
-	_expect(int(star_preview["counts"][&"sentinel"]) < int(vigil_board.production_snapshot()["counts"][&"sentinel"]), "single-source Star Sentinel should trade lower throughput for its cheaper graph")
-	_expect(star_board.mana_used() < vigil_board.mana_used(), "Star Sentinel should require less factory mana than Eye plus Cross")
-	star_board.free()
-	vigil_board.free()
-
-
-func _test_factory_combines_meaning_glyphs_into_alternate_recipe() -> void:
-	var simulation := FactorySimulation.new()
-	for recipe in FactoryContent.recipes():
-		_expect(simulation.add_recipe(recipe), "alternate meaning recipe fixture should register every acquired recipe")
-	var eye_source := FactoryNodeModel.new(
-		&"eye_source",
-		FactoryNodeModel.NodeKind.SOURCE,
-		{"meaning_glyph_id": MeaningGlyphsModel.EYE, "interval_ticks": 1}
-	)
-	var cross_source := FactoryNodeModel.new(
-		&"cross_source",
-		FactoryNodeModel.NodeKind.SOURCE,
-		{"meaning_glyph_id": MeaningGlyphsModel.CROSS, "interval_ticks": 1}
-	)
-	var combiner := FactoryNodeModel.new(
-		&"combiner",
-		FactoryNodeModel.NodeKind.COMBINER,
-		{
-			"processing_ticks": 1,
-			"connection_mode": GlyphModel.CONNECTION_SIMPLE,
-		}
-	)
-	var summoner := FactoryNodeModel.new(&"summoner", FactoryNodeModel.NodeKind.SUMMONER)
-	for node in [eye_source, cross_source, combiner, summoner]:
-		_expect(simulation.add_node(node), "meaning-combination pipeline should accept its equipment")
-	_expect(simulation.connect_nodes(FactoryLineModel.new(&"eye", &"eye_source", &"combiner", 0, 1))["ok"], "Eye should feed the first combine input")
-	_expect(simulation.connect_nodes(FactoryLineModel.new(&"cross", &"cross_source", &"combiner", 1, 1))["ok"], "Cross should feed the second combine input")
-	_expect(simulation.connect_nodes(FactoryLineModel.new(&"summon", &"combiner", &"summoner", 0, 1))["ok"], "combined meaning Glyph should feed the summoner")
-	for _tick in 12:
-		simulation.tick()
-	_expect(not simulation.summon_events.is_empty(), "Eye plus Cross should summon through the acquired alternate recipe")
-	if not simulation.summon_events.is_empty():
-		_expect(simulation.summon_events[0]["recipe_id"] == &"vigil_cross", "simple meaning combination should preserve its recipe identity")
-		_expect(simulation.summon_events[0]["unit_id"] == &"sentinel", "alternate meaning recipe should summon the intended Sentinel")
-	_expect(simulation.discarded_glyphs == 0, "valid alternate meaning recipe should not be discarded")
-
-
 func _test_factory_recipe_match_preview_is_non_destructive() -> void:
 	var simulation := FactoryContent.build_factory(FactoryContent.PLAN_SCOUT)
-	var eye := MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
+	var ring := GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	var spike := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	var event_count := simulation.summon_events.size()
 	var discard_count := simulation.discarded_glyphs
-	var matching := simulation.recipe_match_result(eye)
+	var matching := simulation.recipe_match_result(ring)
 	_expect(matching["ok"] and matching["is_match"], "match preview should identify an acquired exact recipe")
-	_expect(matching["recipe_id"] == &"watchful_eye", "match preview should expose the exact recipe ID")
+	_expect(matching["recipe_id"] == &"open_ring", "match preview should expose the exact recipe ID")
 	var mismatch := simulation.recipe_match_result(spike)
 	_expect(mismatch["ok"] and not mismatch["is_match"], "match preview should identify a non-matching Glyph")
 	_expect(mismatch["closest_recipe_id"] != &"", "mismatch preview should retain the closest acquired recipe")
@@ -1019,7 +895,7 @@ func _test_factory_rejects_ambiguous_recipes() -> void:
 		simulation.recipes[0].id == &"b_spike" and simulation.recipes[1].id == &"z_ring",
 		"accepted recipes should use stable ID order instead of acquisition order"
 	)
-	_expect(FactoryContent.build_factory(FactoryContent.PLAN_SCOUT).recipes.size() == 6, "all factory recipes should have unique IDs and structures")
+	_expect(FactoryContent.build_factory(FactoryContent.PLAN_SCOUT).recipes.size() == 3, "all basic factory recipes should have unique IDs and structures")
 
 
 func _test_recipe_registration_reports_stable_errors() -> void:
@@ -1117,7 +993,7 @@ func _test_factory_recipe_set_validation_reports_content_location() -> void:
 		"recipe set diagnostics should identify content index, ID, and stable rejection reasons"
 	)
 	var content_result := FactoryContent.validate_recipe_set(FactoryContent.recipes())
-	_expect(content_result["ok"] and content_result["accepted_count"] == 6, "shipped factory recipes should pass aggregate validation")
+	_expect(content_result["ok"] and content_result["accepted_count"] == 3, "shipped factory recipes should pass aggregate validation")
 
 
 func _test_factory_rejects_invalid_recipe_structures() -> void:
@@ -1806,23 +1682,17 @@ func _test_factory_flow_diagnostics_distinguish_blockages() -> void:
 func _test_factory_plans_produce_expected_outputs() -> void:
 	var expected_names := {
 		FactoryContent.PLAN_EMPTY: "手組み工場",
-		FactoryContent.PLAN_SCOUT: "目の斥候",
+		FactoryContent.PLAN_SCOUT: "環の斥候",
 		FactoryContent.PLAN_SENTINEL: "蒼環の衛兵",
-		FactoryContent.PLAN_VIGIL: "警戒十字の衛兵",
-		FactoryContent.PLAN_STELLAR: "星印の衛兵",
 		FactoryContent.PLAN_GOLEM: "結合の巨像",
-		FactoryContent.PLAN_FORTRESS: "要塞標章の巨像",
 	}
 	var expectations := {
 		FactoryContent.PLAN_SCOUT: &"scout",
 		FactoryContent.PLAN_SENTINEL: &"sentinel",
-		FactoryContent.PLAN_VIGIL: &"sentinel",
-		FactoryContent.PLAN_STELLAR: &"sentinel",
 		FactoryContent.PLAN_GOLEM: &"golem",
-		FactoryContent.PLAN_FORTRESS: &"golem",
 	}
 	for plan_id in expected_names:
-		_expect(FactoryContent.plan_name(plan_id) == expected_names[plan_id], "factory plan names should describe the visible meaning sigil in Japanese")
+		_expect(FactoryContent.plan_name(plan_id) == expected_names[plan_id], "factory plan names should describe the visible basic recipe in Japanese")
 	for plan_id in expectations:
 		var simulation := FactoryContent.build_factory(plan_id)
 		for _tick in 160:
@@ -2082,16 +1952,16 @@ func _test_factory_mana_budget_limits_and_refunds_nodes() -> void:
 func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 	var board := FactoryBoard.new()
 	board.configure(FactoryContent.PLAN_SCOUT)
-	_expect(board.goal_equipment_present(&"meaning_source"), "scout inventory should report its exact meaning source as present")
+	_expect(board.goal_equipment_present(&"ring_source"), "scout inventory should report its ring source as present")
 	_expect(board.goal_equipment_present(&"summoner"), "scout inventory should report its summoner as present")
-	_expect(not board.goal_equipment_present(&"spike_source"), "meaning source should not satisfy the separate spike inventory marker")
+	_expect(not board.goal_equipment_present(&"spike_source"), "ring source should not satisfy the separate spike inventory marker")
 	_expect(not board.goal_equipment_present(&"rotator"), "absent processing equipment should remain missing")
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
 	_expect(board.configure_selected_node(1), "inventory fixture should switch its source Primitive")
-	_expect(not board.goal_equipment_present(&"meaning_source") and board.goal_equipment_present(&"spike_source"), "source inventory should follow its current Glyph instead of node kind alone")
+	_expect(not board.goal_equipment_present(&"ring_source") and board.goal_equipment_present(&"spike_source"), "source inventory should follow its current primitive instead of node kind alone")
 	_expect(board.undo(), "inventory fixture should undo the source change")
-	_expect(board.goal_equipment_present(&"meaning_source") and not board.goal_equipment_present(&"spike_source"), "Undo should restore the exact source inventory state")
+	_expect(board.goal_equipment_present(&"ring_source") and not board.goal_equipment_present(&"spike_source"), "Undo should restore the exact source inventory state")
 	board.free()
 
 	var sentinel_board := FactoryBoard.new()
@@ -2103,22 +1973,6 @@ func _test_factory_goal_equipment_presence_tracks_inventory() -> void:
 	_expect(not sentinel_board.goal_equipment_present(&"rotator"), "removed processing equipment should become missing immediately")
 	_expect(sentinel_board.undo() and sentinel_board.goal_equipment_present(&"rotator"), "Undo should restore a removed equipment category")
 	sentinel_board.free()
-
-	var meaning_board := FactoryBoard.new()
-	meaning_board.configure(FactoryContent.PLAN_VIGIL)
-	var required_meaning: Array[StringName] = [MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS]
-	_expect(meaning_board.meaning_source_presence(required_meaning) == &"present", "meaning inventory should recognize every distinct target Glyph source")
-	meaning_board.set_interaction_enabled(true)
-	meaning_board.selected_node_id = &"cross_source"
-	_expect(meaning_board.remove_selected_node(), "meaning inventory fixture should remove one source")
-	_expect(meaning_board.meaning_source_presence(required_meaning) == &"partial", "one remaining target Glyph should be partial instead of falsely complete")
-	_expect(meaning_board.first_missing_meaning_source(required_meaning) == MeaningGlyphsModel.CROSS, "meaning palette should identify the exact missing target source")
-	var replacement_cross := meaning_board.add_node_from_palette(&"meaning_source", MeaningGlyphsModel.CROSS)
-	_expect(replacement_cross != &"" and meaning_board.simulation.nodes[replacement_cross].config.get("meaning_glyph_id") == MeaningGlyphsModel.CROSS, "meaning palette should create the missing registered Glyph directly")
-	_expect(meaning_board.undo(), "preferred meaning source addition should remain one undoable action")
-	_expect(meaning_board.undo() and meaning_board.meaning_source_presence(required_meaning) == &"present", "Undo should restore complete meaning-source inventory")
-	meaning_board.free()
-
 
 func _test_factory_mutations_fail_closed_without_undo_snapshot() -> void:
 	var board := FactoryBoard.new()
@@ -2168,7 +2022,7 @@ func _test_factory_mutations_fail_closed_without_undo_snapshot() -> void:
 
 	_expect(board.simulation.nodes.size() == nodes_before and board.simulation.lines.size() == lines_before, "failed undo capture should preserve graph membership")
 	_expect(board.node_positions == positions_before, "failed undo capture should preserve every equipment position")
-	_expect(board.simulation.nodes[&"ring_source"].config["meaning_glyph_id"] == MeaningGlyphsModel.EYE, "failed undo capture should preserve equipment settings")
+	_expect(board.simulation.nodes[&"ring_source"].config["primitive_id"] == &"ring", "failed undo capture should preserve equipment settings")
 	_expect(board.simulation.nodes[&"ring_source"].output_buffer == invalid_glyph, "failed undo capture should not discard or replace corrupt work in progress")
 	_expect(board.undo_history.size() == undo_before and _factory_runtime_signature(board.undo_history[0]["simulation"]) == undo_signature_before, "failed undo capture should preserve earlier valid undo history")
 	_expect(board.node_serial == node_serial_before and board.connection_serial == connection_serial_before, "failed undo capture should preserve future equipment and line IDs")
@@ -2261,37 +2115,6 @@ func _test_factory_node_configuration_is_undoable() -> void:
 	board.free()
 
 
-func _test_factory_meaning_source_is_configurable() -> void:
-	var board := FactoryBoard.new()
-	board.size = Vector2(1196, 401)
-	board.configure(FactoryContent.PLAN_EMPTY)
-	board.set_interaction_enabled(true)
-	var source_id := board.add_node_from_palette(&"meaning_source")
-	_expect(source_id != &"", "factory palette should add a registered meaning Glyph source")
-	if source_id == &"":
-		board.free()
-		return
-	board.selected_node_id = source_id
-	var details := board.selected_node_details()
-	_expect(details["options"].size() == 6 and details["selected_index"] == 2, "source inspector should combine primitive and meaning options")
-	var eye := board.source_glyph_for_node(source_id)
-	_expect(
-		eye != null and eye.canonical_serialization() == MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE).canonical_serialization(),
-		"new meaning source should visibly emit the Eye"
-	)
-	_expect(board.configure_selected_node(5), "meaning source should switch to the Star through the shared inspector")
-	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.STAR, "meaning selection should be stored explicitly")
-	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == FactoryContent.source_interval_for_glyph(MeaningGlyphsModel.STAR), "meaning selection should use the same canonical source interval as shipped templates")
-	_expect(board.selected_node_details()["title"] == "星印", "meaning source node should name its registered Glyph")
-	_expect(board.undo(), "meaning source selection should be undoable")
-	board.selected_node_id = source_id
-	_expect(board.simulation.nodes[source_id].config.get("meaning_glyph_id") == MeaningGlyphsModel.EYE, "undo should restore the previous meaning Glyph")
-	_expect(board.configure_selected_node(0), "meaning source should also switch back to a primitive source")
-	_expect(board.simulation.nodes[source_id].config.get("primitive_id") == &"ring" and not board.simulation.nodes[source_id].config.has("meaning_glyph_id"), "source switch should not retain an ambiguous hidden definition")
-	_expect(board.simulation.nodes[source_id].config.get("interval_ticks") == FactoryContent.source_interval_for_glyph(&"ring"), "primitive selection should share the same canonical interval lookup")
-	board.free()
-
-
 func _test_factory_configuration_discards_work_transactionally() -> void:
 	var board := FactoryBoard.new()
 	board.configure(FactoryContent.PLAN_SCOUT)
@@ -2299,9 +2122,9 @@ func _test_factory_configuration_discards_work_transactionally() -> void:
 		board.advance_tick()
 	var committed_work_in_progress := board.work_in_progress_count()
 	_expect(committed_work_in_progress > 0, "configuration test should begin with work in progress")
-	_expect("目" in board.work_in_progress_summary(), "work in progress summary should name its meaning-Glyph type")
+	_expect("環" in board.work_in_progress_summary(), "work in progress summary should name its primitive type")
 	_expect(
-		"目印→召喚器" in board.work_in_progress_impact_summary(),
+		"環素材→召喚器" in board.work_in_progress_impact_summary(),
 		"work in progress impact should identify its transport line"
 	)
 	board.begin_edit()
@@ -2309,7 +2132,7 @@ func _test_factory_configuration_discards_work_transactionally() -> void:
 	board.selected_node_id = &"ring_source"
 	_expect(board.configure_selected_node(1), "source configuration should change during time stop")
 	_expect(board.pending_discard_count() == committed_work_in_progress, "configuration should disclose all pending discards")
-	_expect("目" in board.pending_discard_notice(), "discard notice should name the discarded glyph type")
+	_expect("環" in board.pending_discard_notice(), "discard notice should name the discarded glyph type")
 	_expect("影響:" in board.pending_discard_notice(), "discard notice should name affected equipment or lines")
 	_expect(board.preview_simulation.discarded_glyphs == committed_work_in_progress, "preview should count discarded work")
 	_expect(board.undo(), "configuration discard should be undoable")
@@ -2430,18 +2253,6 @@ func _test_factory_setting_preview_is_non_destructive() -> void:
 		_expect(board.setting_option_preview_cache.is_empty(), "committed graph revision should clear hypothetical setting cache")
 		board.cancel_edit()
 		board.free()
-	var simple_combine_board := FactoryBoard.new()
-	simple_combine_board.configure(FactoryContent.PLAN_VIGIL)
-	simple_combine_board.set_interaction_enabled(true)
-	simple_combine_board.selected_node_id = &"combiner"
-	var combine_details := simple_combine_board.selected_node_details()
-	_expect(combine_details["option_enabled"] == [false, false, true], "line-free meaning inputs should expose only Simple Combine as a meaningful setting")
-	var combine_undo_before := simple_combine_board.undo_history.size()
-	_expect(not simple_combine_board.configure_selected_node(0), "factory should reject an invisible radial combine before creating an edit")
-	_expect(simple_combine_board.undo_history.size() == combine_undo_before, "rejected invisible combine should not add an Undo step")
-	_expect("単純結合" in simple_combine_board.connection_message, "rejected invisible combine should explain the available visual grammar")
-	_expect(not simple_combine_board.setting_option_candidate(1)["active"], "disabled pairwise mode should not expose a misleading hypothetical result")
-	simple_combine_board.free()
 	var invalid_board := FactoryBoard.new()
 	invalid_board.configure(FactoryContent.PLAN_SCOUT)
 	_expect(invalid_board.begin_edit(), "invalid setting preview fixture should enter a transaction")
@@ -2500,8 +2311,6 @@ func _test_factory_board_connections_change_output() -> void:
 	board.set_interaction_enabled(true)
 	_expect(board.disconnect_input(&"rotator", 0), "editor should disconnect a processor input")
 	_expect(board.disconnect_input(&"summoner", 0), "editor should disconnect a summoner input")
-	board.selected_node_id = &"ring_source"
-	_expect(board.configure_selected_node(2), "edited sentinel source should switch to the Eye recipe")
 	var result := board.connect_nodes_interactive(&"ring_source", &"summoner", 0)
 	_expect(result["ok"], "editor should connect compatible output and input ports")
 	for _tick in 160:
@@ -2559,7 +2368,7 @@ func _test_factory_board_replaces_failure_with_success() -> void:
 	board.begin_edit()
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
-	_expect(board.configure_selected_node(2), "recovery scenario should restore Eye production")
+	_expect(board.configure_selected_node(0), "recovery scenario should restore ring production")
 	board.commit_edit()
 	board.set_interaction_enabled(false)
 	for _tick in 80:
@@ -2567,7 +2376,7 @@ func _test_factory_board_replaces_failure_with_success() -> void:
 		if not board.simulation.summon_events.is_empty():
 			break
 	_expect(
-		board.connection_message == "召喚成功 // 目シジル",
+		board.connection_message == "召喚成功 // 斥候シジル",
 		"successful recovery should replace the stale failure with direct success feedback"
 	)
 	board.free()
@@ -2673,7 +2482,7 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 	var match_board := FactoryBoard.new()
 	match_board.configure(FactoryContent.PLAN_SCOUT)
 	var summon_line: FactoryLineModel = match_board.simulation.lines[&"line_1"]
-	summon_line.payload = MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
+	summon_line.payload = GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	_expect(
 		match_board.line_recipe_match_state(&"line_1") == &"match",
 		"summoner-bound matching Glyph should expose a positive arrival state"
@@ -2692,7 +2501,7 @@ func _test_factory_board_exposes_visible_work_in_progress_glyphs() -> void:
 		"mismatching arrival marker should use a cross in addition to color"
 	)
 	var summoner: FactoryNodeModel = match_board.simulation.nodes[&"summoner"]
-	summoner.input_buffers[0] = MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE)
+	summoner.input_buffers[0] = GlyphModel.new([GlyphComponentModel.new(&"ring")])
 	_expect(
 		match_board.input_recipe_match_state(&"summoner", 0) == &"match",
 		"matching state should remain visible after the Glyph reaches the summoner input"
@@ -2841,8 +2650,8 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	_expect(board.input_validation_state(&"summoner", 0) == &"valid", "connecting the missing input should clear its port fault marker")
 	board.disconnect_input(&"summoner", 0)
 	var source_center := board.node_local_position(&"ring_source")
-	_expect(board._get_tooltip(source_center) == "glyph_comparison", "source equipment should compare its registered Glyph with the selected target")
-	_expect(board.tooltip_context == "登録済み意味Glyph", "meaning source tooltip should distinguish a reusable Glyph from one Primitive")
+	_expect(board._get_tooltip(source_center) == "glyph_comparison", "source equipment should compare its primitive with the selected target")
+	_expect(board.tooltip_context == "素材Primitive", "source tooltip should identify its basic primitive")
 	_expect(
 		board.source_glyph_for_node(&"ring_source").canonical_serialization() == board.tooltip_glyph.canonical_serialization(),
 		"source tooltip should use the same CanonicalGlyph as the persistent node symbol"
@@ -2854,9 +2663,8 @@ func _test_factory_board_offers_visual_glyph_tooltips() -> void:
 	board.configure(FactoryContent.PLAN_EMPTY)
 	board.set_interaction_enabled(true)
 	board.selected_node_id = &"ring_source"
-	_expect(board.configure_selected_node(0), "tooltip fixture should switch the unwired source to one Primitive")
 	var primitive_source_center := board.node_local_position(&"ring_source")
-	_expect(board._get_tooltip(primitive_source_center) == "glyph_comparison" and board.tooltip_context == "素材Primitive", "legacy primitive sources should retain their distinct material context")
+	_expect(board._get_tooltip(primitive_source_center) == "glyph_comparison" and board.tooltip_context == "素材Primitive", "primitive sources should retain their material context")
 	board.configure(FactoryContent.PLAN_SCOUT)
 	var predicted_candidate := board.final_summoner_candidate_glyph()
 	_expect(board.final_summoner_candidate()["state"] == &"predicted", "non-destructive final output should retain its predicted origin")
@@ -3039,9 +2847,9 @@ func _test_factory_processor_role_marks_follow_settings() -> void:
 	_expect(board.node_role_mark_state(&"colorizer")["pattern"] == &"striped", "colorizer role mark should follow the color restored by undo")
 	_expect(board.colorizer_role_pattern(&"unknown") == &"invalid", "unknown colors should retain the invalid marker instead of a valid pattern")
 	var combiner_board := FactoryBoard.new()
-	combiner_board.configure(FactoryContent.PLAN_VIGIL)
+	combiner_board.configure(FactoryContent.PLAN_GOLEM)
 	var combine_state := combiner_board.node_role_mark_state(&"combiner")
-	_expect(combine_state["valid"] and combine_state["connection_mode"] == GlyphModel.CONNECTION_SIMPLE, "meaning Sentinel should show its line-free combine rule on the board")
+	_expect(combine_state["valid"] and combine_state["connection_mode"] == GlyphModel.CONNECTION_RADIAL, "Golem factory should show its radial combine rule on the board")
 	combiner_board.set_interaction_enabled(true)
 	combiner_board.selected_node_id = &"combiner"
 	var separated_children := [
@@ -3051,12 +2859,6 @@ func _test_factory_processor_role_marks_follow_settings() -> void:
 	combiner_board.cached_node_output_glyphs[&"combiner"] = GlyphModel.combine_many(
 		separated_children,
 		GlyphModel.CONNECTION_SIMPLE
-	)
-	_expect(combiner_board.configure_selected_node(0), "combine role mark fixture should accept radial mode")
-	_expect(combiner_board.node_role_mark_state(&"combiner")["connection_mode"] == GlyphModel.CONNECTION_RADIAL, "combiner role mark should follow a radial setting immediately")
-	combiner_board.cached_node_output_glyphs[&"combiner"] = GlyphModel.combine_many(
-		separated_children,
-		GlyphModel.CONNECTION_RADIAL
 	)
 	_expect(combiner_board.configure_selected_node(1), "combine role mark fixture should accept pairwise mode")
 	_expect(combiner_board.node_role_mark_state(&"combiner")["connection_mode"] == GlyphModel.CONNECTION_PAIRWISE, "combiner role mark should follow a pairwise setting")
@@ -3222,11 +3024,11 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 		"horizon_ticks": 160,
 		"counts": {&"sentinel": 2},
 		"event_offsets": {&"sentinel": PackedInt32Array([30, 60])},
-		"recipe_ids": {&"sentinel": &"vigil_cross"},
+		"recipe_ids": {&"sentinel": &"azure_guard"},
 		"discarded": 0,
 	}
 	var recipe_after := recipe_before.duplicate(true)
-	recipe_after["recipe_ids"][&"sentinel"] = &"stellar_sentinel"
+	recipe_after["recipe_ids"][&"sentinel"] = &"open_ring"
 	var recipe_comparison := comparison_board.compare_production_snapshots(recipe_before, recipe_after)
 	_expect(recipe_comparison["changed"], "same-count and same-timing output should still change when its sigil recipe changes")
 	_expect(recipe_comparison["units"][&"sentinel"]["recipe_state"] == &"changed", "recipe identity should remain independent from quantity and schedule")
@@ -3277,7 +3079,7 @@ func _test_factory_production_preview_is_non_destructive() -> void:
 	_expect(timing_board.set_production_comparison_baseline(timing_baseline), "timing-only comparison should freeze the warm production schedule")
 	timing_board.set_interaction_enabled(true)
 	timing_board.selected_node_id = &"ring_source"
-	_expect(timing_board.configure_selected_node(1) and timing_board.configure_selected_node(2), "changing a source away and back should produce a valid retimed candidate")
+	_expect(timing_board.configure_selected_node(1) and timing_board.configure_selected_node(0), "changing a source away and back should produce a valid retimed candidate")
 	var timing_only_difference := timing_board.production_difference_state(&"scout")
 	_expect(timing_only_difference["count_state"] == &"unchanged" and timing_only_difference["timing_state"] == &"later", "resetting the warm source phase should disclose a later schedule even when the 32-second count is unchanged")
 	_expect(timing_board.undo() and timing_board.undo(), "timing-only comparison should undo both source configuration changes")
@@ -3382,7 +3184,6 @@ func _test_factory_production_preview_explains_first_mismatch() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
 	board.configure(FactoryContent.PLAN_EMPTY)
-	board.simulation.nodes[&"ring_source"].config.erase("meaning_glyph_id")
 	board.simulation.nodes[&"ring_source"].config["primitive_id"] = "spike"
 	board.simulation.nodes[&"ring_source"].config["interval_ticks"] = 18
 	board.simulation.connect_nodes(
@@ -3422,7 +3223,6 @@ func _test_factory_board_explains_restored_validation_errors() -> void:
 	var board := FactoryBoard.new()
 	board.size = Vector2(568, 339)
 	board.configure(FactoryContent.PLAN_SCOUT)
-	board.simulation.nodes[&"ring_source"].config.erase("meaning_glyph_id")
 	board.simulation.nodes[&"ring_source"].config["primitive_id"] = ""
 	board.selected_node_id = &"ring_source"
 	_expect(board.selected_node_details()["selected_index"] == -1, "invalid restored source setting should not masquerade as a valid ring selection")
@@ -3495,13 +3295,14 @@ func _test_sigil_ghost_tracks_plan_recipe() -> void:
 	ghost.show_candidate(ghost.glyph, &"predicted")
 	_expect(ghost.candidate_state == &"match", "identical factory candidate should show a positive comparison state")
 	_expect(ghost.candidate_origin == &"predicted" and ghost.candidate_ring_style() == &"dashed", "predicted factory candidate should keep a dashed visual grammar")
-	ghost.show_candidate(MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR), &"predicted")
-	_expect(ghost.candidate_state == &"owned_other", "a registered non-goal recipe should not look like a summon failure")
-	_expect(ghost.candidate_recipe_id == &"stellar_sentinel" and ghost.candidate_unit_id == &"sentinel", "alternate output should retain the exact acquired recipe result")
-	_expect("星衛兵 → 衛兵" in ghost.candidate_context(), "alternate registered output should identify its result only on demand")
-	_expect("単一素材・中頻度" in ghost.candidate_context(), "alternate registered output should expose its distinct factory process on demand")
-	ghost.show_candidate(MeaningGlyphsModel.glyph(MeaningGlyphsModel.STAR), &"hypothetical", &"glyph", "32秒: 星衛兵→衛兵 4体・初回3.0秒")
-	_expect("32秒: 星衛兵→衛兵 4体" in ghost.candidate_context(), "hypothetical comparison tooltip should retain its production quantity and first arrival")
+	var ring_candidate := GlyphModel.new([GlyphComponentModel.new(&"ring")])
+	ghost.show_candidate(ring_candidate, &"predicted")
+	_expect(ghost.candidate_state == &"owned_other", "a different acquired recipe should not look like a summon failure")
+	_expect(ghost.candidate_recipe_id == &"open_ring" and ghost.candidate_unit_id == &"scout", "alternate output should retain the exact acquired recipe result")
+	_expect("斥候 → 斥候" in ghost.candidate_context(), "alternate output should identify its result only on demand")
+	_expect("単一素材・短工程" in ghost.candidate_context(), "alternate output should expose its distinct factory process on demand")
+	ghost.show_candidate(ring_candidate, &"hypothetical", &"glyph", "32秒: 斥候シジル→斥候 4体・初回3.0秒")
+	_expect("32秒: 斥候シジル→斥候 4体" in ghost.candidate_context(), "hypothetical comparison tooltip should retain its production quantity and first arrival")
 	var mismatching_candidate := GlyphModel.new([GlyphComponentModel.new(&"spike")])
 	ghost.show_candidate(mismatching_candidate)
 	_expect(ghost.candidate_state == &"mismatch", "different factory candidate should show a negative comparison state")
@@ -3602,8 +3403,8 @@ func _test_factory_upgrade_accelerates_ring_source() -> void:
 	_expect(prospective["ok"] and board.compare_production_snapshots(preview_before, prospective)["changed"], "upgrade choice should forecast its production effect before acquisition")
 	_expect(_factory_runtime_signature(board.simulation) == runtime_before and board.production_snapshot() == preview_before and board.run_upgrades == [&"ring_speed"], "prospective upgrade forecast should not mutate factory state or acquired upgrades")
 	_expect(source.config["interval_ticks"] < 18, "ring speed upgrade should accelerate future factories")
-	var plan_forecast := board.plan_production_snapshot(FactoryContent.PLAN_STELLAR)
-	_expect(plan_forecast["ok"] and plan_forecast["mana"] == 40 and int(plan_forecast["counts"][&"sentinel"]) > 0, "plan hover should forecast an alternate template's mana and production")
+	var plan_forecast := board.plan_production_snapshot(FactoryContent.PLAN_SENTINEL)
+	_expect(plan_forecast["ok"] and int(plan_forecast["mana"]) > 0 and int(plan_forecast["counts"][&"sentinel"]) > 0, "plan hover should forecast an alternate template's mana and production")
 	_expect(_factory_runtime_signature(board.simulation) == runtime_before and board.production_snapshot() == preview_before, "plan hover forecast should not mutate the active factory")
 	_expect(board.node_upgrade_state_for(source) == {"upgrade_id": &"ring_speed", "level": 1}, "source equipment should expose its visible upgrade level")
 	_expect("集束 1/3" in board.node_upgrade_tooltip(source), "source hover should disclose the applied upgrade only on demand")

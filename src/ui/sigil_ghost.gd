@@ -37,7 +37,7 @@ func _init() -> void:
 func _ready() -> void:
 	mouse_exited.connect(_clear_hover_slot)
 	if recipe_id == &"":
-		show_recipe(&"watchful_eye")
+		show_recipe(&"open_ring")
 
 
 func _gui_input(event: InputEvent) -> void:

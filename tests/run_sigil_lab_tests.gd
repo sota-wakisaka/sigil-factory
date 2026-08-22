@@ -1,7 +1,6 @@
 extends SceneTree
 
 const SigilGraphModel := preload("res://experiments/sigil_lab/sigil_graph.gd")
-const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_glyphs.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
@@ -13,7 +12,6 @@ var failures := 0
 func _initialize() -> void:
 	_test_graph_evaluation()
 	_test_basic_primitives_and_stretch()
-	_test_registered_meaning_glyphs()
 	_test_line_free_combine_requires_simple_mode()
 	_test_pure_transform_composition()
 	_test_radial_repeat()
@@ -66,52 +64,6 @@ func _test_basic_primitives_and_stretch() -> void:
 		_expect(component.primitive_id == &"circle", "stretch should preserve the source primitive")
 		_expect(component.scale_x_percent == 250 and component.scale_y_percent == 75, "stretch should fold both axes into the canonical component")
 		_expect("|a250,75" in component.canonical_key(), "anisotropic scale should be part of matching identity")
-
-
-func _test_registered_meaning_glyphs() -> void:
-	var expected_canonicals := {
-		RegisteredGlyphsModel.EYE: "S(3:0,0;39:P(33:p6:circle|0,0|0|1|c5:white|a50,50),40:P(34:p6:circle|0,0|0|1|c5:white|a100,50))",
-		RegisteredGlyphsModel.CROSS: "S(3:0,0;40:P(34:p6:square|0,0|0|1|c5:white|a100,25),40:P(34:p6:square|0,0|0|1|c5:white|a25,100))",
-		RegisteredGlyphsModel.TARGET: "S(3:0,0;39:P(33:p6:circle|0,0|0|1|c5:white|a50,50),32:P(26:p6:circle|0,0|0|1|c5:white))",
-		RegisteredGlyphsModel.STAR: "S(3:0,0;34:P(28:p8:triangle|0,0|0|1|c5:white),35:P(29:p8:triangle|0,0|60|1|c5:white))",
-	}
-	var seen_canonicals: Dictionary = {}
-	_expect(RegisteredGlyphsModel.IDS.size() == 4, "the meaning-Glyph set should stay intentionally small")
-	for glyph_id in RegisteredGlyphsModel.IDS:
-		var glyph := RegisteredGlyphsModel.glyph(glyph_id)
-		_expect(glyph != null, "%s should be available as a registered meaning Glyph" % glyph_id)
-		if glyph == null:
-			continue
-		var expected_canonical: String = expected_canonicals[glyph_id]
-		_expect(glyph.canonical_serialization() == expected_canonical, "%s should preserve its authored canonical structure" % glyph_id)
-		_expect(glyph.combine_connection_mode == GlyphModel.CONNECTION_SIMPLE, "%s should use line-free Simple Combine" % glyph_id)
-		_expect(GlyphPainterModel.combine_visuals(glyph, 1.0, false)["connections"].is_empty(), "%s should not invent connector lines" % glyph_id)
-		var maximum_size_percent := 0
-		for component in glyph.components:
-			maximum_size_percent = maxi(
-				maximum_size_percent,
-				maxi(component.scale_x_percent, component.scale_y_percent)
-			)
-		_expect(maximum_size_percent == RegisteredGlyphsModel.NOMINAL_SIZE_PERCENT, "%s should share the registered Glyph nominal size" % glyph_id)
-		_expect(not seen_canonicals.has(expected_canonical), "%s should remain visually and canonically distinct" % glyph_id)
-		seen_canonicals[expected_canonical] = true
-		var graph_text := FileAccess.get_file_as_string(
-			RegisteredGlyphsModel.source_graph_path(glyph_id)
-		)
-		var graph_document = JSON.parse_string(graph_text)
-		_expect(graph_document is Dictionary, "%s should retain its authored Lab graph" % glyph_id)
-		if graph_document is Dictionary:
-			_expect(graph_document["canonical_glyph"] == expected_canonical, "%s graph and registry entry should share one identity" % glyph_id)
-			_expect(graph_document["nodes"].size() >= 4 and graph_document["connections"].size() >= 4, "%s graph should retain its complete construction" % glyph_id)
-	var graph = SigilGraphModel.new()
-	_expect(graph.add_node(&"cross", SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.CROSS}), "a registered Cross source should be accepted")
-	_expect(graph.add_node(&"rotate", SigilGraphModel.ROTATE, {"degrees": 45}), "registered Glyphs should accept downstream transforms")
-	_expect(graph.add_node(&"output", SigilGraphModel.OUTPUT), "registered Glyphs should connect to completion")
-	graph.connect_nodes(&"cross", 0, &"rotate", 0)
-	graph.connect_nodes(&"rotate", 0, &"output", 0)
-	var rotated := graph.evaluate_output()
-	_expect(rotated["ok"] and rotated["glyph"].components.size() == 2, "the registered Cross should remain a reusable two-part Glyph")
-	_expect(not graph.add_node(&"unknown", SigilGraphModel.REGISTERED, {"glyph_id": &"unknown"}), "unknown registered Glyph IDs should fail closed")
 
 
 func _test_line_free_combine_requires_simple_mode() -> void:
@@ -389,24 +341,19 @@ func _test_lab_scene() -> void:
 	_expect(lab.name == "SigilLab", "Sigil Lab scene should use the consistent product term")
 	_expect(lab.graph_edit != null and lab.graph_edit.visible, "Sigil Lab should expose a connectable GraphEdit")
 	_expect(not lab.export_dialog.visible, "graph export dialog should stay hidden when the Lab opens")
-	_expect(lab.node_controls.size() == 5, "default eye template should stay readable and editable")
+	_expect(lab.node_controls.size() == 2, "default graph should contain one basic source and completion")
 	_expect(not lab.structure_button.button_pressed and not lab.output_preview.show_structure, "finished preview should hide hierarchy by default")
 	lab.structure_button.button_pressed = true
 	lab.structure_button.toggled.emit(true)
 	_expect(lab.output_preview.show_structure, "hierarchy toggle should reveal the editing overlay on demand")
 	lab.structure_button.button_pressed = false
 	lab.structure_button.toggled.emit(false)
-	var combine_id: StringName = &""
-	for node_id in lab.graph.nodes:
-		if lab.graph.node_kind(node_id) == SigilGraphModel.COMBINE:
-			combine_id = node_id
-			break
+	var combine_id: StringName = lab.add_lab_node(SigilGraphModel.COMBINE, {}, Vector2(40, 40))
 	_expect(combine_id != &"" and lab.graph.input_count(combine_id) == 8, "Lab Combine nodes should expose eight inputs")
 	_expect(lab.option_controls[combine_id] is OptionButton and lab.option_controls[combine_id].item_count == 3, "Lab Combine should expose simple, radial, and pairwise modes")
 	if lab.option_controls[combine_id] is OptionButton:
 		var combine_option: OptionButton = lab.option_controls[combine_id]
-		_expect(combine_option.selected == 0, "the centered eye template should normalize to Simple Combine")
-		_expect(combine_option.is_item_disabled(1) and combine_option.is_item_disabled(2), "line-free inputs should disable radial and pairwise choices")
+		_expect(combine_option.selected == 1, "a new unconnected Combine should default to Radial mode")
 	var free_rotate: StringName = lab.add_lab_node(SigilGraphModel.ROTATE, {"degrees": 120}, Vector2(40, 40))
 	_expect(lab.option_controls[free_rotate] is SpinBox, "Lab rotation should use a free-angle numeric control")
 	if lab.option_controls[free_rotate] is SpinBox:
@@ -432,21 +379,11 @@ func _test_lab_scene() -> void:
 	_expect(scale_control.find_children("*", "SpinBox", true, false).size() == 2, "Lab stretch should expose independent horizontal and vertical controls")
 	var free_repeat: StringName = lab.add_lab_node(SigilGraphModel.REPEAT, {"count": 6}, Vector2(40, 40))
 	_expect(lab.option_controls[free_repeat] is OptionButton and lab.option_controls[free_repeat].item_count == 6, "Lab repeat should expose all exact equal-angle counts")
-	var registered_cross: StringName = lab.add_lab_node(SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.CROSS}, Vector2(40, 40))
-	_expect(lab.option_controls[registered_cross] is OptionButton and lab.option_controls[registered_cross].item_count == 4, "all authored meaning Glyphs should be reusable from one compact palette node")
-	if lab.option_controls[registered_cross] is OptionButton:
-		var registered_option: OptionButton = lab.option_controls[registered_cross]
-		_expect(registered_option.get_item_text(0) == "目" and registered_option.get_item_text(3) == "星", "meaning-Glyph choices should follow the documented learning order")
+	_expect(not SigilGraphModel.NODE_KINDS.has(&"registered"), "preauthored meaning Glyph sources should be removed from the Lab grammar")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"distribute"), "Distributor should be removed from the Lab grammar")
 	_expect(not SigilGraphModel.NODE_KINDS.has(&"color"), "color processing should be omitted from the Lab grammar")
 	var output: Dictionary = lab.graph.evaluate_output()
-	_expect(output["ok"] and output["glyph"].components.size() == 2, "default eye template should combine two basic circles")
-	_expect(output["glyph"].combine_children.size() == 2, "default eye template should preserve its reusable two-part group")
-	var has_ellipse := false
-	for component in output["glyph"].components:
-		if component.scale_x_percent == 250 and component.scale_y_percent == 100:
-			has_ellipse = true
-	_expect(has_ellipse, "default eye template should derive its outer ellipse from a stretched circle")
+	_expect(output["ok"] and output["glyph"].components.size() == 1, "default graph should output one basic circle")
 	_expect(lab.output_preview.glyph.canonical_serialization() == output["glyph"].canonical_serialization(), "large preview should show the actual graph output")
 	var export_document: String = lab.export_graph_text()
 	var export_data = JSON.parse_string(export_document)
@@ -454,7 +391,7 @@ func _test_lab_scene() -> void:
 	if export_data is Dictionary:
 		_expect(export_data["format"] == "sigil_lab_graph" and int(export_data["version"]) == 1, "export should identify its stable graph format version")
 		_expect(export_data["canonical_glyph"] == output["glyph"].canonical_serialization(), "export should include the exact completed Glyph identity")
-		_expect(export_data["nodes"].size() == lab.graph.nodes.size() and export_data["connections"].size() == 4, "export should preserve every node on the canvas, including registered Glyph work")
+		_expect(export_data["nodes"].size() == lab.graph.nodes.size() and export_data["connections"].size() == 1, "export should preserve the basic graph on the canvas")
 		var exported_source_found := false
 		for exported_node in export_data["nodes"]:
 			_expect(exported_node["position"] is Array and exported_node["position"].size() == 2, "exported nodes should preserve their editor positions")
@@ -472,9 +409,9 @@ func _test_lab_scene() -> void:
 	await process_frame
 	_expect(lab.graph.nodes.size() == 1 and not lab.graph.evaluate_output()["ok"], "clear should retain only an empty completion node")
 	_expect(lab.export_graph_text().is_empty() and lab.export_button.disabled, "incomplete graphs should not export misleading text")
-	lab.load_cardinal_template()
+	lab.load_basic_template()
 	await process_frame
-	_expect(lab.graph.evaluate_output()["ok"], "eye template should be reloadable after clearing")
+	_expect(lab.graph.evaluate_output()["ok"], "basic template should be reloadable after clearing")
 	lab.load_repeat_template()
 	await process_frame
 	var repeat_output: Dictionary = lab.graph.evaluate_output()

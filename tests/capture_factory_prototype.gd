@@ -39,13 +39,14 @@ func _initialize() -> void:
 		var fixture := String(options.get("fixture", ""))
 		if fixture == "circle_summon":
 			view.connect_material_to_summoner(&"circle_01")
-		elif fixture == "meaning_deposits":
+		elif fixture == "resource_overview":
 			view.factory_graph.zoom = 0.2
 			view._center_initial_view()
-		elif fixture == "meaning_target":
+		elif fixture == "basic_target":
 			view.flow_time_override = 0.0
 			view.select_input(0)
-			view.select_target(&"eye")
+			view.select_target(&"circle")
+			view.connect_material_to_summoner(&"circle_01")
 			view.connect_output_to_input(&"eye_vein", &"summoner_center", 0)
 			view.flow_time_override = view.summoner_arrival_time(0, 0) + 0.001
 			view.process_transport_at(view.flow_time_override)

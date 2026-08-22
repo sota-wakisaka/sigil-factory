@@ -3,11 +3,9 @@ extends RefCounted
 
 const GlyphModel := preload("res://src/domain/glyph.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
-const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_glyphs.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 
 const SOURCE := &"source"
-const REGISTERED := &"registered"
 const ROTATE := &"rotate"
 const MOVE := &"move"
 const SCALE := &"scale"
@@ -15,7 +13,7 @@ const REPEAT := &"repeat"
 const COMBINE := &"combine"
 const OUTPUT := &"output"
 
-const NODE_KINDS := [SOURCE, REGISTERED, ROTATE, MOVE, SCALE, REPEAT, COMBINE, OUTPUT]
+const NODE_KINDS := [SOURCE, ROTATE, MOVE, SCALE, REPEAT, COMBINE, OUTPUT]
 const PRIMITIVES := [&"circle", &"triangle", &"square"]
 const REPEAT_COUNTS := [2, 3, 4, 5, 6, 8]
 const MAX_COMBINE_INPUTS := GlyphModel.MAX_COMBINE_CHILDREN
@@ -223,7 +221,7 @@ func disconnect_nodes(
 
 func input_count(node_id: StringName) -> int:
 	match node_kind(node_id):
-		SOURCE, REGISTERED:
+		SOURCE:
 			return 0
 		COMBINE:
 			return GlyphModel.MAX_COMBINE_CHILDREN
@@ -236,7 +234,7 @@ func output_count(node_id: StringName) -> int:
 	match node_kind(node_id):
 		OUTPUT:
 			return 0
-		SOURCE, REGISTERED, ROTATE, MOVE, SCALE, REPEAT, COMBINE:
+		SOURCE, ROTATE, MOVE, SCALE, REPEAT, COMBINE:
 			return 1
 	return 0
 
@@ -282,15 +280,6 @@ func _evaluate(node_id: StringName, cache: Dictionary, active: Dictionary) -> Di
 				GlyphComponentModel.new(StringName(config["primitive_id"])),
 			]),
 			"error": &"",
-		}
-	elif kind == REGISTERED:
-		var registered_glyph := RegisteredGlyphsModel.glyph(
-			StringName(node_config(node_id)["glyph_id"])
-		)
-		result = {
-			"ok": registered_glyph != null,
-			"glyph": registered_glyph,
-			"error": &"" if registered_glyph != null else &"missing_registered_glyph",
 		}
 	elif kind == COMBINE:
 		var inputs: Array = []
@@ -410,11 +399,6 @@ func _normalized_config(kind: StringName, config: Dictionary) -> Dictionary:
 			if not primitive_id in PRIMITIVES:
 				return {"ok": false, "error": &"invalid_primitive", "config": {}}
 			return {"ok": true, "error": &"", "config": {"primitive_id": primitive_id}}
-		REGISTERED:
-			var glyph_id := StringName(config.get("glyph_id", RegisteredGlyphsModel.EYE))
-			if not RegisteredGlyphsModel.has(glyph_id):
-				return {"ok": false, "error": &"invalid_registered_glyph", "config": {}}
-			return {"ok": true, "error": &"", "config": {"glyph_id": glyph_id}}
 		ROTATE:
 			var degrees := (
 				int(config["degrees"])

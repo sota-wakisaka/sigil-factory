@@ -2,7 +2,6 @@ extends SceneTree
 
 const MainMenuScene := preload("res://src/main_menu.tscn")
 const FactoryPrototypeScene := preload("res://experiments/factory_prototype/factory_prototype.tscn")
-const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 
 var failures := 0
 
@@ -10,7 +9,6 @@ var failures := 0
 func _initialize() -> void:
 	await _test_main_menu()
 	await _test_fixed_factory_landmarks()
-	await _test_meaning_glyph_deposits()
 	await _test_move_processing_node()
 	await _test_processed_rotation_target()
 	await _test_scale_processing_node()
@@ -111,7 +109,7 @@ func _test_fixed_factory_landmarks() -> void:
 	)
 	_expect(prototype.PLAYFIELD_SIZE == Vector2(9000.0, 6000.0), "the available playfield should support a large map")
 	_expect(prototype.material_nodes.size() == 30, "material deposits should be scattered across the large map")
-	_expect(prototype.fixed_landmark_count() == 35, "thirty material deposits, four meaning deposits, and one summoner should be fixed landmarks")
+	_expect(prototype.fixed_landmark_count() == 31, "thirty material deposits and one summoner should be fixed landmarks")
 	_expect(prototype.all_landmarks_locked(), "material nodes and the summoner should not be draggable")
 	_expect(prototype.factory_graph.minimap_enabled, "a minimap should support navigation across the large map")
 	_expect(not prototype.factory_graph.is_showing_arrange_button(), "automatic selected-node arrangement should stay hidden for the radial factory layout")
@@ -140,7 +138,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(counts[&"triangle"] == 10, "ten Triangle material deposits should exist")
 	_expect(counts[&"square"] == 10, "ten Square material deposits should exist")
 	_expect(prototype.target_panel != null and prototype.target_panel.anchor_left == 1.0, "the target sigil panel should stay at the upper right")
-	_expect(prototype.target_buttons.size() == 8, "four basic and four registered Glyphs should be selectable targets")
+	_expect(prototype.target_buttons.size() == 4, "the four basic shapes should be selectable targets")
 	_expect(prototype.target_panel.find_child("Input1Button", true, false) == null, "the target panel should not duplicate summoner inputs as tabs")
 	_expect(prototype.input_target_kinds.size() == 3, "the round summoner should retain three input targets without visible text rows")
 	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")
@@ -186,7 +184,7 @@ func _test_fixed_factory_landmarks() -> void:
 	var relay: GraphNode = prototype.relay_nodes[0]
 	var relay_id := StringName(relay.name)
 	_expect(relay.draggable and not relay.get_meta("fixed_landmark", false), "relay nodes should be draggable player-built equipment")
-	_expect(prototype.fixed_landmark_count() == 35, "placing a relay should not change the fixed-landmark count")
+	_expect(prototype.fixed_landmark_count() == 31, "placing a relay should not change the fixed-landmark count")
 	_expect("中継 1" in prototype.status_label.text, "the toolbar should report the number of placed relays")
 	_expect(prototype._landmark_visual(relay).body_radius() > 0.0, "relay nodes should use the circular factory visual language")
 	prototype.begin_rotation_placement()
@@ -731,77 +729,8 @@ func _test_fixed_factory_landmarks() -> void:
 		"deleting from the relay menu should remove only that player-built node"
 	)
 	_expect("中継 1" in prototype.status_label.text, "deleting a relay should refresh the factory equipment count")
-	_expect(prototype.fixed_landmark_count() == 35, "deleting player equipment must not remove fixed landmarks")
+	_expect(prototype.fixed_landmark_count() == 31, "deleting player equipment must not remove fixed landmarks")
 
-	prototype.queue_free()
-	await process_frame
-
-
-func _test_meaning_glyph_deposits() -> void:
-	var prototype = FactoryPrototypeScene.instantiate()
-	root.add_child(prototype)
-	await process_frame
-	await process_frame
-	prototype.flow_time_override = 0.0
-	_expect(prototype.meaning_nodes.size() == 4, "all four registered meaning Glyphs should exist as fixed deposits")
-	var counts: Dictionary = prototype.meaning_glyph_counts()
-	for glyph_id in MeaningGlyphsModel.IDS:
-		_expect(counts[glyph_id] == 1, "%s should have one fixed meaning deposit" % glyph_id)
-		_expect(
-			prototype.target_glyph(glyph_id).canonical_serialization()
-			== MeaningGlyphsModel.glyph(glyph_id).canonical_serialization(),
-			"%s should also be available as an exact summon target" % glyph_id
-		)
-	var eye_node = _first_meaning(prototype, MeaningGlyphsModel.EYE)
-	_expect(eye_node != null and not eye_node.draggable, "meaning deposits should be fixed landmarks")
-	if eye_node != null:
-		var eye_id := StringName(eye_node.name)
-		var output = prototype.output_glyph(eye_id)
-		_expect(
-			output != null
-			and output.canonical_serialization()
-			== MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE).canonical_serialization(),
-			"a meaning deposit should emit the registered canonical Glyph"
-		)
-		if output != null:
-			output.components[0].primitive_id = &"triangle"
-		_expect(
-			prototype.output_glyph(eye_id).canonical_serialization()
-			== MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE).canonical_serialization(),
-			"meaning deposit output should be an owned value"
-		)
-		var rotation = prototype.place_rotation_at(Vector2(3800.0, 2450.0), 45)
-		var rotation_id := StringName(rotation.name)
-		_expect(
-			prototype.connect_output_to_input(eye_id, rotation_id, 0),
-			"a registered meaning source should connect to regular processing equipment"
-		)
-		_expect(
-			prototype.output_glyph(rotation_id).canonical_serialization()
-			== MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE).rotated_degrees(45).canonical_serialization(),
-			"processing should apply to the complete registered meaning Glyph"
-		)
-		prototype.select_input(0)
-		_expect(prototype.select_target(MeaningGlyphsModel.EYE), "the Eye should be selectable for the active summoner input")
-		_expect(
-			prototype.target_preview.meaning_glyph_id == MeaningGlyphsModel.EYE,
-			"the target panel should show the actual selected meaning Glyph"
-		)
-		_expect(
-			prototype.connect_output_to_input(eye_id, StringName(prototype.summoner_node.name), 0),
-			"a registered meaning source should connect directly to a summoner input"
-		)
-		_expect(prototype.summon_state(0) == &"transporting", "a meaning Glyph should travel before summon judgment")
-		_advance_input_to_first_arrival(prototype, 0)
-		_expect(prototype.summon_state(0) == &"matched", "the registered Eye should match its canonical target")
-		_expect(
-			prototype.summoned_monster_count(&"eye_scout") == 1,
-			"the first Eye arrival should summon one Eye Drone"
-		)
-		_expect(
-			prototype.flow_audio.arrival_play_count == 1,
-			"a successful meaning Glyph arrival should use the meaning-Sigil arrival feedback"
-		)
 	prototype.queue_free()
 	await process_frame
 
@@ -1178,11 +1107,15 @@ func _test_combine_processing_node() -> void:
 		"two branched processors should connect to separate combine inputs"
 	)
 	var combined_glyph: Object = prototype.output_glyph(combine_id)
-	var expected_cross: Object = MeaningGlyphsModel.glyph(&"cross")
+	var square_glyph: Object = prototype.primitive_glyph(&"square")
+	var expected_overlap: Object = prototype.GlyphModelScript.combine_many(
+		[square_glyph.stretched_percent(100, 25), square_glyph.stretched_percent(25, 100)],
+		prototype.GlyphModelScript.CONNECTION_SIMPLE
+	)
 	_expect(
 		combined_glyph != null
-		and combined_glyph.canonical_serialization() == expected_cross.canonical_serialization(),
-		"simple combine should build the registered Cross without mutating either branch"
+		and combined_glyph.canonical_serialization() == expected_overlap.canonical_serialization(),
+		"simple combine should overlap both stretched branches without mutating either branch"
 	)
 	var availability: Dictionary = prototype.combine_mode_availability(combine_id)
 	_expect(
@@ -1310,13 +1243,6 @@ func _expect(condition: bool, message: String) -> void:
 func _first_material(prototype, kind: StringName) -> GraphNode:
 	for node in prototype.material_nodes:
 		if StringName(node.get_meta("landmark_kind", &"")) == kind:
-			return node
-	return null
-
-
-func _first_meaning(prototype, glyph_id: StringName) -> GraphNode:
-	for node in prototype.meaning_nodes:
-		if StringName(node.get_meta("meaning_glyph_id", &"")) == glyph_id:
 			return node
 	return null
 

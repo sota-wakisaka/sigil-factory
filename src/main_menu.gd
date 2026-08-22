@@ -92,7 +92,7 @@ func _build_ui() -> void:
 	sigil_lab_button = _menu_card(
 		"SIGIL LAB",
 		"ノードを自由に接続する編集室",
-		"意味グリフの作成とJSON出力"
+		"シジルグラフの作成とJSON出力"
 	)
 	sigil_lab_button.name = "SigilLabButton"
 	sigil_lab_button.pressed.connect(open_sigil_lab)

@@ -4,14 +4,12 @@ extends Control
 const SigilGraphModel := preload("res://experiments/sigil_lab/sigil_graph.gd")
 const SigilGraphEditModel := preload("res://experiments/sigil_lab/sigil_graph_edit.gd")
 const SigilPreviewModel := preload("res://experiments/sigil_lab/sigil_preview.gd")
-const RegisteredGlyphsModel := preload("res://experiments/sigil_lab/registered_glyphs.gd")
 const GlyphModel := preload("res://src/domain/glyph.gd")
 
 const MENU_SCENE := "res://src/main_menu.tscn"
 const PORT_COLOR := Color(0.3, 0.82, 1.0, 1.0)
 const NODE_NAMES := {
 	&"source": "素材",
-	&"registered": "意味",
 	&"rotate": "回転",
 	&"move": "移動",
 	&"scale": "変形",
@@ -48,7 +46,7 @@ var menu_button: Button
 
 func _ready() -> void:
 	_build_ui()
-	_load_eye_template()
+	_load_basic_template()
 	queue_redraw()
 
 
@@ -80,12 +78,8 @@ func clear_workspace() -> void:
 	_clear_workspace()
 
 
-func load_cardinal_template() -> void:
-	_load_eye_template()
-
-
-func load_eye_template() -> void:
-	_load_eye_template()
+func load_basic_template() -> void:
+	_load_basic_template()
 
 
 func load_repeat_template() -> void:
@@ -194,10 +188,10 @@ func _build_header() -> Control:
 	toolbar.add_child(title)
 
 	var template_button := Button.new()
-	template_button.text = "目の印"
-	template_button.tooltip_text = "丸を横へ変形して作る基本テンプレート"
+	template_button.text = "基本形"
+	template_button.tooltip_text = "丸素材を完成へ直接つなぐ最小テンプレート"
 	template_button.custom_minimum_size = Vector2(86, 34)
-	template_button.pressed.connect(_load_eye_template)
+	template_button.pressed.connect(_load_basic_template)
 	toolbar.add_child(template_button)
 
 	var repeat_button := Button.new()
@@ -245,7 +239,6 @@ func _build_palette() -> Control:
 		["○", SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, "丸 // 基本図形"],
 		["△", SigilGraphModel.SOURCE, {"primitive_id": &"triangle"}, "三角 // 基本図形"],
 		["□", SigilGraphModel.SOURCE, {"primitive_id": &"square"}, "四角 // 基本図形"],
-		["印", SigilGraphModel.REGISTERED, {"glyph_id": RegisteredGlyphsModel.EYE}, "登録グリフ // 目・十字・的・星"],
 		["↻", SigilGraphModel.ROTATE, {"degrees": 45}, "中心を基準に1°単位で回転"],
 		["↔", SigilGraphModel.MOVE, {"offset": Vector2i(0, -1)}, "上下左右へ1単位ずつ移動"],
 		["↔↕", SigilGraphModel.SCALE, {"x_percent": 150, "y_percent": 100}, "横・縦を別々に拡大縮小"],
@@ -423,12 +416,6 @@ func _create_graph_node(node_id: StringName, kind: StringName, position: Vector2
 			var option := _source_option(node_id)
 			node.add_child(option)
 			option_controls[node_id] = option
-		SigilGraphModel.REGISTERED:
-			node.add_child(preview)
-			node.set_slot(0, false, 0, PORT_COLOR, true, 0, PORT_COLOR)
-			var option := _registered_option(node_id)
-			node.add_child(option)
-			option_controls[node_id] = option
 		SigilGraphModel.ROTATE, SigilGraphModel.MOVE, SigilGraphModel.SCALE, SigilGraphModel.REPEAT:
 			node.add_child(preview)
 			node.set_slot(0, true, 0, PORT_COLOR, true, 0, PORT_COLOR)
@@ -491,22 +478,6 @@ func _source_option(node_id: StringName) -> OptionButton:
 	option.select([&"circle", &"triangle", &"square"].find(primitive))
 	option.item_selected.connect(func(index: int) -> void:
 		graph.set_node_config(node_id, {"primitive_id": [&"circle", &"triangle", &"square"][index]})
-		_refresh_all()
-	)
-	return option
-
-
-func _registered_option(node_id: StringName) -> OptionButton:
-	var option := OptionButton.new()
-	for glyph_id in RegisteredGlyphsModel.IDS:
-		option.add_item(RegisteredGlyphsModel.label(glyph_id))
-	var glyph_id := StringName(graph.node_config(node_id).get(
-		"glyph_id",
-		RegisteredGlyphsModel.EYE
-	))
-	option.select(maxi(RegisteredGlyphsModel.IDS.find(glyph_id), 0))
-	option.item_selected.connect(func(index: int) -> void:
-		graph.set_node_config(node_id, {"glyph_id": RegisteredGlyphsModel.IDS[index]})
 		_refresh_all()
 	)
 	return option
@@ -748,26 +719,15 @@ func _clear_workspace() -> void:
 	_refresh_all()
 
 
-func _load_eye_template() -> void:
+func _load_basic_template() -> void:
 	_clear_workspace()
-	var pupil := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, Vector2(30, 180))
-	var outline := _add_node(SigilGraphModel.SOURCE, {"primitive_id": &"circle"}, Vector2(30, 390))
-	var stretch := _add_node(
-		SigilGraphModel.SCALE,
-		{"x_percent": 250, "y_percent": 100},
-		Vector2(230, 390)
-	)
-	var combine_root := _add_node(
-		SigilGraphModel.COMBINE,
-		{"connection_mode": GlyphModel.CONNECTION_SIMPLE},
-		Vector2(480, 250)
+	var source := _add_node(
+		SigilGraphModel.SOURCE,
+		{"primitive_id": &"circle"},
+		Vector2(260, 280)
 	)
 	var output_id := graph.output_node_id()
-
-	_connect_nodes(outline, 0, stretch, 0)
-	_connect_nodes(pupil, 0, combine_root, 0)
-	_connect_nodes(stretch, 0, combine_root, 1)
-	_connect_nodes(combine_root, 0, output_id, 0)
+	_connect_nodes(source, 0, output_id, 0)
 	_refresh_all()
 
 

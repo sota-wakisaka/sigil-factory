@@ -39,7 +39,6 @@ func configure() -> void:
 		&"circle": _make_tone([740.0, 1110.0], 0.12, 0.36),
 		&"triangle": _make_tone([820.0, 1230.0], 0.10, 0.34),
 		&"square": _make_tone([520.0, 780.0], 0.14, 0.38),
-		&"meaning": _make_tone([660.0, 990.0, 1320.0], 0.16, 0.31),
 	}
 	connection_player = _make_player("ConnectionSE", -3.0)
 	disconnect_player = _make_player("DisconnectSE", -5.0)
@@ -80,7 +79,7 @@ func streams_ready() -> bool:
 		or disconnect_stream == null
 	):
 		return false
-	for material_kind in [&"circle", &"triangle", &"square", &"meaning"]:
+	for material_kind in [&"circle", &"triangle", &"square"]:
 		if not arrival_streams.has(material_kind):
 			return false
 		var stream: AudioStreamWAV = arrival_streams[material_kind]

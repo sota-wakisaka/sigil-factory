@@ -12,7 +12,6 @@ const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
 const GlyphTooltipModel := preload("res://src/ui/glyph_tooltip.gd")
 const GlyphComparisonTooltipModel := preload("res://src/ui/glyph_comparison_tooltip.gd")
 const GlyphComponentModel := preload("res://src/domain/glyph_component.gd")
-const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 
 const PANEL_COLOR := Color(0.035, 0.055, 0.085, 0.96)
 const NODE_COLOR := Color(0.08, 0.12, 0.18, 1.0)
@@ -24,12 +23,8 @@ const WARNING_COLOR := Color(1.0, 0.38, 0.28, 1.0)
 const WAITING_COLOR := Color(1.0, 0.72, 0.24, 1.0)
 const MATCH_COLOR := Color(0.36, 1.0, 0.58, 1.0)
 const PRODUCTION_INCREASE_COLOR := Color(0.3, 0.86, 0.94, 1.0)
-const SOURCE_OPTION_LABELS := ["環", "棘", "目", "十字", "的", "星"]
-const SOURCE_OPTION_IDS := [
-	&"ring", &"spike",
-	MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS, MeaningGlyphsModel.TARGET,
-	MeaningGlyphsModel.STAR,
-]
+const SOURCE_OPTION_LABELS := ["環", "棘"]
+const SOURCE_OPTION_IDS := [&"ring", &"spike"]
 const COMBINE_OPTION_LABELS := ["中心", "相互", "単純"]
 const COMBINE_OPTION_IDS := [
 	GlyphModel.CONNECTION_RADIAL,
@@ -223,7 +218,7 @@ func node_local_position(node_id: StringName) -> Vector2:
 	return _scaled_position(_display_positions().get(node_id, Vector2.ZERO))
 
 
-func add_node_from_palette(template_id: StringName, preferred_meaning_glyph_id: StringName = &"") -> StringName:
+func add_node_from_palette(template_id: StringName) -> StringName:
 	if not interaction_enabled:
 		return &""
 	var kind := FactoryNodeModel.NodeKind.SOURCE
@@ -236,14 +231,6 @@ func add_node_from_palette(template_id: StringName, preferred_meaning_glyph_id: 
 		&"spike_source":
 			prefix = "spike_source"
 			config = {"primitive_id": "spike", "interval_ticks": FactoryContent.source_interval_for_glyph(&"spike")}
-		&"meaning_source":
-			prefix = "meaning_source"
-			var glyph_id := (
-				preferred_meaning_glyph_id
-				if MeaningGlyphsModel.has(preferred_meaning_glyph_id)
-				else MeaningGlyphsModel.EYE
-			)
-			config = {"meaning_glyph_id": glyph_id, "interval_ticks": FactoryContent.source_interval_for_glyph(glyph_id)}
 		&"rotator":
 			prefix = "rotator"
 			kind = FactoryNodeModel.NodeKind.ROTATOR
@@ -415,7 +402,7 @@ func palette_availability(template_id: StringName) -> Dictionary:
 		return {"available": false, "reason": &"locked"}
 	var kind := FactoryNodeModel.NodeKind.SOURCE
 	match template_id:
-		&"ring_source", &"spike_source", &"meaning_source":
+		&"ring_source", &"spike_source":
 			kind = FactoryNodeModel.NodeKind.SOURCE
 		&"rotator":
 			kind = FactoryNodeModel.NodeKind.ROTATOR
@@ -447,9 +434,6 @@ func goal_equipment_present(template_id: StringName) -> bool:
 			&"spike_source":
 				if node.kind == FactoryNodeModel.NodeKind.SOURCE and StringName(node.config.get("primitive_id", "")) == &"spike":
 					return true
-			&"meaning_source":
-				if node.kind == FactoryNodeModel.NodeKind.SOURCE and MeaningGlyphsModel.has(StringName(node.config.get("meaning_glyph_id", ""))):
-					return true
 			&"rotator":
 				if node.kind == FactoryNodeModel.NodeKind.ROTATOR:
 					return true
@@ -463,40 +447,6 @@ func goal_equipment_present(template_id: StringName) -> bool:
 				if node.kind == FactoryNodeModel.NodeKind.SUMMONER:
 					return true
 	return false
-
-
-func meaning_source_presence(required_ids: Array[StringName]) -> StringName:
-	if required_ids.is_empty():
-		return &"missing"
-	var present := {}
-	var display_simulation := _display_simulation()
-	if display_simulation != null:
-		for node: FactoryNodeModel in display_simulation.nodes.values():
-			if node.kind != FactoryNodeModel.NodeKind.SOURCE:
-				continue
-			var glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
-			if glyph_id in required_ids:
-				present[glyph_id] = true
-	if present.is_empty():
-		return &"missing"
-	return &"present" if present.size() == required_ids.size() else &"partial"
-
-
-func first_missing_meaning_source(required_ids: Array[StringName]) -> StringName:
-	var display_simulation := _display_simulation()
-	for required_id in required_ids:
-		var found := false
-		if display_simulation != null:
-			for node: FactoryNodeModel in display_simulation.nodes.values():
-				if (
-					node.kind == FactoryNodeModel.NodeKind.SOURCE
-					and StringName(node.config.get("meaning_glyph_id", "")) == required_id
-				):
-					found = true
-					break
-		if not found:
-			return required_id
-	return required_ids[0] if not required_ids.is_empty() else MeaningGlyphsModel.EYE
 
 
 func can_undo() -> bool:
@@ -536,10 +486,7 @@ func is_guided_connection_pending() -> bool:
 
 func _source_option_index(node: FactoryNodeModel) -> int:
 	var primitive_id := StringName(node.config.get("primitive_id", ""))
-	if primitive_id != &"":
-		return SOURCE_OPTION_IDS.find(primitive_id)
-	var meaning_glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
-	return SOURCE_OPTION_IDS.find(meaning_glyph_id)
+	return SOURCE_OPTION_IDS.find(primitive_id)
 
 
 func selected_node_details() -> Dictionary:
@@ -691,12 +638,7 @@ func _apply_setting_option(node: FactoryNodeModel, option_index: int) -> bool:
 		FactoryNodeModel.NodeKind.SOURCE:
 			if option_index < 0 or option_index >= SOURCE_OPTION_IDS.size():
 				return false
-			node.config.erase("primitive_id")
-			node.config.erase("meaning_glyph_id")
-			if option_index <= 1:
-				node.config["primitive_id"] = SOURCE_OPTION_IDS[option_index]
-			else:
-				node.config["meaning_glyph_id"] = SOURCE_OPTION_IDS[option_index]
+			node.config["primitive_id"] = SOURCE_OPTION_IDS[option_index]
 			node.config["interval_ticks"] = FactoryContent.source_interval_for_glyph(SOURCE_OPTION_IDS[option_index])
 			node.source_timer = 0
 			_apply_node_upgrades(node)
@@ -1631,10 +1573,6 @@ func _work_in_progress_entries(source_simulation: FactorySimulation) -> Array[Di
 
 
 func _glyph_type_label(glyph: GlyphModel) -> String:
-	var canonical := glyph.canonical_serialization()
-	for meaning_glyph_id in MeaningGlyphsModel.IDS:
-		if MeaningGlyphsModel.glyph(meaning_glyph_id).canonical_serialization() == canonical:
-			return MeaningGlyphsModel.label(meaning_glyph_id)
 	var component_labels := PackedStringArray()
 	for component in glyph.components:
 		var attributes := PackedStringArray([_primitive_name(component.primitive_id)])
@@ -3145,9 +3083,6 @@ func source_glyph_for_node(node_id: StringName) -> GlyphModel:
 	var node: FactoryNodeModel = display_simulation.nodes[node_id]
 	if node.kind != FactoryNodeModel.NodeKind.SOURCE:
 		return null
-	var meaning_glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
-	if meaning_glyph_id != &"":
-		return MeaningGlyphsModel.glyph(meaning_glyph_id)
 	var primitive_id := StringName(node.config.get("primitive_id", ""))
 	if primitive_id == &"":
 		return null
@@ -3271,11 +3206,7 @@ func _get_tooltip(at_position: Vector2) -> String:
 		var node_context: String = {
 			&"actual": "設備内の現在出力Glyph",
 			&"predicted": "32秒予測の出力Glyph",
-			&"source": (
-				"登録済み意味Glyph"
-				if node.config.has("meaning_glyph_id")
-				else "素材Primitive"
-			),
+			&"source": "素材Primitive",
 		}.get(node_state, "")
 		var upgrade_context := node_upgrade_tooltip(node)
 		if upgrade_context != "":
@@ -3851,9 +3782,6 @@ func _path_reaches_node(current_id: StringName, sought_id: StringName, visited: 
 func _node_label(node: FactoryNodeModel) -> String:
 	match node.kind:
 		FactoryNodeModel.NodeKind.SOURCE:
-			var meaning_glyph_id := StringName(node.config.get("meaning_glyph_id", ""))
-			if meaning_glyph_id != &"":
-				return "%s印" % MeaningGlyphsModel.label(meaning_glyph_id) if MeaningGlyphsModel.has(meaning_glyph_id) else "印未設定"
 			var primitive := String(node.config.get("primitive_id", ""))
 			if primitive not in ["ring", "spike"]:
 				return "素材未設定"
