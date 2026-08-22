@@ -1,6 +1,9 @@
 class_name FactoryLandmarkVisual
 extends Control
 
+const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
+const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
+
 const INK := Color(0.68, 0.88, 1.0, 1.0)
 const DIM_INK := Color(0.24, 0.62, 0.78, 0.72)
 const DEPOSIT_OFFSETS := [
@@ -21,6 +24,7 @@ var scale_y_percent := 100
 var move_offset := Vector2i.UP
 var repeat_count := 3
 var combine_connection_mode: StringName = &"simple"
+var meaning_glyph_id: StringName = &""
 
 
 func configure(next_kind: StringName) -> void:
@@ -54,9 +58,19 @@ func configure(next_kind: StringName) -> void:
 
 
 func configure_target(next_kind: StringName) -> void:
+	meaning_glyph_id = &""
 	landmark_kind = next_kind
 	visual_mode = &"target"
 	custom_minimum_size = Vector2(112.0, 112.0)
+	queue_redraw()
+
+
+func configure_meaning(next_glyph_id: StringName, as_target: bool = false) -> void:
+	meaning_glyph_id = next_glyph_id if MeaningGlyphsModel.has(next_glyph_id) else &""
+	landmark_kind = &"meaning"
+	visual_mode = &"target_meaning" if as_target else &"meaning_deposit"
+	custom_minimum_size = Vector2(112.0, 112.0) if as_target else Vector2(142.0, 142.0)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	queue_redraw()
 
 
@@ -143,6 +157,12 @@ func _draw() -> void:
 	if visual_mode == &"target":
 		_draw_target(center)
 		return
+	if visual_mode == &"target_meaning":
+		_draw_meaning_glyph(center, minf(size.x, size.y) * 0.34, true)
+		return
+	if visual_mode == &"meaning_deposit":
+		_draw_meaning_deposit(center)
+		return
 	_draw_material_deposit(center)
 
 
@@ -173,6 +193,35 @@ func _draw_material_deposit(center: Vector2) -> void:
 		var radius := 13.0 if is_center else 6.5
 		var color := INK if is_center else Color(DIM_INK, 0.68)
 		_draw_material_shape(center + DEPOSIT_OFFSETS[index], radius, color, 2.0 if is_center else 1.25)
+
+
+func _draw_meaning_deposit(center: Vector2) -> void:
+	var field_radius := body_radius()
+	draw_circle(center, field_radius, Color(0.018, 0.055, 0.095, 0.94), true)
+	draw_arc(center, field_radius, 0.0, TAU, 64, Color(0.56, 0.76, 1.0, 0.90), 1.7, true)
+	draw_arc(center, field_radius * 0.84, 0.0, TAU, 64, Color(0.28, 0.60, 0.86, 0.48), 1.0, true)
+	for index in 4:
+		var angle := -PI * 0.5 + TAU * float(index) / 4.0
+		var direction := Vector2.from_angle(angle)
+		var point := center + direction * field_radius * 0.92
+		var tangent := Vector2(-direction.y, direction.x)
+		draw_colored_polygon(PackedVector2Array([
+			point + direction * 4.0,
+			point - direction * 3.0 + tangent * 3.0,
+			point - direction * 3.0 - tangent * 3.0,
+		]), Color(0.66, 0.86, 1.0, 0.88))
+	_draw_meaning_glyph(center, field_radius * 0.58, false)
+
+
+func _draw_meaning_glyph(center: Vector2, available_radius: float, target_frame: bool) -> void:
+	var glyph = MeaningGlyphsModel.glyph(meaning_glyph_id)
+	if glyph == null:
+		return
+	if target_frame:
+		draw_circle(center, available_radius * 1.28, Color(0.01, 0.055, 0.08, 0.92), true)
+		draw_arc(center, available_radius * 1.28, 0.0, TAU, 64, Color(0.25, 0.72, 0.90, 0.52), 1.0, true)
+	var scale := GlyphPainterModel.fit_scale(glyph, available_radius, false, 0.18, 4.0)
+	GlyphPainterModel.draw_glyph(self, glyph, center, scale, 1.0, false, 0.78)
 
 
 func _draw_material_shape(center: Vector2, radius: float, color: Color, width: float) -> void:

@@ -39,6 +39,9 @@ func _initialize() -> void:
 		var fixture := String(options.get("fixture", ""))
 		if fixture == "circle_summon":
 			view.connect_material_to_summoner(&"circle_01")
+		elif fixture == "meaning_deposits":
+			view.factory_graph.zoom = 0.2
+			view._center_initial_view()
 		elif fixture == "three_inputs":
 			view.connect_material_to_summoner(&"circle_01", 0)
 			view.connect_material_to_summoner(&"triangle_01", 1)
