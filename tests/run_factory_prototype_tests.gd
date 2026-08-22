@@ -42,6 +42,15 @@ func _test_fixed_factory_landmarks() -> void:
 		return
 
 	_expect(prototype.factory_graph != null, "the prototype should expose a wide GraphEdit playfield")
+	_expect(prototype.flow_audio != null and prototype.flow_audio.streams_ready(), "factory flow feedback should provide generated connection, disconnect, and arrival sounds")
+	_expect(
+		is_equal_approx(prototype.flow_packet_phase(0, 1, 0.0) - prototype.flow_packet_phase(0, 0, 0.0), 0.5),
+		"two transported Glyphs should stay evenly spaced on each line"
+	)
+	_expect(
+		prototype.flow_packet_phase(0, 0, 0.6) > prototype.flow_packet_phase(0, 0, 0.0),
+		"transported Glyph phase should advance toward the summoner over time"
+	)
 	_expect(prototype.PLAYFIELD_SIZE == Vector2(9000.0, 6000.0), "the available playfield should support a large map")
 	_expect(prototype.material_nodes.size() == 30, "material deposits should be scattered across the large map")
 	_expect(prototype.fixed_landmark_count() == 31, "thirty material deposits and one summoner should be fixed landmarks")
@@ -108,12 +117,14 @@ func _test_fixed_factory_landmarks() -> void:
 	prototype.factory_graph.gui_input.emit(body_hover)
 	_expect("召喚器" in prototype.factory_graph.tooltip_text, "summoner name and input guidance should move from node text into a tooltip")
 	if circle_source != null:
+		var connection_sound_count: int = prototype.flow_audio.connection_play_count
 		prototype.factory_graph.connection_request.emit(
 			StringName(circle_source.name),
 			0,
 			StringName(prototype.summoner_node.name),
 			0
 		)
+		_expect(prototype.flow_audio.connection_play_count == connection_sound_count + 1, "a completed connection should play one short connection sound")
 	_expect(circle_source != null and prototype.connected_material_kind() == &"circle", "dragging a Circle deposit output should connect directly to the summoner")
 	_expect(prototype.summon_state() == &"matched", "matching Circle should start summoning")
 	_expect("環霊ウィスプ" in prototype.summon_state_label.text, "the Circle summon state should name its monster")
@@ -185,9 +196,14 @@ func _test_fixed_factory_landmarks() -> void:
 	disconnect_click.button_index = MOUSE_BUTTON_RIGHT
 	disconnect_click.pressed = true
 	disconnect_click.position = prototype.directional_input_position(2, prototype.factory_graph)
+	var disconnect_sound_count: int = prototype.flow_audio.disconnect_play_count
 	prototype.factory_graph.gui_input.emit(disconnect_click)
 	_expect(prototype.selected_input_index == 2, "right-clicking an input should keep its target selected")
 	_expect(prototype.summon_state(2) == &"idle", "right-clicking a directional input should disconnect only that input")
+	_expect(prototype.flow_audio.disconnect_play_count == disconnect_sound_count + 1, "disconnecting a directional input should play one short disconnect sound")
+	var arrival_sound_count: int = prototype.flow_audio.arrival_play_count
+	prototype.flow_audio.play_arrival(&"circle")
+	_expect(prototype.flow_audio.arrival_play_count == arrival_sound_count + 1, "a matched Glyph arrival should have a shape-specific summon sound")
 
 	var bounds := Rect2()
 	var first := true

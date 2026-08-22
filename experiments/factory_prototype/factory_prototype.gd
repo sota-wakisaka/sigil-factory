@@ -3,6 +3,7 @@ extends Control
 
 const FactoryLandmarkVisualModel := preload("res://experiments/factory_prototype/factory_landmark.gd")
 const FactoryDirectionalOverlayModel := preload("res://experiments/factory_prototype/factory_directional_overlay.gd")
+const FactoryFlowAudioModel := preload("res://experiments/factory_prototype/factory_flow_audio.gd")
 
 const MENU_SCENE := "res://src/main_menu.tscn"
 const PLAYFIELD_SIZE := Vector2(9000.0, 6000.0)
@@ -13,6 +14,10 @@ const PORT_IDLE_COLOR := Color(0.20, 0.55, 0.70, 0.92)
 const PORT_HIT_RADIUS := 13.0
 const PORT_DRAW_RADIUS := 5.5
 const BUILTIN_PORT_COLOR := Color(0.0, 0.0, 0.0, 0.0)
+const FLOW_PACKET_COUNT := 2
+const FLOW_CYCLE_SECONDS := 2.4
+const FLOW_PATH_START := 0.06
+const FLOW_PATH_END := 0.94
 const TARGET_ORDER := [&"circle", &"triangle", &"square"]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -76,6 +81,9 @@ var connection_overlay
 var port_overlay
 var graph_menu_panel: PanelContainer
 var graph_minimap: Control
+var flow_audio
+var flow_arrival_cycles: Array[int] = [-1, -1, -1]
+var flow_time_override := -1.0
 var status_label: Label
 var target_panel: PanelContainer
 var target_preview
@@ -101,9 +109,28 @@ var selected_target_kind: StringName:
 
 func _ready() -> void:
 	_build_ui()
+	_setup_flow_audio()
 	_place_landmarks()
 	_refresh_summon_state()
 	call_deferred("_center_initial_view")
+
+
+func _process(_delta: float) -> void:
+	if flow_audio == null:
+		return
+	var now := flow_animation_time_seconds()
+	for input_index in SUMMONER_INPUT_COUNT:
+		if summon_state(input_index) != &"matched":
+			flow_arrival_cycles[input_index] = -1
+			continue
+		var arrival_cycle := flow_arrival_cycle(input_index, now)
+		if flow_arrival_cycles[input_index] < 0:
+			flow_arrival_cycles[input_index] = arrival_cycle
+			continue
+		if arrival_cycle <= flow_arrival_cycles[input_index]:
+			continue
+		flow_arrival_cycles[input_index] = arrival_cycle
+		flow_audio.play_arrival(connected_material_kind(input_index))
 
 
 func _draw() -> void:
@@ -222,12 +249,22 @@ func connect_material_to_summoner(material_node_id: StringName, input_index: int
 		return false
 	_clear_directional_connection_preview()
 	_refresh_summon_state()
+	flow_arrival_cycles[resolved_index] = flow_arrival_cycle(
+		resolved_index,
+		flow_animation_time_seconds()
+	)
+	if flow_audio != null:
+		flow_audio.play_connection(summon_state(resolved_index) == &"matched")
 	return true
 
 
 func disconnect_summoner(input_index: int = -1) -> void:
 	var resolved_index := selected_input_index if input_index < 0 else input_index
-	_remove_summoner_input_connection(resolved_index)
+	var removed := _remove_summoner_input_connection(resolved_index)
+	if removed:
+		flow_arrival_cycles[resolved_index] = -1
+		if flow_audio != null:
+			flow_audio.play_disconnect()
 	_refresh_summon_state()
 
 
@@ -258,8 +295,7 @@ func _on_disconnection_request(
 	to_port: int
 ) -> void:
 	if factory_graph.is_node_connected(from_node, from_port, to_node, to_port):
-		factory_graph.disconnect_node(from_node, from_port, to_node, to_port)
-	_refresh_summon_state()
+		disconnect_summoner(to_port)
 
 
 func _on_factory_graph_input(event: InputEvent) -> void:
@@ -423,6 +459,7 @@ func draw_directional_overlay(overlay: Control, layer: StringName) -> void:
 
 
 func _draw_directional_connection_lines(overlay: Control) -> void:
+	var now := flow_animation_time_seconds()
 	for connection in factory_graph.get_connection_list():
 		var from_node_id := StringName(connection["from_node"])
 		var input_index := int(connection["to_port"])
@@ -435,6 +472,17 @@ func _draw_directional_connection_lines(overlay: Control) -> void:
 			&"mismatch":
 				color = Color(0.96, 0.62, 0.34, 0.96)
 		_draw_connection_curve(overlay, start, finish, color, 3.0)
+		var source := _material_node(from_node_id)
+		if source != null:
+			_draw_flowing_glyphs(
+				overlay,
+				start,
+				finish,
+				StringName(source.get_meta("landmark_kind", &"")),
+				color,
+				input_index,
+				now
+			)
 	if connecting_material_id != &"":
 		var preview_start: Vector2 = directional_output_position(connecting_material_id, overlay)
 		var preview_finish: Vector2 = _convert_control_point(factory_graph, connection_pointer, overlay)
@@ -519,15 +567,97 @@ func _draw_connection_curve(
 	color: Color,
 	width: float
 ) -> void:
+	var points := PackedVector2Array()
+	for index in 25:
+		points.append(connection_curve_point(start, finish, float(index) / 24.0))
+	overlay.draw_polyline(points, color, width, true)
+
+
+func _draw_flowing_glyphs(
+	overlay: Control,
+	start: Vector2,
+	finish: Vector2,
+	material_kind: StringName,
+	color: Color,
+	input_index: int,
+	time_seconds: float
+) -> void:
+	for packet_index in FLOW_PACKET_COUNT:
+		var phase := flow_packet_phase(input_index, packet_index, time_seconds)
+		var progress := lerpf(FLOW_PATH_START, FLOW_PATH_END, phase)
+		var position := connection_curve_point(start, finish, progress)
+		var previous := connection_curve_point(start, finish, maxf(progress - 0.045, 0.0))
+		var direction := previous.direction_to(position)
+		overlay.draw_line(previous, position, Color(color, 0.34), 2.0, true)
+		for mote_index in 2:
+			var mote_progress := maxf(progress - 0.025 * float(mote_index + 1), 0.0)
+			var mote := connection_curve_point(start, finish, mote_progress)
+			overlay.draw_circle(mote, 1.7 - float(mote_index) * 0.45, Color(color, 0.34), true)
+		_draw_transport_glyph(overlay, position, material_kind, color, direction)
+		if phase >= 0.88:
+			var arrival := inverse_lerp(0.88, 1.0, phase)
+			overlay.draw_arc(
+				finish,
+				7.0 + arrival * 17.0,
+				0.0,
+				TAU,
+				28,
+				Color(color, (1.0 - arrival) * 0.72),
+				1.8,
+				true
+			)
+
+
+func _draw_transport_glyph(
+	overlay: Control,
+	position: Vector2,
+	material_kind: StringName,
+	state_color: Color,
+	_direction: Vector2
+) -> void:
+	var glyph_color := Color(0.80, 0.94, 1.0, 1.0)
+	overlay.draw_circle(position, 11.0, Color(state_color, 0.10), true)
+	overlay.draw_circle(position, 8.0, Color(0.008, 0.035, 0.055, 0.94), true)
+	match material_kind:
+		&"circle":
+			overlay.draw_arc(position, 5.2, 0.0, TAU, 24, glyph_color, 1.8, true)
+		&"triangle":
+			var points := PackedVector2Array()
+			for index in 3:
+				points.append(position + Vector2.from_angle(-PI * 0.5 + TAU * float(index) / 3.0) * 5.8)
+			points.append(points[0])
+			overlay.draw_polyline(points, glyph_color, 1.8, true)
+		&"square":
+			overlay.draw_rect(Rect2(position - Vector2(4.5, 4.5), Vector2(9.0, 9.0)), glyph_color, false, 1.8, true)
+
+
+func connection_curve_point(start: Vector2, finish: Vector2, progress: float) -> Vector2:
 	var distance := start.distance_to(finish)
 	var direction := start.direction_to(finish)
 	var handle_length := minf(distance * 0.28, 120.0)
 	var first_control := start + direction * handle_length
 	var second_control := finish - direction * handle_length
-	var points := PackedVector2Array()
-	for index in 25:
-		points.append(start.bezier_interpolate(first_control, second_control, finish, float(index) / 24.0))
-	overlay.draw_polyline(points, color, width, true)
+	return start.bezier_interpolate(first_control, second_control, finish, clampf(progress, 0.0, 1.0))
+
+
+func flow_packet_phase(input_index: int, packet_index: int, time_seconds: float) -> float:
+	return fposmod(
+		time_seconds / FLOW_CYCLE_SECONDS
+		+ float(input_index) * 0.17
+		+ float(packet_index) / float(FLOW_PACKET_COUNT),
+		1.0
+	)
+
+
+func flow_arrival_cycle(input_index: int, time_seconds: float) -> int:
+	var arrival_interval := FLOW_CYCLE_SECONDS / float(FLOW_PACKET_COUNT)
+	return floori(time_seconds / arrival_interval + float(input_index) * 0.34)
+
+
+func flow_animation_time_seconds() -> float:
+	if flow_time_override >= 0.0:
+		return flow_time_override
+	return float(Time.get_ticks_msec()) / 1000.0
 
 
 func _summoner_input_direction(input_index: int, coordinate_space: Control) -> Vector2:
@@ -617,11 +747,12 @@ func _landmark_visual(node: GraphNode) -> Control:
 	return null
 
 
-func _remove_summoner_input_connection(input_index: int) -> void:
+func _remove_summoner_input_connection(input_index: int) -> bool:
 	if input_index < 0 or input_index >= SUMMONER_INPUT_COUNT:
-		return
+		return false
 	if factory_graph == null or summoner_node == null:
-		return
+		return false
+	var removed := false
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["to_node"]) != StringName(summoner_node.name):
 			continue
@@ -633,6 +764,8 @@ func _remove_summoner_input_connection(input_index: int) -> void:
 			StringName(connection["to_node"]),
 			int(connection["to_port"])
 		)
+		removed = true
+	return removed
 
 
 func _material_node(node_id: StringName) -> GraphNode:
@@ -669,6 +802,13 @@ func _refresh_summon_state() -> void:
 		_:
 			summon_state_label.text = "%sを召喚器へ直接接続" % definition["glyph_label"]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
+
+
+func _setup_flow_audio() -> void:
+	flow_audio = FactoryFlowAudioModel.new()
+	flow_audio.name = "FactoryFlowAudio"
+	flow_audio.configure()
+	add_child(flow_audio)
 
 
 func _build_ui() -> void:
