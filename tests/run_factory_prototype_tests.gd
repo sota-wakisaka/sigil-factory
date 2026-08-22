@@ -139,6 +139,14 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(counts[&"square"] == 10, "ten Square material deposits should exist")
 	_expect(prototype.target_panel != null and prototype.target_panel.anchor_left == 1.0, "the target sigil panel should stay at the upper right")
 	_expect(prototype.target_buttons.size() == 8, "basic and radial-layer targets should be selectable")
+	for target_kind in prototype.TARGET_ORDER:
+		var target_button = prototype.target_buttons[target_kind]
+		_expect(
+			target_button.glyph_value != null
+			and target_button.text == ""
+			and target_button.custom_minimum_size.y >= 48.0,
+			"every target selector should display its actual Glyph thumbnail instead of a text abbreviation"
+		)
 	_expect(prototype.target_panel.find_child("Input1Button", true, false) == null, "the target panel should not duplicate summoner inputs as tabs")
 	_expect(prototype.input_target_kinds.size() == 3, "the round summoner should retain three input targets without visible text rows")
 	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")

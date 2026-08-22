@@ -4,6 +4,7 @@ extends Control
 const FactoryLandmarkVisualModel := preload("res://experiments/factory_prototype/factory_landmark.gd")
 const FactoryDirectionalOverlayModel := preload("res://experiments/factory_prototype/factory_directional_overlay.gd")
 const FactoryFlowAudioModel := preload("res://experiments/factory_prototype/factory_flow_audio.gd")
+const FactoryTargetButtonModel := preload("res://experiments/factory_prototype/factory_target_button.gd")
 const GlyphModelScript := preload("res://src/domain/glyph.gd")
 const GlyphComponentModelScript := preload("res://src/domain/glyph_component.gd")
 const GlyphPainterModel := preload("res://src/ui/glyph_painter.gd")
@@ -3996,7 +3997,7 @@ func _build_target_panel() -> PanelContainer:
 	panel.offset_left = -322.0
 	panel.offset_top = 12.0
 	panel.offset_right = -12.0
-	panel.offset_bottom = 340.0
+	panel.offset_bottom = 382.0
 	panel.add_theme_stylebox_override("panel", _target_panel_style())
 
 	var margin := MarginContainer.new()
@@ -4046,13 +4047,14 @@ func _build_target_panel() -> PanelContainer:
 	var target_group := ButtonGroup.new()
 	for target_kind in TARGET_ORDER:
 		var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
-		var button := Button.new()
+		var button = FactoryTargetButtonModel.new()
 		button.name = "%sTargetButton" % String(target_kind).capitalize()
-		button.text = String(definition["glyph_label"])
+		button.text = ""
 		button.tooltip_text = "%s // %s" % [definition["monster_name"], definition["role"]]
-		button.custom_minimum_size = Vector2(65.0, 30.0)
+		button.custom_minimum_size = Vector2(65.0, 48.0)
 		button.toggle_mode = true
 		button.button_group = target_group
+		button.configure_glyph(target_glyph(target_kind))
 		button.pressed.connect(select_target.bind(target_kind))
 		target_buttons[target_kind] = button
 		selector.add_child(button)
