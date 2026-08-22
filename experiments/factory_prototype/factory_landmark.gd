@@ -20,7 +20,8 @@ var visual_mode: StringName = &"deposit"
 func configure(next_kind: StringName) -> void:
 	landmark_kind = next_kind
 	visual_mode = &"summoner" if landmark_kind == &"summoner" else &"deposit"
-	custom_minimum_size = Vector2(152.0, 120.0) if landmark_kind != &"summoner" else Vector2(188.0, 166.0)
+	custom_minimum_size = Vector2(142.0, 142.0) if landmark_kind != &"summoner" else Vector2(176.0, 176.0)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	queue_redraw()
 
 
@@ -29,6 +30,15 @@ func configure_target(next_kind: StringName) -> void:
 	visual_mode = &"target"
 	custom_minimum_size = Vector2(112.0, 112.0)
 	queue_redraw()
+
+
+func body_radius() -> float:
+	var visual_size := size
+	if visual_size.x <= 0.0 or visual_size.y <= 0.0:
+		visual_size = custom_minimum_size
+	if visual_mode == &"summoner":
+		return minf(visual_size.x, visual_size.y) * 0.36 + 18.0
+	return minf(visual_size.x, visual_size.y) * 0.43
 
 
 func _draw() -> void:
@@ -55,20 +65,18 @@ func _draw_target(center: Vector2) -> void:
 
 
 func _draw_material_deposit(center: Vector2) -> void:
-	var field_points := PackedVector2Array([
-		center + Vector2(-61.0, -20.0),
-		center + Vector2(-24.0, -51.0),
-		center + Vector2(29.0, -48.0),
-		center + Vector2(63.0, -14.0),
-		center + Vector2(55.0, 35.0),
-		center + Vector2(7.0, 53.0),
-		center + Vector2(-50.0, 39.0),
-	])
-	draw_colored_polygon(field_points, Color(0.02, 0.10, 0.14, 0.58))
-	draw_polyline(field_points + PackedVector2Array([field_points[0]]), Color(0.20, 0.62, 0.78, 0.26), 1.0, true)
+	var field_radius := body_radius()
+	draw_circle(center, field_radius, Color(0.012, 0.075, 0.105, 0.88), true)
+	draw_arc(center, field_radius, 0.0, TAU, 64, Color(0.30, 0.76, 0.92, 0.72), 1.5, true)
+	draw_arc(center, field_radius * 0.76, 0.0, TAU, 48, Color(0.18, 0.52, 0.66, 0.32), 1.0, true)
+	for index in 12:
+		var angle := TAU * float(index) / 12.0
+		var inner := center + Vector2.from_angle(angle) * field_radius * 0.88
+		var outer := center + Vector2.from_angle(angle) * field_radius
+		draw_line(inner, outer, Color(0.30, 0.76, 0.92, 0.42), 1.0, true)
 	for index in DEPOSIT_OFFSETS.size():
 		var is_center := index == 0
-		var radius := 12.0 if is_center else 7.0
+		var radius := 13.0 if is_center else 6.5
 		var color := INK if is_center else Color(DIM_INK, 0.68)
 		_draw_material_shape(center + DEPOSIT_OFFSETS[index], radius, color, 2.0 if is_center else 1.25)
 
@@ -89,7 +97,7 @@ func _draw_material_shape(center: Vector2, radius: float, color: Color, width: f
 
 
 func _draw_summoner(center: Vector2) -> void:
-	var radius := minf(size.x, size.y) * 0.36
+	var radius := body_radius() - 18.0
 	draw_circle(center, radius + 18.0, Color(0.02, 0.12, 0.16, 0.72), true)
 	for ring_scale in [1.0, 0.68, 0.32]:
 		draw_arc(center, radius * ring_scale, 0.0, TAU, 96, INK if ring_scale == 1.0 else DIM_INK, 2.0 if ring_scale == 1.0 else 1.0, true)

@@ -54,7 +54,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.target_panel != null and prototype.target_panel.anchor_left == 1.0, "the target sigil panel should stay at the upper right")
 	_expect(prototype.target_buttons.size() == 3, "Circle, Triangle, and Square should be selectable targets")
 	_expect(prototype.target_panel.find_child("Input1Button", true, false) == null, "the target panel should not duplicate summoner inputs as tabs")
-	_expect(prototype.summoner_input_labels.size() == 3, "the summoner node should show all three input targets")
+	_expect(prototype.input_target_kinds.size() == 3, "the round summoner should retain three input targets without visible text rows")
 	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")
 	_expect(prototype.target_kind_for_input(1) == &"triangle", "input 2 should initially target Triangle")
 	_expect(prototype.target_kind_for_input(2) == &"square", "input 3 should initially target Square")
@@ -69,6 +69,24 @@ func _test_fixed_factory_landmarks() -> void:
 	var circle_source := _first_material(prototype, &"circle")
 	var triangle_source := _first_material(prototype, &"triangle")
 	var square_source := _first_material(prototype, &"square")
+	var circle_visual = prototype._landmark_visual(circle_source)
+	var summoner_visual = prototype._landmark_visual(prototype.summoner_node)
+	_expect(circle_source.title.is_empty() and prototype.summoner_node.title.is_empty(), "landmark nodes should not render title text")
+	_expect(circle_visual.custom_minimum_size.x == circle_visual.custom_minimum_size.y, "material landmarks should use a circular square canvas")
+	_expect(summoner_visual.custom_minimum_size.x == summoner_visual.custom_minimum_size.y, "the summoner should use a circular square canvas")
+	var body_hover := InputEventMouseMotion.new()
+	body_hover.position = prototype._node_center_in(circle_source, prototype.factory_graph)
+	prototype.factory_graph.gui_input.emit(body_hover)
+	_expect("丸資源パッチ" in prototype.factory_graph.tooltip_text, "material name and fixed state should move from node text into a tooltip")
+	var circle_center: Vector2 = prototype._node_center_in(circle_source, prototype.factory_graph)
+	var circle_output: Vector2 = prototype.directional_output_position(StringName(circle_source.name), prototype.factory_graph)
+	_expect(
+		absf(circle_center.distance_to(circle_output) - prototype._landmark_radius_in(circle_source, prototype.factory_graph)) < 1.0,
+		"material output ports should anchor to the visible circular body"
+	)
+	body_hover.position = prototype._node_center_in(prototype.summoner_node, prototype.factory_graph)
+	prototype.factory_graph.gui_input.emit(body_hover)
+	_expect("召喚器" in prototype.factory_graph.tooltip_text, "summoner name and input guidance should move from node text into a tooltip")
 	if circle_source != null:
 		prototype.factory_graph.connection_request.emit(
 			StringName(circle_source.name),

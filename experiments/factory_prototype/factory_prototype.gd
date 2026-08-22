@@ -82,7 +82,6 @@ var target_name_label: Label
 var target_role_label: Label
 var summon_state_label: Label
 var target_buttons: Dictionary = {}
-var summoner_input_labels: Array[Label] = []
 var input_target_kinds: Array[StringName] = [&"circle", &"triangle", &"square"]
 var selected_input_index := 0
 var connecting_material_id: StringName = &""
@@ -271,10 +270,13 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			factory_graph.tooltip_text = "INPUT %d // 左クリックで目標表示 // 右クリックで切断" % (hovered_input_index + 1)
 		elif hovered_material_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
-			factory_graph.tooltip_text = "出力 // クリックまたはドラッグで接続"
+			factory_graph.tooltip_text = "%s資源パッチ // 固定 // 出力を接続" % _kind_label(
+				StringName(_material_node(hovered_material_id).get_meta("landmark_kind", &""))
+			)
 		else:
-			factory_graph.mouse_default_cursor_shape = Control.CURSOR_ARROW
-			factory_graph.tooltip_text = ""
+			var landmark := directional_landmark_at(event.position)
+			factory_graph.mouse_default_cursor_shape = Control.CURSOR_HELP if landmark != &"" else Control.CURSOR_ARROW
+			factory_graph.tooltip_text = _landmark_tooltip(landmark)
 		if connecting_material_id != &"" and event.position.distance_to(connection_press_position) > 4.0:
 			connection_drag_moved = true
 		return
@@ -344,6 +346,32 @@ func directional_input_at(graph_position: Vector2) -> int:
 		if graph_position.distance_to(directional_input_position(input_index, factory_graph)) <= PORT_HIT_RADIUS:
 			return input_index
 	return -1
+
+
+func directional_landmark_at(graph_position: Vector2) -> StringName:
+	for node in material_nodes:
+		if graph_position.distance_to(_node_center_in(node, factory_graph)) <= _landmark_radius_in(node, factory_graph):
+			return StringName(node.name)
+	if (
+		summoner_node != null
+		and graph_position.distance_to(_node_center_in(summoner_node, factory_graph))
+		<= _landmark_radius_in(summoner_node, factory_graph)
+	):
+		return StringName(summoner_node.name)
+	return &""
+
+
+func _landmark_tooltip(node_id: StringName) -> String:
+	if node_id == &"":
+		return ""
+	if summoner_node != null and node_id == StringName(summoner_node.name):
+		return "召喚器 // 3入力 // 固定 // 入力ポートをクリックして目標表示"
+	var material := _material_node(node_id)
+	if material == null:
+		return ""
+	return "%s資源パッチ // 固定 // 出力を接続" % _kind_label(
+		StringName(material.get_meta("landmark_kind", &""))
+	)
 
 
 func directional_output_position(node_id: StringName, coordinate_space: Control) -> Vector2:
@@ -429,6 +457,8 @@ func _draw_directional_ports(overlay: Control) -> void:
 		elif connecting_material_id != &"":
 			color = PORT_COLOR
 		_draw_input_port(overlay, position, color)
+		var inward := position.direction_to(_node_center_in(summoner_node, overlay))
+		_draw_input_target_marker(overlay, position + inward * 14.0, target_kind_for_input(input_index), color)
 		if input_index == hovered_input_index:
 			overlay.draw_arc(position, PORT_DRAW_RADIUS + 6.0, 0.0, TAU, 20, Color(0.38, 0.80, 1.0, 0.76), 1.0, true)
 		if input_index == selected_input_index:
@@ -458,6 +488,26 @@ func _draw_output_port(
 func _draw_input_port(overlay: Control, position: Vector2, color: Color) -> void:
 	overlay.draw_circle(position, PORT_DRAW_RADIUS + 2.0, Color(0.01, 0.05, 0.08, 0.96), true)
 	overlay.draw_arc(position, PORT_DRAW_RADIUS, 0.0, TAU, 20, color, 2.0, true)
+
+
+func _draw_input_target_marker(
+	overlay: Control,
+	position: Vector2,
+	target_kind: StringName,
+	color: Color
+) -> void:
+	var radius := 3.5
+	match target_kind:
+		&"circle":
+			overlay.draw_arc(position, radius, 0.0, TAU, 16, color, 1.1, true)
+		&"triangle":
+			var points := PackedVector2Array()
+			for index in 3:
+				points.append(position + Vector2.from_angle(-PI * 0.5 + TAU * float(index) / 3.0) * radius)
+			points.append(points[0])
+			overlay.draw_polyline(points, color, 1.1, true)
+		&"square":
+			overlay.draw_rect(Rect2(position - Vector2.ONE * radius, Vector2.ONE * radius * 2.0), color, false, 1.1, true)
 
 
 func _draw_connection_curve(
@@ -499,6 +549,19 @@ func _summoner_input_direction(input_index: int, coordinate_space: Control) -> V
 
 
 func _node_boundary_position(node: GraphNode, direction: Vector2, coordinate_space: Control) -> Vector2:
+	var visual := _landmark_visual(node)
+	if visual != null:
+		var visual_size: Vector2 = visual.size
+		if visual_size.x <= 0.0 or visual_size.y <= 0.0:
+			visual_size = visual.custom_minimum_size
+		var visual_center := visual_size * 0.5
+		var safe_visual_direction := direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
+		var radius := maxf(float(visual.body_radius()), 1.0)
+		return _convert_control_point(
+			visual,
+			visual_center + safe_visual_direction * radius,
+			coordinate_space
+		)
 	var local_size := node.size
 	if local_size.x <= 0.0 or local_size.y <= 0.0:
 		local_size = node.custom_minimum_size
@@ -512,6 +575,12 @@ func _node_boundary_position(node: GraphNode, direction: Vector2, coordinate_spa
 
 
 func _node_center_in(node: GraphNode, coordinate_space: Control) -> Vector2:
+	var visual := _landmark_visual(node)
+	if visual != null:
+		var visual_size: Vector2 = visual.size
+		if visual_size.x <= 0.0 or visual_size.y <= 0.0:
+			visual_size = visual.custom_minimum_size
+		return _convert_control_point(visual, visual_size * 0.5, coordinate_space)
 	var local_size := node.size
 	if local_size.x <= 0.0 or local_size.y <= 0.0:
 		local_size = node.custom_minimum_size
@@ -521,6 +590,29 @@ func _node_center_in(node: GraphNode, coordinate_space: Control) -> Vector2:
 func _convert_control_point(source: Control, local_point: Vector2, destination: Control) -> Vector2:
 	var global_point := source.get_global_transform() * local_point
 	return destination.get_global_transform().affine_inverse() * global_point
+
+
+func _landmark_radius_in(node: GraphNode, coordinate_space: Control) -> float:
+	var visual := _landmark_visual(node)
+	if visual == null:
+		return 0.0
+	var visual_size: Vector2 = visual.size
+	if visual_size.x <= 0.0 or visual_size.y <= 0.0:
+		visual_size = visual.custom_minimum_size
+	var center := _convert_control_point(visual, visual_size * 0.5, coordinate_space)
+	var edge := _convert_control_point(
+		visual,
+		visual_size * 0.5 + Vector2.RIGHT * float(visual.body_radius()),
+		coordinate_space
+	)
+	return center.distance_to(edge)
+
+
+func _landmark_visual(node: GraphNode) -> Control:
+	for child in node.get_children():
+		if child.get_script() == FactoryLandmarkVisualModel:
+			return child
+	return null
 
 
 func _remove_summoner_input_connection(input_index: int) -> void:
@@ -575,21 +667,6 @@ func _refresh_summon_state() -> void:
 		_:
 			summon_state_label.text = "%sを召喚器へ直接接続" % definition["glyph_label"]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
-	_refresh_summoner_input_labels()
-
-
-func _refresh_summoner_input_labels() -> void:
-	for input_index in summoner_input_labels.size():
-		var label := summoner_input_labels[input_index]
-		var target_kind := target_kind_for_input(input_index)
-		label.text = "入力 %d   %s" % [input_index + 1, _shape_symbol(target_kind)]
-		match summon_state(input_index):
-			&"matched":
-				label.add_theme_color_override("font_color", Color(0.48, 0.92, 0.76))
-			&"mismatch":
-				label.add_theme_color_override("font_color", Color(0.96, 0.68, 0.38))
-			_:
-				label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
 
 
 func _build_ui() -> void:
@@ -767,7 +844,7 @@ func _place_landmarks() -> void:
 func _make_material_node(node_id: StringName, kind: StringName, world_position: Vector2) -> GraphNode:
 	var node := GraphNode.new()
 	node.name = String(node_id)
-	node.title = "%s資源パッチ // 固定" % _kind_label(kind)
+	node.title = ""
 	node.position_offset = world_position
 	node.draggable = false
 	node.resizable = false
@@ -779,6 +856,7 @@ func _make_material_node(node_id: StringName, kind: StringName, world_position: 
 	visual.configure(kind)
 	node.add_child(visual)
 	node.set_slot(0, false, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
+	_configure_round_landmark_node(node, visual.custom_minimum_size)
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return node
 
@@ -786,7 +864,7 @@ func _make_material_node(node_id: StringName, kind: StringName, world_position: 
 func _make_summoner_node() -> GraphNode:
 	var node := GraphNode.new()
 	node.name = "summoner_center"
-	node.title = "召喚器 // 3入力 // 固定"
+	node.title = ""
 	node.position_offset = SUMMONER_POSITION
 	node.draggable = false
 	node.resizable = false
@@ -794,22 +872,32 @@ func _make_summoner_node() -> GraphNode:
 	node.set_meta("fixed_landmark", true)
 
 	for input_index in SUMMONER_INPUT_COUNT:
-		var input_row := MarginContainer.new()
-		input_row.custom_minimum_size = Vector2(188.0, 28.0)
-		input_row.add_theme_constant_override("margin_left", 12)
-		var input_label := Label.new()
-		input_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		input_label.add_theme_font_size_override("font_size", 12)
-		input_row.add_child(input_label)
-		summoner_input_labels.append(input_label)
+		var input_row := Control.new()
+		input_row.custom_minimum_size = Vector2(1.0, 1.0)
+		input_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		node.add_child(input_row)
 		node.set_slot(input_index, true, input_index, BUILTIN_PORT_COLOR, false, 0, BUILTIN_PORT_COLOR)
 
 	var visual = FactoryLandmarkVisualModel.new()
 	visual.configure(&"summoner")
 	node.add_child(visual)
+	_configure_round_landmark_node(node, visual.custom_minimum_size)
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return node
+
+
+func _configure_round_landmark_node(node: GraphNode, minimum_size: Vector2) -> void:
+	node.custom_minimum_size = minimum_size
+	node.add_theme_constant_override("separation", 0)
+	node.add_theme_color_override("title_color", Color.TRANSPARENT)
+	var transparent_style := StyleBoxFlat.new()
+	transparent_style.bg_color = Color.TRANSPARENT
+	transparent_style.border_color = Color.TRANSPARENT
+	transparent_style.set_border_width_all(0)
+	for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+		transparent_style.set_content_margin(side, 0.0)
+	for style_name in [&"panel", &"panel_selected", &"titlebar", &"titlebar_selected"]:
+		node.add_theme_stylebox_override(style_name, transparent_style)
 
 
 func _center_initial_view() -> void:
