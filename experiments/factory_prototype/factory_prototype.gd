@@ -36,6 +36,7 @@ const SCALE_PERCENT_PRESETS := [25, 50, 75, 100, 150, 200, 300]
 const MOVE_DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 const MOVE_DIRECTION_LABELS := ["↑", "→", "↓", "←"]
 const MOVE_DISTANCE_PRESETS := [1, 2, 3, 4, 5, 6]
+const REPEAT_COUNT_PRESETS := [2, 3, 4, 5, 6, 8]
 const COMBINE_INPUT_COUNT := 8
 const COMBINE_CONNECTION_MODES := [
 	GlyphModelScript.CONNECTION_SIMPLE,
@@ -121,6 +122,7 @@ var relay_nodes: Array[GraphNode] = []
 var rotation_nodes: Array[GraphNode] = []
 var scale_nodes: Array[GraphNode] = []
 var move_nodes: Array[GraphNode] = []
+var repeat_nodes: Array[GraphNode] = []
 var combine_nodes: Array[GraphNode] = []
 var connection_overlay
 var flow_overlay
@@ -173,6 +175,15 @@ var move_settings_distance: OptionButton
 var move_settings_delete_button: Button
 var move_settings_node_id: StringName = &""
 var move_settings_syncing := false
+var repeat_button: Button
+var repeat_placement_active := false
+var repeat_serial := 0
+var repeat_settings_popup: PopupPanel
+var repeat_settings_title: Label
+var repeat_settings_count: OptionButton
+var repeat_settings_delete_button: Button
+var repeat_settings_node_id: StringName = &""
+var repeat_settings_syncing := false
 var combine_button: Button
 var combine_placement_active := false
 var combine_serial := 0
@@ -262,6 +273,7 @@ func begin_relay_placement() -> void:
 	cancel_rotation_placement()
 	cancel_scale_placement()
 	cancel_move_placement()
+	cancel_repeat_placement()
 	cancel_combine_placement()
 	relay_placement_active = true
 	if relay_button != null:
@@ -282,6 +294,7 @@ func begin_rotation_placement() -> void:
 	cancel_relay_placement()
 	cancel_scale_placement()
 	cancel_move_placement()
+	cancel_repeat_placement()
 	cancel_combine_placement()
 	rotation_placement_active = true
 	if rotation_button != null:
@@ -302,6 +315,7 @@ func begin_scale_placement() -> void:
 	cancel_relay_placement()
 	cancel_rotation_placement()
 	cancel_move_placement()
+	cancel_repeat_placement()
 	cancel_combine_placement()
 	scale_placement_active = true
 	if scale_button != null:
@@ -322,6 +336,7 @@ func begin_move_placement() -> void:
 	cancel_relay_placement()
 	cancel_rotation_placement()
 	cancel_scale_placement()
+	cancel_repeat_placement()
 	cancel_combine_placement()
 	move_placement_active = true
 	if move_button != null:
@@ -337,12 +352,34 @@ func cancel_move_placement() -> void:
 	_refresh_summon_state()
 
 
+func begin_repeat_placement() -> void:
+	_clear_directional_connection_preview()
+	cancel_relay_placement()
+	cancel_move_placement()
+	cancel_rotation_placement()
+	cancel_scale_placement()
+	cancel_combine_placement()
+	repeat_placement_active = true
+	if repeat_button != null:
+		repeat_button.button_pressed = true
+	status_label.text = "反復ノード // 盤面をクリックして配置 // 右クリックで取消"
+	status_label.add_theme_color_override("font_color", Color(0.58, 0.86, 1.0))
+
+
+func cancel_repeat_placement() -> void:
+	repeat_placement_active = false
+	if repeat_button != null:
+		repeat_button.button_pressed = false
+	_refresh_summon_state()
+
+
 func begin_combine_placement() -> void:
 	_clear_directional_connection_preview()
 	cancel_relay_placement()
 	cancel_move_placement()
 	cancel_rotation_placement()
 	cancel_scale_placement()
+	cancel_repeat_placement()
 	combine_placement_active = true
 	if combine_button != null:
 		combine_button.button_pressed = true
@@ -447,6 +484,27 @@ func place_move_at(
 	move_node.selected = true
 	_refresh_factory_status_label()
 	return move_node
+
+
+func place_repeat_at(world_center: Vector2, count: int = 3) -> GraphNode:
+	if factory_graph == null:
+		return null
+	repeat_serial += 1
+	var node_half_size := Vector2.ONE * 59.0
+	var clamped_center := Vector2(
+		clampf(world_center.x, node_half_size.x, PLAYFIELD_SIZE.x - node_half_size.x),
+		clampf(world_center.y, node_half_size.y, PLAYFIELD_SIZE.y - node_half_size.y)
+	)
+	var repeat_node := _make_repeat_node(
+		StringName("repeat_%02d" % repeat_serial),
+		clamped_center,
+		count
+	)
+	repeat_nodes.append(repeat_node)
+	factory_graph.add_child(repeat_node)
+	repeat_node.selected = true
+	_refresh_factory_status_label()
+	return repeat_node
 
 
 func place_combine_at(
@@ -678,6 +736,30 @@ func set_move_offset(node_id: StringName, offset: Vector2i) -> bool:
 	return true
 
 
+func repeat_count(node_id: StringName) -> int:
+	var repeat_node := _repeat_node(node_id)
+	return int(repeat_node.get_meta("repeat_count", 3)) if repeat_node != null else 0
+
+
+func set_repeat_count(node_id: StringName, count: int) -> bool:
+	var repeat_node := _repeat_node(node_id)
+	if repeat_node == null or not REPEAT_COUNT_PRESETS.has(count):
+		return false
+	if repeat_count(node_id) == count:
+		return false
+	var now := flow_animation_time_seconds()
+	process_transport_at(now)
+	repeat_node.set_meta("repeat_count", count)
+	var visual := _landmark_visual(repeat_node)
+	if visual != null:
+		visual.configure_repeat(count)
+	repeat_node.tooltip_text = _repeat_tooltip(node_id)
+	_restart_outgoing_transport(node_id, now)
+	_normalize_downstream_combine_modes(node_id, now)
+	_refresh_summon_state()
+	return true
+
+
 func combine_connection_mode(node_id: StringName) -> StringName:
 	var combine_node := _combine_node(node_id)
 	if combine_node == null:
@@ -757,6 +839,8 @@ func open_relay_settings(node_id: StringName, viewport_position: Vector2) -> boo
 		move_settings_popup.hide()
 	if combine_settings_popup != null:
 		combine_settings_popup.hide()
+	if repeat_settings_popup != null:
+		repeat_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	relay_settings_node_id = node_id
@@ -792,6 +876,8 @@ func open_rotation_settings(node_id: StringName, viewport_position: Vector2) -> 
 		move_settings_popup.hide()
 	if combine_settings_popup != null:
 		combine_settings_popup.hide()
+	if repeat_settings_popup != null:
+		repeat_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	rotation_settings_node_id = node_id
@@ -821,6 +907,8 @@ func open_scale_settings(node_id: StringName, viewport_position: Vector2) -> boo
 		move_settings_popup.hide()
 	if combine_settings_popup != null:
 		combine_settings_popup.hide()
+	if repeat_settings_popup != null:
+		repeat_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	scale_settings_node_id = node_id
@@ -848,6 +936,8 @@ func open_move_settings(node_id: StringName, viewport_position: Vector2) -> bool
 		scale_settings_popup.hide()
 	if combine_settings_popup != null:
 		combine_settings_popup.hide()
+	if repeat_settings_popup != null:
+		repeat_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	move_settings_node_id = node_id
@@ -867,6 +957,33 @@ func open_move_settings(node_id: StringName, viewport_position: Vector2) -> bool
 	return true
 
 
+func open_repeat_settings(node_id: StringName, viewport_position: Vector2) -> bool:
+	var repeat_node := _repeat_node(node_id)
+	if repeat_node == null or repeat_settings_popup == null:
+		return false
+	for popup in [
+		relay_settings_popup,
+		move_settings_popup,
+		rotation_settings_popup,
+		scale_settings_popup,
+		combine_settings_popup,
+		line_settings_popup,
+	]:
+		if popup != null:
+			popup.hide()
+	repeat_settings_node_id = node_id
+	repeat_settings_title.text = "反復ノード // %s" % String(node_id)
+	_sync_repeat_settings(repeat_count(node_id))
+	var popup_size := Vector2i(286, 190)
+	var viewport_size := Vector2i(get_viewport_rect().size)
+	var popup_position := Vector2i(viewport_position.round()) + Vector2i(10, 8)
+	popup_position.x = clampi(popup_position.x, 0, maxi(viewport_size.x - popup_size.x, 0))
+	popup_position.y = clampi(popup_position.y, 0, maxi(viewport_size.y - popup_size.y, 0))
+	repeat_settings_popup.popup(Rect2i(popup_position, popup_size))
+	repeat_settings_count.grab_focus()
+	return true
+
+
 func open_combine_settings(node_id: StringName, viewport_position: Vector2) -> bool:
 	var combine_node := _combine_node(node_id)
 	if combine_node == null or combine_settings_popup == null:
@@ -881,6 +998,8 @@ func open_combine_settings(node_id: StringName, viewport_position: Vector2) -> b
 		scale_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
+	if repeat_settings_popup != null:
+		repeat_settings_popup.hide()
 	combine_settings_node_id = node_id
 	combine_settings_title.text = "合成ノード // %s" % String(node_id)
 	_sync_combine_settings(node_id)
@@ -918,6 +1037,8 @@ func open_line_settings(connection: Dictionary, viewport_position: Vector2) -> b
 		move_settings_popup.hide()
 	if combine_settings_popup != null:
 		combine_settings_popup.hide()
+	if repeat_settings_popup != null:
+		repeat_settings_popup.hide()
 	line_settings_connection = {
 		"from_node": from_node_id,
 		"from_port": from_port,
@@ -998,6 +1119,8 @@ func remove_processing_node(node_id: StringName) -> bool:
 		scale_nodes.erase(node)
 	elif _move_node(node_id) != null:
 		move_nodes.erase(node)
+	elif _repeat_node(node_id) != null:
+		repeat_nodes.erase(node)
 	else:
 		combine_nodes.erase(node)
 	if relay_settings_node_id == node_id and relay_settings_popup != null:
@@ -1008,6 +1131,8 @@ func remove_processing_node(node_id: StringName) -> bool:
 		scale_settings_popup.hide()
 	if move_settings_node_id == node_id and move_settings_popup != null:
 		move_settings_popup.hide()
+	if repeat_settings_node_id == node_id and repeat_settings_popup != null:
+		repeat_settings_popup.hide()
 	if combine_settings_node_id == node_id and combine_settings_popup != null:
 		combine_settings_popup.hide()
 	if (
@@ -1101,12 +1226,14 @@ func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 	var rotation := _rotation_node(node_id)
 	var scale := _scale_node(node_id)
 	var move_node := _move_node(node_id)
+	var repeat_node := _repeat_node(node_id)
 	var combine_node := _combine_node(node_id)
 	if (
 		relay == null
 		and rotation == null
 		and scale == null
 		and move_node == null
+		and repeat_node == null
 		and combine_node == null
 	):
 		return null
@@ -1138,6 +1265,12 @@ func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 			return input_glyph.stretched_percent(stretch.x, stretch.y)
 		if move_node != null:
 			return input_glyph.translated(move_offset(node_id))
+		if repeat_node != null:
+			var repeated := GlyphModelScript.radial_repeat(
+				input_glyph,
+				repeat_count(node_id)
+			)
+			return repeated if GlyphPainterModel.can_draw(repeated) else null
 		return input_glyph
 	return null
 
@@ -1387,10 +1520,12 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			else {}
 		)
 		hovered_connection_key = String(hovered_connection.get("key", ""))
-		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active or combine_placement_active:
+		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active or repeat_placement_active or combine_placement_active:
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
 			if combine_placement_active:
 				factory_graph.tooltip_text = "クリックで合成ノードを配置 // 右クリックで取消"
+			elif repeat_placement_active:
+				factory_graph.tooltip_text = "クリックで反復ノードを配置 // 右クリックで取消"
 			elif move_placement_active:
 				factory_graph.tooltip_text = "クリックで移動ノードを配置 // 右クリックで取消"
 			elif scale_placement_active:
@@ -1424,11 +1559,12 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	var mouse_event := event as InputEventMouseButton
 	if mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
-		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active or combine_placement_active:
+		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active or repeat_placement_active or combine_placement_active:
 			cancel_relay_placement()
 			cancel_rotation_placement()
 			cancel_scale_placement()
 			cancel_move_placement()
+			cancel_repeat_placement()
 			cancel_combine_placement()
 			factory_graph.accept_event()
 			return
@@ -1452,10 +1588,12 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	connection_pointer = mouse_event.position
 	if mouse_event.pressed:
-		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active or combine_placement_active:
+		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active or repeat_placement_active or combine_placement_active:
 			var world_position := graph_screen_to_world(mouse_event.position)
 			if combine_placement_active:
 				place_combine_at(world_position)
+			elif repeat_placement_active:
+				place_repeat_at(world_position)
 			elif move_placement_active:
 				place_move_at(world_position)
 			elif scale_placement_active:
@@ -1468,6 +1606,7 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			cancel_rotation_placement()
 			cancel_scale_placement()
 			cancel_move_placement()
+			cancel_repeat_placement()
 			cancel_combine_placement()
 			factory_graph.accept_event()
 			return
@@ -1527,7 +1666,7 @@ func _clear_directional_connection_preview() -> void:
 
 
 func directional_output_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + combine_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes + combine_nodes:
 		var node_id := StringName(node.name)
 		if graph_position.distance_to(directional_output_position(node_id, factory_graph)) <= PORT_HIT_RADIUS:
 			return node_id
@@ -1535,7 +1674,7 @@ func directional_output_at(graph_position: Vector2) -> StringName:
 
 
 func directional_connection_target_at(graph_position: Vector2) -> Dictionary:
-	for processor in relay_nodes + rotation_nodes + scale_nodes + move_nodes:
+	for processor in relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes:
 		var processor_id := StringName(processor.name)
 		if graph_position.distance_to(directional_node_input_position(processor_id, 0, factory_graph)) <= PORT_HIT_RADIUS:
 			return { "node_id": processor_id, "port": 0 }
@@ -1592,7 +1731,7 @@ func directional_input_at(graph_position: Vector2) -> int:
 
 
 func directional_landmark_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + combine_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes + combine_nodes:
 		if graph_position.distance_to(_node_center_in(node, factory_graph)) <= _landmark_radius_in(node, factory_graph):
 			return StringName(node.name)
 	if (
@@ -1622,6 +1761,8 @@ func _landmark_tooltip(node_id: StringName) -> String:
 		return _scale_tooltip(node_id)
 	if _move_node(node_id) != null:
 		return _move_tooltip(node_id)
+	if _repeat_node(node_id) != null:
+		return _repeat_tooltip(node_id)
 	if _combine_node(node_id) != null:
 		return _combine_tooltip(node_id)
 	return ""
@@ -1646,6 +1787,8 @@ func _output_tooltip(node_id: StringName) -> String:
 			MOVE_DIRECTION_LABELS[_move_direction_index(offset)],
 			maxi(absi(offset.x), absi(offset.y)),
 		]
+	if _repeat_node(node_id) != null:
+		return "反復出力 // %d回対称 // 複数の下流へ分配可能" % repeat_count(node_id)
 	if _combine_node(node_id) != null:
 		return "合成出力 // %d入力 // 複数の下流へ分配可能" % combine_connected_input_count(node_id)
 	return ""
@@ -1667,6 +1810,10 @@ func _move_tooltip(node_id: StringName) -> String:
 		MOVE_DIRECTION_LABELS[direction_index],
 		maxi(absi(offset.x), absi(offset.y)),
 	]
+
+
+func _repeat_tooltip(node_id: StringName) -> String:
+	return "反復ノード // %d回対称 // 右クリックで設定" % repeat_count(node_id)
 
 
 func _combine_tooltip(node_id: StringName) -> String:
@@ -1697,6 +1844,8 @@ func _context_node_label(node_id: StringName, input_port: int = -1) -> String:
 			MOVE_DIRECTION_LABELS[_move_direction_index(offset)],
 			maxi(absi(offset.x), absi(offset.y)),
 		]
+	if _repeat_node(node_id) != null:
+		return "反復 %d回" % repeat_count(node_id)
 	if _combine_node(node_id) != null:
 		return "合成 %d入力" % combine_connected_input_count(node_id)
 	return String(node_id)
@@ -1880,13 +2029,13 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 
 
 func _draw_directional_ports(overlay: Control) -> void:
-	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + combine_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes + combine_nodes:
 		var node_id := StringName(node.name)
 		var position := directional_output_position(node_id, overlay)
 		var active := node_id == connecting_material_id or node_id == hovered_material_id
 		var direction := _node_center_in(node, overlay).direction_to(position)
 		_draw_output_port(overlay, position, direction, PORT_COLOR if active else PORT_IDLE_COLOR, active)
-	for processor in relay_nodes + rotation_nodes + scale_nodes + move_nodes:
+	for processor in relay_nodes + rotation_nodes + scale_nodes + move_nodes + repeat_nodes:
 		var processor_id := StringName(processor.name)
 		var processor_input := directional_node_input_position(processor_id, 0, overlay)
 		var processor_active := hovered_input_node_id == processor_id or connecting_material_id != &""
@@ -2581,6 +2730,13 @@ func _move_node(node_id: StringName) -> GraphNode:
 	return null
 
 
+func _repeat_node(node_id: StringName) -> GraphNode:
+	for node in repeat_nodes:
+		if is_instance_valid(node) and StringName(node.name) == node_id:
+			return node
+	return null
+
+
 func _combine_node(node_id: StringName) -> GraphNode:
 	for node in combine_nodes:
 		if is_instance_valid(node) and StringName(node.name) == node_id:
@@ -2599,7 +2755,10 @@ func _processing_node(node_id: StringName) -> GraphNode:
 	if scale != null:
 		return scale
 	var move_node := _move_node(node_id)
-	return move_node if move_node != null else _combine_node(node_id)
+	if move_node != null:
+		return move_node
+	var repeat_node := _repeat_node(node_id)
+	return repeat_node if repeat_node != null else _combine_node(node_id)
 
 
 func _factory_node(node_id: StringName) -> GraphNode:
@@ -2697,7 +2856,7 @@ func _build_ui() -> void:
 	var back := Button.new()
 	back.name = "BackButton"
 	back.text = "← メニュー"
-	back.custom_minimum_size = Vector2(112.0, 34.0)
+	back.custom_minimum_size = Vector2(104.0, 34.0)
 	back.pressed.connect(return_to_menu)
 	toolbar.add_child(back)
 
@@ -2705,7 +2864,7 @@ func _build_ui() -> void:
 	relay_button.name = "AddRelayButton"
 	relay_button.text = "＋ 中継"
 	relay_button.tooltip_text = "中継ノードを盤面へ配置 // グリフを変えずに転送"
-	relay_button.custom_minimum_size = Vector2(92.0, 34.0)
+	relay_button.custom_minimum_size = Vector2(80.0, 34.0)
 	relay_button.toggle_mode = true
 	relay_button.pressed.connect(_on_relay_button_pressed)
 	toolbar.add_child(relay_button)
@@ -2714,7 +2873,7 @@ func _build_ui() -> void:
 	move_button.name = "AddMoveButton"
 	move_button.text = "＋ 移動"
 	move_button.tooltip_text = "移動ノードを盤面へ配置 // ノード右クリックで方向と距離を設定"
-	move_button.custom_minimum_size = Vector2(92.0, 34.0)
+	move_button.custom_minimum_size = Vector2(80.0, 34.0)
 	move_button.toggle_mode = true
 	move_button.pressed.connect(_on_move_button_pressed)
 	toolbar.add_child(move_button)
@@ -2723,7 +2882,7 @@ func _build_ui() -> void:
 	rotation_button.name = "AddRotationButton"
 	rotation_button.text = "＋ 回転"
 	rotation_button.tooltip_text = "回転ノードを盤面へ配置 // ノード右クリックで角度設定"
-	rotation_button.custom_minimum_size = Vector2(92.0, 34.0)
+	rotation_button.custom_minimum_size = Vector2(80.0, 34.0)
 	rotation_button.toggle_mode = true
 	rotation_button.pressed.connect(_on_rotation_button_pressed)
 	toolbar.add_child(rotation_button)
@@ -2732,24 +2891,33 @@ func _build_ui() -> void:
 	scale_button.name = "AddScaleButton"
 	scale_button.text = "＋ 変形"
 	scale_button.tooltip_text = "変形ノードを盤面へ配置 // ノード右クリックで倍率設定"
-	scale_button.custom_minimum_size = Vector2(92.0, 34.0)
+	scale_button.custom_minimum_size = Vector2(80.0, 34.0)
 	scale_button.toggle_mode = true
 	scale_button.pressed.connect(_on_scale_button_pressed)
 	toolbar.add_child(scale_button)
+
+	repeat_button = Button.new()
+	repeat_button.name = "AddRepeatButton"
+	repeat_button.text = "＋ 反復"
+	repeat_button.tooltip_text = "放射反復ノードを配置 // ノード右クリックで反復数を設定"
+	repeat_button.custom_minimum_size = Vector2(80.0, 34.0)
+	repeat_button.toggle_mode = true
+	repeat_button.pressed.connect(_on_repeat_button_pressed)
+	toolbar.add_child(repeat_button)
 
 	combine_button = Button.new()
 	combine_button.name = "AddCombineButton"
 	combine_button.text = "＋ 合成"
 	combine_button.tooltip_text = "2〜8入力の合成ノードを配置 // ノード右クリックで結合方式を設定"
-	combine_button.custom_minimum_size = Vector2(92.0, 34.0)
+	combine_button.custom_minimum_size = Vector2(80.0, 34.0)
 	combine_button.toggle_mode = true
 	combine_button.pressed.connect(_on_combine_button_pressed)
 	toolbar.add_child(combine_button)
 
 	var title := Label.new()
-	title.text = "FACTORY PROTOTYPE // 固定素材地帯"
+	title.text = "FACTORY PROTOTYPE"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color(0.76, 0.91, 1.0))
 	toolbar.add_child(title)
 
@@ -2809,6 +2977,7 @@ func _build_ui() -> void:
 	_build_rotation_settings_popup()
 	_build_scale_settings_popup()
 	_build_move_settings_popup()
+	_build_repeat_settings_popup()
 	_build_combine_settings_popup()
 	_build_line_settings_popup()
 
@@ -3234,6 +3403,84 @@ func _on_move_settings_delete_pressed() -> void:
 
 func _on_move_settings_popup_hidden() -> void:
 	move_settings_node_id = &""
+
+
+func _build_repeat_settings_popup() -> void:
+	repeat_settings_popup = PopupPanel.new()
+	repeat_settings_popup.name = "RepeatSettingsPopup"
+	repeat_settings_popup.popup_hide.connect(_on_repeat_settings_popup_hidden)
+	add_child(repeat_settings_popup)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	repeat_settings_popup.add_child(margin)
+
+	var column := VBoxContainer.new()
+	column.custom_minimum_size = Vector2(254.0, 142.0)
+	column.add_theme_constant_override("separation", 8)
+	margin.add_child(column)
+
+	repeat_settings_title = Label.new()
+	repeat_settings_title.add_theme_font_size_override("font_size", 14)
+	repeat_settings_title.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
+	column.add_child(repeat_settings_title)
+
+	var count_row := HBoxContainer.new()
+	count_row.add_theme_constant_override("separation", 10)
+	column.add_child(count_row)
+	var count_label := Label.new()
+	count_label.text = "放射反復"
+	count_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	count_row.add_child(count_label)
+	repeat_settings_count = OptionButton.new()
+	repeat_settings_count.name = "RepeatCountOption"
+	repeat_settings_count.custom_minimum_size = Vector2(142.0, 34.0)
+	for count in REPEAT_COUNT_PRESETS:
+		repeat_settings_count.add_item("%d回" % int(count), int(count))
+	repeat_settings_count.item_selected.connect(_on_repeat_count_selected)
+	count_row.add_child(repeat_settings_count)
+
+	var hint := Label.new()
+	hint.text = "中心原点のまわりへ等角度配置"
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", Color(0.44, 0.68, 0.78))
+	column.add_child(hint)
+
+	repeat_settings_delete_button = Button.new()
+	repeat_settings_delete_button.name = "DeleteRepeatButton"
+	repeat_settings_delete_button.text = "反復ノードを削除"
+	repeat_settings_delete_button.custom_minimum_size = Vector2(0.0, 34.0)
+	repeat_settings_delete_button.pressed.connect(_on_repeat_settings_delete_pressed)
+	column.add_child(repeat_settings_delete_button)
+
+
+func _sync_repeat_settings(count: int) -> void:
+	repeat_settings_syncing = true
+	var item_index := repeat_settings_count.get_item_index(count)
+	if item_index >= 0:
+		repeat_settings_count.select(item_index)
+	repeat_settings_syncing = false
+
+
+func _on_repeat_count_selected(_index: int) -> void:
+	if repeat_settings_syncing or repeat_settings_node_id == &"":
+		return
+	var count := repeat_settings_count.get_item_id(repeat_settings_count.selected)
+	set_repeat_count(repeat_settings_node_id, count)
+	_sync_repeat_settings(repeat_count(repeat_settings_node_id))
+
+
+func _on_repeat_settings_delete_pressed() -> void:
+	var node_id := repeat_settings_node_id
+	if node_id != &"":
+		remove_processing_node(node_id)
+
+
+func _on_repeat_settings_popup_hidden() -> void:
+	repeat_settings_node_id = &""
 
 
 func _build_combine_settings_popup() -> void:
@@ -3721,6 +3968,38 @@ func _make_move_node(
 	return node
 
 
+func _make_repeat_node(
+	node_id: StringName,
+	world_center: Vector2,
+	count: int
+) -> GraphNode:
+	var safe_count := count if REPEAT_COUNT_PRESETS.has(count) else 3
+	var node := GraphNode.new()
+	node.name = String(node_id)
+	node.title = ""
+	node.draggable = true
+	node.resizable = false
+	node.set_meta("landmark_kind", &"repeat")
+	node.set_meta("repeat_node", true)
+	node.set_meta("repeat_count", safe_count)
+
+	var port_row := Control.new()
+	port_row.custom_minimum_size = Vector2(1.0, 1.0)
+	port_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	node.add_child(port_row)
+	node.set_slot(0, true, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
+
+	var visual = FactoryLandmarkVisualModel.new()
+	visual.configure_repeat(safe_count)
+	node.add_child(visual)
+	_configure_round_landmark_node(node, visual.custom_minimum_size)
+	node.position_offset = world_center - visual.custom_minimum_size * 0.5
+	node.mouse_filter = Control.MOUSE_FILTER_PASS
+	node.tooltip_text = _repeat_tooltip(StringName(node.name))
+	node.gui_input.connect(_on_repeat_node_gui_input.bind(node))
+	return node
+
+
 func _make_combine_node(
 	node_id: StringName,
 	world_center: Vector2,
@@ -3792,6 +4071,13 @@ func _on_move_button_pressed() -> void:
 		begin_move_placement()
 	else:
 		cancel_move_placement()
+
+
+func _on_repeat_button_pressed() -> void:
+	if repeat_button.button_pressed:
+		begin_repeat_placement()
+	else:
+		cancel_repeat_placement()
 
 
 func _on_combine_button_pressed() -> void:
@@ -3921,6 +4207,36 @@ func _on_move_node_gui_input(event: InputEvent, move_node: GraphNode) -> void:
 		move_node.accept_event()
 
 
+func _on_repeat_node_gui_input(event: InputEvent, repeat_node: GraphNode) -> void:
+	if not event is InputEventMouse:
+		return
+	var repeat_id := StringName(repeat_node.name)
+	var graph_event := event.duplicate() as InputEventMouse
+	graph_event.position = _convert_control_point(repeat_node, event.position, factory_graph)
+	var over_input: bool = graph_event.position.distance_to(
+		directional_node_input_position(repeat_id, 0, factory_graph)
+	) <= PORT_HIT_RADIUS
+	var over_output: bool = graph_event.position.distance_to(
+		directional_output_position(repeat_id, factory_graph)
+	) <= PORT_HIT_RADIUS
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if (
+			mouse_event.pressed
+			and mouse_event.button_index == MOUSE_BUTTON_RIGHT
+			and not over_input
+			and not over_output
+		):
+			open_repeat_settings(repeat_id, mouse_event.global_position)
+			repeat_node.accept_event()
+			return
+	if not over_input and not over_output:
+		return
+	_on_factory_graph_input(graph_event)
+	if event is InputEventMouseButton:
+		repeat_node.accept_event()
+
+
 func _on_combine_node_gui_input(event: InputEvent, combine_node: GraphNode) -> void:
 	if not event is InputEventMouse:
 		return
@@ -3958,11 +4274,12 @@ func _on_combine_node_gui_input(event: InputEvent, combine_node: GraphNode) -> v
 func _refresh_factory_status_label() -> void:
 	if status_label == null:
 		return
-	status_label.text = "中継 %d // 移動 %d // 回転 %d // 変形 %d // 合成 %d" % [
+	status_label.text = "中継 %d 移動 %d 回転 %d 変形 %d 反復 %d 合成 %d" % [
 		relay_nodes.size(),
 		move_nodes.size(),
 		rotation_nodes.size(),
 		scale_nodes.size(),
+		repeat_nodes.size(),
 		combine_nodes.size(),
 	]
 

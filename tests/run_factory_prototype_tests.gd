@@ -13,6 +13,7 @@ func _initialize() -> void:
 	await _test_move_processing_node()
 	await _test_processed_rotation_target()
 	await _test_scale_processing_node()
+	await _test_repeat_processing_node()
 	await _test_combine_processing_node()
 	if failures == 0:
 		print("All Factory Prototype tests passed.")
@@ -973,6 +974,102 @@ func _test_scale_processing_node() -> void:
 	_expect(prototype.factory_graph.get_connection_list().is_empty(), "deleting a scale node should remove attached conveyors")
 	_expect(prototype.summon_state(1) == &"idle", "deleting a scale node should clear downstream summon state")
 	_expect("変形 0" in prototype.status_label.text, "deleting a scale node should refresh the equipment count")
+	prototype.queue_free()
+	await process_frame
+
+
+func _test_repeat_processing_node() -> void:
+	var prototype = FactoryPrototypeScene.instantiate()
+	root.add_child(prototype)
+	await process_frame
+	await process_frame
+	prototype.flow_time_override = 0.0
+	_expect(
+		prototype.repeat_button != null and prototype.repeat_button.text == "＋ 反復",
+		"the toolbar should expose radial repeat placement"
+	)
+	var triangle_source := _first_material(prototype, &"triangle")
+	var move_node = prototype.place_move_at(Vector2(3500.0, 2450.0), Vector2i(4, 0))
+	var repeat_node = prototype.place_repeat_at(Vector2(3900.0, 2450.0), 3)
+	var move_id := StringName(move_node.name)
+	var repeat_id := StringName(repeat_node.name)
+	_expect(
+		repeat_node.draggable
+		and prototype.repeat_count(repeat_id) == 3
+		and "反復 1" in prototype.status_label.text,
+		"a repeat node should use its requested preset and update the equipment count"
+	)
+	_expect(
+		not prototype.set_repeat_count(repeat_id, 7)
+		and prototype.repeat_count(repeat_id) == 3,
+		"a non-preset repeat count should fail closed"
+	)
+	prototype.connect_output_to_input(StringName(triangle_source.name), move_id, 0)
+	prototype.connect_output_to_input(move_id, repeat_id, 0)
+	var moved_triangle = prototype.primitive_glyph(&"triangle").translated(Vector2i(4, 0))
+	var expected_three = prototype.GlyphModelScript.radial_repeat(moved_triangle, 3)
+	_expect(
+		prototype.output_glyph(repeat_id).canonical_serialization()
+		== expected_three.canonical_serialization(),
+		"repeat should apply equal-angle copies around the shared origin without mutating its input"
+	)
+	_expect(
+		prototype.output_glyph(move_id).canonical_serialization()
+		== moved_triangle.canonical_serialization(),
+		"repeat should preserve the upstream Glyph value"
+	)
+
+	var menu_click := InputEventMouseButton.new()
+	menu_click.button_index = MOUSE_BUTTON_RIGHT
+	menu_click.pressed = true
+	menu_click.position = prototype._convert_control_point(
+		prototype.factory_graph,
+		prototype._node_center_in(repeat_node, prototype.factory_graph),
+		repeat_node
+	)
+	menu_click.global_position = Vector2(620.0, 350.0)
+	repeat_node.gui_input.emit(menu_click)
+	_expect(
+		prototype.repeat_settings_popup.visible
+		and prototype.repeat_settings_node_id == repeat_id
+		and prototype.repeat_settings_count.get_item_id(
+			prototype.repeat_settings_count.selected
+		) == 3,
+		"right-clicking a repeat node should expose its repeat count"
+	)
+	var six_index: int = prototype.repeat_settings_count.get_item_index(6)
+	prototype.repeat_settings_count.select(six_index)
+	prototype.repeat_settings_count.item_selected.emit(six_index)
+	var expected_six = prototype.GlyphModelScript.radial_repeat(moved_triangle, 6)
+	_expect(
+		prototype.repeat_count(repeat_id) == 6
+		and prototype.output_glyph(repeat_id).canonical_serialization()
+		== expected_six.canonical_serialization(),
+		"the repeat menu should deterministically change the radial count"
+	)
+
+	var centered_circle_source := _first_material(prototype, &"circle")
+	var no_op_repeat = prototype.place_repeat_at(Vector2(3900.0, 2800.0), 8)
+	var no_op_id := StringName(no_op_repeat.name)
+	prototype.connect_output_to_input(StringName(centered_circle_source.name), no_op_id, 0)
+	_expect(
+		prototype.output_glyph(no_op_id) != null
+		and prototype.output_glyph(no_op_id).canonical_serialization()
+		== prototype.primitive_glyph(&"circle").canonical_serialization(),
+		"a rotationally symmetric center overlap should remain a valid no-op repeat"
+	)
+	_expect(
+		not prototype.connect_output_to_input(repeat_id, move_id, 0),
+		"a repeated output should not reconnect into its upstream branch"
+	)
+
+	prototype.repeat_settings_delete_button.pressed.emit()
+	await process_frame
+	_expect(prototype._repeat_node(repeat_id) == null, "the repeat menu should delete that processor")
+	_expect(
+		prototype._repeat_node(no_op_id) != null and "反復 1" in prototype.status_label.text,
+		"deleting one repeat node should retain unrelated repeat equipment"
+	)
 	prototype.queue_free()
 	await process_frame
 

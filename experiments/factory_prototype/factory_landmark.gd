@@ -19,6 +19,7 @@ var rotation_angle_degrees := 45
 var scale_x_percent := 100
 var scale_y_percent := 100
 var move_offset := Vector2i.UP
+var repeat_count := 3
 var combine_connection_mode: StringName = &"simple"
 
 
@@ -38,6 +39,9 @@ func configure(next_kind: StringName) -> void:
 		custom_minimum_size = Vector2(118.0, 118.0)
 	elif landmark_kind == &"move":
 		visual_mode = &"move"
+		custom_minimum_size = Vector2(118.0, 118.0)
+	elif landmark_kind == &"repeat":
+		visual_mode = &"repeat"
 		custom_minimum_size = Vector2(118.0, 118.0)
 	elif landmark_kind == &"combine":
 		visual_mode = &"combine"
@@ -84,6 +88,15 @@ func configure_move(next_offset: Vector2i) -> void:
 	queue_redraw()
 
 
+func configure_repeat(next_count: int) -> void:
+	landmark_kind = &"repeat"
+	visual_mode = &"repeat"
+	repeat_count = next_count
+	custom_minimum_size = Vector2(118.0, 118.0)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	queue_redraw()
+
+
 func configure_combine(next_connection_mode: StringName) -> void:
 	landmark_kind = &"combine"
 	visual_mode = &"combine"
@@ -99,7 +112,7 @@ func body_radius() -> float:
 		visual_size = custom_minimum_size
 	if visual_mode == &"summoner":
 		return minf(visual_size.x, visual_size.y) * 0.36 + 18.0
-	if visual_mode in [&"relay", &"rotation", &"scale", &"move", &"combine"]:
+	if visual_mode in [&"relay", &"rotation", &"scale", &"move", &"repeat", &"combine"]:
 		return minf(visual_size.x, visual_size.y) * 0.38
 	return minf(visual_size.x, visual_size.y) * 0.43
 
@@ -120,6 +133,9 @@ func _draw() -> void:
 		return
 	if visual_mode == &"move":
 		_draw_move(center)
+		return
+	if visual_mode == &"repeat":
+		_draw_repeat(center)
 		return
 	if visual_mode == &"combine":
 		_draw_combine(center)
@@ -215,6 +231,22 @@ func _draw_relay(center: Vector2) -> void:
 		var direction := Vector2.from_angle(TAU * float(index) / 4.0)
 		draw_line(center + direction * 9.0, center + direction * 18.0, INK, 1.4, true)
 		draw_circle(center + direction * 22.0, 2.8, INK, true)
+
+
+func _draw_repeat(center: Vector2) -> void:
+	var radius := body_radius()
+	draw_circle(center, radius, Color(0.015, 0.075, 0.11, 0.96), true)
+	draw_arc(center, radius, 0.0, TAU, 64, Color(0.42, 0.82, 1.0, 0.92), 1.6, true)
+	var orbit_radius := radius * 0.50
+	draw_arc(center, orbit_radius, 0.0, TAU, 48, Color(DIM_INK, 0.50), 1.0, true)
+	for index in repeat_count:
+		var angle := -PI * 0.5 + TAU * float(index) / float(repeat_count)
+		var direction := Vector2.from_angle(angle)
+		var point := center + direction * orbit_radius
+		draw_line(center + direction * 7.0, point - direction * 5.0, Color(DIM_INK, 0.68), 1.0, true)
+		draw_circle(point, 4.0, Color(0.01, 0.04, 0.06, 1.0), true)
+		draw_arc(point, 4.0, 0.0, TAU, 16, INK, 1.35, true)
+	draw_circle(center, 3.0, INK, true)
 
 
 func _draw_rotation(center: Vector2) -> void:
