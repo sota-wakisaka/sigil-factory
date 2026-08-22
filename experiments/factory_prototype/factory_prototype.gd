@@ -46,7 +46,11 @@ const COMBINE_CONNECTION_MODES := [
 ]
 const COMBINE_CONNECTION_LABELS := ["単純結合", "中心結合", "相互結合"]
 const COMBINE_INPUT_START_ANGLE := -PI * 0.5
-const TARGET_ORDER := [&"circle", &"triangle", &"square", &"diamond"]
+const TARGET_ORDER := [
+	&"circle", &"triangle", &"square", &"diamond",
+	MeaningGlyphsModel.EYE, MeaningGlyphsModel.CROSS, MeaningGlyphsModel.TARGET,
+	MeaningGlyphsModel.STAR, MeaningGlyphsModel.COMPASS,
+]
 const TARGET_DEFINITIONS := {
 	&"circle": {
 		"glyph_label": "○",
@@ -79,6 +83,41 @@ const TARGET_DEFINITIONS := {
 		"monster_id": &"razor_kite",
 		"monster_name": "斜刃カイト",
 		"role": "高速・旋回・切断",
+	},
+	MeaningGlyphsModel.EYE: {
+		"glyph_label": "◉",
+		"meaning_glyph_id": MeaningGlyphsModel.EYE,
+		"monster_id": &"eye_scout",
+		"monster_name": "眼球ドローン",
+		"role": "索敵・照準・支援",
+	},
+	MeaningGlyphsModel.CROSS: {
+		"glyph_label": "✚",
+		"meaning_glyph_id": MeaningGlyphsModel.CROSS,
+		"monster_id": &"cross_guard",
+		"monster_name": "十字ガード",
+		"role": "歩兵・迎撃・陣形",
+	},
+	MeaningGlyphsModel.TARGET: {
+		"glyph_label": "◎",
+		"meaning_glyph_id": MeaningGlyphsModel.TARGET,
+		"monster_id": &"target_turret",
+		"monster_name": "標定タレット",
+		"role": "遠隔・照準・制圧",
+	},
+	MeaningGlyphsModel.STAR: {
+		"glyph_label": "✶",
+		"meaning_glyph_id": MeaningGlyphsModel.STAR,
+		"monster_id": &"star_spark",
+		"monster_name": "星火スパーク",
+		"role": "飛行・散開・連射",
+	},
+	MeaningGlyphsModel.COMPASS: {
+		"glyph_label": "✥",
+		"meaning_glyph_id": MeaningGlyphsModel.COMPASS,
+		"monster_id": &"compass_guide",
+		"monster_name": "羅針ガイド",
+		"role": "誘導・索敵・支援",
 	},
 }
 const MATERIAL_LAYOUT := [
@@ -595,6 +634,9 @@ func target_glyph(target_kind: StringName) -> GlyphModel:
 	if not TARGET_DEFINITIONS.has(target_kind):
 		return null
 	var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
+	var meaning_glyph_id := StringName(definition.get("meaning_glyph_id", &""))
+	if meaning_glyph_id != &"":
+		return MeaningGlyphsModel.glyph(meaning_glyph_id)
 	var glyph := primitive_glyph(StringName(definition.get("primitive_id", target_kind)))
 	if glyph == null:
 		return null
@@ -1373,7 +1415,8 @@ func process_transport_at(time_seconds: float) -> void:
 		flow_arrival_cycles[input_index] = arrival_cycle
 		state_changed = true
 		if flow_audio != null and glyph_matches_target(glyph, input_index):
-			flow_audio.play_arrival(glyph_primitive_kind(target_glyph_for_input(input_index)))
+			var audio_kind := glyph_primitive_kind(target_glyph_for_input(input_index))
+			flow_audio.play_arrival(audio_kind if audio_kind != &"" else &"meaning")
 	if state_changed:
 		_refresh_summon_state()
 
@@ -2148,6 +2191,11 @@ func _draw_input_target_marker(
 	color: Color
 ) -> void:
 	var radius := 3.5
+	if MeaningGlyphsModel.has(target_kind):
+		var glyph := MeaningGlyphsModel.glyph(target_kind)
+		var scale := GlyphPainterModel.fit_scale(glyph, radius * 1.7, false, 0.1, 1.0)
+		GlyphPainterModel.draw_glyph(overlay, glyph, position, scale, color.a, false, 0.42)
+		return
 	match target_kind:
 		&"circle":
 			overlay.draw_arc(position, radius, 0.0, TAU, 16, color, 1.1, true)
@@ -2829,7 +2877,7 @@ func _refresh_summon_state() -> void:
 	var target_kind := selected_target_kind
 	var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
 	target_header_label.text = "召喚目標 // INPUT %d" % (selected_input_index + 1)
-	target_preview.configure_target(target_kind)
+	_configure_target_preview(target_kind)
 	target_name_label.text = String(definition["monster_name"])
 	target_role_label.text = String(definition["role"])
 	for kind in target_buttons:
@@ -2859,6 +2907,17 @@ func _refresh_summon_state() -> void:
 		_:
 			summon_state_label.text = "%sを召喚器入力へ接続" % definition["glyph_label"]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
+
+
+func _configure_target_preview(target_kind: StringName) -> void:
+	if target_preview == null or not TARGET_DEFINITIONS.has(target_kind):
+		return
+	var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
+	var meaning_glyph_id := StringName(definition.get("meaning_glyph_id", &""))
+	if meaning_glyph_id != &"":
+		target_preview.configure_meaning(meaning_glyph_id, true)
+	else:
+		target_preview.configure_target(target_kind)
 
 
 func _refresh_transport_countdown(time_seconds: float) -> void:
@@ -3744,7 +3803,7 @@ func _build_target_panel() -> PanelContainer:
 	panel.offset_left = -322.0
 	panel.offset_top = 12.0
 	panel.offset_right = -12.0
-	panel.offset_bottom = 252.0
+	panel.offset_bottom = 300.0
 	panel.add_theme_stylebox_override("panel", _target_panel_style())
 
 	var margin := MarginContainer.new()
@@ -3768,7 +3827,7 @@ func _build_target_panel() -> PanelContainer:
 	column.add_child(target_row)
 
 	target_preview = FactoryLandmarkVisualModel.new()
-	target_preview.configure_target(selected_target_kind)
+	_configure_target_preview(selected_target_kind)
 	target_row.add_child(target_preview)
 
 	var identity := VBoxContainer.new()
@@ -3786,9 +3845,10 @@ func _build_target_panel() -> PanelContainer:
 	target_role_label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
 	identity.add_child(target_role_label)
 
-	var selector := HBoxContainer.new()
-	selector.alignment = BoxContainer.ALIGNMENT_CENTER
-	selector.add_theme_constant_override("separation", 6)
+	var selector := GridContainer.new()
+	selector.columns = 5
+	selector.add_theme_constant_override("h_separation", 6)
+	selector.add_theme_constant_override("v_separation", 6)
 	column.add_child(selector)
 	var target_group := ButtonGroup.new()
 	for target_kind in TARGET_ORDER:
@@ -3797,7 +3857,7 @@ func _build_target_panel() -> PanelContainer:
 		button.name = "%sTargetButton" % String(target_kind).capitalize()
 		button.text = String(definition["glyph_label"])
 		button.tooltip_text = "%s // %s" % [definition["monster_name"], definition["role"]]
-		button.custom_minimum_size = Vector2(62.0, 32.0)
+		button.custom_minimum_size = Vector2(52.0, 30.0)
 		button.toggle_mode = true
 		button.button_group = target_group
 		button.pressed.connect(select_target.bind(target_kind))

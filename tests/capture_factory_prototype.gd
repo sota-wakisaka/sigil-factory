@@ -42,6 +42,13 @@ func _initialize() -> void:
 		elif fixture == "meaning_deposits":
 			view.factory_graph.zoom = 0.2
 			view._center_initial_view()
+		elif fixture == "meaning_target":
+			view.flow_time_override = 0.0
+			view.select_input(0)
+			view.select_target(&"eye")
+			view.connect_output_to_input(&"eye_vein", &"summoner_center", 0)
+			view.flow_time_override = view.summoner_arrival_time(0, 0) + 0.001
+			view.process_transport_at(view.flow_time_override)
 		elif fixture == "three_inputs":
 			view.connect_material_to_summoner(&"circle_01", 0)
 			view.connect_material_to_summoner(&"triangle_01", 1)

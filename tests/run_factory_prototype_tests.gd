@@ -140,7 +140,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(counts[&"triangle"] == 10, "ten Triangle material deposits should exist")
 	_expect(counts[&"square"] == 10, "ten Square material deposits should exist")
 	_expect(prototype.target_panel != null and prototype.target_panel.anchor_left == 1.0, "the target sigil panel should stay at the upper right")
-	_expect(prototype.target_buttons.size() == 4, "Circle, Triangle, Square, and processed Diamond should be selectable targets")
+	_expect(prototype.target_buttons.size() == 9, "four basic and five registered Glyphs should be selectable targets")
 	_expect(prototype.target_panel.find_child("Input1Button", true, false) == null, "the target panel should not duplicate summoner inputs as tabs")
 	_expect(prototype.input_target_kinds.size() == 3, "the round summoner should retain three input targets without visible text rows")
 	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")
@@ -747,6 +747,11 @@ func _test_meaning_glyph_deposits() -> void:
 	var counts: Dictionary = prototype.meaning_glyph_counts()
 	for glyph_id in MeaningGlyphsModel.IDS:
 		_expect(counts[glyph_id] == 1, "%s should have one fixed meaning deposit" % glyph_id)
+		_expect(
+			prototype.target_glyph(glyph_id).canonical_serialization()
+			== MeaningGlyphsModel.glyph(glyph_id).canonical_serialization(),
+			"%s should also be available as an exact summon target" % glyph_id
+		)
 	var eye_node = _first_meaning(prototype, MeaningGlyphsModel.EYE)
 	_expect(eye_node != null and not eye_node.draggable, "meaning deposits should be fixed landmarks")
 	if eye_node != null:
@@ -775,6 +780,27 @@ func _test_meaning_glyph_deposits() -> void:
 			prototype.output_glyph(rotation_id).canonical_serialization()
 			== MeaningGlyphsModel.glyph(MeaningGlyphsModel.EYE).rotated_degrees(45).canonical_serialization(),
 			"processing should apply to the complete registered meaning Glyph"
+		)
+		prototype.select_input(0)
+		_expect(prototype.select_target(MeaningGlyphsModel.EYE), "the Eye should be selectable for the active summoner input")
+		_expect(
+			prototype.target_preview.meaning_glyph_id == MeaningGlyphsModel.EYE,
+			"the target panel should show the actual selected meaning Glyph"
+		)
+		_expect(
+			prototype.connect_output_to_input(eye_id, StringName(prototype.summoner_node.name), 0),
+			"a registered meaning source should connect directly to a summoner input"
+		)
+		_expect(prototype.summon_state(0) == &"transporting", "a meaning Glyph should travel before summon judgment")
+		_advance_input_to_first_arrival(prototype, 0)
+		_expect(prototype.summon_state(0) == &"matched", "the registered Eye should match its canonical target")
+		_expect(
+			prototype.summoned_monster_count(&"eye_scout") == 1,
+			"the first Eye arrival should summon one Eye Drone"
+		)
+		_expect(
+			prototype.flow_audio.arrival_play_count == 1,
+			"a successful meaning Glyph arrival should use the meaning-Sigil arrival feedback"
 		)
 	prototype.queue_free()
 	await process_frame
