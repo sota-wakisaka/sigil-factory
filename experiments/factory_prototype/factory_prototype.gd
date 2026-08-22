@@ -730,6 +730,7 @@ func _build_ui() -> void:
 	factory_graph.add_theme_color_override("connection_hover_tint_color", Color.TRANSPARENT)
 	factory_graph.add_theme_color_override("connection_rim_color", Color.TRANSPARENT)
 	factory_graph.add_theme_color_override("connection_valid_target_tint_color", Color.TRANSPARENT)
+	factory_graph.show_arrange_button = false
 	factory_graph.minimap_enabled = true
 	factory_graph.zoom = 0.30
 	factory_graph.connection_request.connect(_on_connection_request)

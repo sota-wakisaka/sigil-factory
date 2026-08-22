@@ -47,6 +47,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.fixed_landmark_count() == 31, "thirty material deposits and one summoner should be fixed landmarks")
 	_expect(prototype.all_landmarks_locked(), "material nodes and the summoner should not be draggable")
 	_expect(prototype.factory_graph.minimap_enabled, "a minimap should support navigation across the large map")
+	_expect(not prototype.factory_graph.is_showing_arrange_button(), "automatic selected-node arrangement should stay hidden for the radial factory layout")
 	_expect(prototype.connection_overlay != null and prototype.port_overlay != null, "directional ports and connections should use dedicated overlays")
 	_expect(is_zero_approx(prototype.factory_graph.connection_lines_thickness), "native GraphEdit lines should stay hidden behind the circular directional renderer")
 	_expect(not prototype.factory_graph.right_disconnects, "native GraphEdit connection interaction should not reveal hidden rectangular routes")
