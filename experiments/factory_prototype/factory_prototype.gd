@@ -17,6 +17,7 @@ const PORT_COLOR := Color(0.28, 0.78, 1.0, 1.0)
 const PORT_IDLE_COLOR := Color(0.20, 0.55, 0.70, 0.92)
 const PORT_HIT_RADIUS := 13.0
 const PORT_DRAW_RADIUS := 5.5
+const CONNECTION_HIT_RADIUS := 10.0
 const BUILTIN_PORT_COLOR := Color(0.0, 0.0, 0.0, 0.0)
 const DEFAULT_CONVEYOR_GRADE := 1
 const CONVEYOR_SPEED_BY_GRADE := { 1: 520.0 }
@@ -113,6 +114,7 @@ var input_target_kinds: Array[StringName] = [&"circle", &"triangle", &"square"]
 var selected_input_index := 0
 var connecting_material_id: StringName = &""
 var hovered_material_id: StringName = &""
+var hovered_connection_key := ""
 var hovered_input_index := -1
 var hovered_input_node_id: StringName = &""
 var connection_pointer := Vector2.ZERO
@@ -466,6 +468,7 @@ func disconnect_input(to_node_id: StringName, to_port: int = 0) -> void:
 	process_transport_at(flow_animation_time_seconds())
 	var removed := _remove_input_connection(to_node_id, to_port)
 	if removed:
+		hovered_connection_key = ""
 		_reset_downstream_transport_state(to_node_id, to_port)
 		if flow_audio != null:
 			flow_audio.play_disconnect()
@@ -533,6 +536,12 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			else -1
 		)
 		hovered_material_id = directional_output_at(event.position)
+		var hovered_connection := (
+			directional_connection_at(event.position)
+			if hovered_input_node_id == &"" and hovered_material_id == &""
+			else {}
+		)
+		hovered_connection_key = String(hovered_connection.get("key", ""))
 		if relay_placement_active:
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
 			factory_graph.tooltip_text = "クリックで中継ノードを配置 // 右クリックで取消"
@@ -546,6 +555,9 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		elif hovered_material_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
 			factory_graph.tooltip_text = _output_tooltip(hovered_material_id)
+		elif not hovered_connection.is_empty():
+			factory_graph.mouse_default_cursor_shape = Control.CURSOR_HELP
+			factory_graph.tooltip_text = _connection_tooltip(hovered_connection)
 		else:
 			var landmark := directional_landmark_at(event.position)
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_HELP if landmark != &"" else Control.CURSOR_ARROW
@@ -568,6 +580,14 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			if summoner_node != null and disconnect_node == StringName(summoner_node.name):
 				select_input(disconnect_port)
 			disconnect_input(disconnect_node, disconnect_port)
+			factory_graph.accept_event()
+			return
+		var disconnect_connection := directional_connection_at(mouse_event.position)
+		if not disconnect_connection.is_empty():
+			disconnect_input(
+				StringName(disconnect_connection["to_node"]),
+				int(disconnect_connection["to_port"])
+			)
 			factory_graph.accept_event()
 		return
 	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
@@ -619,6 +639,16 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		factory_graph.accept_event()
 
 
+func _on_factory_graph_mouse_exited() -> void:
+	hovered_material_id = &""
+	hovered_input_node_id = &""
+	hovered_input_index = -1
+	hovered_connection_key = ""
+	if factory_graph != null:
+		factory_graph.tooltip_text = ""
+		factory_graph.mouse_default_cursor_shape = Control.CURSOR_ARROW
+
+
 func _clear_directional_connection_preview() -> void:
 	connecting_material_id = &""
 	connection_drag_moved = false
@@ -642,6 +672,37 @@ func directional_connection_target_at(graph_position: Vector2) -> Dictionary:
 			if graph_position.distance_to(directional_input_position(input_index, factory_graph)) <= PORT_HIT_RADIUS:
 				return { "node_id": StringName(summoner_node.name), "port": input_index }
 	return {}
+
+
+func directional_connection_at(graph_position: Vector2) -> Dictionary:
+	if factory_graph == null:
+		return {}
+	var closest: Dictionary = {}
+	var closest_distance := INF
+	for connection in factory_graph.get_connection_list():
+		var from_node_id := StringName(connection["from_node"])
+		var to_node_id := StringName(connection["to_node"])
+		var to_port := int(connection["to_port"])
+		var start := directional_output_position(from_node_id, factory_graph)
+		var finish := directional_node_input_position(to_node_id, to_port, factory_graph)
+		var closest_point := Geometry2D.get_closest_point_to_segment(
+			graph_position,
+			start,
+			finish
+		)
+		var distance := graph_position.distance_to(closest_point)
+		if distance > CONNECTION_HIT_RADIUS or distance >= closest_distance:
+			continue
+		closest_distance = distance
+		closest = connection.duplicate()
+		closest["key"] = _connection_flow_key(
+			from_node_id,
+			int(connection["from_port"]),
+			to_node_id,
+			to_port
+		)
+		closest["distance_to_line"] = distance
+	return closest
 
 
 func directional_input_at(graph_position: Vector2) -> int:
@@ -688,6 +749,22 @@ func _output_tooltip(node_id: StringName) -> String:
 	if _relay_node(node_id) != null:
 		return "中継出力 // 複数の下流へ分配可能"
 	return ""
+
+
+func _connection_tooltip(connection: Dictionary) -> String:
+	if connection.is_empty():
+		return ""
+	var from_node_id := StringName(connection.get("from_node", &""))
+	var to_node_id := StringName(connection.get("to_node", &""))
+	var to_port := int(connection.get("to_port", -1))
+	if from_node_id == &"" or to_node_id == &"" or to_port < 0:
+		return ""
+	var line_length := connection_world_length(from_node_id, to_node_id, to_port)
+	return "搬送路 // 距離 %.0f // 初回 %.1fs // 間隔 %.1fs // 右クリックで切断" % [
+		line_length,
+		flow_travel_duration(line_length),
+		flow_packet_interval(),
+	]
 
 
 func directional_output_position(node_id: StringName, coordinate_space: Control) -> Vector2:
@@ -776,6 +853,20 @@ func _draw_directional_connection_lines(overlay: Control) -> void:
 					color = Color(0.34, 0.86, 0.76, 0.96)
 				&"mismatch":
 					color = Color(0.96, 0.62, 0.34, 0.96)
+		var connection_key := _connection_flow_key(
+			from_node_id,
+			int(connection["from_port"]),
+			to_node_id,
+			input_index
+		)
+		if connection_key == hovered_connection_key:
+			_draw_connection_curve(
+				overlay,
+				start,
+				finish,
+				Color(0.60, 0.90, 1.0, 0.28),
+				8.0
+			)
 		_draw_connection_curve(overlay, start, finish, color, 3.0)
 	if connecting_material_id != &"":
 		var preview_start: Vector2 = directional_output_position(connecting_material_id, overlay)
@@ -1590,6 +1681,7 @@ func _build_ui() -> void:
 	factory_graph.connection_request.connect(_on_connection_request)
 	factory_graph.disconnection_request.connect(_on_disconnection_request)
 	factory_graph.gui_input.connect(_on_factory_graph_input)
+	factory_graph.mouse_exited.connect(_on_factory_graph_mouse_exited)
 	graph_area.add_child(factory_graph)
 	_configure_graph_hud_occlusion()
 

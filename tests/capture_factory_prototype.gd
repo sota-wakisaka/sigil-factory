@@ -48,6 +48,27 @@ func _initialize() -> void:
 			view.connect_output_to_input(StringName(relay.name), &"summoner_center", 0)
 		if requested_flow_time >= 0.0:
 			view.flow_time_override = requested_flow_time
+		if options.has("hover_line_input"):
+			var hover_input := int(options["hover_line_input"])
+			for connection in view.factory_graph.get_connection_list():
+				if (
+					StringName(connection["to_node"]) != StringName(view.summoner_node.name)
+					or int(connection["to_port"]) != hover_input
+				):
+					continue
+				var from_node_id := StringName(connection["from_node"])
+				var start: Vector2 = view.directional_output_position(
+					from_node_id,
+					view.factory_graph
+				)
+				var finish: Vector2 = view.directional_input_position(
+					hover_input,
+					view.factory_graph
+				)
+				var hover := InputEventMouseMotion.new()
+				hover.position = start.lerp(finish, 0.5)
+				view.factory_graph.gui_input.emit(hover)
+				break
 	await process_frame
 	RenderingServer.force_draw(false)
 

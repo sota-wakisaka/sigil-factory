@@ -335,7 +335,7 @@ func _test_fixed_factory_landmarks() -> void:
 	prototype.disconnect_summoner(1)
 	prototype.disconnect_input(relay_id, 0)
 	_expect(prototype.factory_graph.get_connection_list().is_empty(), "relay test connections should disconnect independently")
-	var second_relay: GraphNode = prototype.place_relay_at(Vector2(5300.0, 4500.0))
+	var second_relay: GraphNode = prototype.place_relay_at(Vector2(5800.0, 4500.0))
 	var second_relay_id := StringName(second_relay.name)
 	_expect(prototype.connect_output_to_input(relay_id, second_relay_id, 0), "relay nodes should chain in the processing direction")
 	_expect(not prototype.connect_output_to_input(second_relay_id, relay_id, 0), "relay connections should reject a cycle")
@@ -392,6 +392,45 @@ func _test_fixed_factory_landmarks() -> void:
 		_expect(prototype.summon_state(0) == &"transporting", "a direct connection should remain in transport before arrival")
 		_expect(prototype.summoned_monster_count(&"ring_wisp") == ring_wisps_before_direct, "a direct connection should not summon on contact")
 		_expect(prototype.flow_audio.arrival_play_count == arrival_sound_before_delivery, "a connection should not play its arrival sound early")
+		var direct_line_start: Vector2 = prototype.directional_output_position(
+			StringName(circle_source.name),
+			prototype.factory_graph
+		)
+		var direct_line_finish: Vector2 = prototype.directional_input_position(0, prototype.factory_graph)
+		var direct_line_midpoint := direct_line_start.lerp(direct_line_finish, 0.5)
+		var direct_line_hit: Dictionary = prototype.directional_connection_at(direct_line_midpoint)
+		_expect(
+			StringName(direct_line_hit.get("from_node", &"")) == StringName(circle_source.name)
+			and StringName(direct_line_hit.get("to_node", &"")) == StringName(prototype.summoner_node.name),
+			"the visible directional line should be a stable hover and interaction target"
+		)
+		var direct_line_hover := InputEventMouseMotion.new()
+		direct_line_hover.position = direct_line_midpoint
+		prototype.factory_graph.gui_input.emit(direct_line_hover)
+		_expect(
+			prototype.hovered_connection_key != ""
+			and "距離" in prototype.factory_graph.tooltip_text
+			and "初回" in prototype.factory_graph.tooltip_text
+			and "間隔" in prototype.factory_graph.tooltip_text,
+			"hovering a conveyor should reveal its distance, first travel time, and fixed interval"
+		)
+		prototype.factory_graph.mouse_exited.emit()
+		_expect(
+			prototype.hovered_connection_key == "" and prototype.factory_graph.tooltip_text.is_empty(),
+			"leaving the factory board should clear the temporary conveyor inspection state"
+		)
+		prototype.factory_graph.gui_input.emit(direct_line_hover)
+		var direct_line_cut := InputEventMouseButton.new()
+		direct_line_cut.button_index = MOUSE_BUTTON_RIGHT
+		direct_line_cut.pressed = true
+		direct_line_cut.position = direct_line_midpoint
+		prototype.factory_graph.gui_input.emit(direct_line_cut)
+		_expect(prototype.summon_state(0) == &"idle", "right-clicking the visible conveyor should disconnect that route directly")
+		_expect(prototype.hovered_connection_key == "", "disconnecting a hovered conveyor should clear its stale highlight")
+		_expect(
+			prototype.connect_material_to_summoner(StringName(circle_source.name), 0),
+			"a line removed from its body should be reconnectable through the same source output"
+		)
 		var direct_first_arrival: float = prototype.summoner_arrival_time(0, 0)
 		var direct_seconds_remaining: float = prototype.transport_seconds_until_first_arrival(
 			0,
