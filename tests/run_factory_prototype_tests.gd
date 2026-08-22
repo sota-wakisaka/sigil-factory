@@ -9,6 +9,7 @@ var failures := 0
 func _initialize() -> void:
 	await _test_main_menu()
 	await _test_fixed_factory_landmarks()
+	await _test_processed_rotation_target()
 	if failures == 0:
 		print("All Factory Prototype tests passed.")
 	quit(failures)
@@ -133,7 +134,7 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(counts[&"triangle"] == 10, "ten Triangle material deposits should exist")
 	_expect(counts[&"square"] == 10, "ten Square material deposits should exist")
 	_expect(prototype.target_panel != null and prototype.target_panel.anchor_left == 1.0, "the target sigil panel should stay at the upper right")
-	_expect(prototype.target_buttons.size() == 3, "Circle, Triangle, and Square should be selectable targets")
+	_expect(prototype.target_buttons.size() == 4, "Circle, Triangle, Square, and processed Diamond should be selectable targets")
 	_expect(prototype.target_panel.find_child("Input1Button", true, false) == null, "the target panel should not duplicate summoner inputs as tabs")
 	_expect(prototype.input_target_kinds.size() == 3, "the round summoner should retain three input targets without visible text rows")
 	_expect(prototype.target_kind_for_input(0) == &"circle", "input 1 should initially target Circle")
@@ -143,6 +144,11 @@ func _test_fixed_factory_landmarks() -> void:
 		prototype.target_glyph_for_input(0).canonical_serialization()
 		!= prototype.target_glyph_for_input(1).canonical_serialization(),
 		"summoner targets should be real canonical Glyph data instead of display-only shape names"
+	)
+	_expect(
+		prototype.target_glyph(&"diamond").canonical_serialization()
+		== prototype.primitive_glyph(&"square").rotated_degrees(45).canonical_serialization(),
+		"the Diamond target should be the canonical result of rotating Square by 45 degrees"
 	)
 	_expect(prototype.selected_input_index == 0 and prototype.selected_target_kind == &"circle", "the target panel should initially show input 1")
 	_expect(prototype.target_monster_id() == &"ring_wisp", "input 1 should show the Ring Wisp")
@@ -626,6 +632,49 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(bounds.size.x >= 7800.0 and bounds.size.y >= 4500.0, "material deposits should span most of the large playfield")
 	_expect(nearest_deposit_distance >= 1250.0, "the summoner should have enough empty space for several processing nodes")
 
+	prototype.queue_free()
+	await process_frame
+
+
+func _test_processed_rotation_target() -> void:
+	var prototype = FactoryPrototypeScene.instantiate()
+	root.add_child(prototype)
+	await process_frame
+	await process_frame
+	prototype.flow_time_override = 0.0
+	var square_source := _first_material(prototype, &"square")
+	var rotation = prototype.place_rotation_at(Vector2(3900.0, 2450.0), 45)
+	var rotation_id := StringName(rotation.name)
+	prototype.select_input(2)
+	_expect(prototype.select_target(&"diamond"), "the processed Diamond target should be selectable per input")
+	_expect(prototype.target_monster_id(2) == &"razor_kite", "Diamond should select the first processed-Sigil monster")
+	_expect(
+		prototype.connect_output_to_input(StringName(square_source.name), rotation_id, 0),
+		"Square should connect to the rotation processor"
+	)
+	_expect(
+		prototype.connect_output_to_input(rotation_id, StringName(prototype.summoner_node.name), 2),
+		"a rotation output should connect to a summoner input"
+	)
+	_expect(prototype.summon_state(2) == &"transporting", "the rotated Glyph should travel before it is judged")
+	_advance_input_to_first_arrival(prototype, 2)
+	_expect(prototype.summon_state(2) == &"matched", "Square rotated by 45 degrees should match Diamond")
+	var razor_kites_after_match: int = prototype.summoned_monster_count(&"razor_kite")
+	_expect(razor_kites_after_match == 1, "the first matching processed Glyph should summon one Razor Kite")
+	var processed_event: Dictionary = prototype.summon_events.back()
+	_expect(
+		String(processed_event.get("canonical_glyph", ""))
+		== prototype.target_glyph(&"diamond").canonical_serialization(),
+		"the summon event should retain the same canonical processed Glyph shown on the conveyor"
+	)
+	_expect(prototype.set_rotation_angle(rotation_id, 37), "an active processor should accept a new arbitrary angle")
+	_expect(prototype.summon_state(2) == &"transporting", "changing an active processor should restart only its downstream delivery")
+	_advance_input_to_first_arrival(prototype, 2)
+	_expect(prototype.summon_state(2) == &"mismatch", "a 37 degree Square should not match the 45 degree Diamond")
+	_expect(prototype.summoned_monster_count(&"razor_kite") == razor_kites_after_match, "a mismatched processed Glyph must not summon")
+	_expect(prototype.set_rotation_angle(rotation_id, 45), "the rotation should return to the target angle")
+	_advance_input_to_first_arrival(prototype, 2)
+	_expect(prototype.summon_state(2) == &"matched", "restoring 45 degrees should restore the processed recipe")
 	prototype.queue_free()
 	await process_frame
 

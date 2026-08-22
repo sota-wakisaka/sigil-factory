@@ -47,6 +47,8 @@ func _initialize() -> void:
 			view.connect_output_to_input(&"circle_01", StringName(relay.name), 0)
 			view.connect_output_to_input(StringName(relay.name), &"summoner_center", 0)
 		elif fixture == "rotation_route":
+			view.select_input(2)
+			view.select_target(&"diamond")
 			var rotation = view.place_rotation_at(Vector2(3900.0, 2450.0), 45)
 			view.connect_output_to_input(&"square_01", StringName(rotation.name), 0)
 			view.connect_output_to_input(StringName(rotation.name), &"summoner_center", 2)

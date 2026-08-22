@@ -28,25 +28,39 @@ const SUMMON_EVENT_HISTORY_LIMIT := 128
 const FLOW_TRAIL_SCREEN_LENGTH := 18.0
 const FLOW_PATH_START := 0.0
 const FLOW_PATH_END := 1.0
-const TARGET_ORDER := [&"circle", &"triangle", &"square"]
+const TARGET_ORDER := [&"circle", &"triangle", &"square", &"diamond"]
 const TARGET_DEFINITIONS := {
 	&"circle": {
 		"glyph_label": "○",
+		"primitive_id": &"circle",
+		"rotation_degrees": 0,
 		"monster_id": &"ring_wisp",
 		"monster_name": "環霊ウィスプ",
 		"role": "軽量・浮遊・群体",
 	},
 	&"triangle": {
 		"glyph_label": "△",
+		"primitive_id": &"triangle",
+		"rotation_degrees": 0,
 		"monster_id": &"stinger",
 		"monster_name": "針獣スティンガー",
 		"role": "高速・突撃・軽装",
 	},
 	&"square": {
 		"glyph_label": "□",
+		"primitive_id": &"square",
+		"rotation_degrees": 0,
 		"monster_id": &"stone_block",
 		"monster_name": "石殻ブロック",
 		"role": "低速・防壁・重装",
+	},
+	&"diamond": {
+		"glyph_label": "◇",
+		"primitive_id": &"square",
+		"rotation_degrees": 45,
+		"monster_id": &"razor_kite",
+		"monster_name": "斜刃カイト",
+		"role": "高速・旋回・切断",
 	},
 }
 const MATERIAL_LAYOUT := [
@@ -285,7 +299,17 @@ func target_kind_for_input(input_index: int) -> StringName:
 
 
 func target_glyph_for_input(input_index: int) -> GlyphModel:
-	return primitive_glyph(target_kind_for_input(input_index))
+	return target_glyph(target_kind_for_input(input_index))
+
+
+func target_glyph(target_kind: StringName) -> GlyphModel:
+	if not TARGET_DEFINITIONS.has(target_kind):
+		return null
+	var definition: Dictionary = TARGET_DEFINITIONS[target_kind]
+	var glyph := primitive_glyph(StringName(definition.get("primitive_id", target_kind)))
+	if glyph == null:
+		return null
+	return glyph.rotated_degrees(int(definition.get("rotation_degrees", 0)))
 
 
 func target_monster_id(input_index: int = -1) -> StringName:
@@ -465,7 +489,7 @@ func process_transport_at(time_seconds: float) -> void:
 		flow_arrival_cycles[input_index] = arrival_cycle
 		state_changed = true
 		if flow_audio != null and glyph_matches_target(glyph, input_index):
-			flow_audio.play_arrival(target_kind_for_input(input_index))
+			flow_audio.play_arrival(glyph_primitive_kind(target_glyph_for_input(input_index)))
 	if state_changed:
 		_refresh_summon_state()
 
@@ -1052,7 +1076,12 @@ func _draw_directional_ports(overlay: Control) -> void:
 			color = PORT_COLOR
 		_draw_input_port(overlay, position, color)
 		var inward := position.direction_to(_node_center_in(summoner_node, overlay))
-		_draw_input_target_marker(overlay, position + inward * 14.0, target_kind_for_input(input_index), color)
+		_draw_input_target_marker(
+			overlay,
+			position + inward * 14.0,
+			target_kind_for_input(input_index),
+			color
+		)
 		if input_index == hovered_input_index:
 			overlay.draw_arc(position, PORT_DRAW_RADIUS + 6.0, 0.0, TAU, 20, Color(0.38, 0.80, 1.0, 0.76), 1.0, true)
 		if input_index == selected_input_index:
@@ -1102,6 +1131,15 @@ func _draw_input_target_marker(
 			overlay.draw_polyline(points, color, 1.1, true)
 		&"square":
 			overlay.draw_rect(Rect2(position - Vector2.ONE * radius, Vector2.ONE * radius * 2.0), color, false, 1.1, true)
+		&"diamond":
+			var points := PackedVector2Array([
+				position + Vector2(0.0, -radius * 1.35),
+				position + Vector2(radius * 1.35, 0.0),
+				position + Vector2(0.0, radius * 1.35),
+				position + Vector2(-radius * 1.35, 0.0),
+				position + Vector2(0.0, -radius * 1.35),
+			])
+			overlay.draw_polyline(points, color, 1.1, true)
 
 
 func _draw_connection_curve(
@@ -1688,16 +1726,15 @@ func _refresh_summon_state() -> void:
 			]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.92, 0.76))
 		&"mismatch":
-			var material_kind := connected_material_kind(selected_input_index)
+			var connected := connected_glyph(selected_input_index)
 			summon_state_label.text = "不一致 // 接続 %s  /  目標 %s" % [
-				_shape_symbol(material_kind),
+				glyph_symbol(connected),
 				definition["glyph_label"],
 			]
 			summon_state_label.add_theme_color_override("font_color", Color(0.96, 0.68, 0.38))
 		&"transporting":
-			var material_kind := connected_material_kind(selected_input_index)
 			_set_transporting_state_text(
-				material_kind,
+				connected_glyph(selected_input_index),
 				transport_seconds_until_first_arrival(selected_input_index)
 			)
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.78, 0.94))
@@ -1710,17 +1747,17 @@ func _refresh_transport_countdown(time_seconds: float) -> void:
 	if summon_state_label == null or summon_state(selected_input_index) != &"transporting":
 		return
 	_set_transporting_state_text(
-		connected_material_kind(selected_input_index),
+		connected_glyph(selected_input_index),
 		transport_seconds_until_first_arrival(selected_input_index, time_seconds)
 	)
 
 
-func _set_transporting_state_text(material_kind: StringName, seconds_remaining: float) -> void:
+func _set_transporting_state_text(glyph: GlyphModel, seconds_remaining: float) -> void:
 	var eta_text := "--"
 	if not is_inf(seconds_remaining):
 		eta_text = "%.1fs" % seconds_remaining
 	summon_state_label.text = "輸送中 // %s → INPUT %d // %s" % [
-		_shape_symbol(material_kind),
+		glyph_symbol(glyph),
 		selected_input_index + 1,
 		eta_text,
 	]
@@ -1923,7 +1960,7 @@ func _build_target_panel() -> PanelContainer:
 		button.name = "%sTargetButton" % String(target_kind).capitalize()
 		button.text = String(definition["glyph_label"])
 		button.tooltip_text = "%s // %s" % [definition["monster_name"], definition["role"]]
-		button.custom_minimum_size = Vector2(70.0, 32.0)
+		button.custom_minimum_size = Vector2(62.0, 32.0)
 		button.toggle_mode = true
 		button.button_group = target_group
 		button.pressed.connect(select_target.bind(target_kind))
@@ -2176,6 +2213,17 @@ static func _shape_symbol(kind: StringName) -> String:
 		&"triangle": "△",
 		&"square": "□",
 	}.get(kind, "?")
+
+
+func glyph_symbol(glyph: GlyphModel) -> String:
+	if glyph == null:
+		return "?"
+	var serialization := glyph.canonical_serialization()
+	for target_kind in TARGET_ORDER:
+		var candidate := target_glyph(target_kind)
+		if candidate != null and candidate.canonical_serialization() == serialization:
+			return String(TARGET_DEFINITIONS[target_kind]["glyph_label"])
+	return "✦"
 
 
 static func _target_panel_style() -> StyleBoxFlat:

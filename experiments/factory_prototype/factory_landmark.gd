@@ -122,6 +122,15 @@ func _draw_material_shape(center: Vector2, radius: float, color: Color, width: f
 		&"square":
 			var rect := Rect2(center - Vector2.ONE * radius * 0.72, Vector2.ONE * radius * 1.44)
 			draw_rect(rect, color, false, width, true)
+		&"diamond":
+			var diamond := PackedVector2Array([
+				center + Vector2(0.0, -radius),
+				center + Vector2(radius, 0.0),
+				center + Vector2(0.0, radius),
+				center + Vector2(-radius, 0.0),
+				center + Vector2(0.0, -radius),
+			])
+			draw_polyline(diamond, color, width, true)
 
 
 func _draw_summoner(center: Vector2) -> void:
