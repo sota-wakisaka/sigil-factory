@@ -94,6 +94,11 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.selected_input_index == 0 and prototype.selected_target_kind == &"circle", "the target panel should initially show input 1")
 	_expect(prototype.target_monster_id() == &"ring_wisp", "input 1 should show the Ring Wisp")
 	_expect(prototype.summon_state() == &"idle", "input 1 should start disconnected")
+	var initial_summoner_input_positions: Array[Vector2] = []
+	for input_index in prototype.SUMMONER_INPUT_COUNT:
+		initial_summoner_input_positions.append(
+			prototype.directional_input_position(input_index, prototype.factory_graph)
+		)
 	var input_hover := InputEventMouseMotion.new()
 	input_hover.position = prototype.directional_input_position(1, prototype.factory_graph)
 	prototype.factory_graph.gui_input.emit(input_hover)
@@ -243,15 +248,18 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.directional_port_direction(&"triangle_01", &"output").x < -0.9, "an east-side material output should face west toward the center")
 	_expect(prototype.directional_port_direction(&"square_04", &"output").y > 0.9, "a north-side material output should face south toward the center")
 	_expect(prototype.directional_port_direction(&"square_08", &"output").y < -0.9, "a south-side material output should face north toward the center")
-	for input_index in 2:
-		var connection := _connection_for_input(prototype, input_index)
-		var connected_source: GraphNode = prototype._material_node(StringName(connection["from_node"]))
-		var expected_direction: Vector2 = prototype._node_center_in(prototype.summoner_node, prototype.factory_graph).direction_to(
-			prototype._node_center_in(connected_source, prototype.factory_graph)
+	for input_index in prototype.SUMMONER_INPUT_COUNT:
+		_expect(
+			prototype.directional_port_direction(&"summoner_center", &"input", input_index).dot(
+				prototype.SUMMONER_INPUT_DIRECTIONS[input_index]
+			) > 0.99,
+			"each summoner input should keep its assigned fixed direction"
 		)
 		_expect(
-			prototype.directional_port_direction(&"summoner_center", &"input", input_index).dot(expected_direction) > 0.80,
-			"a connected summoner input should face its actual upstream node"
+			prototype.directional_input_position(input_index, prototype.factory_graph).distance_to(
+				initial_summoner_input_positions[input_index]
+			) < 0.1,
+			"summoner input pins should not move when connections change"
 		)
 
 	var output_click := InputEventMouseButton.new()
@@ -260,6 +268,13 @@ func _test_fixed_factory_landmarks() -> void:
 	output_click.position = prototype.directional_output_position(StringName(square_source.name), prototype.factory_graph)
 	prototype.factory_graph.gui_input.emit(output_click)
 	_expect(prototype.connecting_material_id == StringName(square_source.name), "clicking a directional output should start a connection")
+	for input_index in prototype.SUMMONER_INPUT_COUNT:
+		_expect(
+			prototype.directional_input_position(input_index, prototype.factory_graph).distance_to(
+				initial_summoner_input_positions[input_index]
+			) < 0.1,
+			"summoner input pins should remain fixed during a connection preview"
+		)
 	var input_click := InputEventMouseButton.new()
 	input_click.button_index = MOUSE_BUTTON_LEFT
 	input_click.pressed = true

@@ -9,6 +9,7 @@ const MENU_SCENE := "res://src/main_menu.tscn"
 const PLAYFIELD_SIZE := Vector2(9000.0, 6000.0)
 const SUMMONER_POSITION := Vector2(4400.0, 2895.0)
 const SUMMONER_INPUT_COUNT := 3
+const SUMMONER_INPUT_DIRECTIONS := [Vector2.LEFT, Vector2.UP, Vector2.RIGHT]
 const PORT_COLOR := Color(0.28, 0.78, 1.0, 1.0)
 const PORT_IDLE_COLOR := Color(0.20, 0.55, 0.70, 0.92)
 const PORT_HIT_RADIUS := 13.0
@@ -572,10 +573,7 @@ func directional_input_position(input_index: int, coordinate_space: Control) -> 
 	):
 		return Vector2.ZERO
 	var direction := _summoner_input_direction(input_index, coordinate_space)
-	var base := _node_boundary_position(summoner_node, direction, coordinate_space)
-	var tangent := Vector2(-direction.y, direction.x)
-	base += tangent * float(input_index - 1) * 18.0
-	return base
+	return _node_boundary_position(summoner_node, direction, coordinate_space)
 
 
 func directional_node_input_position(node_id: StringName, input_port: int, coordinate_space: Control) -> Vector2:
@@ -845,24 +843,10 @@ func flow_animation_time_seconds() -> float:
 	return float(Time.get_ticks_msec()) / 1000.0
 
 
-func _summoner_input_direction(input_index: int, coordinate_space: Control) -> Vector2:
-	for connection in factory_graph.get_connection_list():
-		if (
-			StringName(connection["to_node"]) == StringName(summoner_node.name)
-			and int(connection["to_port"]) == input_index
-		):
-			var source := _factory_node(StringName(connection["from_node"]))
-			if source != null:
-				return _node_center_in(summoner_node, coordinate_space).direction_to(
-					_node_center_in(source, coordinate_space)
-				)
-	if connecting_material_id != &"":
-		var active_source := _factory_node(connecting_material_id)
-		if active_source != null:
-			return _node_center_in(summoner_node, coordinate_space).direction_to(
-				_node_center_in(active_source, coordinate_space)
-			)
-	return Vector2.from_angle([PI, -PI * 0.5, 0.0][input_index])
+func _summoner_input_direction(input_index: int, _coordinate_space: Control) -> Vector2:
+	if input_index < 0 or input_index >= SUMMONER_INPUT_DIRECTIONS.size():
+		return Vector2.ZERO
+	return SUMMONER_INPUT_DIRECTIONS[input_index]
 
 
 func _relay_input_direction(relay_id: StringName, coordinate_space: Control) -> Vector2:
