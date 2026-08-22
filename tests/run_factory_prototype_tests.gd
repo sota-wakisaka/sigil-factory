@@ -249,11 +249,15 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.directional_port_direction(&"square_04", &"output").y > 0.9, "a north-side material output should face south toward the center")
 	_expect(prototype.directional_port_direction(&"square_08", &"output").y < -0.9, "a south-side material output should face north toward the center")
 	for input_index in prototype.SUMMONER_INPUT_COUNT:
+		var expected_input_direction := Vector2.from_angle(
+			prototype.SUMMONER_INPUT_START_ANGLE
+			+ TAU * float(input_index) / float(prototype.SUMMONER_INPUT_COUNT)
+		)
 		_expect(
 			prototype.directional_port_direction(&"summoner_center", &"input", input_index).dot(
-				prototype.SUMMONER_INPUT_DIRECTIONS[input_index]
+				expected_input_direction
 			) > 0.99,
-			"each summoner input should keep its assigned fixed direction"
+			"summoner inputs should keep equal angles measured from the top"
 		)
 		_expect(
 			prototype.directional_input_position(input_index, prototype.factory_graph).distance_to(

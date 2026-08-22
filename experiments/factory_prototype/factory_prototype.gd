@@ -9,7 +9,7 @@ const MENU_SCENE := "res://src/main_menu.tscn"
 const PLAYFIELD_SIZE := Vector2(9000.0, 6000.0)
 const SUMMONER_POSITION := Vector2(4400.0, 2895.0)
 const SUMMONER_INPUT_COUNT := 3
-const SUMMONER_INPUT_DIRECTIONS := [Vector2.LEFT, Vector2.UP, Vector2.RIGHT]
+const SUMMONER_INPUT_START_ANGLE := -PI * 0.5
 const PORT_COLOR := Color(0.28, 0.78, 1.0, 1.0)
 const PORT_IDLE_COLOR := Color(0.20, 0.55, 0.70, 0.92)
 const PORT_HIT_RADIUS := 13.0
@@ -844,9 +844,12 @@ func flow_animation_time_seconds() -> float:
 
 
 func _summoner_input_direction(input_index: int, _coordinate_space: Control) -> Vector2:
-	if input_index < 0 or input_index >= SUMMONER_INPUT_DIRECTIONS.size():
+	if input_index < 0 or input_index >= SUMMONER_INPUT_COUNT:
 		return Vector2.ZERO
-	return SUMMONER_INPUT_DIRECTIONS[input_index]
+	return Vector2.from_angle(
+		SUMMONER_INPUT_START_ANGLE
+		+ TAU * float(input_index) / float(SUMMONER_INPUT_COUNT)
+	)
 
 
 func _relay_input_direction(relay_id: StringName, coordinate_space: Control) -> Vector2:
