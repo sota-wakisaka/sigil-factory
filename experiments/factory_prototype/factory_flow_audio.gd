@@ -32,17 +32,17 @@ func configure() -> void:
 	if connection_player != null:
 		return
 	playback_enabled = DisplayServer.get_name() != "headless"
-	matched_connection_stream = _make_tone([620.0, 930.0], 0.14, 0.28)
-	mismatch_connection_stream = _make_tone([270.0, 210.0], 0.16, 0.25)
-	disconnect_stream = _make_tone([360.0, 190.0], 0.11, 0.22)
+	matched_connection_stream = _make_tone([620.0, 930.0], 0.14, 0.42)
+	mismatch_connection_stream = _make_tone([270.0, 210.0], 0.16, 0.36)
+	disconnect_stream = _make_tone([360.0, 190.0], 0.11, 0.36)
 	arrival_streams = {
-		&"circle": _make_tone([740.0, 1110.0], 0.12, 0.20),
-		&"triangle": _make_tone([820.0, 1230.0], 0.10, 0.18),
-		&"square": _make_tone([520.0, 780.0], 0.14, 0.22),
+		&"circle": _make_tone([740.0, 1110.0], 0.12, 0.36),
+		&"triangle": _make_tone([820.0, 1230.0], 0.10, 0.34),
+		&"square": _make_tone([520.0, 780.0], 0.14, 0.38),
 	}
-	connection_player = _make_player("ConnectionSE", -14.0)
-	disconnect_player = _make_player("DisconnectSE", -17.0)
-	arrival_player = _make_player("ArrivalSE", -19.0)
+	connection_player = _make_player("ConnectionSE", -3.0)
+	disconnect_player = _make_player("DisconnectSE", -5.0)
+	arrival_player = _make_player("ArrivalSE", -6.0)
 
 
 func play_connection(matched: bool) -> void:

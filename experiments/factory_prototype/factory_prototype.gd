@@ -16,8 +16,9 @@ const PORT_DRAW_RADIUS := 5.5
 const BUILTIN_PORT_COLOR := Color(0.0, 0.0, 0.0, 0.0)
 const FLOW_PACKET_COUNT := 2
 const FLOW_CYCLE_SECONDS := 2.4
-const FLOW_PATH_START := 0.06
-const FLOW_PATH_END := 0.94
+const FLOW_PATH_START := 0.03
+const FLOW_PATH_END := 1.0
+const FLOW_TRAVEL_PHASE := 0.90
 const TARGET_ORDER := [&"circle", &"triangle", &"square"]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -78,6 +79,7 @@ var factory_graph: GraphEdit
 var summoner_node: GraphNode
 var material_nodes: Array[GraphNode] = []
 var connection_overlay
+var flow_overlay
 var port_overlay
 var graph_menu_panel: PanelContainer
 var graph_minimap: Control
@@ -455,11 +457,13 @@ func draw_directional_overlay(overlay: Control, layer: StringName) -> void:
 	if layer == &"connections":
 		_draw_directional_connection_lines(overlay)
 		return
+	if layer == &"flow":
+		_draw_directional_flow_effects(overlay)
+		return
 	_draw_directional_ports(overlay)
 
 
 func _draw_directional_connection_lines(overlay: Control) -> void:
-	var now := flow_animation_time_seconds()
 	for connection in factory_graph.get_connection_list():
 		var from_node_id := StringName(connection["from_node"])
 		var input_index := int(connection["to_port"])
@@ -472,6 +476,25 @@ func _draw_directional_connection_lines(overlay: Control) -> void:
 			&"mismatch":
 				color = Color(0.96, 0.62, 0.34, 0.96)
 		_draw_connection_curve(overlay, start, finish, color, 3.0)
+	if connecting_material_id != &"":
+		var preview_start: Vector2 = directional_output_position(connecting_material_id, overlay)
+		var preview_finish: Vector2 = _convert_control_point(factory_graph, connection_pointer, overlay)
+		_draw_connection_curve(overlay, preview_start, preview_finish, Color(0.42, 0.82, 1.0, 0.72), 2.0)
+
+
+func _draw_directional_flow_effects(overlay: Control) -> void:
+	var now := flow_animation_time_seconds()
+	for connection in factory_graph.get_connection_list():
+		var from_node_id := StringName(connection["from_node"])
+		var input_index := int(connection["to_port"])
+		var start := directional_output_position(from_node_id, overlay)
+		var finish := directional_input_position(input_index, overlay)
+		var color := PORT_COLOR
+		match summon_state(input_index):
+			&"matched":
+				color = Color(0.34, 0.86, 0.76, 0.96)
+			&"mismatch":
+				color = Color(0.96, 0.62, 0.34, 0.96)
 		var source := _material_node(from_node_id)
 		if source != null:
 			_draw_flowing_glyphs(
@@ -483,10 +506,6 @@ func _draw_directional_connection_lines(overlay: Control) -> void:
 				input_index,
 				now
 			)
-	if connecting_material_id != &"":
-		var preview_start: Vector2 = directional_output_position(connecting_material_id, overlay)
-		var preview_finish: Vector2 = _convert_control_point(factory_graph, connection_pointer, overlay)
-		_draw_connection_curve(overlay, preview_start, preview_finish, Color(0.42, 0.82, 1.0, 0.72), 2.0)
 
 
 func _draw_directional_ports(overlay: Control) -> void:
@@ -584,7 +603,7 @@ func _draw_flowing_glyphs(
 ) -> void:
 	for packet_index in FLOW_PACKET_COUNT:
 		var phase := flow_packet_phase(input_index, packet_index, time_seconds)
-		var progress := lerpf(FLOW_PATH_START, FLOW_PATH_END, phase)
+		var progress := flow_packet_progress(phase)
 		var position := connection_curve_point(start, finish, progress)
 		var previous := connection_curve_point(start, finish, maxf(progress - 0.045, 0.0))
 		var direction := previous.direction_to(position)
@@ -594,8 +613,8 @@ func _draw_flowing_glyphs(
 			var mote := connection_curve_point(start, finish, mote_progress)
 			overlay.draw_circle(mote, 1.7 - float(mote_index) * 0.45, Color(color, 0.34), true)
 		_draw_transport_glyph(overlay, position, material_kind, color, direction)
-		if phase >= 0.88:
-			var arrival := inverse_lerp(0.88, 1.0, phase)
+		if phase >= FLOW_TRAVEL_PHASE:
+			var arrival := inverse_lerp(FLOW_TRAVEL_PHASE, 1.0, phase)
 			overlay.draw_arc(
 				finish,
 				7.0 + arrival * 17.0,
@@ -649,9 +668,18 @@ func flow_packet_phase(input_index: int, packet_index: int, time_seconds: float)
 	)
 
 
+func flow_packet_progress(phase: float) -> float:
+	var travel_progress := clampf(phase / FLOW_TRAVEL_PHASE, 0.0, 1.0)
+	return lerpf(FLOW_PATH_START, FLOW_PATH_END, travel_progress)
+
+
 func flow_arrival_cycle(input_index: int, time_seconds: float) -> int:
 	var arrival_interval := FLOW_CYCLE_SECONDS / float(FLOW_PACKET_COUNT)
-	return floori(time_seconds / arrival_interval + float(input_index) * 0.34)
+	return floori(
+		time_seconds / arrival_interval
+		+ float(input_index) * 0.34
+		+ (1.0 - FLOW_TRAVEL_PHASE)
+	)
 
 
 func flow_animation_time_seconds() -> float:
@@ -1010,6 +1038,13 @@ func _place_landmarks() -> void:
 
 	summoner_node = _make_summoner_node()
 	factory_graph.add_child(summoner_node)
+
+	flow_overlay = FactoryDirectionalOverlayModel.new()
+	flow_overlay.name = "DirectionalFlowOverlay"
+	flow_overlay.z_index = 10
+	flow_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	flow_overlay.configure(self, &"flow")
+	factory_graph.add_child(flow_overlay)
 
 	port_overlay = FactoryDirectionalOverlayModel.new()
 	port_overlay.name = "DirectionalPortOverlay"

@@ -53,6 +53,10 @@ func _initialize() -> void:
 		print("Factory Prototype capture: %s (%dx%d)" % [output, image.get_width(), image.get_height()])
 	else:
 		printerr("Factory Prototype capture failed: %s" % error)
+	view.queue_free()
+	await process_frame
+	capture_viewport.queue_free()
+	await process_frame
 	quit(0 if error == OK else 1)
 
 

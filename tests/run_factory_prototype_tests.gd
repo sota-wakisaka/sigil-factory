@@ -51,13 +51,20 @@ func _test_fixed_factory_landmarks() -> void:
 		prototype.flow_packet_phase(0, 0, 0.6) > prototype.flow_packet_phase(0, 0, 0.0),
 		"transported Glyph phase should advance toward the summoner over time"
 	)
+	_expect(prototype.flow_packet_progress(0.0) == prototype.FLOW_PATH_START, "transport should begin just outside its source port")
+	_expect(prototype.flow_packet_progress(prototype.FLOW_TRAVEL_PHASE) == 1.0, "transport should reach the exact input center before the arrival effect begins")
+	_expect(prototype.flow_packet_progress(0.98) == 1.0, "the Glyph should remain centered on its input while the arrival ring expands")
 	_expect(prototype.PLAYFIELD_SIZE == Vector2(9000.0, 6000.0), "the available playfield should support a large map")
 	_expect(prototype.material_nodes.size() == 30, "material deposits should be scattered across the large map")
 	_expect(prototype.fixed_landmark_count() == 31, "thirty material deposits and one summoner should be fixed landmarks")
 	_expect(prototype.all_landmarks_locked(), "material nodes and the summoner should not be draggable")
 	_expect(prototype.factory_graph.minimap_enabled, "a minimap should support navigation across the large map")
 	_expect(not prototype.factory_graph.is_showing_arrange_button(), "automatic selected-node arrangement should stay hidden for the radial factory layout")
-	_expect(prototype.connection_overlay != null and prototype.port_overlay != null, "directional ports and connections should use dedicated overlays")
+	_expect(prototype.connection_overlay != null and prototype.flow_overlay != null and prototype.port_overlay != null, "directional lines, moving Glyphs, and ports should use dedicated overlays")
+	_expect(prototype.connection_overlay.z_index < prototype.flow_overlay.z_index, "flow effects should render in front of background lines")
+	_expect(prototype.flow_overlay.z_index < prototype.port_overlay.z_index, "flow effects should remain behind the exact input and output ports")
+	_expect(prototype.flow_audio.connection_player.volume_db == -3.0, "connection sounds should remain clearly audible")
+	_expect(prototype.flow_audio.arrival_player.volume_db == -6.0, "repeated arrival sounds should remain audible without overpowering connections")
 	_expect(is_zero_approx(prototype.factory_graph.connection_lines_thickness), "native GraphEdit lines should stay hidden behind the circular directional renderer")
 	_expect(not prototype.factory_graph.right_disconnects, "native GraphEdit connection interaction should not reveal hidden rectangular routes")
 	_expect(prototype.factory_graph.get_theme_constant("connection_hover_thickness") == 0, "native connection hover thickness should remain disabled")
@@ -113,6 +120,23 @@ func _test_fixed_factory_landmarks() -> void:
 		absf(circle_center.distance_to(circle_output) - prototype._landmark_radius_in(circle_source, prototype.factory_graph)) < 1.0,
 		"material output ports should anchor to the visible circular body"
 	)
+	var circle_output_effect: Vector2 = prototype.directional_output_position(StringName(circle_source.name), prototype.flow_overlay)
+	var circle_output_port: Vector2 = prototype.directional_output_position(StringName(circle_source.name), prototype.port_overlay)
+	_expect(
+		(prototype.flow_overlay.get_global_transform() * circle_output_effect).distance_to(
+			prototype.port_overlay.get_global_transform() * circle_output_port
+		) < 0.1,
+		"moving Glyph effects should share the exact output-port center across overlay layers"
+	)
+	for input_index in prototype.SUMMONER_INPUT_COUNT:
+		var arrival_effect: Vector2 = prototype.directional_input_position(input_index, prototype.flow_overlay)
+		var input_port: Vector2 = prototype.directional_input_position(input_index, prototype.port_overlay)
+		_expect(
+			(prototype.flow_overlay.get_global_transform() * arrival_effect).distance_to(
+				prototype.port_overlay.get_global_transform() * input_port
+			) < 0.1,
+			"arrival rings should stay centered on summoner input %d" % (input_index + 1)
+		)
 	body_hover.position = prototype._node_center_in(prototype.summoner_node, prototype.factory_graph)
 	prototype.factory_graph.gui_input.emit(body_hover)
 	_expect("召喚器" in prototype.factory_graph.tooltip_text, "summoner name and input guidance should move from node text into a tooltip")
