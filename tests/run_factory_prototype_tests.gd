@@ -680,6 +680,32 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(bounds.size.x >= 7800.0 and bounds.size.y >= 4500.0, "material deposits should span most of the large playfield")
 	_expect(nearest_deposit_distance >= 1250.0, "the summoner should have enough empty space for several processing nodes")
 
+	var relay_menu_click := InputEventMouseButton.new()
+	relay_menu_click.button_index = MOUSE_BUTTON_RIGHT
+	relay_menu_click.pressed = true
+	relay_menu_click.position = prototype._convert_control_point(
+		prototype.factory_graph,
+		prototype._node_center_in(relay, prototype.factory_graph),
+		relay
+	)
+	relay_menu_click.global_position = Vector2(580.0, 360.0)
+	relay.gui_input.emit(relay_menu_click)
+	_expect(
+		prototype.relay_settings_popup.visible
+		and prototype.relay_settings_node_id == relay_id
+		and prototype.relay_settings_delete_button != null,
+		"right-clicking a relay body should open its individual menu with deletion"
+	)
+	prototype.relay_settings_delete_button.pressed.emit()
+	await process_frame
+	_expect(
+		prototype.relay_nodes.size() == 1
+		and StringName(prototype.relay_nodes[0].name) == second_relay_id,
+		"deleting from the relay menu should remove only that player-built node"
+	)
+	_expect("中継 1" in prototype.status_label.text, "deleting a relay should refresh the factory equipment count")
+	_expect(prototype.fixed_landmark_count() == 31, "deleting player equipment must not remove fixed landmarks")
+
 	prototype.queue_free()
 	await process_frame
 
@@ -723,6 +749,27 @@ func _test_processed_rotation_target() -> void:
 	_expect(prototype.set_rotation_angle(rotation_id, 45), "the rotation should return to the target angle")
 	_advance_input_to_first_arrival(prototype, 2)
 	_expect(prototype.summon_state(2) == &"matched", "restoring 45 degrees should restore the processed recipe")
+	var rotation_menu_click := InputEventMouseButton.new()
+	rotation_menu_click.button_index = MOUSE_BUTTON_RIGHT
+	rotation_menu_click.pressed = true
+	rotation_menu_click.position = prototype._convert_control_point(
+		prototype.factory_graph,
+		prototype._node_center_in(rotation, prototype.factory_graph),
+		rotation
+	)
+	rotation_menu_click.global_position = Vector2(620.0, 360.0)
+	rotation.gui_input.emit(rotation_menu_click)
+	_expect(
+		prototype.rotation_settings_popup.visible
+		and prototype.rotation_settings_delete_button != null,
+		"the rotation menu should include deletion beside its angle setting"
+	)
+	prototype.rotation_settings_delete_button.pressed.emit()
+	await process_frame
+	_expect(prototype.rotation_nodes.is_empty(), "deleting from the rotation menu should remove the processor")
+	_expect(prototype.factory_graph.get_connection_list().is_empty(), "deleting a processor should remove all of its attached conveyors")
+	_expect(prototype.summon_state(2) == &"idle", "deleting a connected processor should clear its downstream summon state")
+	_expect("回転 0" in prototype.status_label.text, "deleting a rotation node should refresh the equipment count")
 	prototype.queue_free()
 	await process_frame
 

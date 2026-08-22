@@ -56,6 +56,9 @@ func _initialize() -> void:
 		elif fixture == "rotation_settings":
 			var rotation = view.place_rotation_at(Vector2(3900.0, 2450.0), 45)
 			view.open_rotation_settings(StringName(rotation.name), Vector2(620.0, 330.0))
+		elif fixture == "relay_settings":
+			var relay = view.place_relay_at(Vector2(3900.0, 2450.0))
+			view.open_relay_settings(StringName(relay.name), Vector2(620.0, 330.0))
 		elif fixture == "line_settings":
 			view.connect_material_to_summoner(&"circle_01", 0)
 			var connection = view._connection_to_input(&"summoner_center", 0)

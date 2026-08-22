@@ -118,12 +118,18 @@ var status_label: Label
 var relay_button: Button
 var relay_placement_active := false
 var relay_serial := 0
+var relay_settings_popup: PopupPanel
+var relay_settings_title: Label
+var relay_settings_details: Label
+var relay_settings_delete_button: Button
+var relay_settings_node_id: StringName = &""
 var rotation_button: Button
 var rotation_placement_active := false
 var rotation_serial := 0
 var rotation_settings_popup: PopupPanel
 var rotation_settings_title: Label
 var rotation_settings_angle: SpinBox
+var rotation_settings_delete_button: Button
 var rotation_settings_node_id: StringName = &""
 var rotation_settings_syncing := false
 var line_settings_popup: PopupPanel
@@ -409,10 +415,40 @@ func set_rotation_angle(node_id: StringName, angle_degrees: int) -> bool:
 	return true
 
 
+func open_relay_settings(node_id: StringName, viewport_position: Vector2) -> bool:
+	if _relay_node(node_id) == null or relay_settings_popup == null:
+		return false
+	if rotation_settings_popup != null:
+		rotation_settings_popup.hide()
+	if line_settings_popup != null:
+		line_settings_popup.hide()
+	relay_settings_node_id = node_id
+	relay_settings_title.text = "中継ノード // %s" % String(node_id)
+	var input_connection := _connection_to_input(node_id, 0)
+	var output_count := 0
+	for connection in factory_graph.get_connection_list():
+		if StringName(connection["from_node"]) == node_id:
+			output_count += 1
+	relay_settings_details.text = "入力 %s // 出力 %d\nグリフを変えずに転送" % [
+		"接続済み" if not input_connection.is_empty() else "未接続",
+		output_count,
+	]
+	var popup_size := Vector2i(272, 166)
+	var viewport_size := Vector2i(get_viewport_rect().size)
+	var popup_position := Vector2i(viewport_position.round()) + Vector2i(10, 8)
+	popup_position.x = clampi(popup_position.x, 0, maxi(viewport_size.x - popup_size.x, 0))
+	popup_position.y = clampi(popup_position.y, 0, maxi(viewport_size.y - popup_size.y, 0))
+	relay_settings_popup.popup(Rect2i(popup_position, popup_size))
+	relay_settings_delete_button.grab_focus()
+	return true
+
+
 func open_rotation_settings(node_id: StringName, viewport_position: Vector2) -> bool:
 	var rotation := _rotation_node(node_id)
 	if rotation == null or rotation_settings_popup == null or rotation_settings_angle == null:
 		return false
+	if relay_settings_popup != null:
+		relay_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	rotation_settings_node_id = node_id
@@ -420,7 +456,7 @@ func open_rotation_settings(node_id: StringName, viewport_position: Vector2) -> 
 	rotation_settings_syncing = true
 	rotation_settings_angle.set_value_no_signal(rotation_angle(node_id))
 	rotation_settings_syncing = false
-	var popup_size := Vector2i(252, 132)
+	var popup_size := Vector2i(252, 188)
 	var viewport_size := Vector2i(get_viewport_rect().size)
 	var popup_position := Vector2i(viewport_position.round()) + Vector2i(10, 8)
 	popup_position.x = clampi(popup_position.x, 0, maxi(viewport_size.x - popup_size.x, 0))
@@ -447,6 +483,8 @@ func open_line_settings(connection: Dictionary, viewport_position: Vector2) -> b
 		return false
 	if rotation_settings_popup != null:
 		rotation_settings_popup.hide()
+	if relay_settings_popup != null:
+		relay_settings_popup.hide()
 	line_settings_connection = {
 		"from_node": from_node_id,
 		"from_port": from_port,
@@ -483,6 +521,74 @@ func _connection_to_input(to_node_id: StringName, to_port: int) -> Dictionary:
 		):
 			return connection.duplicate()
 	return {}
+
+
+func remove_processing_node(node_id: StringName) -> bool:
+	var node := _processing_node(node_id)
+	if node == null or factory_graph == null:
+		return false
+	process_transport_at(flow_animation_time_seconds())
+	var removed_connections: Array[Dictionary] = []
+	var downstream_inputs: Array[Dictionary] = []
+	for connection in factory_graph.get_connection_list():
+		var from_node_id := StringName(connection["from_node"])
+		var to_node_id := StringName(connection["to_node"])
+		if from_node_id != node_id and to_node_id != node_id:
+			continue
+		var owned_connection: Dictionary = connection.duplicate()
+		removed_connections.append(owned_connection)
+		if from_node_id == node_id:
+			downstream_inputs.append({
+				"node_id": to_node_id,
+				"port": int(connection["to_port"]),
+			})
+	for connection in removed_connections:
+		connection_flow_started_at.erase(_connection_flow_key(
+			StringName(connection["from_node"]),
+			int(connection["from_port"]),
+			StringName(connection["to_node"]),
+			int(connection["to_port"])
+		))
+		factory_graph.disconnect_node(
+			StringName(connection["from_node"]),
+			int(connection["from_port"]),
+			StringName(connection["to_node"]),
+			int(connection["to_port"])
+		)
+	for input in downstream_inputs:
+		_reset_downstream_transport_state(StringName(input["node_id"]), int(input["port"]))
+	if _relay_node(node_id) != null:
+		relay_nodes.erase(node)
+	else:
+		rotation_nodes.erase(node)
+	if relay_settings_node_id == node_id and relay_settings_popup != null:
+		relay_settings_popup.hide()
+	if rotation_settings_node_id == node_id and rotation_settings_popup != null:
+		rotation_settings_popup.hide()
+	if (
+		not line_settings_connection.is_empty()
+		and (
+			StringName(line_settings_connection.get("from_node", &"")) == node_id
+			or StringName(line_settings_connection.get("to_node", &"")) == node_id
+		)
+		and line_settings_popup != null
+	):
+		line_settings_popup.hide()
+	if hovered_material_id == node_id:
+		hovered_material_id = &""
+	if hovered_input_node_id == node_id:
+		hovered_input_node_id = &""
+	_clear_directional_connection_preview()
+	hovered_connection_key = ""
+	node.queue_free()
+	if not removed_connections.is_empty() and flow_audio != null:
+		flow_audio.play_disconnect()
+	_refresh_factory_status_label()
+	_refresh_summon_state()
+	for overlay in [connection_overlay, flow_overlay, port_overlay]:
+		if overlay != null:
+			overlay.queue_redraw()
+	return true
 
 
 func _restart_outgoing_transport(node_id: StringName, time_seconds: float) -> void:
@@ -947,7 +1053,7 @@ func _landmark_tooltip(node_id: StringName) -> String:
 			StringName(material.get_meta("landmark_kind", &""))
 		)
 	if _relay_node(node_id) != null:
-		return "中継ノード // グリフを変えずに転送 // ドラッグ移動"
+		return "中継ノード // グリフを変えずに転送 // 右クリックで個別メニュー"
 	if _rotation_node(node_id) != null:
 		return _rotation_tooltip(node_id)
 	return ""
@@ -1970,8 +2076,56 @@ func _build_ui() -> void:
 	footer.add_theme_font_size_override("font_size", 12)
 	footer.add_theme_color_override("font_color", Color(0.40, 0.58, 0.66))
 	page.add_child(footer)
+	_build_relay_settings_popup()
 	_build_rotation_settings_popup()
 	_build_line_settings_popup()
+
+
+func _build_relay_settings_popup() -> void:
+	relay_settings_popup = PopupPanel.new()
+	relay_settings_popup.name = "RelaySettingsPopup"
+	relay_settings_popup.popup_hide.connect(_on_relay_settings_popup_hidden)
+	add_child(relay_settings_popup)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	relay_settings_popup.add_child(margin)
+
+	var column := VBoxContainer.new()
+	column.custom_minimum_size = Vector2(240.0, 124.0)
+	column.add_theme_constant_override("separation", 8)
+	margin.add_child(column)
+
+	relay_settings_title = Label.new()
+	relay_settings_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	relay_settings_title.add_theme_font_size_override("font_size", 14)
+	relay_settings_title.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
+	column.add_child(relay_settings_title)
+
+	relay_settings_details = Label.new()
+	relay_settings_details.add_theme_font_size_override("font_size", 12)
+	relay_settings_details.add_theme_color_override("font_color", Color(0.52, 0.74, 0.84))
+	column.add_child(relay_settings_details)
+
+	relay_settings_delete_button = Button.new()
+	relay_settings_delete_button.name = "DeleteRelayButton"
+	relay_settings_delete_button.text = "中継ノードを削除"
+	relay_settings_delete_button.custom_minimum_size = Vector2(0.0, 34.0)
+	relay_settings_delete_button.pressed.connect(_on_relay_settings_delete_pressed)
+	column.add_child(relay_settings_delete_button)
+
+
+func _on_relay_settings_delete_pressed() -> void:
+	var node_id := relay_settings_node_id
+	if node_id != &"":
+		remove_processing_node(node_id)
+
+
+func _on_relay_settings_popup_hidden() -> void:
+	relay_settings_node_id = &""
 
 
 func _build_rotation_settings_popup() -> void:
@@ -1988,7 +2142,7 @@ func _build_rotation_settings_popup() -> void:
 	rotation_settings_popup.add_child(margin)
 
 	var column := VBoxContainer.new()
-	column.custom_minimum_size = Vector2(220.0, 94.0)
+	column.custom_minimum_size = Vector2(220.0, 138.0)
 	column.add_theme_constant_override("separation", 8)
 	margin.add_child(column)
 
@@ -2022,11 +2176,24 @@ func _build_rotation_settings_popup() -> void:
 	hint.add_theme_color_override("font_color", Color(0.44, 0.68, 0.78))
 	column.add_child(hint)
 
+	rotation_settings_delete_button = Button.new()
+	rotation_settings_delete_button.name = "DeleteRotationButton"
+	rotation_settings_delete_button.text = "回転ノードを削除"
+	rotation_settings_delete_button.custom_minimum_size = Vector2(0.0, 34.0)
+	rotation_settings_delete_button.pressed.connect(_on_rotation_settings_delete_pressed)
+	column.add_child(rotation_settings_delete_button)
+
 
 func _on_rotation_settings_angle_changed(value: float) -> void:
 	if rotation_settings_syncing or rotation_settings_node_id == &"":
 		return
 	set_rotation_angle(rotation_settings_node_id, roundi(value))
+
+
+func _on_rotation_settings_delete_pressed() -> void:
+	var node_id := rotation_settings_node_id
+	if node_id != &"":
+		remove_processing_node(node_id)
 
 
 func _on_rotation_settings_popup_hidden() -> void:
@@ -2280,7 +2447,7 @@ func _make_relay_node(node_id: StringName, world_center: Vector2) -> GraphNode:
 	_configure_round_landmark_node(node, visual.custom_minimum_size)
 	node.position_offset = world_center - visual.custom_minimum_size * 0.5
 	node.mouse_filter = Control.MOUSE_FILTER_PASS
-	node.tooltip_text = "中継ノード // グリフを変えずに転送 // ドラッグ移動"
+	node.tooltip_text = "中継ノード // グリフを変えずに転送 // 右クリックで個別メニュー"
 	node.gui_input.connect(_on_relay_node_gui_input.bind(node))
 	return node
 
@@ -2342,6 +2509,17 @@ func _on_relay_node_gui_input(event: InputEvent, relay: GraphNode) -> void:
 	var over_output: bool = graph_event.position.distance_to(
 		directional_output_position(relay_id, factory_graph)
 	) <= PORT_HIT_RADIUS
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if (
+			mouse_event.pressed
+			and mouse_event.button_index == MOUSE_BUTTON_RIGHT
+			and not over_input
+			and not over_output
+		):
+			open_relay_settings(relay_id, mouse_event.global_position)
+			relay.accept_event()
+			return
 	if not over_input and not over_output:
 		return
 	_on_factory_graph_input(graph_event)
