@@ -74,6 +74,8 @@ var summoner_node: GraphNode
 var material_nodes: Array[GraphNode] = []
 var connection_overlay
 var port_overlay
+var graph_menu_panel: PanelContainer
+var graph_minimap: Control
 var status_label: Label
 var target_panel: PanelContainer
 var target_preview
@@ -717,18 +719,24 @@ func _build_ui() -> void:
 	factory_graph = GraphEdit.new()
 	factory_graph.name = "FactoryGraph"
 	factory_graph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	factory_graph.right_disconnects = true
+	factory_graph.right_disconnects = false
 	factory_graph.connection_lines_curvature = 0.12
 	# GraphEdit retains topology and emits connection signals, while the directional
-	# overlay is the sole visual line renderer. Native lines still target the hidden
-	# rectangular slots and otherwise appear as displaced shadows around round nodes.
+	# overlay is the sole visual line renderer. Native line, hover, and rim passes
+	# still target hidden rectangular slots and otherwise appear as displaced shadows.
 	factory_graph.connection_lines_thickness = 0.0
+	factory_graph.connection_lines_antialiased = false
+	factory_graph.add_theme_constant_override("connection_hover_thickness", 0)
+	factory_graph.add_theme_color_override("connection_hover_tint_color", Color.TRANSPARENT)
+	factory_graph.add_theme_color_override("connection_rim_color", Color.TRANSPARENT)
+	factory_graph.add_theme_color_override("connection_valid_target_tint_color", Color.TRANSPARENT)
 	factory_graph.minimap_enabled = true
-	factory_graph.zoom = 0.36
+	factory_graph.zoom = 0.30
 	factory_graph.connection_request.connect(_on_connection_request)
 	factory_graph.disconnection_request.connect(_on_disconnection_request)
 	factory_graph.gui_input.connect(_on_factory_graph_input)
 	graph_area.add_child(factory_graph)
+	_configure_graph_hud_occlusion()
 
 	connection_overlay = FactoryDirectionalOverlayModel.new()
 	connection_overlay.name = "DirectionalConnectionOverlay"
@@ -745,6 +753,31 @@ func _build_ui() -> void:
 	footer.add_theme_font_size_override("font_size", 12)
 	footer.add_theme_color_override("font_color", Color(0.40, 0.58, 0.66))
 	page.add_child(footer)
+
+
+func _configure_graph_hud_occlusion() -> void:
+	graph_menu_panel = factory_graph.get_menu_hbox().get_parent() as PanelContainer
+	graph_minimap = _find_control_by_class(factory_graph, &"GraphEditMinimap")
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.025, 0.035, 0.045, 1.0)
+	panel_style.border_color = Color(0.18, 0.28, 0.34, 1.0)
+	panel_style.set_border_width_all(1)
+	if graph_menu_panel != null:
+		graph_menu_panel.z_index = 30
+		graph_menu_panel.add_theme_stylebox_override("panel", panel_style)
+	if graph_minimap != null:
+		graph_minimap.z_index = 30
+		graph_minimap.add_theme_stylebox_override("panel", panel_style.duplicate())
+
+
+func _find_control_by_class(root_node: Node, target_class: StringName) -> Control:
+	for child in root_node.get_children(true):
+		if StringName(child.get_class()) == target_class:
+			return child as Control
+		var nested := _find_control_by_class(child, target_class)
+		if nested != null:
+			return nested
+	return null
 
 
 func _build_target_panel() -> PanelContainer:

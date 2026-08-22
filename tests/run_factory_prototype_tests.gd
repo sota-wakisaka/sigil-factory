@@ -35,6 +35,11 @@ func _test_fixed_factory_landmarks() -> void:
 	root.add_child(prototype)
 	await process_frame
 	await process_frame
+	if not prototype.has_method("fixed_landmark_count"):
+		_expect(false, "the Factory Prototype scene script should load successfully")
+		prototype.queue_free()
+		await process_frame
+		return
 
 	_expect(prototype.factory_graph != null, "the prototype should expose a wide GraphEdit playfield")
 	_expect(prototype.PLAYFIELD_SIZE == Vector2(9000.0, 6000.0), "the available playfield should support a large map")
@@ -44,7 +49,17 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.factory_graph.minimap_enabled, "a minimap should support navigation across the large map")
 	_expect(prototype.connection_overlay != null and prototype.port_overlay != null, "directional ports and connections should use dedicated overlays")
 	_expect(is_zero_approx(prototype.factory_graph.connection_lines_thickness), "native GraphEdit lines should stay hidden behind the circular directional renderer")
-	_expect(prototype.factory_graph.zoom <= 0.40, "the initial camera should show the wider inner deposit ring")
+	_expect(not prototype.factory_graph.right_disconnects, "native GraphEdit connection interaction should not reveal hidden rectangular routes")
+	_expect(prototype.factory_graph.get_theme_constant("connection_hover_thickness") == 0, "native connection hover thickness should remain disabled")
+	_expect(prototype.factory_graph.get_theme_color("connection_hover_tint_color").a == 0.0, "native connection hover tint should remain transparent")
+	_expect(prototype.factory_graph.get_theme_color("connection_rim_color").a == 0.0, "native connection rim shadows should remain transparent")
+	_expect(prototype.factory_graph.get_theme_color("connection_valid_target_tint_color").a == 0.0, "native target tint should not reveal hidden rectangular ports")
+	_expect(prototype.graph_menu_panel != null and prototype.graph_minimap != null, "GraphEdit HUD surfaces should be available for line occlusion")
+	_expect(prototype.graph_menu_panel.z_index > prototype.port_overlay.z_index, "the GraphEdit toolbar should cover directional lines and ports")
+	_expect(prototype.graph_minimap.z_index > prototype.port_overlay.z_index, "the minimap should cover directional lines and ports")
+	_expect(prototype.graph_menu_panel.get_theme_stylebox("panel").bg_color.a == 1.0, "the toolbar should fully occlude routes passing behind it")
+	_expect(prototype.graph_minimap.get_theme_stylebox("panel").bg_color.a == 1.0, "the minimap should fully occlude routes passing behind it")
+	_expect(prototype.factory_graph.zoom <= 0.31, "the initial camera should show the complete inner deposit ring outside the GraphEdit HUD")
 	_expect(prototype.summoner_node.position_offset == prototype.SUMMONER_POSITION, "the summoner should remain at the factory center")
 	_expect(prototype.summoner_node.get_meta("landmark_kind") == &"summoner", "the center landmark should be identifiable as the summoner")
 
@@ -70,6 +85,9 @@ func _test_fixed_factory_landmarks() -> void:
 	var circle_source := _first_material(prototype, &"circle")
 	var triangle_source := _first_material(prototype, &"triangle")
 	var square_source := _first_material(prototype, &"square")
+	var square_output: Vector2 = prototype.directional_output_position(StringName(square_source.name), prototype.factory_graph)
+	var menu_bottom: float = prototype.graph_menu_panel.position.y + prototype.graph_menu_panel.size.y
+	_expect(square_output.y > menu_bottom, "the upper inner deposit output should remain visible below the GraphEdit toolbar")
 	var circle_visual = prototype._landmark_visual(circle_source)
 	var summoner_visual = prototype._landmark_visual(prototype.summoner_node)
 	_expect(circle_source.title.is_empty() and prototype.summoner_node.title.is_empty(), "landmark nodes should not render title text")
