@@ -540,7 +540,13 @@ func _build_ui() -> void:
 	factory_graph.gui_input.connect(_on_graph_input)
 	graph_area.add_child(factory_graph)
 	connection_overlay = DirectionalOverlayModel.new()
-	connection_overlay.z_index = -10
+	connection_overlay.name = "RuneConnectionOverlay"
+	# GraphEdit draws its background and grid before its children.  A negative
+	# z-index puts this child behind that background, which makes every actual
+	# conveyor disappear while the higher flow/port overlays remain visible.
+	# Keep it at the normal child layer: it was added before GraphNodes, so lines
+	# remain behind nodes while staying in front of the grid.
+	connection_overlay.z_index = 0
 	connection_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	connection_overlay.configure(self, &"connections")
 	factory_graph.add_child(connection_overlay)
@@ -1206,11 +1212,18 @@ func _reset_downstream_transport(node_id: StringName) -> void:
 
 
 func _connection_world_length(connection: Dictionary) -> float:
-	var from_node := _node(StringName(connection["from_node"]))
-	var to_node := _node(StringName(connection["to_node"]))
-	if from_node == null or to_node == null:
+	if factory_graph == null:
 		return 0.0
-	return _node_world_center(from_node).distance_to(_node_world_center(to_node))
+	var from_id := StringName(connection.get("from_node", &""))
+	var to_id := StringName(connection.get("to_node", &""))
+	if _node(from_id) == null or _node(to_id) == null:
+		return 0.0
+	# Transport timing must use the same endpoints that are drawn.  Center-to-
+	# center distance made short and long conveyors move at visibly different
+	# speeds because the hidden radius at both ends was counted as travel.
+	var start := _port_position(from_id, int(connection.get("from_port", 0)), true, factory_graph)
+	var finish := _port_position(to_id, int(connection.get("to_port", 0)), false, factory_graph)
+	return start.distance_to(finish) / maxf(factory_graph.zoom, 0.001)
 
 
 func _connection_key(from_id: StringName, from_port: int, to_id: StringName, to_port: int) -> String:

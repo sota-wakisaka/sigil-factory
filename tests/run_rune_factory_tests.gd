@@ -79,6 +79,10 @@ func _test_factory_scene() -> void:
 		await process_frame
 		return
 	_expect(prototype.source_count() == 24, "the world should contain all twenty-four rune sources")
+	_expect(
+		prototype.connection_overlay.z_index >= 0,
+		"connection lines should render in front of the GraphEdit background"
+	)
 	var tiers: Dictionary = prototype.source_distance_tiers()
 	_expect(
 		int(tiers[&"near"]) == 2 and int(tiers[&"middle"]) == 6 and int(tiers[&"far"]) == 16,
@@ -93,6 +97,20 @@ func _test_factory_scene() -> void:
 		prototype.connect_nodes(red_source, 0, shift_id, 0)
 		and prototype.connect_nodes(shift_id, 0, attune_id, 0),
 		"a source should connect through rune processors"
+	)
+	var first_connection = prototype._connection_to(shift_id, 0)
+	var line_start: Vector2 = prototype._port_position(red_source, 0, true, prototype.connection_overlay)
+	var line_finish: Vector2 = prototype._port_position(shift_id, 0, false, prototype.connection_overlay)
+	_expect(
+		line_start.distance_to(line_finish) > 1.0,
+		"a connected conveyor should have distinct visible endpoints"
+	)
+	_expect(
+		is_equal_approx(
+			prototype._connection_world_length(first_connection),
+			line_start.distance_to(line_finish) / prototype.factory_graph.zoom
+		),
+		"transport distance should match the line drawn between its ports"
 	)
 	prototype.node_menu_node_id = shift_id
 	prototype._preview_node_menu_item(103)
