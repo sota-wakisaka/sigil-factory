@@ -535,8 +535,17 @@ func _build_ui() -> void:
 	factory_graph.show_arrange_button = false
 	factory_graph.minimap_enabled = true
 	factory_graph.zoom = 0.28
+	factory_graph.right_disconnects = false
 	factory_graph.connection_lines_thickness = 0.0
+	factory_graph.connection_lines_antialiased = false
 	factory_graph.add_theme_constant_override("connection_hover_thickness", 0)
+	# GraphEdit remains the topology/input owner, but its native connections are
+	# anchored to the hidden rectangular slots.  Every native pass must be fully
+	# transparent or it appears as a displaced diagonal shadow underneath the
+	# radial port-to-port renderer.
+	factory_graph.add_theme_color_override("connection_hover_tint_color", Color.TRANSPARENT)
+	factory_graph.add_theme_color_override("connection_rim_color", Color.TRANSPARENT)
+	factory_graph.add_theme_color_override("connection_valid_target_tint_color", Color.TRANSPARENT)
 	factory_graph.gui_input.connect(_on_graph_input)
 	graph_area.add_child(factory_graph)
 	connection_overlay = DirectionalOverlayModel.new()

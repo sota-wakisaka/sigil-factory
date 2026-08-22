@@ -83,6 +83,12 @@ func _test_factory_scene() -> void:
 		prototype.connection_overlay.z_index >= 0,
 		"connection lines should render in front of the GraphEdit background"
 	)
+	_expect(
+		prototype.factory_graph.get_theme_color("connection_hover_tint_color").a == 0.0
+		and prototype.factory_graph.get_theme_color("connection_rim_color").a == 0.0
+		and prototype.factory_graph.get_theme_color("connection_valid_target_tint_color").a == 0.0,
+		"native rectangular GraphEdit routes should not remain as displaced shadows"
+	)
 	var tiers: Dictionary = prototype.source_distance_tiers()
 	_expect(
 		int(tiers[&"near"]) == 2 and int(tiers[&"middle"]) == 6 and int(tiers[&"far"]) == 16,
