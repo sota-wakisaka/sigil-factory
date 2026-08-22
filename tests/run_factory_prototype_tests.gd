@@ -37,28 +37,31 @@ func _test_fixed_factory_landmarks() -> void:
 	await process_frame
 
 	_expect(prototype.factory_graph != null, "the prototype should expose a wide GraphEdit playfield")
-	_expect(prototype.PLAYFIELD_SIZE == Vector2(2600.0, 1800.0), "the available playfield should start wide")
-	_expect(prototype.material_nodes.size() == 6, "two sources for each basic shape should be scattered")
-	_expect(prototype.fixed_landmark_count() == 7, "six material nodes and one summoner should be fixed landmarks")
+	_expect(prototype.PLAYFIELD_SIZE == Vector2(9000.0, 6000.0), "the available playfield should support a large map")
+	_expect(prototype.material_nodes.size() == 30, "material deposits should be scattered across the large map")
+	_expect(prototype.fixed_landmark_count() == 31, "thirty material deposits and one summoner should be fixed landmarks")
 	_expect(prototype.all_landmarks_locked(), "material nodes and the summoner should not be draggable")
+	_expect(prototype.factory_graph.minimap_enabled, "a minimap should support navigation across the large map")
+	_expect(prototype.factory_graph.zoom <= 0.60, "the initial camera should show the inner deposit ring")
 	_expect(prototype.summoner_node.position_offset == prototype.SUMMONER_POSITION, "the summoner should remain at the factory center")
 	_expect(prototype.summoner_node.get_meta("landmark_kind") == &"summoner", "the center landmark should be identifiable as the summoner")
 
 	var counts: Dictionary = prototype.material_kind_counts()
-	_expect(counts[&"circle"] == 2, "two Circle material nodes should exist")
-	_expect(counts[&"triangle"] == 2, "two Triangle material nodes should exist")
-	_expect(counts[&"square"] == 2, "two Square material nodes should exist")
+	_expect(counts[&"circle"] == 10, "ten Circle material deposits should exist")
+	_expect(counts[&"triangle"] == 10, "ten Triangle material deposits should exist")
+	_expect(counts[&"square"] == 10, "ten Square material deposits should exist")
 
 	var bounds := Rect2()
 	var first := true
 	for node in prototype.material_nodes:
 		_expect(node.get_meta("fixed_landmark", false), "%s should be marked as a fixed landmark" % node.name)
+		_expect(node.get_meta("material_deposit", false), "%s should be marked as a material deposit" % node.name)
 		if first:
 			bounds = Rect2(node.position_offset, Vector2.ZERO)
 			first = false
 		else:
 			bounds = bounds.expand(node.position_offset)
-	_expect(bounds.size.x >= 1500.0 and bounds.size.y >= 900.0, "material sources should be visibly scattered over the playfield")
+	_expect(bounds.size.x >= 7800.0 and bounds.size.y >= 4500.0, "material deposits should span most of the large playfield")
 
 	prototype.queue_free()
 	await process_frame

@@ -4,16 +4,42 @@ extends Control
 const FactoryLandmarkVisualModel := preload("res://experiments/factory_prototype/factory_landmark.gd")
 
 const MENU_SCENE := "res://src/main_menu.tscn"
-const PLAYFIELD_SIZE := Vector2(2600.0, 1800.0)
-const SUMMONER_POSITION := Vector2(1210.0, 790.0)
+const PLAYFIELD_SIZE := Vector2(9000.0, 6000.0)
+const SUMMONER_POSITION := Vector2(4400.0, 2895.0)
 const PORT_COLOR := Color(0.28, 0.78, 1.0, 1.0)
 const MATERIAL_LAYOUT := [
-	{ "id": &"circle_northwest", "kind": &"circle", "position": Vector2(430.0, 300.0) },
-	{ "id": &"circle_southeast", "kind": &"circle", "position": Vector2(1950.0, 1270.0) },
-	{ "id": &"triangle_northeast", "kind": &"triangle", "position": Vector2(1880.0, 260.0) },
-	{ "id": &"triangle_southwest", "kind": &"triangle", "position": Vector2(390.0, 1300.0) },
-	{ "id": &"square_west", "kind": &"square", "position": Vector2(250.0, 790.0) },
-	{ "id": &"square_east", "kind": &"square", "position": Vector2(2150.0, 760.0) },
+	# Inner deposits keep all three materials available near the first factory hub.
+	{ "id": &"circle_01", "kind": &"circle", "position": Vector2(3600.0, 2500.0) },
+	{ "id": &"circle_02", "kind": &"circle", "position": Vector2(3700.0, 3250.0) },
+	{ "id": &"triangle_01", "kind": &"triangle", "position": Vector2(5200.0, 2500.0) },
+	{ "id": &"triangle_02", "kind": &"triangle", "position": Vector2(4400.0, 2350.0) },
+	{ "id": &"square_01", "kind": &"square", "position": Vector2(5300.0, 3000.0) },
+	{ "id": &"square_02", "kind": &"square", "position": Vector2(4400.0, 3400.0) },
+	# Distant deposits make route length and direction part of later factory planning.
+	{ "id": &"circle_03", "kind": &"circle", "position": Vector2(1500.0, 800.0) },
+	{ "id": &"circle_04", "kind": &"circle", "position": Vector2(7100.0, 1000.0) },
+	{ "id": &"circle_05", "kind": &"circle", "position": Vector2(8000.0, 2700.0) },
+	{ "id": &"circle_06", "kind": &"circle", "position": Vector2(6900.0, 4800.0) },
+	{ "id": &"circle_07", "kind": &"circle", "position": Vector2(2500.0, 5000.0) },
+	{ "id": &"circle_08", "kind": &"circle", "position": Vector2(800.0, 3500.0) },
+	{ "id": &"circle_09", "kind": &"circle", "position": Vector2(3000.0, 1400.0) },
+	{ "id": &"circle_10", "kind": &"circle", "position": Vector2(6100.0, 3900.0) },
+	{ "id": &"triangle_03", "kind": &"triangle", "position": Vector2(2800.0, 700.0) },
+	{ "id": &"triangle_04", "kind": &"triangle", "position": Vector2(6000.0, 650.0) },
+	{ "id": &"triangle_05", "kind": &"triangle", "position": Vector2(8200.0, 1500.0) },
+	{ "id": &"triangle_06", "kind": &"triangle", "position": Vector2(7800.0, 4100.0) },
+	{ "id": &"triangle_07", "kind": &"triangle", "position": Vector2(5600.0, 5200.0) },
+	{ "id": &"triangle_08", "kind": &"triangle", "position": Vector2(1200.0, 4900.0) },
+	{ "id": &"triangle_09", "kind": &"triangle", "position": Vector2(900.0, 2000.0) },
+	{ "id": &"triangle_10", "kind": &"triangle", "position": Vector2(2600.0, 3800.0) },
+	{ "id": &"square_03", "kind": &"square", "position": Vector2(450.0, 700.0) },
+	{ "id": &"square_04", "kind": &"square", "position": Vector2(4400.0, 500.0) },
+	{ "id": &"square_05", "kind": &"square", "position": Vector2(7600.0, 650.0) },
+	{ "id": &"square_06", "kind": &"square", "position": Vector2(8500.0, 3400.0) },
+	{ "id": &"square_07", "kind": &"square", "position": Vector2(7200.0, 5300.0) },
+	{ "id": &"square_08", "kind": &"square", "position": Vector2(4000.0, 5350.0) },
+	{ "id": &"square_09", "kind": &"square", "position": Vector2(1800.0, 4200.0) },
+	{ "id": &"square_10", "kind": &"square", "position": Vector2(1600.0, 1500.0) },
 ]
 
 var factory_graph: GraphEdit
@@ -91,7 +117,7 @@ func _build_ui() -> void:
 	toolbar.add_child(title)
 
 	status_label = Label.new()
-	status_label.text = "広域盤面 2600 × 1800  //  素材地点 6  //  中央召喚器 1"
+	status_label.text = "広域盤面 9000 × 6000  //  資源パッチ 30  //  中央召喚器 1"
 	status_label.add_theme_font_size_override("font_size", 12)
 	status_label.add_theme_color_override("font_color", Color(0.44, 0.68, 0.78))
 	toolbar.add_child(status_label)
@@ -104,11 +130,11 @@ func _build_ui() -> void:
 	factory_graph.right_disconnects = true
 	factory_graph.connection_lines_curvature = 0.12
 	factory_graph.minimap_enabled = true
-	factory_graph.zoom = 0.72
+	factory_graph.zoom = 0.55
 	page.add_child(factory_graph)
 
 	var footer := Label.new()
-	footer.text = "ドラッグ: 盤面移動  /  ホイール: ズーム  /  固定素材と召喚器は移動不可"
+	footer.text = "ドラッグ: 盤面移動  /  ホイール: ズーム  /  ミニマップ: 広域確認  /  資源パッチと召喚器は移動不可"
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	footer.add_theme_font_size_override("font_size", 12)
 	footer.add_theme_color_override("font_color", Color(0.40, 0.58, 0.66))
@@ -132,12 +158,13 @@ func _place_landmarks() -> void:
 func _make_material_node(node_id: StringName, kind: StringName, world_position: Vector2) -> GraphNode:
 	var node := GraphNode.new()
 	node.name = String(node_id)
-	node.title = "%s素材 // 固定" % _kind_label(kind)
+	node.title = "%s資源パッチ // 固定" % _kind_label(kind)
 	node.position_offset = world_position
 	node.draggable = false
 	node.resizable = false
 	node.set_meta("landmark_kind", kind)
 	node.set_meta("fixed_landmark", true)
+	node.set_meta("material_deposit", true)
 
 	var visual = FactoryLandmarkVisualModel.new()
 	visual.configure(kind)
