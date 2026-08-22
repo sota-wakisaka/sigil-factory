@@ -209,6 +209,15 @@ func _test_fixed_factory_landmarks() -> void:
 		prototype.flow_packet_progress(upstream_line_length, upstream_flow_start, 1, 10.0) < 0.0,
 		"a live material conveyor should not be instantly prefilled"
 	)
+	var initial_packets: Array[Dictionary] = prototype.transport_packets_for_connection(
+		circle_source_id,
+		relay_id,
+		0,
+		10.0
+	)
+	_expect(initial_packets.size() == 1, "the transport model should own one source packet at connection time")
+	if not initial_packets.is_empty():
+		_expect(String(initial_packets[0]["packet_id"]).ends_with("#0"), "the first transported Glyph should have a stable sequence identity")
 	_expect(prototype.connect_output_to_input(relay_id, StringName(prototype.summoner_node.name), 0), "a relay output should connect to a summoner input")
 	var downstream_flow_start: float = prototype.connection_flow_start_time(
 		relay_id,
@@ -222,13 +231,60 @@ func _test_fixed_factory_landmarks() -> void:
 		),
 		"a relay conveyor should stay empty until the first upstream Glyph arrives"
 	)
+	_expect(
+		prototype.transport_packets_for_connection(
+			relay_id,
+			StringName(prototype.summoner_node.name),
+			0,
+			10.0
+		).is_empty(),
+		"the downstream transport queue should be empty before the relay receives a Glyph"
+	)
+	_expect(prototype.summon_state(0) == &"transporting", "a connected relay route should not summon before its first Glyph arrives")
+	_expect(prototype.summoned_monster_count(&"ring_wisp") == 0, "connecting a route should not create a monster immediately")
+	_advance_input_to_first_arrival(prototype, 0)
 	var relay_center: Vector2 = prototype._node_center_in(relay, prototype.factory_graph)
 	var relay_input: Vector2 = prototype.directional_node_input_position(relay_id, 0, prototype.factory_graph)
 	var relay_output: Vector2 = prototype.directional_output_position(relay_id, prototype.factory_graph)
 	_expect(relay_center.direction_to(relay_input).dot(relay_center.direction_to(prototype._node_center_in(circle_source, prototype.factory_graph))) > 0.8, "the relay input should face its actual upstream source")
 	_expect(relay_center.direction_to(relay_output).dot(relay_center.direction_to(prototype._node_center_in(prototype.summoner_node, prototype.factory_graph))) > 0.8, "the relay output should face its actual downstream destination")
-	_expect(prototype.summon_state(0) == &"matched", "Circle routed through a relay should still summon the Circle target")
+	_expect(prototype.summon_state(0) == &"matched", "Circle routed through a relay should summon after the Glyph arrives")
+	_expect(prototype.summoned_monster_count(&"ring_wisp") == 1, "the first matching arrival should summon exactly one monster")
+	_expect(prototype.summon_event_count() == 1, "the first delivered Glyph should create one arrival event")
+	var ring_count_before_rewire: int = prototype.summoned_monster_count(&"ring_wisp")
+	_expect(
+		prototype.connect_output_to_input(StringName(triangle_source.name), relay_id, 0),
+		"a relay input should accept a replacement material route"
+	)
+	_expect(prototype.summon_state(0) == &"transporting", "rewiring an upstream relay input should reset downstream delivery state")
+	_advance_input_to_first_arrival(prototype, 0)
+	_expect(prototype.summon_state(0) == &"mismatch", "the replacement Glyph should be judged only after traversing the relay")
+	_expect(
+		prototype.summoned_monster_count(&"ring_wisp") == ring_count_before_rewire,
+		"an arriving mismatched Glyph should not summon a monster"
+	)
+	_expect(prototype.connect_output_to_input(circle_source_id, relay_id, 0), "the relay should reconnect to its matching source")
+	_expect(prototype.summon_state(0) == &"transporting", "reconnecting the upstream route should require a fresh delivery")
+	_advance_input_to_first_arrival(prototype, 0)
+	_expect(prototype.summon_state(0) == &"matched", "the restored relay route should match after its fresh arrival")
+	upstream_flow_start = prototype.connection_flow_start_time(circle_source_id, relay_id, 0)
 	_expect(prototype.connect_output_to_input(relay_id, StringName(prototype.summoner_node.name), 1), "one relay output should distribute to another downstream input")
+	var branch_flow_start: float = prototype.connection_flow_start_time(
+		relay_id,
+		StringName(prototype.summoner_node.name),
+		1
+	)
+	var upstream_first_arrival: float = upstream_flow_start + prototype.flow_travel_duration(upstream_line_length)
+	_expect(branch_flow_start >= prototype.flow_time_override, "a late relay branch should wait for the next available upstream Glyph")
+	_expect(
+		is_zero_approx(
+			fposmod(
+				branch_flow_start - upstream_first_arrival,
+				prototype.flow_packet_interval()
+			)
+		),
+		"a late relay branch should inherit the upstream production phase"
+	)
 	_expect(prototype.connected_material_kind(1) == &"circle", "distributed relay output should preserve the same Glyph on every branch")
 	_expect(prototype.factory_graph.get_connection_list().size() == 3, "relay routing should contain one upstream and two downstream connections")
 	prototype.disconnect_summoner(0)
@@ -280,6 +336,8 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect("召喚器" in prototype.factory_graph.tooltip_text, "summoner name and input guidance should move from node text into a tooltip")
 	if circle_source != null:
 		var connection_sound_count: int = prototype.flow_audio.connection_play_count
+		var arrival_sound_before_delivery: int = prototype.flow_audio.arrival_play_count
+		var ring_wisps_before_direct: int = prototype.summoned_monster_count(&"ring_wisp")
 		prototype.factory_graph.connection_request.emit(
 			StringName(circle_source.name),
 			0,
@@ -287,20 +345,36 @@ func _test_fixed_factory_landmarks() -> void:
 			0
 		)
 		_expect(prototype.flow_audio.connection_play_count == connection_sound_count + 1, "a completed connection should play one short connection sound")
+		_expect(prototype.summon_state(0) == &"transporting", "a direct connection should remain in transport before arrival")
+		_expect(prototype.summoned_monster_count(&"ring_wisp") == ring_wisps_before_direct, "a direct connection should not summon on contact")
+		_expect(prototype.flow_audio.arrival_play_count == arrival_sound_before_delivery, "a connection should not play its arrival sound early")
+		_advance_input_to_first_arrival(prototype, 0)
+		_expect(prototype.flow_audio.arrival_play_count == arrival_sound_before_delivery + 1, "the first delivered Glyph should play one arrival sound")
 	_expect(circle_source != null and prototype.connected_material_kind() == &"circle", "dragging a Circle deposit output should connect directly to the summoner")
-	_expect(prototype.summon_state() == &"matched", "matching Circle should start summoning")
+	_expect(prototype.summon_state() == &"matched", "matching Circle should start summoning after arrival")
 	_expect("環霊ウィスプ" in prototype.summon_state_label.text, "the Circle summon state should name its monster")
+	var direct_ring_count: int = prototype.summoned_monster_count(&"ring_wisp")
+	prototype.flow_time_override += prototype.flow_packet_interval() * 2.0 + 0.001
+	prototype.process_transport_at(prototype.flow_time_override)
+	_expect(
+		prototype.summoned_monster_count(&"ring_wisp") == direct_ring_count + 2,
+		"each subsequent delivered Glyph should summon one additional monster"
+	)
 
 	_click_input(prototype, 1)
 	_expect(prototype.selected_input_index == 1, "clicking summoner input 2 should select it")
 	_expect(prototype.selected_target_kind == &"triangle" and prototype.target_monster_id() == &"stinger", "the panel should switch to input 2's Triangle target")
 	_expect(triangle_source != null and prototype.connect_material_to_summoner(StringName(triangle_source.name), 1), "a Triangle deposit should connect independently to input 2")
+	_expect(prototype.summon_state(1) == &"transporting", "input 2 should wait for its own first delivery")
+	_advance_input_to_first_arrival(prototype, 1)
 	_expect(prototype.summon_state(0) == &"matched" and prototype.summon_state(1) == &"matched", "inputs 1 and 2 should judge their own sigils independently")
 
 	_click_input(prototype, 2)
 	_expect(prototype.selected_input_index == 2, "clicking summoner input 3 should select it")
 	_expect(prototype.selected_target_kind == &"square" and prototype.target_monster_id() == &"stone_block", "the panel should switch to input 3's Square target")
 	_expect(square_source != null and prototype.connect_material_to_summoner(StringName(square_source.name), 2), "a Square deposit should connect independently to input 3")
+	_expect(prototype.summon_state(2) == &"transporting", "input 3 should wait for its own first delivery")
+	_advance_input_to_first_arrival(prototype, 2)
 	_expect(prototype.factory_graph.get_connection_list().size() == 3, "the summoner should retain one connection per input")
 	_expect(prototype.summoning_monsters() == [&"ring_wisp", &"stinger", &"stone_block"], "all three matching inputs should summon their own monsters")
 
@@ -311,6 +385,8 @@ func _test_fixed_factory_landmarks() -> void:
 	_expect(prototype.summon_state(2) == &"matched", "changing input 2 must not change input 3's result")
 	_expect("INPUT 2" in prototype.target_header_label.text and prototype.selected_target_kind == &"square", "the target panel should show the selected input's target")
 	_expect(square_source != null and prototype.connect_material_to_summoner(StringName(square_source.name), 1), "reconnecting input 2 should replace only that input")
+	_expect(prototype.summon_state(1) == &"transporting", "replacing an input should discard the old delivery state")
+	_advance_input_to_first_arrival(prototype, 1)
 	_expect(prototype.factory_graph.get_connection_list().size() == 3, "replacing one input should preserve the other input connections")
 	_expect(prototype.summon_state(1) == &"matched", "input 2 should match after its own reconnection")
 
@@ -322,7 +398,14 @@ func _test_fixed_factory_landmarks() -> void:
 		StringName(active_connection["to_node"]),
 		int(active_connection["to_port"])
 	)
+	var disconnected_input_events := _summon_event_count_for_input(prototype, 2)
+	prototype.flow_time_override += prototype.flow_packet_interval() * 2.0
+	prototype.process_transport_at(prototype.flow_time_override)
 	_expect(prototype.summon_state(2) == &"idle", "disconnecting input 3 should stop only that input")
+	_expect(
+		_summon_event_count_for_input(prototype, 2) == disconnected_input_events,
+		"disconnecting a line should remove its transported Glyphs and stop later arrivals"
+	)
 	_expect(prototype.summon_state(0) == &"matched" and prototype.summon_state(1) == &"matched", "disconnecting input 3 should preserve the other summons")
 	_expect(prototype.factory_graph.get_connection_list().size() == 2, "disconnecting one input should preserve two connections")
 
@@ -367,7 +450,9 @@ func _test_fixed_factory_landmarks() -> void:
 	input_click.position = prototype.directional_input_position(2, prototype.factory_graph)
 	prototype.factory_graph.gui_input.emit(input_click)
 	_expect(prototype.selected_input_index == 2, "connecting through an input port should also select that input")
-	_expect(prototype.summon_state(2) == &"matched", "clicking an all-direction input should finish the connection")
+	_expect(prototype.summon_state(2) == &"transporting", "clicking an all-direction input should start transport")
+	_advance_input_to_first_arrival(prototype, 2)
+	_expect(prototype.summon_state(2) == &"matched", "the all-direction input should summon after delivery")
 	var disconnect_click := InputEventMouseButton.new()
 	disconnect_click.button_index = MOUSE_BUTTON_RIGHT
 	disconnect_click.pressed = true
@@ -430,3 +515,20 @@ func _click_input(prototype, input_index: int) -> void:
 	click.pressed = true
 	click.position = prototype.directional_input_position(input_index, prototype.factory_graph)
 	prototype.factory_graph.gui_input.emit(click)
+
+
+func _advance_input_to_first_arrival(prototype, input_index: int) -> void:
+	var first_arrival: float = prototype.summoner_arrival_time(input_index, 0)
+	_expect(not is_inf(first_arrival), "input %d should expose a finite first arrival" % (input_index + 1))
+	if is_inf(first_arrival):
+		return
+	prototype.flow_time_override = first_arrival + 0.001
+	prototype.process_transport_at(prototype.flow_time_override)
+
+
+func _summon_event_count_for_input(prototype, input_index: int) -> int:
+	var count := 0
+	for event in prototype.summon_events:
+		if int(event["input_index"]) == input_index:
+			count += 1
+	return count

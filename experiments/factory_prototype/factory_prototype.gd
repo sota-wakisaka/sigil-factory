@@ -20,6 +20,7 @@ const CONVEYOR_SPEED_BY_GRADE := { 1: 520.0 }
 const FLOW_GLYPH_SPACING_WORLD_UNITS := 600.0
 const FLOW_ARRIVAL_EFFECT_SECONDS := 0.28
 const FLOW_MAX_VISIBLE_GLYPHS := 24
+const SUMMON_EVENT_HISTORY_LIMIT := 128
 const FLOW_TRAIL_SCREEN_LENGTH := 18.0
 const FLOW_PATH_START := 0.0
 const FLOW_PATH_END := 1.0
@@ -91,6 +92,8 @@ var graph_minimap: Control
 var flow_audio
 var flow_arrival_cycles: Array[int] = [-1, -1, -1]
 var connection_flow_started_at: Dictionary = {}
+var summoned_monster_counts: Dictionary = {}
+var summon_events: Array[Dictionary] = []
 var flow_time_override := -1.0
 var status_label: Label
 var relay_button: Button
@@ -128,25 +131,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if flow_audio == null:
-		return
-	var now := flow_animation_time_seconds()
-	for input_index in SUMMONER_INPUT_COUNT:
-		if summon_state(input_index) != &"matched":
-			flow_arrival_cycles[input_index] = -1
-			continue
-		var arrival_cycle := flow_arrival_cycle(input_index, now)
-		if arrival_cycle < 0:
-			flow_arrival_cycles[input_index] = -1
-			continue
-		if flow_arrival_cycles[input_index] < 0:
-			flow_arrival_cycles[input_index] = arrival_cycle
-			flow_audio.play_arrival(connected_material_kind(input_index))
-			continue
-		if arrival_cycle <= flow_arrival_cycles[input_index]:
-			continue
-		flow_arrival_cycles[input_index] = arrival_cycle
-		flow_audio.play_arrival(connected_material_kind(input_index))
+	process_transport_at(flow_animation_time_seconds())
 
 
 func _draw() -> void:
@@ -228,6 +213,7 @@ func graph_screen_to_world(screen_position: Vector2) -> Vector2:
 func select_target(target_kind: StringName) -> bool:
 	if not TARGET_DEFINITIONS.has(target_kind):
 		return false
+	process_transport_at(flow_animation_time_seconds())
 	input_target_kinds[selected_input_index] = target_kind
 	_refresh_summon_state()
 	return true
@@ -295,6 +281,8 @@ func summon_state(input_index: int = -1) -> StringName:
 	var material_kind := connected_material_kind(resolved_index)
 	if material_kind == &"":
 		return &"idle"
+	if flow_arrival_cycle(resolved_index, flow_animation_time_seconds()) < 0:
+		return &"transporting"
 	return &"matched" if material_kind == target_kind_for_input(resolved_index) else &"mismatch"
 
 
@@ -304,6 +292,75 @@ func summoning_monsters() -> Array[StringName]:
 		if summon_state(input_index) == &"matched":
 			result.append(target_monster_id(input_index))
 	return result
+
+
+func summoned_monster_count(monster_id: StringName) -> int:
+	return int(summoned_monster_counts.get(monster_id, 0))
+
+
+func summon_event_count() -> int:
+	return summon_events.size()
+
+
+func process_transport_at(time_seconds: float) -> void:
+	var state_changed := false
+	for input_index in SUMMONER_INPUT_COUNT:
+		var material_kind := connected_material_kind(input_index)
+		if material_kind == &"":
+			if flow_arrival_cycles[input_index] != -1:
+				state_changed = true
+			flow_arrival_cycles[input_index] = -1
+			continue
+		var arrival_cycle := flow_arrival_cycle(input_index, time_seconds)
+		if arrival_cycle < 0:
+			continue
+		var previous_cycle := flow_arrival_cycles[input_index]
+		if arrival_cycle <= previous_cycle:
+			continue
+		_record_summoner_arrivals(
+			input_index,
+			previous_cycle + 1,
+			arrival_cycle,
+			material_kind
+		)
+		flow_arrival_cycles[input_index] = arrival_cycle
+		state_changed = true
+		if flow_audio != null and material_kind == target_kind_for_input(input_index):
+			flow_audio.play_arrival(material_kind)
+	if state_changed:
+		_refresh_summon_state()
+
+
+func _record_summoner_arrivals(
+	input_index: int,
+	first_cycle: int,
+	last_cycle: int,
+	material_kind: StringName
+) -> void:
+	if last_cycle < first_cycle:
+		return
+	var target_kind := target_kind_for_input(input_index)
+	var matched := material_kind == target_kind
+	var arrival_count := last_cycle - first_cycle + 1
+	var monster_id := target_monster_id(input_index) if matched else StringName()
+	if matched:
+		summoned_monster_counts[monster_id] = summoned_monster_count(monster_id) + arrival_count
+	var retained_first_cycle := maxi(
+		first_cycle,
+		last_cycle - SUMMON_EVENT_HISTORY_LIMIT + 1
+	)
+	for arrival_cycle in range(retained_first_cycle, last_cycle + 1):
+		summon_events.append({
+			"input_index": input_index,
+			"arrival_cycle": arrival_cycle,
+			"arrival_time": summoner_arrival_time(input_index, arrival_cycle),
+			"glyph_kind": material_kind,
+			"target_kind": target_kind,
+			"matched": matched,
+			"monster_id": monster_id,
+		})
+	while summon_events.size() > SUMMON_EVENT_HISTORY_LIMIT:
+		summon_events.pop_front()
 
 
 func connect_material_to_summoner(material_node_id: StringName, input_index: int = -1) -> bool:
@@ -327,6 +384,7 @@ func connect_output_to_input(from_node_id: StringName, to_node_id: StringName, t
 	if factory_graph.is_node_connected(from_node_id, 0, to_node_id, to_port):
 		_clear_directional_connection_preview()
 		return true
+	process_transport_at(flow_animation_time_seconds())
 	_remove_input_connection(to_node_id, to_port)
 	var error := factory_graph.connect_node(from_node_id, 0, to_node_id, to_port, true)
 	if error != OK:
@@ -335,15 +393,14 @@ func connect_output_to_input(from_node_id: StringName, to_node_id: StringName, t
 	connection_flow_started_at[_connection_flow_key(from_node_id, 0, to_node_id, to_port)] = (
 		flow_animation_time_seconds()
 	)
+	_reset_downstream_transport_state(to_node_id, to_port)
 	_clear_directional_connection_preview()
 	_refresh_summon_state()
-	if summoner_node != null and to_node_id == StringName(summoner_node.name):
-		flow_arrival_cycles[to_port] = -1
 	if flow_audio != null:
 		var matched := (
 			summoner_node == null
 			or to_node_id != StringName(summoner_node.name)
-			or summon_state(to_port) == &"matched"
+			or output_glyph_kind(from_node_id) == target_kind_for_input(to_port)
 		)
 		flow_audio.play_connection(matched)
 	return true
@@ -357,13 +414,40 @@ func disconnect_summoner(input_index: int = -1) -> void:
 
 
 func disconnect_input(to_node_id: StringName, to_port: int = 0) -> void:
+	process_transport_at(flow_animation_time_seconds())
 	var removed := _remove_input_connection(to_node_id, to_port)
 	if removed:
-		if summoner_node != null and to_node_id == StringName(summoner_node.name):
-			flow_arrival_cycles[to_port] = -1
+		_reset_downstream_transport_state(to_node_id, to_port)
 		if flow_audio != null:
 			flow_audio.play_disconnect()
 	_refresh_summon_state()
+
+
+func _reset_downstream_transport_state(start_node_id: StringName, start_port: int) -> void:
+	if summoner_node == null:
+		return
+	var summoner_id := StringName(summoner_node.name)
+	if start_node_id == summoner_id:
+		if start_port >= 0 and start_port < flow_arrival_cycles.size():
+			flow_arrival_cycles[start_port] = -1
+		return
+	var pending: Array[StringName] = [start_node_id]
+	var visited: Dictionary = {}
+	while not pending.is_empty():
+		var node_id: StringName = pending.pop_front()
+		if visited.has(node_id):
+			continue
+		visited[node_id] = true
+		for connection in factory_graph.get_connection_list():
+			if StringName(connection["from_node"]) != node_id:
+				continue
+			var to_node_id := StringName(connection["to_node"])
+			if to_node_id == summoner_id:
+				var to_port := int(connection["to_port"])
+				if to_port >= 0 and to_port < flow_arrival_cycles.size():
+					flow_arrival_cycles[to_port] = -1
+				continue
+			pending.append(to_node_id)
 
 
 func _on_connection_request(
@@ -671,13 +755,18 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 					color = Color(0.34, 0.86, 0.76, 0.96)
 				&"mismatch":
 					color = Color(0.96, 0.62, 0.34, 0.96)
-		var glyph_kind := output_glyph_kind(from_node_id)
-		if glyph_kind != &"":
+		var packets := transport_packets_for_connection(
+			from_node_id,
+			to_node_id,
+			input_index,
+			now
+		)
+		if output_glyph_kind(from_node_id) != &"":
 			_draw_flowing_glyphs(
 				overlay,
 				start,
 				finish,
-				glyph_kind,
+				packets,
 				color,
 				now,
 				line_length,
@@ -778,7 +867,7 @@ func _draw_flowing_glyphs(
 	overlay: Control,
 	start: Vector2,
 	finish: Vector2,
-	material_kind: StringName,
+	packets: Array[Dictionary],
 	color: Color,
 	time_seconds: float,
 	line_length: float,
@@ -786,15 +875,9 @@ func _draw_flowing_glyphs(
 ) -> void:
 	var screen_length := maxf(start.distance_to(finish), 1.0)
 	var trail_progress := FLOW_TRAIL_SCREEN_LENGTH / screen_length
-	for packet_index in flow_packet_slot_count(line_length):
-		var progress := flow_packet_progress(
-			line_length,
-			flow_start_time,
-			packet_index,
-			time_seconds
-		)
-		if progress < 0.0:
-			continue
+	for packet in packets:
+		var progress := float(packet["progress"])
+		var material_kind := StringName(packet["glyph_kind"])
 		var position := connection_curve_point(start, finish, progress)
 		var previous := connection_curve_point(
 			start,
@@ -966,6 +1049,72 @@ func flow_arrival_cycle(
 	)
 
 
+func summoner_arrival_time(input_index: int, arrival_cycle: int) -> float:
+	if arrival_cycle < 0:
+		return INF
+	var timing := _summoner_input_transport_timing(input_index)
+	var line_length := float(timing.get("line_length", 0.0))
+	var flow_start_time := float(timing.get("flow_start_time", INF))
+	if line_length <= 0.0 or is_inf(flow_start_time):
+		return INF
+	return (
+		flow_start_time
+		+ flow_travel_duration(line_length)
+		+ float(arrival_cycle) * flow_packet_interval()
+	)
+
+
+func transport_packets_for_connection(
+	from_node_id: StringName,
+	to_node_id: StringName,
+	to_port: int,
+	time_seconds: float = -1.0
+) -> Array[Dictionary]:
+	var packets: Array[Dictionary] = []
+	if factory_graph == null or not factory_graph.is_node_connected(
+		from_node_id,
+		0,
+		to_node_id,
+		to_port
+	):
+		return packets
+	var resolved_time := flow_animation_time_seconds() if time_seconds < 0.0 else time_seconds
+	var flow_start_time := connection_flow_start_time(from_node_id, to_node_id, to_port)
+	if is_inf(flow_start_time) or resolved_time < flow_start_time:
+		return packets
+	var line_length := connection_world_length(from_node_id, to_node_id, to_port)
+	var interval := flow_packet_interval()
+	var emitted_count := floori((resolved_time - flow_start_time) / interval) + 1
+	var glyph_kind := output_glyph_kind(from_node_id)
+	if glyph_kind == &"":
+		return packets
+	for packet_index in flow_packet_slot_count(line_length):
+		var progress := flow_packet_progress(
+			line_length,
+			flow_start_time,
+			packet_index,
+			resolved_time
+		)
+		if progress < 0.0:
+			continue
+		var sequence_index := emitted_count - packet_index - 1
+		if sequence_index < 0:
+			continue
+		var emitted_at := flow_start_time + float(sequence_index) * interval
+		packets.append({
+			"packet_id": "%s#%d" % [
+				_connection_flow_key(from_node_id, 0, to_node_id, to_port),
+				sequence_index,
+			],
+			"sequence_index": sequence_index,
+			"glyph_kind": glyph_kind,
+			"emitted_at": emitted_at,
+			"arrival_at": emitted_at + flow_travel_duration(line_length),
+			"progress": progress,
+		})
+	return packets
+
+
 func _summoner_input_transport_timing(input_index: int) -> Dictionary:
 	if factory_graph == null or summoner_node == null:
 		return {}
@@ -1008,15 +1157,17 @@ func _connection_flow_start_time_from(
 	var key := _connection_flow_key(from_node_id, 0, to_node_id, to_port)
 	if not connection_flow_started_at.has(key):
 		return INF
-	var upstream_available_time := _node_flow_available_time(from_node_id, visited)
-	if is_inf(upstream_available_time):
-		return INF
-	return maxf(float(connection_flow_started_at[key]), upstream_available_time)
+	var connection_created_at := float(connection_flow_started_at[key])
+	if _material_node(from_node_id) != null:
+		return connection_created_at
+	return _node_next_output_time(from_node_id, connection_created_at, visited)
 
 
-func _node_flow_available_time(node_id: StringName, visited: Dictionary) -> float:
-	if _material_node(node_id) != null:
-		return 0.0
+func _node_next_output_time(
+	node_id: StringName,
+	not_before_time: float,
+	visited: Dictionary
+) -> float:
 	if _relay_node(node_id) == null or visited.has(node_id):
 		return INF
 	visited[node_id] = true
@@ -1038,7 +1189,11 @@ func _node_flow_available_time(node_id: StringName, visited: Dictionary) -> floa
 			node_id,
 			to_port
 		)
-		return segment_start_time + flow_travel_duration(line_length)
+		var first_arrival := segment_start_time + flow_travel_duration(line_length)
+		if not_before_time <= first_arrival:
+			return first_arrival
+		var elapsed_intervals := (not_before_time - first_arrival) / flow_packet_interval()
+		return first_arrival + float(ceili(elapsed_intervals - 0.000001)) * flow_packet_interval()
 	return INF
 
 
@@ -1244,7 +1399,10 @@ func _refresh_summon_state() -> void:
 	var state := summon_state(selected_input_index)
 	match state:
 		&"matched":
-			summon_state_label.text = "召喚中 // %s" % definition["monster_name"]
+			summon_state_label.text = "召喚中 // %s  ×%d" % [
+				definition["monster_name"],
+				summoned_monster_count(StringName(definition["monster_id"])),
+			]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.92, 0.76))
 		&"mismatch":
 			var material_kind := connected_material_kind(selected_input_index)
@@ -1253,6 +1411,13 @@ func _refresh_summon_state() -> void:
 				definition["glyph_label"],
 			]
 			summon_state_label.add_theme_color_override("font_color", Color(0.96, 0.68, 0.38))
+		&"transporting":
+			var material_kind := connected_material_kind(selected_input_index)
+			summon_state_label.text = "輸送中 // %s → INPUT %d" % [
+				_shape_symbol(material_kind),
+				selected_input_index + 1,
+			]
+			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.78, 0.94))
 		_:
 			summon_state_label.text = "%sを召喚器入力へ接続" % definition["glyph_label"]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
