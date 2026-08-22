@@ -78,6 +78,7 @@ const MATERIAL_LAYOUT := [
 var factory_graph: GraphEdit
 var summoner_node: GraphNode
 var material_nodes: Array[GraphNode] = []
+var relay_nodes: Array[GraphNode] = []
 var connection_overlay
 var flow_overlay
 var port_overlay
@@ -87,6 +88,9 @@ var flow_audio
 var flow_arrival_cycles: Array[int] = [-1, -1, -1]
 var flow_time_override := -1.0
 var status_label: Label
+var relay_button: Button
+var relay_placement_active := false
+var relay_serial := 0
 var target_panel: PanelContainer
 var target_preview
 var target_header_label: Label
@@ -99,6 +103,7 @@ var selected_input_index := 0
 var connecting_material_id: StringName = &""
 var hovered_material_id: StringName = &""
 var hovered_input_index := -1
+var hovered_input_node_id: StringName = &""
 var connection_pointer := Vector2.ZERO
 var connection_press_position := Vector2.ZERO
 var connection_drag_moved := false
@@ -165,6 +170,52 @@ func all_landmarks_locked() -> bool:
 	return true
 
 
+func begin_relay_placement() -> void:
+	_clear_directional_connection_preview()
+	relay_placement_active = true
+	if relay_button != null:
+		relay_button.button_pressed = true
+	status_label.text = "中継ノード // 盤面をクリックして配置 // 右クリックで取消"
+	status_label.add_theme_color_override("font_color", Color(0.58, 0.86, 1.0))
+
+
+func cancel_relay_placement() -> void:
+	relay_placement_active = false
+	if relay_button != null:
+		relay_button.button_pressed = false
+	_refresh_summon_state()
+
+
+func place_relay_at(world_center: Vector2) -> GraphNode:
+	if factory_graph == null:
+		return null
+	relay_serial += 1
+	var relay_half_size := Vector2.ONE * 59.0
+	var safe_center := Vector2(
+		clampf(world_center.x, relay_half_size.x, PLAYFIELD_SIZE.x - relay_half_size.x),
+		clampf(world_center.y, relay_half_size.y, PLAYFIELD_SIZE.y - relay_half_size.y)
+	)
+	var relay := _make_relay_node(
+		StringName("relay_%02d" % relay_serial),
+		safe_center
+	)
+	relay_nodes.append(relay)
+	factory_graph.add_child(relay)
+	relay.selected = true
+	_refresh_factory_status_label()
+	return relay
+
+
+func graph_screen_to_world(screen_position: Vector2) -> Vector2:
+	if factory_graph == null:
+		return Vector2.ZERO
+	var world := (screen_position + factory_graph.scroll_offset) / maxf(factory_graph.zoom, 0.001)
+	return Vector2(
+		clampf(world.x, 0.0, PLAYFIELD_SIZE.x),
+		clampf(world.y, 0.0, PLAYFIELD_SIZE.y)
+	)
+
+
 func select_target(target_kind: StringName) -> bool:
 	if not TARGET_DEFINITIONS.has(target_kind):
 		return false
@@ -206,9 +257,27 @@ func connected_material_kind(input_index: int = -1) -> StringName:
 			continue
 		if int(connection["to_port"]) != resolved_index:
 			continue
-		var source := _material_node(StringName(connection["from_node"]))
-		if source != null:
-			return StringName(source.get_meta("landmark_kind", &""))
+		return output_glyph_kind(StringName(connection["from_node"]))
+	return &""
+
+
+func output_glyph_kind(node_id: StringName) -> StringName:
+	return _output_glyph_kind(node_id, {})
+
+
+func _output_glyph_kind(node_id: StringName, visited: Dictionary) -> StringName:
+	if visited.has(node_id):
+		return &""
+	visited[node_id] = true
+	var material := _material_node(node_id)
+	if material != null:
+		return StringName(material.get_meta("landmark_kind", &""))
+	if _relay_node(node_id) == null:
+		return &""
+	for connection in factory_graph.get_connection_list():
+		if StringName(connection["to_node"]) != node_id or int(connection["to_port"]) != 0:
+			continue
+		return _output_glyph_kind(StringName(connection["from_node"]), visited)
 	return &""
 
 
@@ -230,41 +299,56 @@ func summoning_monsters() -> Array[StringName]:
 
 func connect_material_to_summoner(material_node_id: StringName, input_index: int = -1) -> bool:
 	var resolved_index := selected_input_index if input_index < 0 else input_index
-	var source := _material_node(material_node_id)
-	if (
-		source == null
-		or summoner_node == null
-		or resolved_index < 0
-		or resolved_index >= SUMMONER_INPUT_COUNT
-	):
+	if _material_node(material_node_id) == null or summoner_node == null:
 		return false
-	_remove_summoner_input_connection(resolved_index)
-	var error := factory_graph.connect_node(
-		StringName(source.name),
-		0,
+	return connect_output_to_input(
+		material_node_id,
 		StringName(summoner_node.name),
-		resolved_index,
-		true
+		resolved_index
 	)
+
+
+func connect_output_to_input(from_node_id: StringName, to_node_id: StringName, to_port: int = 0) -> bool:
+	if not _valid_output_node(from_node_id) or not _valid_input_port(to_node_id, to_port):
+		return false
+	if from_node_id == to_node_id or _would_create_connection_cycle(from_node_id, to_node_id):
+		status_label.text = "循環する配線は接続できません"
+		status_label.add_theme_color_override("font_color", Color(0.96, 0.62, 0.40))
+		return false
+	if factory_graph.is_node_connected(from_node_id, 0, to_node_id, to_port):
+		_clear_directional_connection_preview()
+		return true
+	_remove_input_connection(to_node_id, to_port)
+	var error := factory_graph.connect_node(from_node_id, 0, to_node_id, to_port, true)
 	if error != OK:
 		_refresh_summon_state()
 		return false
 	_clear_directional_connection_preview()
 	_refresh_summon_state()
-	flow_arrival_cycles[resolved_index] = flow_arrival_cycle(
-		resolved_index,
-		flow_animation_time_seconds()
-	)
+	if summoner_node != null and to_node_id == StringName(summoner_node.name):
+		flow_arrival_cycles[to_port] = flow_arrival_cycle(to_port, flow_animation_time_seconds())
 	if flow_audio != null:
-		flow_audio.play_connection(summon_state(resolved_index) == &"matched")
+		var matched := (
+			summoner_node == null
+			or to_node_id != StringName(summoner_node.name)
+			or summon_state(to_port) == &"matched"
+		)
+		flow_audio.play_connection(matched)
 	return true
 
 
 func disconnect_summoner(input_index: int = -1) -> void:
 	var resolved_index := selected_input_index if input_index < 0 else input_index
-	var removed := _remove_summoner_input_connection(resolved_index)
+	if summoner_node == null:
+		return
+	disconnect_input(StringName(summoner_node.name), resolved_index)
+
+
+func disconnect_input(to_node_id: StringName, to_port: int = 0) -> void:
+	var removed := _remove_input_connection(to_node_id, to_port)
 	if removed:
-		flow_arrival_cycles[resolved_index] = -1
+		if summoner_node != null and to_node_id == StringName(summoner_node.name):
+			flow_arrival_cycles[to_port] = -1
 		if flow_audio != null:
 			flow_audio.play_disconnect()
 	_refresh_summon_state()
@@ -276,18 +360,11 @@ func _on_connection_request(
 	to_node: StringName,
 	to_port: int
 ) -> void:
-	if (
-		from_port != 0
-		or to_port < 0
-		or to_port >= SUMMONER_INPUT_COUNT
-		or summoner_node == null
-		or to_node != StringName(summoner_node.name)
-		or _material_node(from_node) == null
-	):
-		summon_state_label.text = "直接接続できるのは資源パッチ → 召喚器"
+	if from_port != 0 or not _valid_output_node(from_node) or not _valid_input_port(to_node, to_port):
+		summon_state_label.text = "出力ポートから中継入力または召喚器入力へ接続"
 		summon_state_label.add_theme_color_override("font_color", Color(0.96, 0.62, 0.40))
 		return
-	connect_material_to_summoner(from_node, to_port)
+	connect_output_to_input(from_node, to_node, to_port)
 
 
 func _on_disconnection_request(
@@ -297,22 +374,33 @@ func _on_disconnection_request(
 	to_port: int
 ) -> void:
 	if factory_graph.is_node_connected(from_node, from_port, to_node, to_port):
-		disconnect_summoner(to_port)
+		disconnect_input(to_node, to_port)
 
 
 func _on_factory_graph_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		connection_pointer = event.position
-		hovered_input_index = directional_input_at(event.position)
+		var target := directional_connection_target_at(event.position)
+		hovered_input_node_id = StringName(target.get("node_id", &""))
+		hovered_input_index = (
+			int(target.get("port", -1))
+			if summoner_node != null and hovered_input_node_id == StringName(summoner_node.name)
+			else -1
+		)
 		hovered_material_id = directional_output_at(event.position)
-		if hovered_input_index >= 0:
+		if relay_placement_active:
+			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
+			factory_graph.tooltip_text = "クリックで中継ノードを配置 // 右クリックで取消"
+		elif hovered_input_node_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-			factory_graph.tooltip_text = "INPUT %d // 左クリックで目標表示 // 右クリックで切断" % (hovered_input_index + 1)
+			factory_graph.tooltip_text = (
+				"INPUT %d // 左クリックで目標表示 // 右クリックで切断" % (hovered_input_index + 1)
+				if hovered_input_index >= 0
+				else "中継入力 // 出力から接続 // 右クリックで切断"
+			)
 		elif hovered_material_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
-			factory_graph.tooltip_text = "%s資源パッチ // 固定 // 出力を接続" % _kind_label(
-				StringName(_material_node(hovered_material_id).get_meta("landmark_kind", &""))
-			)
+			factory_graph.tooltip_text = _output_tooltip(hovered_material_id)
 		else:
 			var landmark := directional_landmark_at(event.position)
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_HELP if landmark != &"" else Control.CURSOR_ARROW
@@ -324,21 +412,36 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	var mouse_event := event as InputEventMouseButton
 	if mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
-		var disconnect_input := directional_input_at(mouse_event.position)
-		if disconnect_input >= 0:
-			select_input(disconnect_input)
-			disconnect_summoner(disconnect_input)
+		if relay_placement_active:
+			cancel_relay_placement()
+			factory_graph.accept_event()
+			return
+		var disconnect_target := directional_connection_target_at(mouse_event.position)
+		if not disconnect_target.is_empty():
+			var disconnect_node := StringName(disconnect_target["node_id"])
+			var disconnect_port := int(disconnect_target["port"])
+			if summoner_node != null and disconnect_node == StringName(summoner_node.name):
+				select_input(disconnect_port)
+			disconnect_input(disconnect_node, disconnect_port)
 			factory_graph.accept_event()
 		return
 	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
 		return
 	connection_pointer = mouse_event.position
 	if mouse_event.pressed:
-		var input_index := directional_input_at(mouse_event.position)
-		if input_index >= 0:
-			select_input(input_index)
+		if relay_placement_active:
+			place_relay_at(graph_screen_to_world(mouse_event.position))
+			cancel_relay_placement()
+			factory_graph.accept_event()
+			return
+		var input_target := directional_connection_target_at(mouse_event.position)
+		if not input_target.is_empty():
+			var input_node_id := StringName(input_target["node_id"])
+			var input_port := int(input_target["port"])
+			if summoner_node != null and input_node_id == StringName(summoner_node.name):
+				select_input(input_port)
 			if connecting_material_id != &"":
-				connect_material_to_summoner(connecting_material_id, input_index)
+				connect_output_to_input(connecting_material_id, input_node_id, input_port)
 			factory_graph.accept_event()
 			return
 		var material_id := directional_output_at(mouse_event.position)
@@ -346,7 +449,7 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			connecting_material_id = material_id
 			connection_press_position = mouse_event.position
 			connection_drag_moved = false
-			summon_state_label.text = "接続先の召喚器入力を選択"
+			summon_state_label.text = "接続先の中継入力または召喚器入力を選択"
 			summon_state_label.add_theme_color_override("font_color", Color(0.58, 0.86, 1.0))
 			factory_graph.accept_event()
 			return
@@ -356,10 +459,13 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	if connecting_material_id == &"":
 		return
-	var release_input := directional_input_at(mouse_event.position)
-	if release_input >= 0:
-		select_input(release_input)
-		connect_material_to_summoner(connecting_material_id, release_input)
+	var release_target := directional_connection_target_at(mouse_event.position)
+	if not release_target.is_empty():
+		var release_node := StringName(release_target["node_id"])
+		var release_port := int(release_target["port"])
+		if summoner_node != null and release_node == StringName(summoner_node.name):
+			select_input(release_port)
+		connect_output_to_input(connecting_material_id, release_node, release_port)
 		factory_graph.accept_event()
 		return
 	if connection_drag_moved:
@@ -374,11 +480,23 @@ func _clear_directional_connection_preview() -> void:
 
 
 func directional_output_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes:
+	for node in material_nodes + relay_nodes:
 		var node_id := StringName(node.name)
 		if graph_position.distance_to(directional_output_position(node_id, factory_graph)) <= PORT_HIT_RADIUS:
 			return node_id
 	return &""
+
+
+func directional_connection_target_at(graph_position: Vector2) -> Dictionary:
+	for relay in relay_nodes:
+		var relay_id := StringName(relay.name)
+		if graph_position.distance_to(directional_node_input_position(relay_id, 0, factory_graph)) <= PORT_HIT_RADIUS:
+			return { "node_id": relay_id, "port": 0 }
+	if summoner_node != null:
+		for input_index in SUMMONER_INPUT_COUNT:
+			if graph_position.distance_to(directional_input_position(input_index, factory_graph)) <= PORT_HIT_RADIUS:
+				return { "node_id": StringName(summoner_node.name), "port": input_index }
+	return {}
 
 
 func directional_input_at(graph_position: Vector2) -> int:
@@ -389,7 +507,7 @@ func directional_input_at(graph_position: Vector2) -> int:
 
 
 func directional_landmark_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes:
+	for node in material_nodes + relay_nodes:
 		if graph_position.distance_to(_node_center_in(node, factory_graph)) <= _landmark_radius_in(node, factory_graph):
 			return StringName(node.name)
 	if (
@@ -407,20 +525,41 @@ func _landmark_tooltip(node_id: StringName) -> String:
 	if summoner_node != null and node_id == StringName(summoner_node.name):
 		return "召喚器 // 3入力 // 固定 // 入力ポートをクリックして目標表示"
 	var material := _material_node(node_id)
-	if material == null:
-		return ""
-	return "%s資源パッチ // 固定 // 出力を接続" % _kind_label(
-		StringName(material.get_meta("landmark_kind", &""))
-	)
+	if material != null:
+		return "%s資源パッチ // 固定 // 出力を接続" % _kind_label(
+			StringName(material.get_meta("landmark_kind", &""))
+		)
+	if _relay_node(node_id) != null:
+		return "中継ノード // グリフを変えずに転送 // ドラッグ移動"
+	return ""
+
+
+func _output_tooltip(node_id: StringName) -> String:
+	var material := _material_node(node_id)
+	if material != null:
+		return "%s資源パッチ // 固定 // 出力を接続" % _kind_label(
+			StringName(material.get_meta("landmark_kind", &""))
+		)
+	if _relay_node(node_id) != null:
+		return "中継出力 // 複数の下流へ分配可能"
+	return ""
 
 
 func directional_output_position(node_id: StringName, coordinate_space: Control) -> Vector2:
-	var source := _material_node(node_id)
+	var source := _factory_node(node_id)
 	if source == null or summoner_node == null or coordinate_space == null:
 		return Vector2.ZERO
 	var source_center := _node_center_in(source, coordinate_space)
-	var summoner_center := _node_center_in(summoner_node, coordinate_space)
-	var direction := source_center.direction_to(summoner_center)
+	var direction_sum := Vector2.ZERO
+	for connection in factory_graph.get_connection_list():
+		if StringName(connection["from_node"]) != node_id:
+			continue
+		var downstream := _factory_node(StringName(connection["to_node"]))
+		if downstream != null:
+			direction_sum += source_center.direction_to(_node_center_in(downstream, coordinate_space))
+	var direction := direction_sum.normalized()
+	if direction.is_zero_approx():
+		direction = source_center.direction_to(_node_center_in(summoner_node, coordinate_space))
 	return _node_boundary_position(source, direction, coordinate_space)
 
 
@@ -439,12 +578,21 @@ func directional_input_position(input_index: int, coordinate_space: Control) -> 
 	return base
 
 
+func directional_node_input_position(node_id: StringName, input_port: int, coordinate_space: Control) -> Vector2:
+	if summoner_node != null and node_id == StringName(summoner_node.name):
+		return directional_input_position(input_port, coordinate_space)
+	var relay := _relay_node(node_id)
+	if relay == null or input_port != 0 or coordinate_space == null:
+		return Vector2.ZERO
+	return _node_boundary_position(relay, _relay_input_direction(node_id, coordinate_space), coordinate_space)
+
+
 func directional_port_direction(node_id: StringName, port_kind: StringName, input_index: int = -1) -> Vector2:
-	var node: GraphNode = summoner_node if port_kind == &"input" else _material_node(node_id)
+	var node: GraphNode = _factory_node(node_id)
 	if node == null:
 		return Vector2.ZERO
 	var point := (
-		directional_input_position(input_index, factory_graph)
+		directional_node_input_position(node_id, input_index, factory_graph)
 		if port_kind == &"input"
 		else directional_output_position(node_id, factory_graph)
 	)
@@ -466,15 +614,17 @@ func draw_directional_overlay(overlay: Control, layer: StringName) -> void:
 func _draw_directional_connection_lines(overlay: Control) -> void:
 	for connection in factory_graph.get_connection_list():
 		var from_node_id := StringName(connection["from_node"])
+		var to_node_id := StringName(connection["to_node"])
 		var input_index := int(connection["to_port"])
 		var start := directional_output_position(from_node_id, overlay)
-		var finish := directional_input_position(input_index, overlay)
+		var finish := directional_node_input_position(to_node_id, input_index, overlay)
 		var color := PORT_COLOR
-		match summon_state(input_index):
-			&"matched":
-				color = Color(0.34, 0.86, 0.76, 0.96)
-			&"mismatch":
-				color = Color(0.96, 0.62, 0.34, 0.96)
+		if summoner_node != null and to_node_id == StringName(summoner_node.name):
+			match summon_state(input_index):
+				&"matched":
+					color = Color(0.34, 0.86, 0.76, 0.96)
+				&"mismatch":
+					color = Color(0.96, 0.62, 0.34, 0.96)
 		_draw_connection_curve(overlay, start, finish, color, 3.0)
 	if connecting_material_id != &"":
 		var preview_start: Vector2 = directional_output_position(connecting_material_id, overlay)
@@ -486,22 +636,24 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 	var now := flow_animation_time_seconds()
 	for connection in factory_graph.get_connection_list():
 		var from_node_id := StringName(connection["from_node"])
+		var to_node_id := StringName(connection["to_node"])
 		var input_index := int(connection["to_port"])
 		var start := directional_output_position(from_node_id, overlay)
-		var finish := directional_input_position(input_index, overlay)
+		var finish := directional_node_input_position(to_node_id, input_index, overlay)
 		var color := PORT_COLOR
-		match summon_state(input_index):
-			&"matched":
-				color = Color(0.34, 0.86, 0.76, 0.96)
-			&"mismatch":
-				color = Color(0.96, 0.62, 0.34, 0.96)
-		var source := _material_node(from_node_id)
-		if source != null:
+		if summoner_node != null and to_node_id == StringName(summoner_node.name):
+			match summon_state(input_index):
+				&"matched":
+					color = Color(0.34, 0.86, 0.76, 0.96)
+				&"mismatch":
+					color = Color(0.96, 0.62, 0.34, 0.96)
+		var glyph_kind := output_glyph_kind(from_node_id)
+		if glyph_kind != &"":
 			_draw_flowing_glyphs(
 				overlay,
 				start,
 				finish,
-				StringName(source.get_meta("landmark_kind", &"")),
+				glyph_kind,
 				color,
 				input_index,
 				now
@@ -509,12 +661,17 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 
 
 func _draw_directional_ports(overlay: Control) -> void:
-	for node in material_nodes:
+	for node in material_nodes + relay_nodes:
 		var node_id := StringName(node.name)
 		var position := directional_output_position(node_id, overlay)
 		var active := node_id == connecting_material_id or node_id == hovered_material_id
 		var direction := _node_center_in(node, overlay).direction_to(position)
 		_draw_output_port(overlay, position, direction, PORT_COLOR if active else PORT_IDLE_COLOR, active)
+	for relay in relay_nodes:
+		var relay_id := StringName(relay.name)
+		var relay_input := directional_node_input_position(relay_id, 0, overlay)
+		var relay_active := hovered_input_node_id == relay_id or connecting_material_id != &""
+		_draw_input_port(overlay, relay_input, PORT_COLOR if relay_active else PORT_IDLE_COLOR)
 	for input_index in SUMMONER_INPUT_COUNT:
 		var position := directional_input_position(input_index, overlay)
 		var state := summon_state(input_index)
@@ -694,18 +851,36 @@ func _summoner_input_direction(input_index: int, coordinate_space: Control) -> V
 			StringName(connection["to_node"]) == StringName(summoner_node.name)
 			and int(connection["to_port"]) == input_index
 		):
-			var source := _material_node(StringName(connection["from_node"]))
+			var source := _factory_node(StringName(connection["from_node"]))
 			if source != null:
 				return _node_center_in(summoner_node, coordinate_space).direction_to(
 					_node_center_in(source, coordinate_space)
 				)
 	if connecting_material_id != &"":
-		var active_source := _material_node(connecting_material_id)
+		var active_source := _factory_node(connecting_material_id)
 		if active_source != null:
 			return _node_center_in(summoner_node, coordinate_space).direction_to(
 				_node_center_in(active_source, coordinate_space)
 			)
 	return Vector2.from_angle([PI, -PI * 0.5, 0.0][input_index])
+
+
+func _relay_input_direction(relay_id: StringName, coordinate_space: Control) -> Vector2:
+	var relay := _relay_node(relay_id)
+	if relay == null:
+		return Vector2.LEFT
+	var relay_center := _node_center_in(relay, coordinate_space)
+	for connection in factory_graph.get_connection_list():
+		if StringName(connection["to_node"]) != relay_id or int(connection["to_port"]) != 0:
+			continue
+		var source := _factory_node(StringName(connection["from_node"]))
+		if source != null:
+			return relay_center.direction_to(_node_center_in(source, coordinate_space))
+	if connecting_material_id != &"":
+		var active_source := _factory_node(connecting_material_id)
+		if active_source != null and StringName(active_source.name) != relay_id:
+			return relay_center.direction_to(_node_center_in(active_source, coordinate_space))
+	return _node_center_in(summoner_node, coordinate_space).direction_to(relay_center)
 
 
 func _node_boundary_position(node: GraphNode, direction: Vector2, coordinate_space: Control) -> Vector2:
@@ -775,16 +950,14 @@ func _landmark_visual(node: GraphNode) -> Control:
 	return null
 
 
-func _remove_summoner_input_connection(input_index: int) -> bool:
-	if input_index < 0 or input_index >= SUMMONER_INPUT_COUNT:
-		return false
-	if factory_graph == null or summoner_node == null:
+func _remove_input_connection(to_node_id: StringName, to_port: int) -> bool:
+	if factory_graph == null or not _valid_input_port(to_node_id, to_port):
 		return false
 	var removed := false
 	for connection in factory_graph.get_connection_list():
-		if StringName(connection["to_node"]) != StringName(summoner_node.name):
+		if StringName(connection["to_node"]) != to_node_id:
 			continue
-		if int(connection["to_port"]) != input_index:
+		if int(connection["to_port"]) != to_port:
 			continue
 		factory_graph.disconnect_node(
 			StringName(connection["from_node"]),
@@ -796,11 +969,55 @@ func _remove_summoner_input_connection(input_index: int) -> bool:
 	return removed
 
 
+func _valid_output_node(node_id: StringName) -> bool:
+	return _material_node(node_id) != null or _relay_node(node_id) != null
+
+
+func _valid_input_port(node_id: StringName, input_port: int) -> bool:
+	if summoner_node != null and node_id == StringName(summoner_node.name):
+		return input_port >= 0 and input_port < SUMMONER_INPUT_COUNT
+	return _relay_node(node_id) != null and input_port == 0
+
+
+func _would_create_connection_cycle(from_node_id: StringName, to_node_id: StringName) -> bool:
+	if _relay_node(from_node_id) == null:
+		return false
+	var pending: Array[StringName] = [to_node_id]
+	var visited: Dictionary = {}
+	while not pending.is_empty():
+		var current: StringName = pending.pop_back()
+		if current == from_node_id:
+			return true
+		if visited.has(current):
+			continue
+		visited[current] = true
+		for connection in factory_graph.get_connection_list():
+			if StringName(connection["from_node"]) == current:
+				pending.append(StringName(connection["to_node"]))
+	return false
+
+
 func _material_node(node_id: StringName) -> GraphNode:
 	for node in material_nodes:
 		if StringName(node.name) == node_id:
 			return node
 	return null
+
+
+func _relay_node(node_id: StringName) -> GraphNode:
+	for node in relay_nodes:
+		if is_instance_valid(node) and StringName(node.name) == node_id:
+			return node
+	return null
+
+
+func _factory_node(node_id: StringName) -> GraphNode:
+	if summoner_node != null and StringName(summoner_node.name) == node_id:
+		return summoner_node
+	var material := _material_node(node_id)
+	if material != null:
+		return material
+	return _relay_node(node_id)
 
 
 func _refresh_summon_state() -> void:
@@ -828,7 +1045,7 @@ func _refresh_summon_state() -> void:
 			]
 			summon_state_label.add_theme_color_override("font_color", Color(0.96, 0.68, 0.38))
 		_:
-			summon_state_label.text = "%sを召喚器へ直接接続" % definition["glyph_label"]
+			summon_state_label.text = "%sを召喚器入力へ接続" % definition["glyph_label"]
 			summon_state_label.add_theme_color_override("font_color", Color(0.48, 0.70, 0.82))
 
 
@@ -864,6 +1081,15 @@ func _build_ui() -> void:
 	back.pressed.connect(return_to_menu)
 	toolbar.add_child(back)
 
+	relay_button = Button.new()
+	relay_button.name = "AddRelayButton"
+	relay_button.text = "＋ 中継"
+	relay_button.tooltip_text = "中継ノードを盤面へ配置 // グリフを変えずに転送"
+	relay_button.custom_minimum_size = Vector2(92.0, 34.0)
+	relay_button.toggle_mode = true
+	relay_button.pressed.connect(_on_relay_button_pressed)
+	toolbar.add_child(relay_button)
+
 	var title := Label.new()
 	title.text = "FACTORY PROTOTYPE // 固定素材地帯"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -872,10 +1098,10 @@ func _build_ui() -> void:
 	toolbar.add_child(title)
 
 	status_label = Label.new()
-	status_label.text = "広域盤面 9000 × 6000  //  資源パッチ 30  //  中央召喚器 1"
 	status_label.add_theme_font_size_override("font_size", 12)
 	status_label.add_theme_color_override("font_color", Color(0.44, 0.68, 0.78))
 	toolbar.add_child(status_label)
+	_refresh_factory_status_label()
 
 	var graph_area := Control.new()
 	graph_area.name = "FactoryGraphArea"
@@ -1097,6 +1323,64 @@ func _make_summoner_node() -> GraphNode:
 	_configure_round_landmark_node(node, visual.custom_minimum_size)
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return node
+
+
+func _make_relay_node(node_id: StringName, world_center: Vector2) -> GraphNode:
+	var node := GraphNode.new()
+	node.name = String(node_id)
+	node.title = ""
+	node.draggable = true
+	node.resizable = false
+	node.set_meta("landmark_kind", &"relay")
+	node.set_meta("relay_node", true)
+
+	var port_row := Control.new()
+	port_row.custom_minimum_size = Vector2(1.0, 1.0)
+	port_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	node.add_child(port_row)
+	node.set_slot(0, true, 0, BUILTIN_PORT_COLOR, true, 0, BUILTIN_PORT_COLOR)
+
+	var visual = FactoryLandmarkVisualModel.new()
+	visual.configure(&"relay")
+	node.add_child(visual)
+	_configure_round_landmark_node(node, visual.custom_minimum_size)
+	node.position_offset = world_center - visual.custom_minimum_size * 0.5
+	node.mouse_filter = Control.MOUSE_FILTER_PASS
+	node.tooltip_text = "中継ノード // グリフを変えずに転送 // ドラッグ移動"
+	node.gui_input.connect(_on_relay_node_gui_input.bind(node))
+	return node
+
+
+func _on_relay_button_pressed() -> void:
+	if relay_button.button_pressed:
+		begin_relay_placement()
+	else:
+		cancel_relay_placement()
+
+
+func _on_relay_node_gui_input(event: InputEvent, relay: GraphNode) -> void:
+	if not event is InputEventMouse:
+		return
+	var graph_event := event.duplicate() as InputEventMouse
+	graph_event.position = _convert_control_point(relay, event.position, factory_graph)
+	var relay_id := StringName(relay.name)
+	var over_input: bool = graph_event.position.distance_to(
+		directional_node_input_position(relay_id, 0, factory_graph)
+	) <= PORT_HIT_RADIUS
+	var over_output: bool = graph_event.position.distance_to(
+		directional_output_position(relay_id, factory_graph)
+	) <= PORT_HIT_RADIUS
+	if not over_input and not over_output:
+		return
+	_on_factory_graph_input(graph_event)
+	if event is InputEventMouseButton:
+		relay.accept_event()
+
+
+func _refresh_factory_status_label() -> void:
+	if status_label == null:
+		return
+	status_label.text = "広域盤面 9000 × 6000  //  資源パッチ 30  //  中継 %d  //  中央召喚器 1" % relay_nodes.size()
 
 
 func _configure_round_landmark_node(node: GraphNode, minimum_size: Vector2) -> void:

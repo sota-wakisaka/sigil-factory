@@ -38,6 +38,10 @@ func _initialize() -> void:
 			view.connect_material_to_summoner(&"circle_01", 0)
 			view.connect_material_to_summoner(&"triangle_01", 1)
 			view.connect_material_to_summoner(&"square_01", 2)
+		elif fixture == "relay_route":
+			var relay = view.place_relay_at(Vector2(3800.0, 2980.0))
+			view.connect_output_to_input(&"circle_01", StringName(relay.name), 0)
+			view.connect_output_to_input(StringName(relay.name), &"summoner_center", 0)
 		if options.has("flow_time"):
 			view.flow_time_override = float(options["flow_time"])
 	await process_frame

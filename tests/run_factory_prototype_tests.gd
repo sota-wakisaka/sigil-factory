@@ -102,6 +102,57 @@ func _test_fixed_factory_landmarks() -> void:
 	var circle_source := _first_material(prototype, &"circle")
 	var triangle_source := _first_material(prototype, &"triangle")
 	var square_source := _first_material(prototype, &"square")
+	_expect(prototype.relay_button != null and prototype.relay_button.text == "＋ 中継", "the toolbar should expose relay placement")
+	prototype.begin_relay_placement()
+	_expect(prototype.relay_placement_active and prototype.relay_button.button_pressed, "relay placement should enter a visible one-shot mode")
+	var relay_world_center := Vector2(5000.0, 4500.0)
+	var relay_click := InputEventMouseButton.new()
+	relay_click.button_index = MOUSE_BUTTON_LEFT
+	relay_click.pressed = true
+	relay_click.position = relay_world_center * prototype.factory_graph.zoom - prototype.factory_graph.scroll_offset
+	prototype.factory_graph.gui_input.emit(relay_click)
+	_expect(prototype.relay_nodes.size() == 1 and not prototype.relay_placement_active, "clicking the board in placement mode should create one relay and exit placement")
+	var relay: GraphNode = prototype.relay_nodes[0]
+	var relay_id := StringName(relay.name)
+	_expect(relay.draggable and not relay.get_meta("fixed_landmark", false), "relay nodes should be draggable player-built equipment")
+	_expect(prototype.fixed_landmark_count() == 31, "placing a relay should not change the fixed-landmark count")
+	_expect("中継 1" in prototype.status_label.text, "the toolbar should report the number of placed relays")
+	_expect(prototype._landmark_visual(relay).body_radius() > 0.0, "relay nodes should use the circular factory visual language")
+	var relay_source_click := InputEventMouseButton.new()
+	relay_source_click.button_index = MOUSE_BUTTON_LEFT
+	relay_source_click.pressed = true
+	relay_source_click.position = prototype.directional_output_position(StringName(circle_source.name), prototype.factory_graph)
+	prototype.factory_graph.gui_input.emit(relay_source_click)
+	var relay_input_click := InputEventMouseButton.new()
+	relay_input_click.button_index = MOUSE_BUTTON_LEFT
+	relay_input_click.pressed = true
+	relay_input_click.position = prototype._convert_control_point(
+		prototype.factory_graph,
+		prototype.directional_node_input_position(relay_id, 0, prototype.factory_graph),
+		relay
+	)
+	relay.gui_input.emit(relay_input_click)
+	_expect(prototype.output_glyph_kind(relay_id) == &"circle", "clicking a material output and the visible relay input should create the connection")
+	_expect(prototype.output_glyph_kind(relay_id) == &"circle", "a relay should preserve its incoming Glyph kind")
+	_expect(prototype.connect_output_to_input(relay_id, StringName(prototype.summoner_node.name), 0), "a relay output should connect to a summoner input")
+	var relay_center: Vector2 = prototype._node_center_in(relay, prototype.factory_graph)
+	var relay_input: Vector2 = prototype.directional_node_input_position(relay_id, 0, prototype.factory_graph)
+	var relay_output: Vector2 = prototype.directional_output_position(relay_id, prototype.factory_graph)
+	_expect(relay_center.direction_to(relay_input).dot(relay_center.direction_to(prototype._node_center_in(circle_source, prototype.factory_graph))) > 0.8, "the relay input should face its actual upstream source")
+	_expect(relay_center.direction_to(relay_output).dot(relay_center.direction_to(prototype._node_center_in(prototype.summoner_node, prototype.factory_graph))) > 0.8, "the relay output should face its actual downstream destination")
+	_expect(prototype.summon_state(0) == &"matched", "Circle routed through a relay should still summon the Circle target")
+	_expect(prototype.connect_output_to_input(relay_id, StringName(prototype.summoner_node.name), 1), "one relay output should distribute to another downstream input")
+	_expect(prototype.connected_material_kind(1) == &"circle", "distributed relay output should preserve the same Glyph on every branch")
+	_expect(prototype.factory_graph.get_connection_list().size() == 3, "relay routing should contain one upstream and two downstream connections")
+	prototype.disconnect_summoner(0)
+	prototype.disconnect_summoner(1)
+	prototype.disconnect_input(relay_id, 0)
+	_expect(prototype.factory_graph.get_connection_list().is_empty(), "relay test connections should disconnect independently")
+	var second_relay: GraphNode = prototype.place_relay_at(Vector2(5300.0, 4500.0))
+	var second_relay_id := StringName(second_relay.name)
+	_expect(prototype.connect_output_to_input(relay_id, second_relay_id, 0), "relay nodes should chain in the processing direction")
+	_expect(not prototype.connect_output_to_input(second_relay_id, relay_id, 0), "relay connections should reject a cycle")
+	prototype.disconnect_input(second_relay_id, 0)
 	var square_output: Vector2 = prototype.directional_output_position(StringName(square_source.name), prototype.factory_graph)
 	var menu_bottom: float = prototype.graph_menu_panel.position.y + prototype.graph_menu_panel.size.y
 	_expect(square_output.y > menu_bottom, "the upper inner deposit output should remain visible below the GraphEdit toolbar")
