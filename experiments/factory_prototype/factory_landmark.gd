@@ -19,6 +19,7 @@ var rotation_angle_degrees := 45
 var scale_x_percent := 100
 var scale_y_percent := 100
 var move_offset := Vector2i.UP
+var combine_connection_mode: StringName = &"simple"
 
 
 func configure(next_kind: StringName) -> void:
@@ -38,6 +39,9 @@ func configure(next_kind: StringName) -> void:
 	elif landmark_kind == &"move":
 		visual_mode = &"move"
 		custom_minimum_size = Vector2(118.0, 118.0)
+	elif landmark_kind == &"combine":
+		visual_mode = &"combine"
+		custom_minimum_size = Vector2(134.0, 134.0)
 	else:
 		visual_mode = &"deposit"
 		custom_minimum_size = Vector2(142.0, 142.0)
@@ -80,13 +84,22 @@ func configure_move(next_offset: Vector2i) -> void:
 	queue_redraw()
 
 
+func configure_combine(next_connection_mode: StringName) -> void:
+	landmark_kind = &"combine"
+	visual_mode = &"combine"
+	combine_connection_mode = next_connection_mode
+	custom_minimum_size = Vector2(134.0, 134.0)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	queue_redraw()
+
+
 func body_radius() -> float:
 	var visual_size := size
 	if visual_size.x <= 0.0 or visual_size.y <= 0.0:
 		visual_size = custom_minimum_size
 	if visual_mode == &"summoner":
 		return minf(visual_size.x, visual_size.y) * 0.36 + 18.0
-	if visual_mode in [&"relay", &"rotation", &"scale", &"move"]:
+	if visual_mode in [&"relay", &"rotation", &"scale", &"move", &"combine"]:
 		return minf(visual_size.x, visual_size.y) * 0.38
 	return minf(visual_size.x, visual_size.y) * 0.43
 
@@ -107,6 +120,9 @@ func _draw() -> void:
 		return
 	if visual_mode == &"move":
 		_draw_move(center)
+		return
+	if visual_mode == &"combine":
+		_draw_combine(center)
 		return
 	if visual_mode == &"target":
 		_draw_target(center)
@@ -270,3 +286,31 @@ func _draw_move(center: Vector2) -> void:
 	for step in distance:
 		var marker := center - direction * radius * 0.18 + direction * float(step) * 5.0
 		draw_circle(marker, 1.6, Color(DIM_INK, 0.92), true)
+
+
+func _draw_combine(center: Vector2) -> void:
+	var radius := body_radius()
+	draw_circle(center, radius, Color(0.015, 0.075, 0.11, 0.96), true)
+	draw_arc(center, radius, 0.0, TAU, 64, Color(0.42, 0.82, 1.0, 0.92), 1.6, true)
+	var child_centers := [
+		center + Vector2(-17.0, -12.0),
+		center + Vector2(17.0, -12.0),
+		center + Vector2(0.0, 18.0),
+	]
+	if combine_connection_mode == &"radial":
+		for child_center in child_centers:
+			draw_line(center, child_center, Color(DIM_INK, 0.88), 1.6, true)
+	elif combine_connection_mode == &"pairwise":
+		for index in child_centers.size():
+			draw_line(
+				child_centers[index],
+				child_centers[(index + 1) % child_centers.size()],
+				Color(DIM_INK, 0.88),
+				1.6,
+				true
+			)
+	for child_center in child_centers:
+		draw_circle(child_center, 4.0, Color(0.01, 0.04, 0.06, 1.0), true)
+		draw_arc(child_center, 4.0, 0.0, TAU, 20, INK, 1.4, true)
+	if combine_connection_mode == &"radial":
+		draw_circle(center, 3.2, INK, true)

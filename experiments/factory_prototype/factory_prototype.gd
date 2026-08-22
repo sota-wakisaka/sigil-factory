@@ -36,6 +36,14 @@ const SCALE_PERCENT_PRESETS := [25, 50, 75, 100, 150, 200, 300]
 const MOVE_DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 const MOVE_DIRECTION_LABELS := ["↑", "→", "↓", "←"]
 const MOVE_DISTANCE_PRESETS := [1, 2, 3, 4, 5, 6]
+const COMBINE_INPUT_COUNT := 8
+const COMBINE_CONNECTION_MODES := [
+	GlyphModelScript.CONNECTION_SIMPLE,
+	GlyphModelScript.CONNECTION_RADIAL,
+	GlyphModelScript.CONNECTION_PAIRWISE,
+]
+const COMBINE_CONNECTION_LABELS := ["単純結合", "中心結合", "相互結合"]
+const COMBINE_INPUT_START_ANGLE := -PI * 0.5
 const TARGET_ORDER := [&"circle", &"triangle", &"square", &"diamond"]
 const TARGET_DEFINITIONS := {
 	&"circle": {
@@ -113,6 +121,7 @@ var relay_nodes: Array[GraphNode] = []
 var rotation_nodes: Array[GraphNode] = []
 var scale_nodes: Array[GraphNode] = []
 var move_nodes: Array[GraphNode] = []
+var combine_nodes: Array[GraphNode] = []
 var connection_overlay
 var flow_overlay
 var port_overlay
@@ -164,6 +173,17 @@ var move_settings_distance: OptionButton
 var move_settings_delete_button: Button
 var move_settings_node_id: StringName = &""
 var move_settings_syncing := false
+var combine_button: Button
+var combine_placement_active := false
+var combine_serial := 0
+var combine_settings_popup: PopupPanel
+var combine_settings_title: Label
+var combine_settings_mode: OptionButton
+var combine_settings_details: Label
+var combine_settings_delete_button: Button
+var combine_settings_node_id: StringName = &""
+var combine_settings_syncing := false
+var combine_settings_icon_cache: Dictionary = {}
 var line_settings_popup: PopupPanel
 var line_settings_title: Label
 var line_settings_details: Label
@@ -242,6 +262,7 @@ func begin_relay_placement() -> void:
 	cancel_rotation_placement()
 	cancel_scale_placement()
 	cancel_move_placement()
+	cancel_combine_placement()
 	relay_placement_active = true
 	if relay_button != null:
 		relay_button.button_pressed = true
@@ -261,6 +282,7 @@ func begin_rotation_placement() -> void:
 	cancel_relay_placement()
 	cancel_scale_placement()
 	cancel_move_placement()
+	cancel_combine_placement()
 	rotation_placement_active = true
 	if rotation_button != null:
 		rotation_button.button_pressed = true
@@ -280,6 +302,7 @@ func begin_scale_placement() -> void:
 	cancel_relay_placement()
 	cancel_rotation_placement()
 	cancel_move_placement()
+	cancel_combine_placement()
 	scale_placement_active = true
 	if scale_button != null:
 		scale_button.button_pressed = true
@@ -299,6 +322,7 @@ func begin_move_placement() -> void:
 	cancel_relay_placement()
 	cancel_rotation_placement()
 	cancel_scale_placement()
+	cancel_combine_placement()
 	move_placement_active = true
 	if move_button != null:
 		move_button.button_pressed = true
@@ -310,6 +334,26 @@ func cancel_move_placement() -> void:
 	move_placement_active = false
 	if move_button != null:
 		move_button.button_pressed = false
+	_refresh_summon_state()
+
+
+func begin_combine_placement() -> void:
+	_clear_directional_connection_preview()
+	cancel_relay_placement()
+	cancel_move_placement()
+	cancel_rotation_placement()
+	cancel_scale_placement()
+	combine_placement_active = true
+	if combine_button != null:
+		combine_button.button_pressed = true
+	status_label.text = "合成ノード // 盤面をクリックして配置 // 右クリックで取消"
+	status_label.add_theme_color_override("font_color", Color(0.58, 0.86, 1.0))
+
+
+func cancel_combine_placement() -> void:
+	combine_placement_active = false
+	if combine_button != null:
+		combine_button.button_pressed = false
 	_refresh_summon_state()
 
 
@@ -403,6 +447,30 @@ func place_move_at(
 	move_node.selected = true
 	_refresh_factory_status_label()
 	return move_node
+
+
+func place_combine_at(
+	world_center: Vector2,
+	connection_mode: StringName = GlyphModelScript.CONNECTION_SIMPLE
+) -> GraphNode:
+	if factory_graph == null:
+		return null
+	combine_serial += 1
+	var node_half_size := Vector2.ONE * 67.0
+	var clamped_center := Vector2(
+		clampf(world_center.x, node_half_size.x, PLAYFIELD_SIZE.x - node_half_size.x),
+		clampf(world_center.y, node_half_size.y, PLAYFIELD_SIZE.y - node_half_size.y)
+	)
+	var combine_node := _make_combine_node(
+		StringName("combine_%02d" % combine_serial),
+		clamped_center,
+		connection_mode
+	)
+	combine_nodes.append(combine_node)
+	factory_graph.add_child(combine_node)
+	combine_node.selected = true
+	_refresh_factory_status_label()
+	return combine_node
 
 
 func graph_screen_to_world(screen_position: Vector2) -> Vector2:
@@ -537,6 +605,7 @@ func set_rotation_angle(node_id: StringName, angle_degrees: int) -> bool:
 		visual.configure_rotation(normalized_angle)
 	rotation.tooltip_text = _rotation_tooltip(node_id)
 	_restart_outgoing_transport(node_id, now)
+	_normalize_downstream_combine_modes(node_id, now)
 	_refresh_summon_state()
 	return true
 
@@ -571,6 +640,7 @@ func set_scale_percent(node_id: StringName, x_percent: int, y_percent: int) -> b
 		visual.configure_scale(x_percent, y_percent)
 	scale.tooltip_text = _scale_tooltip(node_id)
 	_restart_outgoing_transport(node_id, now)
+	_normalize_downstream_combine_modes(node_id, now)
 	_refresh_summon_state()
 	return true
 
@@ -603,6 +673,75 @@ func set_move_offset(node_id: StringName, offset: Vector2i) -> bool:
 		visual.configure_move(offset)
 	move_node.tooltip_text = _move_tooltip(node_id)
 	_restart_outgoing_transport(node_id, now)
+	_normalize_downstream_combine_modes(node_id, now)
+	_refresh_summon_state()
+	return true
+
+
+func combine_connection_mode(node_id: StringName) -> StringName:
+	var combine_node := _combine_node(node_id)
+	if combine_node == null:
+		return GlyphModelScript.CONNECTION_SIMPLE
+	return StringName(combine_node.get_meta(
+		"combine_connection_mode",
+		GlyphModelScript.CONNECTION_SIMPLE
+	))
+
+
+func combine_connected_input_count(node_id: StringName) -> int:
+	if _combine_node(node_id) == null:
+		return 0
+	var count := 0
+	for connection in factory_graph.get_connection_list():
+		if StringName(connection["to_node"]) == node_id:
+			count += 1
+	return count
+
+
+func combine_mode_availability(node_id: StringName) -> Dictionary:
+	var modes := {
+		GlyphModelScript.CONNECTION_SIMPLE: true,
+		GlyphModelScript.CONNECTION_RADIAL: true,
+		GlyphModelScript.CONNECTION_PAIRWISE: true,
+	}
+	if _combine_node(node_id) == null:
+		return {"complete": false, "modes": modes}
+	var inputs := _combine_input_glyphs(node_id, {})
+	if inputs.size() < GlyphModelScript.MIN_COMBINE_CHILDREN:
+		return {"complete": false, "modes": modes}
+	for mode in [GlyphModelScript.CONNECTION_RADIAL, GlyphModelScript.CONNECTION_PAIRWISE]:
+		var candidate := GlyphModelScript.combine_many(inputs, mode)
+		modes[mode] = (
+			candidate != null
+			and not GlyphPainterModel.top_level_connection_visuals(
+				candidate,
+				1.0,
+				false
+			).is_empty()
+		)
+	return {"complete": true, "modes": modes}
+
+
+func set_combine_connection_mode(node_id: StringName, connection_mode: StringName) -> bool:
+	var combine_node := _combine_node(node_id)
+	if combine_node == null or not connection_mode in COMBINE_CONNECTION_MODES:
+		return false
+	var availability := combine_mode_availability(node_id)
+	if (
+		bool(availability["complete"])
+		and not bool(availability["modes"].get(connection_mode, false))
+	):
+		return false
+	if combine_connection_mode(node_id) == connection_mode:
+		return false
+	var now := flow_animation_time_seconds()
+	process_transport_at(now)
+	combine_node.set_meta("combine_connection_mode", connection_mode)
+	var visual := _landmark_visual(combine_node)
+	if visual != null:
+		visual.configure_combine(connection_mode)
+	combine_node.tooltip_text = _combine_tooltip(node_id)
+	_restart_outgoing_transport(node_id, now)
 	_refresh_summon_state()
 	return true
 
@@ -616,6 +755,8 @@ func open_relay_settings(node_id: StringName, viewport_position: Vector2) -> boo
 		scale_settings_popup.hide()
 	if move_settings_popup != null:
 		move_settings_popup.hide()
+	if combine_settings_popup != null:
+		combine_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	relay_settings_node_id = node_id
@@ -649,6 +790,8 @@ func open_rotation_settings(node_id: StringName, viewport_position: Vector2) -> 
 		scale_settings_popup.hide()
 	if move_settings_popup != null:
 		move_settings_popup.hide()
+	if combine_settings_popup != null:
+		combine_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	rotation_settings_node_id = node_id
@@ -676,6 +819,8 @@ func open_scale_settings(node_id: StringName, viewport_position: Vector2) -> boo
 		rotation_settings_popup.hide()
 	if move_settings_popup != null:
 		move_settings_popup.hide()
+	if combine_settings_popup != null:
+		combine_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	scale_settings_node_id = node_id
@@ -701,6 +846,8 @@ func open_move_settings(node_id: StringName, viewport_position: Vector2) -> bool
 		rotation_settings_popup.hide()
 	if scale_settings_popup != null:
 		scale_settings_popup.hide()
+	if combine_settings_popup != null:
+		combine_settings_popup.hide()
 	if line_settings_popup != null:
 		line_settings_popup.hide()
 	move_settings_node_id = node_id
@@ -717,6 +864,33 @@ func open_move_settings(node_id: StringName, viewport_position: Vector2) -> bool
 	)
 	if direction_button is Button:
 		direction_button.grab_focus()
+	return true
+
+
+func open_combine_settings(node_id: StringName, viewport_position: Vector2) -> bool:
+	var combine_node := _combine_node(node_id)
+	if combine_node == null or combine_settings_popup == null:
+		return false
+	if relay_settings_popup != null:
+		relay_settings_popup.hide()
+	if move_settings_popup != null:
+		move_settings_popup.hide()
+	if rotation_settings_popup != null:
+		rotation_settings_popup.hide()
+	if scale_settings_popup != null:
+		scale_settings_popup.hide()
+	if line_settings_popup != null:
+		line_settings_popup.hide()
+	combine_settings_node_id = node_id
+	combine_settings_title.text = "合成ノード // %s" % String(node_id)
+	_sync_combine_settings(node_id)
+	var popup_size := Vector2i(308, 230)
+	var viewport_size := Vector2i(get_viewport_rect().size)
+	var popup_position := Vector2i(viewport_position.round()) + Vector2i(10, 8)
+	popup_position.x = clampi(popup_position.x, 0, maxi(viewport_size.x - popup_size.x, 0))
+	popup_position.y = clampi(popup_position.y, 0, maxi(viewport_size.y - popup_size.y, 0))
+	combine_settings_popup.popup(Rect2i(popup_position, popup_size))
+	combine_settings_mode.grab_focus()
 	return true
 
 
@@ -742,6 +916,8 @@ func open_line_settings(connection: Dictionary, viewport_position: Vector2) -> b
 		scale_settings_popup.hide()
 	if move_settings_popup != null:
 		move_settings_popup.hide()
+	if combine_settings_popup != null:
+		combine_settings_popup.hide()
 	line_settings_connection = {
 		"from_node": from_node_id,
 		"from_port": from_port,
@@ -820,8 +996,10 @@ func remove_processing_node(node_id: StringName) -> bool:
 		rotation_nodes.erase(node)
 	elif _scale_node(node_id) != null:
 		scale_nodes.erase(node)
-	else:
+	elif _move_node(node_id) != null:
 		move_nodes.erase(node)
+	else:
+		combine_nodes.erase(node)
 	if relay_settings_node_id == node_id and relay_settings_popup != null:
 		relay_settings_popup.hide()
 	if rotation_settings_node_id == node_id and rotation_settings_popup != null:
@@ -830,6 +1008,8 @@ func remove_processing_node(node_id: StringName) -> bool:
 		scale_settings_popup.hide()
 	if move_settings_node_id == node_id and move_settings_popup != null:
 		move_settings_popup.hide()
+	if combine_settings_node_id == node_id and combine_settings_popup != null:
+		combine_settings_popup.hide()
 	if (
 		not line_settings_connection.is_empty()
 		and (
@@ -871,6 +1051,45 @@ func _restart_outgoing_transport(node_id: StringName, time_seconds: float) -> vo
 		_reset_downstream_transport_state(to_node_id, to_port)
 
 
+func _normalize_downstream_combine_modes(start_node_id: StringName, time_seconds: float) -> void:
+	var pending: Array[StringName] = [start_node_id]
+	var visited: Dictionary = {}
+	while not pending.is_empty():
+		var node_id: StringName = pending.pop_front()
+		if visited.has(node_id):
+			continue
+		visited[node_id] = true
+		_normalize_combine_connection_mode(node_id, time_seconds)
+		for connection in factory_graph.get_connection_list():
+			if StringName(connection["from_node"]) == node_id:
+				pending.append(StringName(connection["to_node"]))
+
+
+func _normalize_combine_connection_mode(node_id: StringName, time_seconds: float) -> bool:
+	var combine_node := _combine_node(node_id)
+	if combine_node == null:
+		return false
+	var availability := combine_mode_availability(node_id)
+	var current_mode := combine_connection_mode(node_id)
+	combine_node.tooltip_text = _combine_tooltip(node_id)
+	if combine_settings_node_id == node_id:
+		_sync_combine_settings(node_id)
+	if (
+		not bool(availability["complete"])
+		or bool(availability["modes"].get(current_mode, false))
+	):
+		return false
+	combine_node.set_meta("combine_connection_mode", GlyphModelScript.CONNECTION_SIMPLE)
+	var visual := _landmark_visual(combine_node)
+	if visual != null:
+		visual.configure_combine(GlyphModelScript.CONNECTION_SIMPLE)
+	combine_node.tooltip_text = _combine_tooltip(node_id)
+	_restart_outgoing_transport(node_id, time_seconds)
+	if combine_settings_node_id == node_id:
+		_sync_combine_settings(node_id)
+	return true
+
+
 func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 	if visited.has(node_id):
 		return null
@@ -882,8 +1101,28 @@ func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 	var rotation := _rotation_node(node_id)
 	var scale := _scale_node(node_id)
 	var move_node := _move_node(node_id)
-	if relay == null and rotation == null and scale == null and move_node == null:
+	var combine_node := _combine_node(node_id)
+	if (
+		relay == null
+		and rotation == null
+		and scale == null
+		and move_node == null
+		and combine_node == null
+	):
 		return null
+	if combine_node != null:
+		var inputs := _combine_input_glyphs(node_id, visited)
+		if inputs.size() < GlyphModelScript.MIN_COMBINE_CHILDREN:
+			return null
+		var mode := combine_connection_mode(node_id)
+		var availability := combine_mode_availability(node_id)
+		if (
+			bool(availability["complete"])
+			and not bool(availability["modes"].get(mode, false))
+		):
+			mode = GlyphModelScript.CONNECTION_SIMPLE
+		var combined := GlyphModelScript.combine_many(inputs, mode)
+		return combined if GlyphPainterModel.can_draw(combined) else null
 	for connection in factory_graph.get_connection_list():
 		if StringName(connection["to_node"]) != node_id or int(connection["to_port"]) != 0:
 			continue
@@ -901,6 +1140,28 @@ func _output_glyph(node_id: StringName, visited: Dictionary) -> GlyphModel:
 			return input_glyph.translated(move_offset(node_id))
 		return input_glyph
 	return null
+
+
+func _combine_input_glyphs(node_id: StringName, visited: Dictionary) -> Array:
+	var inputs: Array = []
+	if _combine_node(node_id) == null or factory_graph == null:
+		return inputs
+	var connections: Array = []
+	for connection in factory_graph.get_connection_list():
+		if StringName(connection["to_node"]) == node_id:
+			connections.append(connection)
+	connections.sort_custom(func(first, second) -> bool:
+		return int(first["to_port"]) < int(second["to_port"])
+	)
+	for connection in connections:
+		var input_glyph := _output_glyph(
+			StringName(connection["from_node"]),
+			visited.duplicate()
+		)
+		if input_glyph == null:
+			return []
+		inputs.append(input_glyph)
+	return inputs
 
 
 func summon_state(input_index: int = -1) -> StringName:
@@ -1015,16 +1276,20 @@ func connect_output_to_input(from_node_id: StringName, to_node_id: StringName, t
 	if factory_graph.is_node_connected(from_node_id, 0, to_node_id, to_port):
 		_clear_directional_connection_preview()
 		return true
-	process_transport_at(flow_animation_time_seconds())
+	var now := flow_animation_time_seconds()
+	process_transport_at(now)
 	_remove_input_connection(to_node_id, to_port)
 	var error := factory_graph.connect_node(from_node_id, 0, to_node_id, to_port, true)
 	if error != OK:
 		_refresh_summon_state()
 		return false
 	connection_flow_started_at[_connection_flow_key(from_node_id, 0, to_node_id, to_port)] = (
-		flow_animation_time_seconds()
+		now
 	)
 	_reset_downstream_transport_state(to_node_id, to_port)
+	if _processing_node(to_node_id) != null:
+		_restart_outgoing_transport(to_node_id, now)
+	_normalize_downstream_combine_modes(to_node_id, now)
 	_clear_directional_connection_preview()
 	_refresh_summon_state()
 	if flow_audio != null:
@@ -1045,11 +1310,15 @@ func disconnect_summoner(input_index: int = -1) -> void:
 
 
 func disconnect_input(to_node_id: StringName, to_port: int = 0) -> void:
-	process_transport_at(flow_animation_time_seconds())
+	var now := flow_animation_time_seconds()
+	process_transport_at(now)
 	var removed := _remove_input_connection(to_node_id, to_port)
 	if removed:
 		hovered_connection_key = ""
 		_reset_downstream_transport_state(to_node_id, to_port)
+		if _processing_node(to_node_id) != null:
+			_restart_outgoing_transport(to_node_id, now)
+		_normalize_downstream_combine_modes(to_node_id, now)
 		if flow_audio != null:
 			flow_audio.play_disconnect()
 	_refresh_summon_state()
@@ -1110,11 +1379,7 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		connection_pointer = event.position
 		var target := directional_connection_target_at(event.position)
 		hovered_input_node_id = StringName(target.get("node_id", &""))
-		hovered_input_index = (
-			int(target.get("port", -1))
-			if summoner_node != null and hovered_input_node_id == StringName(summoner_node.name)
-			else -1
-		)
+		hovered_input_index = int(target.get("port", -1))
 		hovered_material_id = directional_output_at(event.position)
 		var hovered_connection := (
 			directional_connection_at(event.position)
@@ -1122,9 +1387,11 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			else {}
 		)
 		hovered_connection_key = String(hovered_connection.get("key", ""))
-		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active:
+		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active or combine_placement_active:
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
-			if move_placement_active:
+			if combine_placement_active:
+				factory_graph.tooltip_text = "クリックで合成ノードを配置 // 右クリックで取消"
+			elif move_placement_active:
 				factory_graph.tooltip_text = "クリックで移動ノードを配置 // 右クリックで取消"
 			elif scale_placement_active:
 				factory_graph.tooltip_text = "クリックで変形ノードを配置 // 右クリックで取消"
@@ -1134,11 +1401,12 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 				factory_graph.tooltip_text = "クリックで中継ノードを配置 // 右クリックで取消"
 		elif hovered_input_node_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-			factory_graph.tooltip_text = (
-				"INPUT %d // 左クリックで目標表示 // 右クリックで搬送路メニュー" % (hovered_input_index + 1)
-				if hovered_input_index >= 0
-				else "加工入力 // 出力から接続 // 右クリックで搬送路メニュー"
-			)
+			if summoner_node != null and hovered_input_node_id == StringName(summoner_node.name):
+				factory_graph.tooltip_text = "INPUT %d // 左クリックで目標表示 // 右クリックで搬送路メニュー" % (hovered_input_index + 1)
+			elif _combine_node(hovered_input_node_id) != null:
+				factory_graph.tooltip_text = "合成入力 %d // 出力から接続 // 右クリックで搬送路メニュー" % (hovered_input_index + 1)
+			else:
+				factory_graph.tooltip_text = "加工入力 // 出力から接続 // 右クリックで搬送路メニュー"
 		elif hovered_material_id != &"":
 			factory_graph.mouse_default_cursor_shape = Control.CURSOR_CROSS
 			factory_graph.tooltip_text = _output_tooltip(hovered_material_id)
@@ -1156,11 +1424,12 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	var mouse_event := event as InputEventMouseButton
 	if mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
-		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active:
+		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active or combine_placement_active:
 			cancel_relay_placement()
 			cancel_rotation_placement()
 			cancel_scale_placement()
 			cancel_move_placement()
+			cancel_combine_placement()
 			factory_graph.accept_event()
 			return
 		var input_target := directional_connection_target_at(mouse_event.position)
@@ -1183,9 +1452,11 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 		return
 	connection_pointer = mouse_event.position
 	if mouse_event.pressed:
-		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active:
+		if relay_placement_active or rotation_placement_active or scale_placement_active or move_placement_active or combine_placement_active:
 			var world_position := graph_screen_to_world(mouse_event.position)
-			if move_placement_active:
+			if combine_placement_active:
+				place_combine_at(world_position)
+			elif move_placement_active:
 				place_move_at(world_position)
 			elif scale_placement_active:
 				place_scale_at(world_position)
@@ -1197,6 +1468,7 @@ func _on_factory_graph_input(event: InputEvent) -> void:
 			cancel_rotation_placement()
 			cancel_scale_placement()
 			cancel_move_placement()
+			cancel_combine_placement()
 			factory_graph.accept_event()
 			return
 		var input_target := directional_connection_target_at(mouse_event.position)
@@ -1255,7 +1527,7 @@ func _clear_directional_connection_preview() -> void:
 
 
 func directional_output_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + combine_nodes:
 		var node_id := StringName(node.name)
 		if graph_position.distance_to(directional_output_position(node_id, factory_graph)) <= PORT_HIT_RADIUS:
 			return node_id
@@ -1267,6 +1539,13 @@ func directional_connection_target_at(graph_position: Vector2) -> Dictionary:
 		var processor_id := StringName(processor.name)
 		if graph_position.distance_to(directional_node_input_position(processor_id, 0, factory_graph)) <= PORT_HIT_RADIUS:
 			return { "node_id": processor_id, "port": 0 }
+	for combine_node in combine_nodes:
+		var combine_id := StringName(combine_node.name)
+		for input_index in COMBINE_INPUT_COUNT:
+			if graph_position.distance_to(
+				directional_node_input_position(combine_id, input_index, factory_graph)
+			) <= PORT_HIT_RADIUS:
+				return {"node_id": combine_id, "port": input_index}
 	if summoner_node != null:
 		for input_index in SUMMONER_INPUT_COUNT:
 			if graph_position.distance_to(directional_input_position(input_index, factory_graph)) <= PORT_HIT_RADIUS:
@@ -1313,7 +1592,7 @@ func directional_input_at(graph_position: Vector2) -> int:
 
 
 func directional_landmark_at(graph_position: Vector2) -> StringName:
-	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + combine_nodes:
 		if graph_position.distance_to(_node_center_in(node, factory_graph)) <= _landmark_radius_in(node, factory_graph):
 			return StringName(node.name)
 	if (
@@ -1343,6 +1622,8 @@ func _landmark_tooltip(node_id: StringName) -> String:
 		return _scale_tooltip(node_id)
 	if _move_node(node_id) != null:
 		return _move_tooltip(node_id)
+	if _combine_node(node_id) != null:
+		return _combine_tooltip(node_id)
 	return ""
 
 
@@ -1365,6 +1646,8 @@ func _output_tooltip(node_id: StringName) -> String:
 			MOVE_DIRECTION_LABELS[_move_direction_index(offset)],
 			maxi(absi(offset.x), absi(offset.y)),
 		]
+	if _combine_node(node_id) != null:
+		return "合成出力 // %d入力 // 複数の下流へ分配可能" % combine_connected_input_count(node_id)
 	return ""
 
 
@@ -1383,6 +1666,15 @@ func _move_tooltip(node_id: StringName) -> String:
 	return "移動ノード // %s%d // 右クリックで設定" % [
 		MOVE_DIRECTION_LABELS[direction_index],
 		maxi(absi(offset.x), absi(offset.y)),
+	]
+
+
+func _combine_tooltip(node_id: StringName) -> String:
+	var mode_index := COMBINE_CONNECTION_MODES.find(combine_connection_mode(node_id))
+	var mode_label: String = COMBINE_CONNECTION_LABELS[maxi(mode_index, 0)]
+	return "合成ノード // %s // 入力 %d/8 // 右クリックで設定" % [
+		mode_label,
+		combine_connected_input_count(node_id),
 	]
 
 
@@ -1405,6 +1697,8 @@ func _context_node_label(node_id: StringName, input_port: int = -1) -> String:
 			MOVE_DIRECTION_LABELS[_move_direction_index(offset)],
 			maxi(absi(offset.x), absi(offset.y)),
 		]
+	if _combine_node(node_id) != null:
+		return "合成 %d入力" % combine_connected_input_count(node_id)
 	return String(node_id)
 
 
@@ -1458,7 +1752,17 @@ func directional_node_input_position(node_id: StringName, input_port: int, coord
 	if summoner_node != null and node_id == StringName(summoner_node.name):
 		return directional_input_position(input_port, coordinate_space)
 	var processor := _processing_node(node_id)
-	if processor == null or input_port != 0 or coordinate_space == null:
+	if processor == null or coordinate_space == null:
+		return Vector2.ZERO
+	if _combine_node(node_id) != null:
+		if input_port < 0 or input_port >= COMBINE_INPUT_COUNT:
+			return Vector2.ZERO
+		return _node_boundary_position(
+			processor,
+			_combine_input_direction(input_port),
+			coordinate_space
+		)
+	if input_port != 0:
 		return Vector2.ZERO
 	return _node_boundary_position(
 		processor,
@@ -1576,7 +1880,7 @@ func _draw_directional_flow_effects(overlay: Control) -> void:
 
 
 func _draw_directional_ports(overlay: Control) -> void:
-	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes:
+	for node in material_nodes + relay_nodes + rotation_nodes + scale_nodes + move_nodes + combine_nodes:
 		var node_id := StringName(node.name)
 		var position := directional_output_position(node_id, overlay)
 		var active := node_id == connecting_material_id or node_id == hovered_material_id
@@ -1587,6 +1891,19 @@ func _draw_directional_ports(overlay: Control) -> void:
 		var processor_input := directional_node_input_position(processor_id, 0, overlay)
 		var processor_active := hovered_input_node_id == processor_id or connecting_material_id != &""
 		_draw_input_port(overlay, processor_input, PORT_COLOR if processor_active else PORT_IDLE_COLOR)
+	for combine_node in combine_nodes:
+		var combine_id := StringName(combine_node.name)
+		for input_index in COMBINE_INPUT_COUNT:
+			var combine_input := directional_node_input_position(combine_id, input_index, overlay)
+			var combine_active := (
+				hovered_input_node_id == combine_id
+				and hovered_input_index == input_index
+			) or connecting_material_id != &""
+			_draw_input_port(
+				overlay,
+				combine_input,
+				PORT_COLOR if combine_active else PORT_IDLE_COLOR
+			)
 	for input_index in SUMMONER_INPUT_COUNT:
 		var position := directional_input_position(input_index, overlay)
 		var state := summon_state(input_index)
@@ -2003,9 +2320,34 @@ func _node_next_output_time(
 	if _processing_node(node_id) == null or visited.has(node_id):
 		return INF
 	visited[node_id] = true
+	var input_connections: Array = []
 	for connection in factory_graph.get_connection_list():
-		if StringName(connection["to_node"]) != node_id:
-			continue
+		if StringName(connection["to_node"]) == node_id:
+			input_connections.append(connection)
+	if _combine_node(node_id) != null:
+		if input_connections.size() < GlyphModelScript.MIN_COMBINE_CHILDREN:
+			return INF
+		var latest_arrival := not_before_time
+		for connection in input_connections:
+			var from_node_id := StringName(connection["from_node"])
+			var to_port := int(connection["to_port"])
+			var segment_start_time := _connection_flow_start_time_from(
+				from_node_id,
+				node_id,
+				to_port,
+				visited.duplicate()
+			)
+			if is_inf(segment_start_time):
+				return INF
+			var line_length := connection_world_length(from_node_id, node_id, to_port)
+			var first_arrival := segment_start_time + flow_travel_duration(line_length)
+			var next_arrival := first_arrival
+			if not_before_time > first_arrival:
+				var elapsed_intervals := (not_before_time - first_arrival) / flow_packet_interval()
+				next_arrival = first_arrival + float(ceili(elapsed_intervals - 0.000001)) * flow_packet_interval()
+			latest_arrival = maxf(latest_arrival, next_arrival)
+		return latest_arrival
+	for connection in input_connections:
 		var from_node_id := StringName(connection["from_node"])
 		var to_port := int(connection["to_port"])
 		var segment_start_time := _connection_flow_start_time_from(
@@ -2050,6 +2392,15 @@ func _summoner_input_direction(input_index: int, _coordinate_space: Control) -> 
 	return Vector2.from_angle(
 		SUMMONER_INPUT_START_ANGLE
 		+ TAU * float(input_index) / float(SUMMONER_INPUT_COUNT)
+	)
+
+
+func _combine_input_direction(input_index: int) -> Vector2:
+	if input_index < 0 or input_index >= COMBINE_INPUT_COUNT:
+		return Vector2.ZERO
+	return Vector2.from_angle(
+		COMBINE_INPUT_START_ANGLE
+		+ TAU * float(input_index) / float(COMBINE_INPUT_COUNT)
 	)
 
 
@@ -2172,6 +2523,8 @@ func _valid_output_node(node_id: StringName) -> bool:
 func _valid_input_port(node_id: StringName, input_port: int) -> bool:
 	if summoner_node != null and node_id == StringName(summoner_node.name):
 		return input_port >= 0 and input_port < SUMMONER_INPUT_COUNT
+	if _combine_node(node_id) != null:
+		return input_port >= 0 and input_port < COMBINE_INPUT_COUNT
 	return _processing_node(node_id) != null and input_port == 0
 
 
@@ -2228,6 +2581,13 @@ func _move_node(node_id: StringName) -> GraphNode:
 	return null
 
 
+func _combine_node(node_id: StringName) -> GraphNode:
+	for node in combine_nodes:
+		if is_instance_valid(node) and StringName(node.name) == node_id:
+			return node
+	return null
+
+
 func _processing_node(node_id: StringName) -> GraphNode:
 	var relay := _relay_node(node_id)
 	if relay != null:
@@ -2236,7 +2596,10 @@ func _processing_node(node_id: StringName) -> GraphNode:
 	if rotation != null:
 		return rotation
 	var scale := _scale_node(node_id)
-	return scale if scale != null else _move_node(node_id)
+	if scale != null:
+		return scale
+	var move_node := _move_node(node_id)
+	return move_node if move_node != null else _combine_node(node_id)
 
 
 func _factory_node(node_id: StringName) -> GraphNode:
@@ -2374,6 +2737,15 @@ func _build_ui() -> void:
 	scale_button.pressed.connect(_on_scale_button_pressed)
 	toolbar.add_child(scale_button)
 
+	combine_button = Button.new()
+	combine_button.name = "AddCombineButton"
+	combine_button.text = "＋ 合成"
+	combine_button.tooltip_text = "2〜8入力の合成ノードを配置 // ノード右クリックで結合方式を設定"
+	combine_button.custom_minimum_size = Vector2(92.0, 34.0)
+	combine_button.toggle_mode = true
+	combine_button.pressed.connect(_on_combine_button_pressed)
+	toolbar.add_child(combine_button)
+
 	var title := Label.new()
 	title.text = "FACTORY PROTOTYPE // 固定素材地帯"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2437,6 +2809,7 @@ func _build_ui() -> void:
 	_build_rotation_settings_popup()
 	_build_scale_settings_popup()
 	_build_move_settings_popup()
+	_build_combine_settings_popup()
 	_build_line_settings_popup()
 
 
@@ -2863,6 +3236,130 @@ func _on_move_settings_popup_hidden() -> void:
 	move_settings_node_id = &""
 
 
+func _build_combine_settings_popup() -> void:
+	combine_settings_popup = PopupPanel.new()
+	combine_settings_popup.name = "CombineSettingsPopup"
+	combine_settings_popup.popup_hide.connect(_on_combine_settings_popup_hidden)
+	add_child(combine_settings_popup)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	combine_settings_popup.add_child(margin)
+
+	var column := VBoxContainer.new()
+	column.custom_minimum_size = Vector2(276.0, 182.0)
+	column.add_theme_constant_override("separation", 8)
+	margin.add_child(column)
+
+	combine_settings_title = Label.new()
+	combine_settings_title.add_theme_font_size_override("font_size", 14)
+	combine_settings_title.add_theme_color_override("font_color", Color(0.72, 0.91, 1.0))
+	column.add_child(combine_settings_title)
+
+	var mode_row := HBoxContainer.new()
+	mode_row.add_theme_constant_override("separation", 10)
+	column.add_child(mode_row)
+	var mode_label := Label.new()
+	mode_label.text = "結合方式"
+	mode_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mode_row.add_child(mode_label)
+	combine_settings_mode = OptionButton.new()
+	combine_settings_mode.name = "CombineModeOption"
+	combine_settings_mode.custom_minimum_size = Vector2(176.0, 34.0)
+	combine_settings_mode.fit_to_longest_item = false
+	for mode_index in COMBINE_CONNECTION_MODES.size():
+		var mode: StringName = COMBINE_CONNECTION_MODES[mode_index]
+		combine_settings_mode.add_item(COMBINE_CONNECTION_LABELS[mode_index], mode_index)
+		combine_settings_mode.set_item_icon(mode_index, _combine_mode_icon(mode))
+	combine_settings_mode.get_popup().add_theme_constant_override("icon_max_width", 30)
+	combine_settings_mode.item_selected.connect(_on_combine_mode_selected)
+	mode_row.add_child(combine_settings_mode)
+
+	combine_settings_details = Label.new()
+	combine_settings_details.add_theme_font_size_override("font_size", 11)
+	combine_settings_details.add_theme_color_override("font_color", Color(0.44, 0.68, 0.78))
+	column.add_child(combine_settings_details)
+
+	combine_settings_delete_button = Button.new()
+	combine_settings_delete_button.name = "DeleteCombineButton"
+	combine_settings_delete_button.text = "合成ノードを削除"
+	combine_settings_delete_button.custom_minimum_size = Vector2(0.0, 34.0)
+	combine_settings_delete_button.pressed.connect(_on_combine_settings_delete_pressed)
+	column.add_child(combine_settings_delete_button)
+
+
+func _combine_mode_icon(connection_mode: StringName) -> Texture2D:
+	if combine_settings_icon_cache.has(connection_mode):
+		return combine_settings_icon_cache[connection_mode]
+	var lines := ""
+	if connection_mode == GlyphModelScript.CONNECTION_RADIAL:
+		lines = "<path d='M15 12 L5 5 M15 12 L25 5 M15 12 L15 21'/>"
+	elif connection_mode == GlyphModelScript.CONNECTION_PAIRWISE:
+		lines = "<path d='M5 5 L25 5 L15 21 Z'/>"
+	var body := (
+		"<g fill='none' stroke='#8edcff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'>%s</g>" % lines
+		+ "<g fill='#bfeaff'><circle cx='5' cy='5' r='2'/><circle cx='25' cy='5' r='2'/><circle cx='15' cy='21' r='2'/></g>"
+	)
+	if connection_mode == GlyphModelScript.CONNECTION_RADIAL:
+		body += "<circle cx='15' cy='12' r='2' fill='#bfeaff'/>"
+	var svg := "<svg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'>%s</svg>" % body
+	var image := Image.new()
+	if image.load_svg_from_string(svg, 1.0) != OK:
+		return null
+	var texture := ImageTexture.create_from_image(image)
+	combine_settings_icon_cache[connection_mode] = texture
+	return texture
+
+
+func _sync_combine_settings(node_id: StringName) -> void:
+	if _combine_node(node_id) == null or combine_settings_mode == null:
+		return
+	combine_settings_syncing = true
+	var availability := combine_mode_availability(node_id)
+	var current_mode := combine_connection_mode(node_id)
+	var current_index := COMBINE_CONNECTION_MODES.find(current_mode)
+	combine_settings_mode.select(maxi(current_index, 0))
+	for mode_index in COMBINE_CONNECTION_MODES.size():
+		var mode: StringName = COMBINE_CONNECTION_MODES[mode_index]
+		var disabled := (
+			bool(availability["complete"])
+			and not bool(availability["modes"].get(mode, false))
+		)
+		combine_settings_mode.set_item_disabled(mode_index, disabled)
+	var input_count := combine_connected_input_count(node_id)
+	combine_settings_details.text = (
+		"入力 %d/8 // 可視線なしは単純結合のみ" % input_count
+		if input_count >= GlyphModelScript.MIN_COMBINE_CHILDREN
+		else "入力 %d/8 // 2本以上で合成開始" % input_count
+	)
+	combine_settings_syncing = false
+
+
+func _on_combine_mode_selected(index: int) -> void:
+	if combine_settings_syncing or combine_settings_node_id == &"":
+		return
+	if index < 0 or index >= COMBINE_CONNECTION_MODES.size():
+		return
+	set_combine_connection_mode(
+		combine_settings_node_id,
+		COMBINE_CONNECTION_MODES[index]
+	)
+	_sync_combine_settings(combine_settings_node_id)
+
+
+func _on_combine_settings_delete_pressed() -> void:
+	var node_id := combine_settings_node_id
+	if node_id != &"":
+		remove_processing_node(node_id)
+
+
+func _on_combine_settings_popup_hidden() -> void:
+	combine_settings_node_id = &""
+
+
 func _build_line_settings_popup() -> void:
 	line_settings_popup = PopupPanel.new()
 	line_settings_popup.name = "LineSettingsPopup"
@@ -3224,6 +3721,51 @@ func _make_move_node(
 	return node
 
 
+func _make_combine_node(
+	node_id: StringName,
+	world_center: Vector2,
+	connection_mode: StringName
+) -> GraphNode:
+	var safe_mode := (
+		connection_mode
+		if connection_mode in COMBINE_CONNECTION_MODES
+		else GlyphModelScript.CONNECTION_SIMPLE
+	)
+	var node := GraphNode.new()
+	node.name = String(node_id)
+	node.title = ""
+	node.draggable = true
+	node.resizable = false
+	node.set_meta("landmark_kind", &"combine")
+	node.set_meta("combine_node", true)
+	node.set_meta("combine_connection_mode", safe_mode)
+
+	for input_index in COMBINE_INPUT_COUNT:
+		var port_row := Control.new()
+		port_row.custom_minimum_size = Vector2(1.0, 1.0)
+		port_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		node.add_child(port_row)
+		node.set_slot(
+			input_index,
+			true,
+			input_index,
+			BUILTIN_PORT_COLOR,
+			input_index == 0,
+			0,
+			BUILTIN_PORT_COLOR
+		)
+
+	var visual = FactoryLandmarkVisualModel.new()
+	visual.configure_combine(safe_mode)
+	node.add_child(visual)
+	_configure_round_landmark_node(node, visual.custom_minimum_size)
+	node.position_offset = world_center - visual.custom_minimum_size * 0.5
+	node.mouse_filter = Control.MOUSE_FILTER_PASS
+	node.tooltip_text = _combine_tooltip(StringName(node.name))
+	node.gui_input.connect(_on_combine_node_gui_input.bind(node))
+	return node
+
+
 func _on_relay_button_pressed() -> void:
 	if relay_button.button_pressed:
 		begin_relay_placement()
@@ -3250,6 +3792,13 @@ func _on_move_button_pressed() -> void:
 		begin_move_placement()
 	else:
 		cancel_move_placement()
+
+
+func _on_combine_button_pressed() -> void:
+	if combine_button.button_pressed:
+		begin_combine_placement()
+	else:
+		cancel_combine_placement()
 
 
 func _on_relay_node_gui_input(event: InputEvent, relay: GraphNode) -> void:
@@ -3372,14 +3921,49 @@ func _on_move_node_gui_input(event: InputEvent, move_node: GraphNode) -> void:
 		move_node.accept_event()
 
 
+func _on_combine_node_gui_input(event: InputEvent, combine_node: GraphNode) -> void:
+	if not event is InputEventMouse:
+		return
+	var combine_id := StringName(combine_node.name)
+	var graph_event := event.duplicate() as InputEventMouse
+	graph_event.position = _convert_control_point(combine_node, event.position, factory_graph)
+	var over_input := false
+	for input_index in COMBINE_INPUT_COUNT:
+		if graph_event.position.distance_to(
+			directional_node_input_position(combine_id, input_index, factory_graph)
+		) <= PORT_HIT_RADIUS:
+			over_input = true
+			break
+	var over_output: bool = graph_event.position.distance_to(
+		directional_output_position(combine_id, factory_graph)
+	) <= PORT_HIT_RADIUS
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if (
+			mouse_event.pressed
+			and mouse_event.button_index == MOUSE_BUTTON_RIGHT
+			and not over_input
+			and not over_output
+		):
+			open_combine_settings(combine_id, mouse_event.global_position)
+			combine_node.accept_event()
+			return
+	if not over_input and not over_output:
+		return
+	_on_factory_graph_input(graph_event)
+	if event is InputEventMouseButton:
+		combine_node.accept_event()
+
+
 func _refresh_factory_status_label() -> void:
 	if status_label == null:
 		return
-	status_label.text = "中継 %d // 移動 %d // 回転 %d // 変形 %d" % [
+	status_label.text = "中継 %d // 移動 %d // 回転 %d // 変形 %d // 合成 %d" % [
 		relay_nodes.size(),
 		move_nodes.size(),
 		rotation_nodes.size(),
 		scale_nodes.size(),
+		combine_nodes.size(),
 	]
 
 

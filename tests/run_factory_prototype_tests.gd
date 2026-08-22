@@ -2,6 +2,7 @@ extends SceneTree
 
 const MainMenuScene := preload("res://src/main_menu.tscn")
 const FactoryPrototypeScene := preload("res://experiments/factory_prototype/factory_prototype.tscn")
+const MeaningGlyphsModel := preload("res://src/domain/meaning_glyphs.gd")
 
 var failures := 0
 
@@ -12,6 +13,7 @@ func _initialize() -> void:
 	await _test_move_processing_node()
 	await _test_processed_rotation_target()
 	await _test_scale_processing_node()
+	await _test_combine_processing_node()
 	if failures == 0:
 		print("All Factory Prototype tests passed.")
 	quit(failures)
@@ -971,6 +973,162 @@ func _test_scale_processing_node() -> void:
 	_expect(prototype.factory_graph.get_connection_list().is_empty(), "deleting a scale node should remove attached conveyors")
 	_expect(prototype.summon_state(1) == &"idle", "deleting a scale node should clear downstream summon state")
 	_expect("変形 0" in prototype.status_label.text, "deleting a scale node should refresh the equipment count")
+	prototype.queue_free()
+	await process_frame
+
+
+func _test_combine_processing_node() -> void:
+	var prototype = FactoryPrototypeScene.instantiate()
+	root.add_child(prototype)
+	await process_frame
+	await process_frame
+	prototype.flow_time_override = 0.0
+	_expect(
+		prototype.combine_button != null and prototype.combine_button.text == "＋ 合成",
+		"the toolbar should expose eight-input combine placement"
+	)
+	var square_source := _first_material(prototype, &"square")
+	var horizontal = prototype.place_scale_at(Vector2(3400.0, 2350.0), 100, 25)
+	var vertical = prototype.place_scale_at(Vector2(3400.0, 2700.0), 25, 100)
+	var combine_node = prototype.place_combine_at(
+		Vector2(3900.0, 2525.0),
+		prototype.GlyphModelScript.CONNECTION_SIMPLE
+	)
+	var horizontal_id := StringName(horizontal.name)
+	var vertical_id := StringName(vertical.name)
+	var combine_id := StringName(combine_node.name)
+	_expect(
+		prototype._valid_input_port(combine_id, 0)
+		and prototype._valid_input_port(combine_id, 7)
+		and not prototype._valid_input_port(combine_id, 8),
+		"a combine node should expose exactly eight all-direction inputs"
+	)
+	prototype.connect_output_to_input(StringName(square_source.name), horizontal_id, 0)
+	prototype.connect_output_to_input(StringName(square_source.name), vertical_id, 0)
+	_expect(
+		prototype.connect_output_to_input(horizontal_id, combine_id, 0)
+		and prototype.connect_output_to_input(vertical_id, combine_id, 4),
+		"two branched processors should connect to separate combine inputs"
+	)
+	var combined_glyph: Object = prototype.output_glyph(combine_id)
+	var expected_cross: Object = MeaningGlyphsModel.glyph(&"cross")
+	_expect(
+		combined_glyph != null
+		and combined_glyph.canonical_serialization() == expected_cross.canonical_serialization(),
+		"simple combine should build the registered Cross without mutating either branch"
+	)
+	var availability: Dictionary = prototype.combine_mode_availability(combine_id)
+	_expect(
+		availability["complete"]
+		and availability["modes"][prototype.GlyphModelScript.CONNECTION_SIMPLE]
+		and not availability["modes"][prototype.GlyphModelScript.CONNECTION_RADIAL]
+		and not availability["modes"][prototype.GlyphModelScript.CONNECTION_PAIRWISE],
+		"overlapping children should allow only line-free Simple Combine"
+	)
+	_expect(
+		not prototype.set_combine_connection_mode(
+			combine_id,
+			prototype.GlyphModelScript.CONNECTION_RADIAL
+		),
+		"a line mode with no visible connector should fail closed"
+	)
+
+	var menu_click := InputEventMouseButton.new()
+	menu_click.button_index = MOUSE_BUTTON_RIGHT
+	menu_click.pressed = true
+	menu_click.position = prototype._convert_control_point(
+		prototype.factory_graph,
+		prototype._node_center_in(combine_node, prototype.factory_graph),
+		combine_node
+	)
+	menu_click.global_position = Vector2(620.0, 350.0)
+	combine_node.gui_input.emit(menu_click)
+	_expect(
+		prototype.combine_settings_popup.visible
+		and prototype.combine_settings_node_id == combine_id
+		and prototype.combine_settings_mode.selected == 0
+		and prototype.combine_settings_mode.is_item_disabled(1)
+		and prototype.combine_settings_mode.is_item_disabled(2)
+		and prototype.combine_settings_mode.get_item_icon(0) != null,
+		"the combine menu should show icons and disable invisible connection modes"
+	)
+
+	prototype.select_input(2)
+	prototype.select_target(&"square")
+	_expect(
+		prototype.connect_output_to_input(
+			combine_id,
+			StringName(prototype.summoner_node.name),
+			2
+		),
+		"a combined output should connect to the summoner"
+	)
+	var combine_flow_start: float = prototype.connection_flow_start_time(
+		combine_id,
+		StringName(prototype.summoner_node.name),
+		2
+	)
+	var horizontal_arrival: float = prototype.connection_flow_start_time(
+		horizontal_id,
+		combine_id,
+		0
+	) + prototype.flow_travel_duration(
+		prototype.connection_world_length(horizontal_id, combine_id, 0)
+	)
+	var vertical_arrival: float = prototype.connection_flow_start_time(
+		vertical_id,
+		combine_id,
+		4
+	) + prototype.flow_travel_duration(
+		prototype.connection_world_length(vertical_id, combine_id, 4)
+	)
+	_expect(
+		combine_flow_start >= maxf(horizontal_arrival, vertical_arrival),
+		"combine transport should wait until every connected input has arrived"
+	)
+	_expect(
+		not prototype.connect_output_to_input(combine_id, horizontal_id, 0),
+		"a combine output should not reconnect into its own upstream branch"
+	)
+
+	prototype.combine_settings_delete_button.pressed.emit()
+	await process_frame
+	_expect(prototype.combine_nodes.is_empty(), "the combine menu should delete that processor")
+	_expect(
+		prototype.factory_graph.get_connection_list().size() == 2,
+		"deleting a combine node should keep only the two independent source branches"
+	)
+	_expect(prototype.summon_state(2) == &"idle", "deleting a combine should clear downstream summon state")
+
+	var circle_source := _first_material(prototype, &"circle")
+	var move_left = prototype.place_move_at(Vector2(4100.0, 2300.0), Vector2i(-6, 0))
+	var move_right = prototype.place_move_at(Vector2(4100.0, 2750.0), Vector2i(6, 0))
+	var spaced_combine = prototype.place_combine_at(Vector2(4500.0, 2525.0))
+	var move_left_id := StringName(move_left.name)
+	var move_right_id := StringName(move_right.name)
+	var spaced_combine_id := StringName(spaced_combine.name)
+	prototype.connect_output_to_input(StringName(circle_source.name), move_left_id, 0)
+	prototype.connect_output_to_input(StringName(circle_source.name), move_right_id, 0)
+	prototype.connect_output_to_input(move_left_id, spaced_combine_id, 2)
+	prototype.connect_output_to_input(move_right_id, spaced_combine_id, 6)
+	var spaced_availability: Dictionary = prototype.combine_mode_availability(spaced_combine_id)
+	_expect(
+		spaced_availability["modes"][prototype.GlyphModelScript.CONNECTION_RADIAL]
+		and spaced_availability["modes"][prototype.GlyphModelScript.CONNECTION_PAIRWISE]
+		and prototype.set_combine_connection_mode(
+			spaced_combine_id,
+			prototype.GlyphModelScript.CONNECTION_PAIRWISE
+		)
+		and prototype.output_glyph(spaced_combine_id).combine_connection_mode
+		== prototype.GlyphModelScript.CONNECTION_PAIRWISE,
+		"spatially separated children should enable visible center and pairwise connections"
+	)
+	_expect(
+		prototype.set_move_offset(move_right_id, Vector2i(-6, 0))
+		and prototype.combine_connection_mode(spaced_combine_id)
+		== prototype.GlyphModelScript.CONNECTION_SIMPLE,
+		"an upstream change that removes every connector should normalize back to Simple Combine"
+	)
 	prototype.queue_free()
 	await process_frame
 

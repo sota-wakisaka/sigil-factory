@@ -65,6 +65,15 @@ func _initialize() -> void:
 		elif fixture == "move_settings":
 			var move_node = view.place_move_at(Vector2(3900.0, 2450.0), Vector2i(0, -3))
 			view.open_move_settings(StringName(move_node.name), Vector2(620.0, 330.0))
+		elif fixture == "combine_settings":
+			var horizontal = view.place_scale_at(Vector2(3450.0, 2300.0), 100, 25)
+			var vertical = view.place_scale_at(Vector2(3450.0, 2700.0), 25, 100)
+			var combine_node = view.place_combine_at(Vector2(3900.0, 2500.0))
+			view.connect_output_to_input(&"square_01", StringName(horizontal.name), 0)
+			view.connect_output_to_input(&"square_01", StringName(vertical.name), 0)
+			view.connect_output_to_input(StringName(horizontal.name), StringName(combine_node.name), 0)
+			view.connect_output_to_input(StringName(vertical.name), StringName(combine_node.name), 4)
+			view.open_combine_settings(StringName(combine_node.name), Vector2(620.0, 330.0))
 		elif fixture == "line_settings":
 			view.connect_material_to_summoner(&"circle_01", 0)
 			var connection = view._connection_to_input(&"summoner_center", 0)
